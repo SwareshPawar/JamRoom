@@ -1,11 +1,50 @@
-import React from 'react';
+import React, { useState } from 'react';
+import Login from './Login';
+import Home from './Home';
+import { instruments } from './instruments';
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [selectedInstrument, setSelectedInstrument] = useState('');
+
+  // Demo login handler
+  const handleLogin = () => {
+    setIsLoggedIn(true);
+  };
+
+  if (!isLoggedIn) {
+    // Pass demo login handler to Login page
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <h1 className="text-4xl font-bold text-blue-600">Welcome to JamRoom Booking!</h1>
-      <p className="mt-4 text-lg">Book your slot and jam with ease.</p>
-    </div>
+    <>
+      <Home />
+      <div className="w-full max-w-md mx-auto mt-8 bg-white rounded shadow p-6">
+        <label className="block mb-2 font-semibold">Select Instrument:</label>
+        <select
+          className="w-full p-2 border rounded mb-4"
+          value={selectedInstrument}
+          onChange={e => setSelectedInstrument(e.target.value)}
+        >
+          <option value="">-- Choose an instrument --</option>
+          {instruments.map(inst => (
+            <option key={inst.name} value={inst.name}>{inst.name}</option>
+          ))}
+        </select>
+
+        {selectedInstrument && (
+          <div>
+            <h2 className="text-xl font-bold mb-2">Fields for {selectedInstrument}:</h2>
+            <ul className="list-disc ml-6">
+              {instruments.find(i => i.name === selectedInstrument).fields.map(field => (
+                <li key={field}>{field}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
