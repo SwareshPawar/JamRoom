@@ -1,0 +1,48 @@
+/* style.css for JamSpace */
+.booking-slot {
+    transition: all 0.2s ease;
+}
+.booking-slot:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+}
+.calendar-day {
+    min-height: 120px;
+}
+.time-slot {
+    height: 40px;
+    border-radius: 6px;
+    margin: 2px 0;
+}
+.booked {
+    background: linear-gradient(135deg, #EF4444, #DC2626);
+}
+.available {
+    background: linear-gradient(135deg, #10B981, #059669);
+}
+.selected {
+    background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+}
+
+
+.time-slot {
+    transition: all 0.2s ease;
+}
+
+.time-slot:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.time-slot.selected {
+    background-color: #8B5CF6 !important;
+    color: white !important;
+}
+
+.notification {
+    border-left: 4px solid transparent;
+}
+
+.notification.unread {
+    border-left-color: #8B5CF6;
+}
