@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JamRoom Booking</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <style>
+      body { font-family: 'Roboto', Arial, sans-serif; background: #f5f5f5; margin: 0; }
+      .container { max-width: 500px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 32px; }
+      h1 { color: #1976d2; text-align: center; margin-bottom: 24px; }
+      label { font-weight: 500; margin-bottom: 8px; display: block; }
+      input, select { width: 100%; padding: 10px; margin-bottom: 16px; border-radius: 6px; border: 1px solid #ccc; }
+      button { background: #1976d2; color: #fff; border: none; padding: 12px 0; border-radius: 6px; font-size: 1rem; font-weight: 700; cursor: pointer; width: 100%; }
+      button:hover { background: #1565c0; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>JamRoom Booking</h1>
+      <form>
+        <label for="name">Your Name</label>
+        <input type="text" id="name" name="name" required />
+
+        <label for="instrument">Select Instrument</label>
+        <select id="instrument" name="instrument" required>
+          <option value="">-- Choose an instrument --</option>
+          <option value="Guitar">Guitar</option>
+          <option value="Drums">Drums</option>
+          <option value="Keyboard">Keyboard</option>
+          <option value="Microphone">Microphone</option>
+          <option value="Bass">Bass</option>
+        </select>
+
+        <label for="slot">Select Slot</label>
+        <select id="slot" name="slot" required>
+          <option value="">-- Choose a slot --</option>
+          <option value="10:00-11:00">10:00-11:00</option>
+          <option value="11:00-12:00">11:00-12:00</option>
+          <option value="12:00-13:00">12:00-13:00</option>
+          <option value="13:00-14:00">13:00-14:00</option>
+        </select>
+
+        <button type="submit">Book Now</button>
+      </form>
+    </div>
+  </body>
+</html>
