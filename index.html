@@ -286,10 +286,11 @@ window.addEventListener('DOMContentLoaded', function() {
   if (durationInput && totalPriceSpan) {
     function updatePrice() {
       let hours = parseInt(durationInput.value, 10);
-      if (isNaN(hours) || hours < 1) hours = 1;
-      if (hours > 8) hours = 8;
+      if (isNaN(hours)) hours = '';
+      if (hours !== '' && hours < 1) hours = 1;
+      if (hours !== '' && hours > 8) hours = 8;
       durationInput.value = hours;
-      const price = hours * 300;
+      const price = hours !== '' ? hours * 300 : 0;
       totalPriceSpan.textContent = `₹${price}`;
     }
     durationInput.addEventListener('input', updatePrice);
