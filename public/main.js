@@ -125,10 +125,11 @@ function showAdminDashboard() {
 }
 
 function hideAllSections() {
-    elements.welcomeSection.classList.add('hidden');
-    elements.bookingSection.classList.add('hidden');
-    elements.userDashboard.classList.add('hidden');
-    elements.adminDashboard.classList.add('hidden');
+    // Defensive null checks for all sections in hideAllSections
+    elements.welcomeSection?.classList.add('hidden');
+    elements.bookingSection?.classList.add('hidden');
+    elements.userDashboard?.classList.add('hidden');
+    elements.adminDashboard?.classList.add('hidden');
 }
 
 function showModal(modalId) {
@@ -651,11 +652,22 @@ const BACKEND_URL = 'http://127.0.0.1:5000';
 async function safeFetch(url, options) {
     try {
         const res = await fetch(BACKEND_URL + url, options);
-        if (!res.ok) throw new Error('Server error');
+        if (!res.ok) {
+            // Try to get error message from response
+            let errorMsg = 'Server error';
+            try {
+                const errorData = await res.json();
+                errorMsg = errorData.error || errorMsg;
+            } catch (e) {
+                errorMsg = `HTTP ${res.status} ${res.statusText}`;
+            }
+            throw new Error(errorMsg);
+        }
         return await res.json();
     } catch (err) {
         console.error('Fetch error:', err);
-        return { success: false, error: 'Backend is not available. Please try again later.' };
+        showError(err.message || 'Backend is not available. Please try again later.');
+        return { success: false, error: err.message };
     }
 }
 
@@ -678,29 +690,6 @@ function showError(message, duration = 5000) {
 function hideError() {
     const errorBanner = document.getElementById('errorBanner');
     errorBanner.classList.add('hidden');
-}
-
-// Update the safeFetch function to handle errors better
-async function safeFetch(url, options) {
-    try {
-        const res = await fetch(BACKEND_URL + url, options);
-        if (!res.ok) {
-            // Try to get error message from response
-            let errorMsg = 'Server error';
-            try {
-                const errorData = await res.json();
-                errorMsg = errorData.error || errorMsg;
-            } catch (e) {
-                errorMsg = `HTTP ${res.status} ${res.statusText}`;
-            }
-            throw new Error(errorMsg);
-        }
-        return await res.json();
-    } catch (err) {
-        console.error('Fetch error:', err);
-        showError(err.message || 'Backend is not available. Please try again later.');
-        return { success: false, error: err.message };
-    }
 }
 
 // Make functions available globally for HTML onclick attributes
