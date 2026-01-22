@@ -35,8 +35,14 @@ const generateCalendarInvite = (options) => {
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const [endHour, endMinute] = endTime.split(':').map(Number);
 
-    const startDateTime = new Date(year, month - 1, day, startHour, startMinute);
-    const endDateTime = new Date(year, month - 1, day, endHour, endMinute);
+    // Create dates in IST (India Standard Time - UTC+5:30)
+    // We use UTC and then adjust for IST offset
+    const startDateTime = new Date(Date.UTC(year, month - 1, day, startHour, startMinute));
+    const endDateTime = new Date(Date.UTC(year, month - 1, day, endHour, endMinute));
+    
+    // Adjust from IST to UTC (subtract 5 hours 30 minutes)
+    startDateTime.setMinutes(startDateTime.getMinutes() - 330);
+    endDateTime.setMinutes(endDateTime.getMinutes() - 330);
 
     // Create calendar
     const calendar = ical({

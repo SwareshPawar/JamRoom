@@ -424,6 +424,72 @@
             }
         };
 
+        // Populate time slots based on selected date
+        const populateTimeSlots = () => {
+            const dateInput = document.getElementById('bookingDate');
+            const timeSelect = document.getElementById('startTime');
+            const selectedDate = dateInput.value;
+            
+            if (!selectedDate) {
+                // No date selected, show all times
+                timeSelect.innerHTML = `
+                    <option value="">Select time</option>
+                    <option value="09:00">9:00 AM</option>
+                    <option value="10:00">10:00 AM</option>
+                    <option value="11:00">11:00 AM</option>
+                    <option value="12:00">12:00 PM</option>
+                    <option value="13:00">1:00 PM</option>
+                    <option value="14:00">2:00 PM</option>
+                    <option value="15:00">3:00 PM</option>
+                    <option value="16:00">4:00 PM</option>
+                    <option value="17:00">5:00 PM</option>
+                    <option value="18:00">6:00 PM</option>
+                    <option value="19:00">7:00 PM</option>
+                    <option value="20:00">8:00 PM</option>
+                    <option value="21:00">9:00 PM</option>
+                    <option value="22:00">10:00 PM</option>
+                    <option value="23:00">11:00 PM</option>
+                `;
+                return;
+            }
+
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const currentHour = now.getHours();
+            
+            const allTimeSlots = [
+                { value: '09:00', label: '9:00 AM', hour: 9 },
+                { value: '10:00', label: '10:00 AM', hour: 10 },
+                { value: '11:00', label: '11:00 AM', hour: 11 },
+                { value: '12:00', label: '12:00 PM', hour: 12 },
+                { value: '13:00', label: '1:00 PM', hour: 13 },
+                { value: '14:00', label: '2:00 PM', hour: 14 },
+                { value: '15:00', label: '3:00 PM', hour: 15 },
+                { value: '16:00', label: '4:00 PM', hour: 16 },
+                { value: '17:00', label: '5:00 PM', hour: 17 },
+                { value: '18:00', label: '6:00 PM', hour: 18 },
+                { value: '19:00', label: '7:00 PM', hour: 19 },
+                { value: '20:00', label: '8:00 PM', hour: 20 },
+                { value: '21:00', label: '9:00 PM', hour: 21 },
+                { value: '22:00', label: '10:00 PM', hour: 22 },
+                { value: '23:00', label: '11:00 PM', hour: 23 }
+            ];
+
+            timeSelect.innerHTML = '<option value="">Select time</option>';
+            
+            allTimeSlots.forEach(slot => {
+                // If today, only show times after current hour
+                if (selectedDate === todayStr && slot.hour <= currentHour) {
+                    return; // Skip past times
+                }
+                
+                const option = document.createElement('option');
+                option.value = slot.value;
+                option.textContent = slot.label;
+                timeSelect.appendChild(option);
+            });
+        };
+
         // Update price calculation
         const updatePrice = () => {
             const rentalSelect = document.getElementById('rentalType');
@@ -638,6 +704,7 @@
         document.getElementById('bookingDate').addEventListener('change', (e) => {
             if (e.target.value) {
                 loadAvailability(e.target.value);
+                populateTimeSlots(); // Update time slots based on selected date
             }
         });
 
