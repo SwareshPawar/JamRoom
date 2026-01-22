@@ -23,6 +23,43 @@ const generateBillHTML = async (booking, settings) => {
     <meta charset="UTF-8">
     <title>${settings?.studioName || 'JamRoom'} Booking Invoice</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --accent-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --success-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --accent-color: #4facfe;
+            --success-color: #43e97b;
+            --warning-color: #fa709a;
+            --danger-color: #ff6b6b;
+            
+            --text-primary: #2d3748;
+            --text-secondary: #4a5568;
+            --text-muted: #718096;
+            --text-light: #a0aec0;
+            
+            --bg-primary: #ffffff;
+            --bg-secondary: #f7fafc;
+            --bg-accent: #edf2f7;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            
+            --border-color: #e2e8f0;
+            --border-radius: 12px;
+            --border-radius-sm: 8px;
+            --border-radius-lg: 16px;
+            
+            --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -30,17 +67,37 @@ const generateBillHTML = async (booking, settings) => {
         }
         
         body {
-            font-family: 'Arial', sans-serif;
-            color: #333;
-            line-height: 1.4;
-            background: #fff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--text-primary);
+            line-height: 1.6;
+            background: var(--bg-secondary);
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         
         .invoice {
             max-width: 800px;
             margin: 0 auto;
-            padding: 40px 30px;
-            background: white;
+            background: var(--bg-primary);
+            border-radius: var(--border-radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-xl);
+            position: relative;
+        }
+        
+        .invoice::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--primary-gradient);
+        }
+        
+        .invoice-content {
+            padding: 40px;
         }
         
         .header {
@@ -48,145 +105,225 @@ const generateBillHTML = async (booking, settings) => {
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 40px;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 20px;
+            position: relative;
         }
         
         .logo-section {
             flex: 1;
+            max-width: 60%;
         }
         
         .company-name {
-            font-size: 32px;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 5px;
+            font-size: 28px;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            line-height: 1.2;
         }
         
         .company-tagline {
-            color: #666;
+            color: var(--text-muted);
             font-size: 14px;
-            margin-bottom: 15px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .company-details {
-            font-size: 12px;
-            color: #666;
-            line-height: 1.5;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            background: var(--bg-accent);
+            padding: 16px;
+            border-radius: var(--border-radius-sm);
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .company-details strong {
+            color: var(--text-primary);
+            font-weight: 600;
         }
         
         .invoice-title {
             text-align: right;
-            flex: 1;
+            flex: 0 0 auto;
+            min-width: 35%;
         }
         
         .invoice-title h1 {
-            font-size: 36px;
-            color: #667eea;
-            margin-bottom: 10px;
+            font-size: 42px;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
         }
         
         .invoice-number {
-            background: #667eea;
+            background: var(--primary-gradient);
             color: white;
-            padding: 8px 15px;
-            border-radius: 5px;
+            padding: 12px 20px;
+            border-radius: var(--border-radius-lg);
             display: inline-block;
-            margin-bottom: 10px;
-            font-weight: bold;
+            margin-bottom: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            box-shadow: var(--shadow-md);
+            letter-spacing: 0.5px;
         }
         
         .invoice-date {
-            color: #666;
+            color: var(--text-muted);
             font-size: 14px;
+            font-weight: 500;
         }
         
         .billing-section {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
         }
         
-        .bill-to, .bill-details {
-            flex: 1;
-            margin-right: 20px;
+        .bill-card {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .bill-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+        
+        .bill-to::before {
+            background: var(--accent-gradient);
+        }
+        
+        .bill-details::before {
+            background: var(--warning-gradient);
         }
         
         .section-title {
             font-size: 16px;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
             text-transform: uppercase;
             letter-spacing: 1px;
+            font-size: 12px;
         }
         
-        .customer-info {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
+        .customer-info, .booking-details {
+            padding: 0;
+            background: transparent;
+            border: none;
+            border-radius: 0;
         }
         
         .customer-name {
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
         }
         
         .customer-email {
-            color: #666;
+            color: var(--text-muted);
             font-size: 14px;
-        }
-        
-        .booking-details {
-            background: #fff3cd;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 4px solid #ffc107;
+            margin-bottom: 12px;
         }
         
         .detail-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             font-size: 14px;
+            align-items: center;
         }
         
         .detail-label {
-            font-weight: bold;
-            color: #333;
+            font-weight: 500;
+            color: var(--text-secondary);
         }
         
         .detail-value {
-            color: #666;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: var(--border-radius-lg);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-confirmed {
+            background: var(--success-gradient);
+            color: white;
+        }
+        
+        .status-pending {
+            background: var(--warning-gradient);
+            color: white;
+        }
+        
+        .status-cancelled {
+            background: var(--danger-color);
+            color: white;
         }
         
         .items-table {
             width: 100%;
             border-collapse: collapse;
             margin: 30px 0;
-            background: white;
-            border-radius: 8px;
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
             overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
         }
         
         .items-table th {
-            background: #667eea;
+            background: var(--primary-gradient);
             color: white;
-            padding: 15px;
+            padding: 20px 16px;
             text-align: left;
-            font-weight: bold;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            font-size: 12px;
+            font-size: 13px;
         }
         
         .items-table td {
-            padding: 15px;
-            border-bottom: 1px solid #e9ecef;
+            padding: 20px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+        
+        .items-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        
+        .items-table tbody tr:hover {
+            background: var(--bg-accent);
         }
         
         .items-table tr:last-child td {
@@ -194,58 +331,201 @@ const generateBillHTML = async (booking, settings) => {
         }
         
         .items-table tr:nth-child(even) {
-            background: #f8f9fa;
+            background: var(--bg-secondary);
         }
         
         .amount-cell {
             text-align: right;
-            font-weight: bold;
+            font-weight: 600;
+            color: var(--text-primary);
         }
         
         .totals-section {
-            margin-top: 30px;
+            margin-top: 40px;
             display: flex;
             justify-content: flex-end;
         }
         
+        .totals-container {
+            min-width: 350px;
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        
         .totals-table {
-            width: 300px;
+            width: 100%;
             border-collapse: collapse;
         }
         
         .totals-table td {
-            padding: 10px 15px;
-            border-bottom: 1px solid #e9ecef;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 15px;
         }
         
         .totals-table .label {
-            font-weight: bold;
-            color: #333;
+            font-weight: 500;
+            color: var(--text-secondary);
         }
         
         .totals-table .amount {
             text-align: right;
-            font-weight: bold;
-            color: #333;
+            font-weight: 600;
+            color: var(--text-primary);
         }
         
         .total-row {
-            background: #667eea !important;
+            background: var(--primary-gradient) !important;
             color: white !important;
-            font-size: 18px;
         }
         
         .total-row td {
             border-bottom: none !important;
-            font-weight: bold !important;
+            font-weight: 700 !important;
+            font-size: 18px !important;
+            padding: 20px !important;
         }
         
         .payment-info {
             margin-top: 40px;
-            padding: 20px;
-            background: #d1ecf1;
-            border-radius: 8px;
-            border-left: 4px solid #17a2b8;
+            padding: 24px;
+            background: var(--bg-accent);
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--accent-color);
+            position: relative;
+        }
+        
+        .payment-info::before {
+            content: '💳';
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            font-size: 24px;
+            opacity: 0.3;
+        }
+        
+        .payment-info h3 {
+            color: var(--text-primary);
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .payment-info p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            padding: 30px 0;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .footer-text {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        
+        .footer-highlight {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 600;
+        }
+        
+        /* Responsive Design */
+        @media screen and (max-width: 768px) {
+            .invoice-content {
+                padding: 30px 20px;
+            }
+            
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .logo-section {
+                max-width: 100%;
+                margin-bottom: 30px;
+            }
+            
+            .invoice-title {
+                text-align: center;
+            }
+            
+            .billing-section {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .company-name {
+                font-size: 24px;
+            }
+            
+            .invoice-title h1 {
+                font-size: 32px;
+            }
+            
+            .items-table th,
+            .items-table td {
+                padding: 12px 8px;
+                font-size: 12px;
+            }
+            
+            .totals-container {
+                min-width: 100%;
+            }
+        }
+        
+        @media screen and (max-width: 480px) {
+            .invoice-content {
+                padding: 20px 15px;
+            }
+            
+            .company-name {
+                font-size: 20px;
+            }
+            
+            .invoice-title h1 {
+                font-size: 28px;
+            }
+            
+            .invoice-number {
+                font-size: 14px;
+                padding: 10px 16px;
+            }
+            
+            .bill-card {
+                padding: 20px;
+            }
+            
+            .items-table th,
+            .items-table td {
+                padding: 10px 6px;
+                font-size: 11px;
+            }
+        }
+        
+        /* Print Styles */
+        @media print {
+            .invoice {
+                box-shadow: none;
+                border-radius: 0;
+                max-width: 100%;
+            }
+            
+            .invoice-content {
+                padding: 20px;
+            }
         }
         
         .payment-title {
@@ -300,57 +580,59 @@ const generateBillHTML = async (booking, settings) => {
 </head>
 <body>
     <div class="invoice">
-        <!-- Header -->
-        <div class="header">
-            <div class="logo-section">
-                <div class="company-name">${settings?.studioName || 'JamRoom'}</div>
-                <div class="company-tagline">Professional Music Studio Rental</div>
-                <div class="company-details">
-                    ${settings?.studioAddress || 'Studio Address'}<br>
-                    Email: ${settings?.adminEmails?.[0] || 'swarjrs@gmail.com'}<br>
-                    Phone: ${settings?.studioPhone || '+91 XXXX XXXXXX'}
+        <div class="invoice-content">
+            <!-- Header -->
+            <div class="header">
+                <div class="logo-section">
+                    <div class="company-name">${settings?.studioName || 'JamRoom'}</div>
+                    <div class="company-tagline">Professional Music Studio Rental</div>
+                    <div class="company-details">
+                        <strong>Address:</strong><br>
+                        ${settings?.studioAddress || 'Studio Address'}<br><br>
+                        <strong>Email:</strong> ${settings?.adminEmails?.[0] || 'swarjrs@gmail.com'}<br>
+                        <strong>Phone:</strong> ${settings?.studioPhone || '+91 XXXX XXXXXX'}
+                    </div>
                 </div>
-            </div>
-            <div class="invoice-title">
-                <h1>INVOICE</h1>
-                <div class="invoice-number">#JR${booking._id.toString().slice(-6).toUpperCase()}</div>
-                <div class="invoice-date">Date: ${currentDate.toLocaleDateString('en-IN')}</div>
-            </div>
-        </div>
-        
-        <!-- Billing Information -->
-        <div class="billing-section">
-            <div class="bill-to">
-                <div class="section-title">Bill To</div>
-                <div class="customer-info">
-                    <div class="customer-name">${booking.userName || booking.userId?.name || 'Customer'}</div>
-                    <div class="customer-email">${booking.userEmail || booking.userId?.email || ''}</div>
-                    ${booking.bandName ? `<div style="margin-top: 8px; color: #667eea; font-weight: bold;">Band: ${booking.bandName}</div>` : ''}
+                <div class="invoice-title">
+                    <h1>INVOICE</h1>
+                    <div class="invoice-number">#JR${booking._id.toString().slice(-6).toUpperCase()}</div>
+                    <div class="invoice-date">Date: ${currentDate.toLocaleDateString('en-IN')}</div>
                 </div>
             </div>
             
-            <div class="bill-details">
-                <div class="section-title">Booking Details</div>
-                <div class="booking-details">
-                    <div class="detail-row">
-                        <span class="detail-label">Date:</span>
-                        <span class="detail-value">${bookingDate.toLocaleDateString('en-IN')}</span>
+            <!-- Billing Information -->
+            <div class="billing-section">
+                <div class="bill-card bill-to">
+                    <div class="section-title">👤 Bill To</div>
+                    <div class="customer-info">
+                        <div class="customer-name">${booking.userName || booking.userId?.name || 'Customer'}</div>
+                        <div class="customer-email">${booking.userEmail || booking.userId?.email || ''}</div>
+                        ${booking.bandName ? `<div style="margin-top: 12px; color: var(--primary-color); font-weight: 600; font-size: 14px;">🎵 Band: ${booking.bandName}</div>` : ''}
                     </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Time:</span>
-                        <span class="detail-value">${booking.startTime} - ${booking.endTime}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Duration:</span>
-                        <span class="detail-value">${booking.duration} hour(s)</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Status:</span>
-                        <span class="status-badge status-${booking.bookingStatus.toLowerCase()}">${booking.bookingStatus}</span>
+                </div>
+                
+                <div class="bill-card bill-details">
+                    <div class="section-title">📅 Booking Details</div>
+                    <div class="booking-details">
+                        <div class="detail-row">
+                            <span class="detail-label">📅 Date:</span>
+                            <span class="detail-value">${bookingDate.toLocaleDateString('en-IN')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🕒 Time:</span>
+                            <span class="detail-value">${booking.startTime} - ${booking.endTime}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">⏱️ Duration:</span>
+                            <span class="detail-value">${booking.duration} hour(s)</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">✅ Status:</span>
+                            <span class="status-badge status-${booking.bookingStatus.toLowerCase()}">${booking.bookingStatus}</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
         
         <!-- Items Table -->
         <table class="items-table">
@@ -382,40 +664,45 @@ const generateBillHTML = async (booking, settings) => {
         
         <!-- Totals -->
         <div class="totals-section">
-            <table class="totals-table">
-                <tr>
-                    <td class="label">Subtotal:</td>
-                    <td class="amount">₹${subtotal.toFixed(2)}</td>
-                </tr>
-                <tr>
-                    <td class="label">GST (18%):</td>
-                    <td class="amount">₹${taxAmount.toFixed(2)}</td>
-                </tr>
-                <tr class="total-row">
-                    <td class="label">Total Amount:</td>
-                    <td class="amount">₹${totalAmount.toFixed(2)}</td>
-                </tr>
-            </table>
+            <div class="totals-container">
+                <table class="totals-table">
+                    <tr>
+                        <td class="label">💰 Subtotal:</td>
+                        <td class="amount">₹${subtotal.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">🧾 GST (18%):</td>
+                        <td class="amount">₹${taxAmount.toFixed(2)}</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td class="label">💳 Total Amount:</td>
+                        <td class="amount">₹${totalAmount.toFixed(2)}</td>
+                    </tr>
+                </table>
+            </div>
         </div>
         
         <!-- Payment Information -->
         <div class="payment-info">
-            <div class="payment-title">Payment Information</div>
-            <div class="payment-details">
-                <strong>Payment Status:</strong> ${booking.paymentStatus}<br>
-                ${booking.paymentReference ? `<strong>Payment Reference:</strong> ${booking.paymentReference}<br>` : ''}
-                <strong>Payment Method:</strong> UPI / Bank Transfer<br>
-                <em>Please make payment before your booking slot to confirm your reservation.</em>
-            </div>
+            <h3>💳 Payment Information</h3>
+            <p><strong>Payment Status:</strong> <span class="status-badge status-${booking.paymentStatus?.toLowerCase() || 'pending'}">${booking.paymentStatus || 'Pending'}</span></p>
+            ${booking.paymentReference ? `<p><strong>Payment Reference:</strong> ${booking.paymentReference}</p>` : ''}
+            <p><strong>Payment Method:</strong> UPI / Bank Transfer</p>
+            <p style="font-style: italic; margin-top: 12px; color: var(--text-muted);">Please make payment before your booking slot to confirm your reservation.</p>
         </div>
         
         <!-- Footer -->
         <div class="footer">
-            <div class="thank-you">Thank you for choosing ${settings?.studioName || 'JamRoom'}!</div>
-            <p>For any queries regarding this invoice, please contact us at ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</p>
-            <p style="margin-top: 10px;">
-                This is a computer-generated invoice. No signature required.
-            </p>
+            <div class="footer-text">
+                <span class="footer-highlight">Thank you for choosing ${settings?.studioName || 'JamRoom'}!</span>
+            </div>
+            <div class="footer-text">
+                For any queries regarding this invoice, please contact us at <strong>${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</strong>
+            </div>
+            <div class="footer-text" style="margin-top: 16px; font-size: 12px; opacity: 0.8;">
+                🤖 This is a computer-generated invoice. No signature required.
+            </div>
+        </div>
         </div>
     </div>
 </body>
