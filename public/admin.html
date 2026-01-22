@@ -8,36 +8,69 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f8fafc;
+            letter-spacing: -0.01em;
         }
         .topbar {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px 30px;
+            padding: 25px 35px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
-        .topbar h1 { font-size: 1.8em; }
+        .topbar h1 { 
+            font-size: 1.9em;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
         .btn {
-            padding: 10px 20px;
+            padding: 12px 20px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 1em;
-            transition: all 0.3s;
+            font-weight: 600;
+            transition: all 0.3s ease;
             margin: 0 5px;
             text-decoration: none;
             display: inline-block;
+            letter-spacing: 0.01em;
         }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn-primary { background: #667eea; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-warning { background: #ffc107; color: #000; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .btn-sm { padding: 6px 12px; font-size: 0.85em; }
+        .btn:hover { 
+            opacity: 0.9; 
+            transform: translateY(-2px);
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+        }
+        .btn-success { 
+            background: #28a745; 
+            color: white;
+            box-shadow: 0 3px 12px rgba(40, 167, 69, 0.3);
+        }
+        .btn-danger { 
+            background: #dc3545; 
+            color: white;
+            box-shadow: 0 3px 12px rgba(220, 53, 69, 0.3);
+        }
+        .btn-warning { 
+            background: #ffc107; 
+            color: #000;
+            box-shadow: 0 3px 12px rgba(255, 193, 7, 0.3);
+        }
+        .btn-secondary { 
+            background: #6c757d; 
+            color: white; 
+        }
+        .btn-sm { 
+            padding: 8px 14px; 
+            font-size: 0.9em;
+        }
         
         .dashboard {
             max-width: 1400px;
@@ -52,15 +85,131 @@
             margin-bottom: 30px;
         }
         
-        .stat-card {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        @media (max-width: 768px) {
+            .topbar {
+                padding: 15px;
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .topbar h1 {
+                font-size: 1.4em;
+            }
+            
+            .dashboard {
+                padding: 0 15px;
+                margin: 20px auto;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+            
+            .stat-card {
+                padding: 20px;
+            }
+            
+            .stat-card .number {
+                font-size: 2em;
+            }
+            
+            .section {
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            
+            .section h2 {
+                font-size: 1.3em;
+            }
+            
+            .tabs {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            
+            .tab {
+                padding: 10px 15px;
+                font-size: 0.9em;
+            }
+            
+            .btn {
+                padding: 8px 12px;
+                font-size: 0.85em;
+                margin: 2px;
+            }
+            
+            .btn-sm {
+                padding: 4px 8px;
+                font-size: 0.75em;
+            }
+            
+            /* Make tables responsive */
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                border: 1px solid #e1e8ed;
+                border-radius: 8px;
+                margin: 20px 0;
+                width: 100%;
+            }
+            
+            .table-container table {
+                min-width: 800px;
+                margin: 0;
+            }
+            
+            /* Calendar responsive adjustments */
+            .fc-toolbar {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .fc-toolbar-chunk {
+                display: flex;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .fc-button-group {
+                flex-wrap: wrap;
+            }
+            
+            .fc-daygrid-day-number {
+                font-size: 0.8em;
+            }
         }
         
-        .stat-card h3 { color: #666; font-size: 0.9em; margin-bottom: 10px; }
-        .stat-card .number { font-size: 2.5em; color: #667eea; font-weight: bold; }
+        .stat-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 { 
+            color: #6c757d; 
+            font-size: 0.9em; 
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        .stat-card .number { 
+            font-size: 2.75em; 
+            color: #667eea; 
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
         
         .section {
             background: white;
@@ -102,6 +251,47 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            table {
+                font-size: 0.8em;
+            }
+            
+            table th, table td {
+                padding: 6px 4px;
+                white-space: nowrap;
+            }
+            
+            /* Only hide Type column on medium screens, keep all other columns */
+            table th:nth-child(5), 
+            table td:nth-child(5) {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            table {
+                font-size: 0.75em;
+            }
+            
+            table th, table td {
+                padding: 4px 2px;
+            }
+            
+            /* Hide Type and Price columns on very small screens, but keep Actions */
+            table th:nth-child(5), 
+            table td:nth-child(5),
+            table th:nth-child(6), 
+            table td:nth-child(6) {
+                display: none;
+            }
+            
+            .btn-sm {
+                padding: 3px 5px;
+                font-size: 0.65em;
+            }
         }
         
         table th, table td {
@@ -159,6 +349,13 @@
             gap: 15px;
         }
         
+        @media (max-width: 600px) {
+            .time-container {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+        }
+        
         .alert {
             padding: 15px;
             border-radius: 8px;
@@ -174,6 +371,20 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             text-align: center;
             font-weight: 500;
+        }
+        
+        @media (max-width: 480px) {
+            .alert {
+                min-width: 280px;
+                max-width: 90vw;
+                padding: 12px;
+                font-size: 0.9em;
+            }
+            
+            input, select, textarea {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 10px;
+            }
         }
         
         .alert.show { display: block; }
@@ -538,6 +749,14 @@
                         <label>Admin Emails (comma-separated)*</label>
                         <textarea id="adminEmails" rows="3" placeholder="admin1@example.com, admin2@example.com"></textarea>
                     </div>
+                    
+                    <!-- Rental Types and Pricing Section -->
+                    <h3 style="margin: 30px 0 20px 0; color: #2c3e50; border-bottom: 2px solid #667eea; padding-bottom: 10px;">🏷️ Rental Types & Pricing</h3>
+                    <div id="rentalTypesContainer">
+                        <!-- Rental types will be loaded here dynamically -->
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addRentalType()" style="margin-bottom: 20px;">+ Add Rental Type</button>
+                    
                     <button type="submit" class="btn btn-success">Save Settings</button>
                 </form>
             </div>
@@ -1082,6 +1301,7 @@ Notes: ${booking.notes || 'N/A'}`);
             }
 
             const tableHtml = `
+                <div class="table-container">
                 <table>
                     <thead>
                         <tr>
@@ -1108,6 +1328,7 @@ Notes: ${booking.notes || 'N/A'}`);
                         `).join('')}
                     </tbody>
                 </table>
+                </div>
             `;
             
             document.getElementById('revenueTable').innerHTML = tableHtml;
@@ -1153,7 +1374,7 @@ Notes: ${booking.notes || 'N/A'}`);
                     return;
                 }
 
-                let html = '<table><thead><tr><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+                let html = '<div class="table-container"><table><thead><tr><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
                 
                 data.bookings.forEach(booking => {
                     // Skip old bookings that don't have the new schema
@@ -1190,7 +1411,7 @@ Notes: ${booking.notes || 'N/A'}`);
                     `;
                 });
 
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
                 document.getElementById('bookingsTable').innerHTML = html;
             } catch (error) {
                 console.error('Load bookings error:', error);
@@ -1546,6 +1767,9 @@ Notes: ${booking.notes || 'N/A'}`);
                 document.getElementById('upiId').value = settings.upiId;
                 document.getElementById('upiName').value = settings.upiName;
                 document.getElementById('adminEmails').value = settings.adminEmails.join(', ');
+                
+                // Load rental types
+                loadRentalTypes(settings.rentalTypes || []);
             } catch (error) {
                 showAlert('settingsAlert', 'Failed to load settings', 'error');
             }
@@ -1560,7 +1784,8 @@ Notes: ${booking.notes || 'N/A'}`);
                 studioAddress: document.getElementById('studioAddress').value,
                 upiId: document.getElementById('upiId').value,
                 upiName: document.getElementById('upiName').value,
-                adminEmails: document.getElementById('adminEmails').value.split(',').map(e => e.trim()).filter(e => e)
+                adminEmails: document.getElementById('adminEmails').value.split(',').map(e => e.trim()).filter(e => e),
+                rentalTypes: getCurrentRentalTypes()
             };
 
             try {
@@ -1611,6 +1836,113 @@ Notes: ${booking.notes || 'N/A'}`);
                 showAlert('userAlert', error.message, 'error');
             }
         });
+
+        // Rental Types Management Functions
+        function loadRentalTypes(rentalTypes = []) {
+            const container = document.getElementById('rentalTypesContainer');
+            container.innerHTML = '';
+            
+            rentalTypes.forEach((rental, index) => {
+                const rentalDiv = document.createElement('div');
+                rentalDiv.style.cssText = 'border: 2px solid #e1e8ed; padding: 20px; margin-bottom: 15px; border-radius: 8px; background: #f8f9fa;';
+                rentalDiv.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Name*</label>
+                            <input type="text" value="${rental.name || ''}" onchange="updateRentalType(${index}, 'name', this.value)" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Base Price (₹)*</label>
+                            <input type="number" value="${rental.basePrice || ''}" onchange="updateRentalType(${index}, 'basePrice', parseInt(this.value))" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" min="0">
+                        </div>
+                        <button type="button" onclick="removeRentalType(${index})" 
+                                style="padding: 8px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Remove</button>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Description</label>
+                        <textarea onchange="updateRentalType(${index}, 'description', this.value)" 
+                                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; resize: vertical;" 
+                                  rows="2" placeholder="Optional description">${rental.description || ''}</textarea>
+                    </div>
+                `;
+                container.appendChild(rentalDiv);
+            });
+        }
+        
+        function addRentalType() {
+            const container = document.getElementById('rentalTypesContainer');
+            const currentCount = container.children.length;
+            
+            const rentalDiv = document.createElement('div');
+            rentalDiv.style.cssText = 'border: 2px solid #e1e8ed; padding: 20px; margin-bottom: 15px; border-radius: 8px; background: #f8f9fa;';
+            rentalDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Name*</label>
+                        <input type="text" value="" onchange="updateRentalType(${currentCount}, 'name', this.value)" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" 
+                               placeholder="e.g., Hourly, Half Day, Full Day">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Base Price (₹)*</label>
+                        <input type="number" value="" onchange="updateRentalType(${currentCount}, 'basePrice', parseInt(this.value))" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" 
+                               min="0" placeholder="0">
+                    </div>
+                    <button type="button" onclick="removeRentalType(${currentCount})" 
+                            style="padding: 8px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Remove</button>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Description</label>
+                    <textarea onchange="updateRentalType(${currentCount}, 'description', this.value)" 
+                              style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; resize: vertical;" 
+                              rows="2" placeholder="Optional description"></textarea>
+                </div>
+            `;
+            container.appendChild(rentalDiv);
+        }
+        
+        function removeRentalType(index) {
+            const container = document.getElementById('rentalTypesContainer');
+            if (container.children[index]) {
+                container.removeChild(container.children[index]);
+                // Refresh the display to update indices
+                const currentData = getCurrentRentalTypes();
+                loadRentalTypes(currentData);
+            }
+        }
+        
+        function updateRentalType(index, field, value) {
+            // This function is called when individual fields are updated
+            // The actual data collection happens in getCurrentRentalTypes()
+        }
+        
+        function getCurrentRentalTypes() {
+            const container = document.getElementById('rentalTypesContainer');
+            const rentalTypes = [];
+            
+            Array.from(container.children).forEach((div, index) => {
+                const nameInput = div.querySelector('input[type="text"]');
+                const priceInput = div.querySelector('input[type="number"]');
+                const descInput = div.querySelector('textarea');
+                
+                const name = nameInput?.value?.trim();
+                const basePrice = parseInt(priceInput?.value) || 0;
+                const description = descInput?.value?.trim();
+                
+                if (name && basePrice > 0) {
+                    rentalTypes.push({
+                        name,
+                        basePrice,
+                        description: description || ''
+                    });
+                }
+            });
+            
+            return rentalTypes;
+        }
 
         // Initialize
         checkAuth();
