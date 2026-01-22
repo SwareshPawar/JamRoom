@@ -251,16 +251,16 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
-            font-size: 0.9em;
+            font-size: 1em;
         }
         
         @media (max-width: 768px) {
             table {
-                font-size: 0.8em;
+                font-size: 0.9em;
             }
             
             table th, table td {
-                padding: 6px 4px;
+                padding: 8px 6px;
                 white-space: nowrap;
             }
             
@@ -273,11 +273,11 @@
         
         @media (max-width: 480px) {
             table {
-                font-size: 0.75em;
+                font-size: 0.85em;
             }
             
             table th, table td {
-                padding: 4px 2px;
+                padding: 6px 4px;
             }
             
             /* Hide Type and Price columns on very small screens, but keep Actions */
@@ -289,28 +289,34 @@
             }
             
             .btn-sm {
-                padding: 3px 5px;
-                font-size: 0.65em;
+                padding: 4px 6px;
+                font-size: 0.75em;
             }
         }
         
         table th, table td {
-            padding: 12px;
+            padding: 14px;
             text-align: left;
             border-bottom: 1px solid #e1e8ed;
+            font-size: 0.98em;
         }
         
         table th {
             background: #f8f9fa;
             font-weight: 600;
             color: #333;
+            font-size: 1em;
+        }
+        
+        table td small {
+            font-size: 0.85em;
         }
         
         .status-badge {
             display: inline-block;
-            padding: 5px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
-            font-size: 0.85em;
+            font-size: 0.9em;
             font-weight: bold;
         }
         
@@ -1391,9 +1397,15 @@ Notes: ${booking.notes || 'N/A'}`);
                     return;
                 }
 
-                let html = '<div class="table-container"><table><thead><tr><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+                // Sort bookings by creation date (newest first)
+                const sortedBookings = data.bookings.sort((a, b) => {
+                    return new Date(b.createdAt) - new Date(a.createdAt);
+                });
+
+                let html = '<div class="table-container"><table><thead><tr><th>#</th><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
                 
-                data.bookings.forEach(booking => {
+                let serialNo = 1;
+                sortedBookings.forEach(booking => {
                     // Skip old bookings that don't have the new schema
                     if (!booking.startTime || !booking.endTime || !booking.duration) {
                         console.log('Skipping old booking:', booking._id);
@@ -1403,9 +1415,17 @@ Notes: ${booking.notes || 'N/A'}`);
                     const statusClass = booking.bookingStatus.toLowerCase();
                     const userName = booking.userId?.name || booking.userName || 'N/A';
                     const userEmail = booking.userId?.email || booking.userEmail || 'N/A';
+                    const createdDate = booking.createdAt ? new Date(booking.createdAt).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) : 'N/A';
                     
                     html += `
                         <tr>
+                            <td style="font-weight: bold; text-align: center;">${serialNo++}</td>
                             <td>${userName}<br><small>${userEmail}</small></td>
                             <td>${formatDate(booking.date)}</td>
                             <td>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</td>
@@ -1423,6 +1443,7 @@ Notes: ${booking.notes || 'N/A'}`);
                                 }
                             </td>
                             <td><span class="status-badge status-${statusClass}">${booking.bookingStatus}</span></td>
+                            <td><small>${createdDate}</small></td>
                             <td>
                                 ${booking.bookingStatus === 'PENDING' ? `
                                     <button onclick="approveBooking('${booking._id}')" class="btn btn-success btn-sm">Approve</button>

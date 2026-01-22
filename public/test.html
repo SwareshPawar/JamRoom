@@ -497,6 +497,7 @@
         let userToken = null;
         let adminToken = null;
         let testBookingId = null;
+        let createdBookingIds = []; // Track all created bookings for cleanup
         let testResults = { passed: 0, failed: 0, pending: 0, total: 0 };
 
         // Obfuscated test credentials (base64 encoded)
@@ -787,6 +788,7 @@
             }
             
             testBookingId = data.booking._id;
+            createdBookingIds.push(testBookingId); // Track for cleanup
             return `Booking created: ${testBookingId}, Time: ${startTime}-${endTime}, Total: ₹${data.booking.price}`;
         };
 
@@ -964,6 +966,7 @@
             }
             
             const bookingId = createData.booking._id;
+            createdBookingIds.push(bookingId); // Track for cleanup
             log(`Created booking ${bookingId} for approval test`, 'info');
             
             // Approve with admin
@@ -1247,12 +1250,59 @@
 
         // ==================== TEST RUNNERS ====================
 
+        // Cleanup function to delete all test bookings
+        const cleanupTestBookings = async () => {
+            if (createdBookingIds.length === 0) {
+                log('No test bookings to clean up', 'info');
+                return;
+            }
+            
+            log(`Cleaning up ${createdBookingIds.length} test booking(s)...`, 'info');
+            
+            // Need admin token for deletion
+            if (!adminToken) {
+                try {
+                    await testAuthAdminLogin();
+                } catch (e) {
+                    log('Could not get admin token for cleanup', 'warn');
+                    return;
+                }
+            }
+            
+            let deleted = 0;
+            let failed = 0;
+            
+            for (const bookingId of createdBookingIds) {
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${adminToken}` }
+                    });
+                    if (res.ok) {
+                        deleted++;
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    failed++;
+                }
+            }
+            
+            createdBookingIds = []; // Clear the array
+            log(`🧹 Cleanup complete: ${deleted} deleted, ${failed} failed`, deleted > 0 ? 'success' : 'warn');
+        };
+
         const runAllTests = async () => {
             resetTests();
             log('Starting all tests...', 'info');
             
-            await runApiTests();
-            await runFrontendTests();
+            try {
+                await runApiTests();
+                await runFrontendTests();
+            } finally {
+                // Always cleanup, even if tests fail
+                await cleanupTestBookings();
+            }
             
             log(`\n========== TEST COMPLETE ==========`, 'info');
             log(`Total: ${testResults.total} | Passed: ${testResults.passed} | Failed: ${testResults.failed}`, 
@@ -1317,6 +1367,7 @@
             userToken = null;
             adminToken = null;
             testBookingId = null;
+            createdBookingIds = [];
             
             document.querySelectorAll('.test-status').forEach(el => {
                 el.className = 'test-status status-pending';
@@ -1340,7 +1391,7 @@
         // Initialize
         updateTokenStatus();
         log('Test suite ready. Server: ' + API_URL, 'info');
-        log('Using hardcoded test users: testuser@jamroom.com and testadmin@jamroom.com', 'info');
+        log('Test accounts are pre-configured. All test bookings will be cleaned up after tests.', 'info');
     </script>
 </body>
 </html>
