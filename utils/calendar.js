@@ -1,4 +1,4 @@
-const ical = require('ical-generator');
+const ical = require('ical-generator').default || require('ical-generator');
 
 /**
  * Generate iCal calendar invite
