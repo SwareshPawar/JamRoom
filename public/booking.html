@@ -357,7 +357,8 @@
 
                 if (!res.ok) throw new Error('Not authenticated');
 
-                currentUser = await res.json();
+                const data = await res.json();
+                currentUser = data.user;
                 document.getElementById('userName').textContent = `Welcome, ${currentUser.name}`;
                 
                 await loadSettings();

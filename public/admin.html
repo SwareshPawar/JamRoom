@@ -419,7 +419,8 @@
 
                 if (!res.ok) throw new Error('Not authenticated');
 
-                currentUser = await res.json();
+                const data = await res.json();
+                currentUser = data.user;
                 
                 if (currentUser.role !== 'admin') {
                     alert('Admin access required');
