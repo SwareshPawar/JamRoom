@@ -31,17 +31,25 @@ const adminSettingsSchema = new mongoose.Schema({
   },
   upiId: {
     type: String,
-    default: 'jamroom@paytm'
+    default: 'swareshpawar@okicici'
   },
   upiName: {
     type: String,
-    default: 'JamRoom Studio'
+    default: 'Swar JamRoom & Music Studio (SwarJRS)'
   },
   adminEmails: [{
     type: String,
     lowercase: true,
     trim: true
   }],
+  studioName: {
+    type: String,
+    default: 'Swar JamRoom & Music Studio (SwarJRS)'
+  },
+  studioAddress: {
+    type: String,
+    default: 'Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057'
+  },
   businessHours: {
     startTime: {
       type: String,

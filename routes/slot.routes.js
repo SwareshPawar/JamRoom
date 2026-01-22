@@ -25,15 +25,23 @@ router.get('/', async (req, res) => {
     // Check which slots are already booked
     const slotsWithBookings = await Promise.all(
       slots.map(async (slot) => {
-        const booking = await Booking.findOne({
+        // Check for confirmed bookings (slots are available if only pending)
+        const confirmedBooking = await Booking.findOne({
           slotId: slot._id,
-          bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
+          bookingStatus: 'CONFIRMED'
         });
+
+        // Also get pending bookings for reference
+        const pendingBookings = await Booking.find({
+          slotId: slot._id,
+          bookingStatus: 'PENDING'
+        }).countDocuments();
 
         return {
           ...slot.toObject(),
-          isBooked: !!booking,
-          bookingId: booking?._id
+          isBooked: !!confirmedBooking,
+          bookingId: confirmedBooking?._id,
+          pendingBookings
         };
       })
     );

@@ -63,10 +63,10 @@ router.post('/', protect, async (req, res) => {
     const bookingDate = new Date(date);
     bookingDate.setHours(0, 0, 0, 0);
 
-    // Check for conflicts with existing bookings
+    // Check for conflicts with existing bookings (only CONFIRMED bookings block slots)
     const existingBookings = await Booking.find({
       date: bookingDate,
-      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
+      bookingStatus: 'CONFIRMED'
     });
 
     for (const booking of existingBookings) {
@@ -206,11 +206,14 @@ router.get('/availability/:date', async (req, res) => {
     const date = new Date(req.params.date);
     date.setHours(0, 0, 0, 0);
 
-    // Get all bookings for the date
+    // Get all bookings for the date (show both PENDING and CONFIRMED for reference)
     const bookings = await Booking.find({
       date,
       bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
     }).select('startTime endTime rentalType bookingStatus');
+
+    // Only confirmed bookings block new bookings
+    const confirmedBookings = bookings.filter(b => b.bookingStatus === 'CONFIRMED');
 
     // Get all blocked times for the date
     const blockedTimes = await BlockedTime.find({

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - JamRoom</title>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -163,14 +164,125 @@
             border-radius: 8px;
             margin-bottom: 20px;
             display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 300px;
+            max-width: 500px;
+            z-index: 1001;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            font-weight: 500;
         }
         
         .alert.show { display: block; }
-        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .alert-success { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 2px solid #c3e6cb; 
+        }
+        .alert-error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 2px solid #f5c6cb; 
+        }
+        .alert-info { 
+            background: #d1ecf1; 
+            color: #0c5460; 
+            border: 2px solid #bee5eb; 
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffeaa7;
+        }
+        
+        /* Backdrop for centered alerts */
+        .alert-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .alert-backdrop.show {
+            display: block;
+        }
         
         .loading { text-align: center; padding: 20px; color: #666; }
+        
+        /* Enhanced Loading Indicators */
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            display: none;
+        }
+        
+        .loading-overlay.show {
+            display: flex;
+        }
+        
+        .loading-content {
+            text-align: center;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+        
+        .loading-content .loader {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Button Loading State */
+        .btn.loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        
+        .btn.loading::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
         
         .modal {
             display: none;
@@ -206,6 +318,30 @@
             font-size: 2em;
             cursor: pointer;
             color: #999;
+        }
+        
+        /* Calendar Styles */
+        .calendar-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .calendar-controls select {
+            width: auto;
+            min-width: 120px;
+        }
+        
+        #calendar {
+            background: white;
+        }
+        
+        .fc-event {
+            cursor: pointer;
+        }
+        
+        .fc-event:hover {
+            opacity: 0.8;
         }
         
         .close:hover { color: #333; }
@@ -255,6 +391,8 @@
         <div class="section">
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('bookings')">📋 Bookings</button>
+                <button class="tab" onclick="switchTab('calendar')">📅 Calendar</button>
+                <button class="tab" onclick="switchTab('revenue')">💰 Revenue</button>
                 <button class="tab" onclick="switchTab('blocked')">🚫 Blocked Times</button>
                 <button class="tab" onclick="switchTab('settings')">⚙️ Settings</button>
                 <button class="tab" onclick="switchTab('users')">👥 Users</button>
@@ -266,6 +404,104 @@
                 <div id="bookingAlert" class="alert"></div>
                 <div id="bookingsLoading" class="loading">Loading bookings...</div>
                 <div id="bookingsTable"></div>
+            </div>
+
+            <!-- Calendar Tab -->
+            <div id="calendarTab" class="tab-content">
+                <h2>Booking Calendar</h2>
+                <div id="calendarAlert" class="alert"></div>
+                <div class="calendar-controls" style="margin-bottom: 20px;">
+                    <select id="calendarMonth">
+                        <option value="0">January</option>
+                        <option value="1">February</option>
+                        <option value="2">March</option>
+                        <option value="3">April</option>
+                        <option value="4">May</option>
+                        <option value="5">June</option>
+                        <option value="6">July</option>
+                        <option value="7">August</option>
+                        <option value="8">September</option>
+                        <option value="9">October</option>
+                        <option value="10">November</option>
+                        <option value="11">December</option>
+                    </select>
+                    <select id="calendarYear"></select>
+                    <button class="btn btn-primary" onclick="loadCalendar()">Load Calendar</button>
+                </div>
+                <div id="calendarLoading" class="loading" style="display: none;">Loading calendar...</div>
+                <div id="calendar-container">
+                    <div id="calendar"></div>
+                </div>
+            </div>
+
+            <!-- Revenue Tab -->
+            <div id="revenueTab" class="tab-content">
+                <h2>Revenue Analytics</h2>
+                <div id="revenueAlert" class="alert"></div>
+                
+                <!-- Revenue Filters -->
+                <div class="revenue-filters" style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <h3>Filter Revenue Data</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                        <div class="form-group">
+                            <label>Quick Filter</label>
+                            <select id="revenueFilter" onchange="loadRevenue()">
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month" selected>This Month</option>
+                                <option value="year">This Year</option>
+                                <option value="range">Custom Range</option>
+                            </select>
+                        </div>
+                        
+                        <div id="customRangeInputs" style="display: none; grid-column: span 2;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div class="form-group">
+                                    <label>Start Date</label>
+                                    <input type="date" id="revenueStartDate">
+                                </div>
+                                <div class="form-group">
+                                    <label>End Date</label>
+                                    <input type="date" id="revenueEndDate">
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="loadRevenue()" style="margin-top: 10px;">Apply Filter</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Revenue Summary Cards -->
+                <div class="revenue-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                    <div class="stat-card">
+                        <h3>Total Revenue</h3>
+                        <div class="number" id="revenueTotal">₹0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Bookings</h3>
+                        <div class="number" id="revenueBookings">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Avg Booking Value</h3>
+                        <div class="number" id="revenueAvg">₹0</div>
+                    </div>
+                </div>
+
+                <!-- Revenue by Type -->
+                <div class="revenue-charts" style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+                    <div class="section">
+                        <h3>Revenue by Rental Type</h3>
+                        <div id="revenueByType"></div>
+                    </div>
+                    <div class="section">
+                        <h3>Bookings by Rental Type</h3>
+                        <div id="bookingsByType"></div>
+                    </div>
+                </div>
+
+                <!-- Revenue Table -->
+                <div id="revenueLoading" class="loading" style="display: none;">Loading revenue data...</div>
+                <div id="revenueTable"></div>
             </div>
 
             <!-- Blocked Times Tab -->
@@ -282,6 +518,14 @@
                 <h2>Admin Settings</h2>
                 <div id="settingsAlert" class="alert"></div>
                 <form id="settingsForm">
+                    <div class="form-group">
+                        <label>Studio Name*</label>
+                        <input type="text" id="studioName" required placeholder="Swar JamRoom & Music Studio (SwarJRS)">
+                    </div>
+                    <div class="form-group">
+                        <label>Studio Address*</label>
+                        <textarea id="studioAddress" rows="3" placeholder="Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057"></textarea>
+                    </div>
                     <div class="form-group">
                         <label>UPI ID*</label>
                         <input type="text" id="upiId" required>
@@ -363,16 +607,141 @@
         </div>
     </div>
 
+    <!-- Global Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loader"></div>
+            <div id="loadingMessage">Processing...</div>
+        </div>
+    </div>
+
+    <!-- Alert Backdrop -->
+    <div id="alertBackdrop" class="alert-backdrop"></div>
+    
+    <!-- Centered Alert -->
+    <div id="centeredAlert" class="alert">
+        <div id="centeredAlertMessage"></div>
+    </div>
+
+    <!-- Confirmation Modals -->
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="confirmationTitle">Confirm Action</h2>
+                <span class="close" onclick="closeModal('confirmationModal')">&times;</span>
+            </div>
+            <div id="confirmationMessage">Are you sure?</div>
+            <div class="form-group" id="reasonGroup" style="display: none; margin-top: 15px;">
+                <label for="rejectionReason">Rejection Reason (Optional):</label>
+                <textarea id="rejectionReason" placeholder="Enter reason for rejection..." rows="3"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button id="confirmButton" class="btn btn-primary" style="flex: 1;">Confirm</button>
+                <button onclick="closeModal('confirmationModal')" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = window.location.origin;
         let currentUser = null;
 
         // Utility functions
         const showAlert = (elementId, message, type = 'info') => {
-            const alert = document.getElementById(elementId);
-            alert.textContent = message;
+            // Use centered alert system for better UX
+            const backdrop = document.getElementById('alertBackdrop');
+            const alert = document.getElementById('centeredAlert');
+            const messageEl = document.getElementById('centeredAlertMessage');
+            
+            messageEl.textContent = message;
             alert.className = `alert alert-${type} show`;
-            setTimeout(() => alert.classList.remove('show'), 5000);
+            backdrop.classList.add('show');
+            
+            // Auto-hide after 4 seconds
+            setTimeout(() => {
+                alert.classList.remove('show');
+                backdrop.classList.remove('show');
+            }, 4000);
+            
+            // Also allow clicking backdrop to close
+            backdrop.onclick = () => {
+                alert.classList.remove('show');
+                backdrop.classList.remove('show');
+            };
+        };
+
+        // Loading utility functions
+        const showLoading = (message = 'Loading...') => {
+            const overlay = document.getElementById('loadingOverlay');
+            const messageEl = document.getElementById('loadingMessage');
+            messageEl.textContent = message;
+            overlay.classList.add('show');
+        };
+
+        const hideLoading = () => {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        };
+
+        const showButtonLoading = (buttonId, originalText) => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.classList.add('loading');
+                button.textContent = '';
+                button.setAttribute('data-original-text', originalText);
+            }
+        };
+
+        const hideButtonLoading = (buttonId) => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.classList.remove('loading');
+                const originalText = button.getAttribute('data-original-text');
+                if (originalText) {
+                    button.textContent = originalText;
+                    button.removeAttribute('data-original-text');
+                }
+            }
+        };
+
+        const showSectionLoading = (containerId, message = 'Loading...') => {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = `
+                    <div class="loading">
+                        <div class="loader"></div>
+                        ${message}
+                    </div>
+                `;
+            }
+        };
+
+        // Confirmation modal functions
+        const showConfirmationModal = (title, message, confirmText, onConfirm, showReason = false) => {
+            document.getElementById('confirmationTitle').textContent = title;
+            document.getElementById('confirmationMessage').textContent = message;
+            document.getElementById('confirmButton').textContent = confirmText;
+            
+            const reasonGroup = document.getElementById('reasonGroup');
+            const rejectionReason = document.getElementById('rejectionReason');
+            
+            if (showReason) {
+                reasonGroup.style.display = 'block';
+                rejectionReason.value = '';
+            } else {
+                reasonGroup.style.display = 'none';
+            }
+            
+            document.getElementById('confirmationModal').classList.add('show');
+            
+            // Remove any existing listeners and add new one
+            const confirmButton = document.getElementById('confirmButton');
+            const newButton = confirmButton.cloneNode(true);
+            confirmButton.parentNode.replaceChild(newButton, confirmButton);
+            
+            newButton.onclick = () => {
+                closeModal('confirmationModal');
+                onConfirm();
+            };
         };
 
         const formatDate = (dateStr) => {
@@ -451,6 +820,8 @@
             document.getElementById(tab + 'Tab').classList.add('active');
 
             if (tab === 'bookings') loadBookings();
+            if (tab === 'calendar') initCalendar();
+            if (tab === 'revenue') loadRevenue();
             if (tab === 'blocked') loadBlockedTimes();
             if (tab === 'settings') loadSettings();
         };
@@ -475,9 +846,227 @@
             }
         };
 
+        // Calendar functionality
+        let calendar = null;
+
+        const initCalendar = () => {
+            if (calendar) {
+                calendar.destroy();
+            }
+
+            // Initialize month/year selectors
+            const now = new Date();
+            const monthSelect = document.getElementById('calendarMonth');
+            const yearSelect = document.getElementById('calendarYear');
+            
+            // Set current month
+            monthSelect.value = now.getMonth();
+            
+            // Populate year options
+            yearSelect.innerHTML = '';
+            for (let year = now.getFullYear() - 1; year <= now.getFullYear() + 2; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                if (year === now.getFullYear()) option.selected = true;
+                yearSelect.appendChild(option);
+            }
+
+            const calendarEl = document.getElementById('calendar');
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                eventClick: function(info) {
+                    const booking = info.event.extendedProps;
+                    alert(`Booking Details:
+Name: ${booking.userName}
+Email: ${booking.userEmail}
+Band: ${booking.bandName || 'N/A'}
+Type: ${booking.rentalType}
+Price: ₹${booking.price}
+Status: ${booking.status}
+Payment: ${booking.paymentStatus}
+Notes: ${booking.notes || 'N/A'}`);
+                },
+                eventDidMount: function(info) {
+                    const booking = info.event.extendedProps;
+                    info.el.setAttribute('title', `${booking.userName} - ${booking.rentalType} (${booking.status})`);
+                }
+            });
+
+            calendar.render();
+            loadCalendar();
+        };
+
+        const loadCalendar = async () => {
+            try {
+                const month = document.getElementById('calendarMonth').value;
+                const year = document.getElementById('calendarYear').value;
+                
+                showSectionLoading('calendar', 'Loading calendar events...');
+                
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/bookings/calendar?month=${month}&year=${year}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load calendar data');
+
+                const data = await res.json();
+                
+                // Clear existing events
+                calendar.removeAllEvents();
+                
+                // Add new events
+                calendar.addEventSource(data.events);
+                
+                // Navigate calendar to selected month
+                calendar.gotoDate(new Date(parseInt(year), parseInt(month), 1));
+                
+            } catch (error) {
+                console.error('Failed to load calendar:', error);
+                showAlert('calendarAlert', 'Failed to load calendar data', 'error');
+            }
+        };
+
+        // Revenue functionality
+        const loadRevenue = async () => {
+            try {
+                showSectionLoading('revenueTable', 'Loading revenue data...');
+                
+                const filter = document.getElementById('revenueFilter').value;
+                let url = `${API_URL}/api/admin/revenue?filter=${filter}`;
+                
+                // Handle custom range
+                if (filter === 'range') {
+                    const startDate = document.getElementById('revenueStartDate').value;
+                    const endDate = document.getElementById('revenueEndDate').value;
+                    
+                    if (!startDate || !endDate) {
+                        showAlert('revenueAlert', 'Please select both start and end dates for custom range', 'error');
+                        return;
+                    }
+                    
+                    url += `&startDate=${startDate}&endDate=${endDate}`;
+                }
+
+                const token = localStorage.getItem('token');
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load revenue data');
+
+                const data = await res.json();
+                
+                // Update summary cards
+                document.getElementById('revenueTotal').textContent = `₹${data.revenue.totalRevenue}`;
+                document.getElementById('revenueBookings').textContent = data.revenue.totalBookings;
+                document.getElementById('revenueAvg').textContent = `₹${data.revenue.avgBookingValue}`;
+                
+                // Update revenue by type
+                updateRevenueCharts(data.revenue);
+                
+                // Update revenue table
+                updateRevenueTable(data.bookings);
+                
+            } catch (error) {
+                console.error('Failed to load revenue:', error);
+                showAlert('revenueAlert', 'Failed to load revenue data', 'error');
+            }
+        };
+
+        const updateRevenueCharts = (revenue) => {
+            // Revenue by type
+            const revenueByTypeHtml = Object.entries(revenue.revenueByType)
+                .sort(([,a], [,b]) => b - a)
+                .map(([type, amount]) => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                        <span>${type}</span>
+                        <strong>₹${amount}</strong>
+                    </div>
+                `).join('') || '<p style="text-align: center; color: #666;">No data available</p>';
+            
+            document.getElementById('revenueByType').innerHTML = revenueByTypeHtml;
+            
+            // Bookings by type
+            const bookingsByTypeHtml = Object.entries(revenue.bookingsByType)
+                .sort(([,a], [,b]) => b - a)
+                .map(([type, count]) => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                        <span>${type}</span>
+                        <strong>${count} booking${count !== 1 ? 's' : ''}</strong>
+                    </div>
+                `).join('') || '<p style="text-align: center; color: #666;">No data available</p>';
+                
+            document.getElementById('bookingsByType').innerHTML = bookingsByTypeHtml;
+        };
+
+        const updateRevenueTable = (bookings) => {
+            if (bookings.length === 0) {
+                document.getElementById('revenueTable').innerHTML = '<p style="text-align: center; color: #666;">No bookings found for the selected period</p>';
+                return;
+            }
+
+            const tableHtml = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Time</th>
+                            <th>Duration</th>
+                            <th>Type</th>
+                            <th>Band</th>
+                            <th>Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${bookings.map(booking => `
+                            <tr>
+                                <td>${formatDate(booking.date)}</td>
+                                <td>${booking.userName}<br><small>${booking.userEmail}</small></td>
+                                <td>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</td>
+                                <td>${booking.duration}h</td>
+                                <td>${booking.rentalType}</td>
+                                <td>${booking.bandName || 'N/A'}</td>
+                                <td><strong>₹${booking.price}</strong></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            document.getElementById('revenueTable').innerHTML = tableHtml;
+        };
+
+        // Show/hide custom range inputs
+        document.addEventListener('DOMContentLoaded', () => {
+            const revenueFilter = document.getElementById('revenueFilter');
+            if (revenueFilter) {
+                revenueFilter.addEventListener('change', (e) => {
+                    const customRangeInputs = document.getElementById('customRangeInputs');
+                    if (e.target.value === 'range') {
+                        customRangeInputs.style.display = 'block';
+                    } else {
+                        customRangeInputs.style.display = 'none';
+                        if (e.target.value !== 'range') {
+                            loadRevenue();
+                        }
+                    }
+                });
+            }
+        });
+
         // Load bookings
         const loadBookings = async () => {
             try {
+                showSectionLoading('bookingsTable', 'Loading bookings...');
+                
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${API_URL}/api/admin/bookings`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -538,49 +1127,69 @@
 
         // Approve booking
         const approveBooking = async (bookingId) => {
-            if (!confirm('Approve this booking?')) return;
+            showConfirmationModal(
+                'Approve Booking',
+                'Are you sure you want to approve this booking? This will confirm the reservation and send a notification to the customer.',
+                'Approve',
+                async () => {
+                    try {
+                        showLoading('Approving booking...');
+                        
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/approve`, {
+                            method: 'PUT',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
 
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/approve`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                        if (!res.ok) throw new Error('Failed to approve booking');
 
-                if (!res.ok) throw new Error('Failed to approve booking');
-
-                showAlert('bookingAlert', 'Booking approved successfully!', 'success');
-                await loadStats();
-                await loadBookings();
-            } catch (error) {
-                showAlert('bookingAlert', error.message, 'error');
-            }
+                        showAlert('bookingAlert', 'Booking approved successfully!', 'success');
+                        await loadStats();
+                        await loadBookings();
+                    } catch (error) {
+                        showAlert('bookingAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
         };
 
         // Reject booking
         const rejectBooking = async (bookingId) => {
-            const reason = prompt('Rejection reason (optional):');
-            if (reason === null) return; // User cancelled
+            showConfirmationModal(
+                'Reject Booking',
+                'Are you sure you want to reject this booking? This will notify the customer that their booking has been declined.',
+                'Reject',
+                async () => {
+                    const reason = document.getElementById('rejectionReason').value.trim();
+                    
+                    try {
+                        showLoading('Rejecting booking...');
+                        
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/reject`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ reason: reason || undefined })
+                        });
 
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/reject`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ reason })
-                });
+                        if (!res.ok) throw new Error('Failed to reject booking');
 
-                if (!res.ok) throw new Error('Failed to reject booking');
-
-                showAlert('bookingAlert', 'Booking rejected', 'info');
-                await loadStats();
-                await loadBookings();
-            } catch (error) {
-                showAlert('bookingAlert', error.message, 'error');
-            }
+                        showAlert('bookingAlert', 'Booking rejected', 'info');
+                        await loadStats();
+                        await loadBookings();
+                    } catch (error) {
+                        showAlert('bookingAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                },
+                true // Show reason input
+            );
         };
 
         // Load blocked times
@@ -696,6 +1305,8 @@
                 const data = await res.json();
                 const settings = data.settings;
 
+                document.getElementById('studioName').value = settings.studioName || 'JamRoom Studio';
+                document.getElementById('studioAddress').value = settings.studioAddress || '';
                 document.getElementById('upiId').value = settings.upiId;
                 document.getElementById('upiName').value = settings.upiName;
                 document.getElementById('adminEmails').value = settings.adminEmails.join(', ');
@@ -709,6 +1320,8 @@
             e.preventDefault();
 
             const formData = {
+                studioName: document.getElementById('studioName').value,
+                studioAddress: document.getElementById('studioAddress').value,
                 upiId: document.getElementById('upiId').value,
                 upiName: document.getElementById('upiName').value,
                 adminEmails: document.getElementById('adminEmails').value.split(',').map(e => e.trim()).filter(e => e)
