@@ -254,6 +254,29 @@ router.get('/my-bookings', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/bookings/settings
+// @desc    Get public booking settings (rental types and base price)
+// @access  Public (no auth required)
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+    
+    res.json({
+      success: true,
+      settings: {
+        rentalTypes: settings.rentalTypes,
+        basePrice: settings.basePrice
+      }
+    });
+  } catch (error) {
+    console.error('Get public settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching settings'
+    });
+  }
+});
+
 // @route   GET /api/bookings/:id
 // @desc    Get single booking
 // @access  Private

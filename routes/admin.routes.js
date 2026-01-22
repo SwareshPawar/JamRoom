@@ -67,6 +67,15 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       });
     }
 
+    // Check if this is an old booking without the new schema
+    if (!booking.startTime || !booking.endTime || !booking.duration || 
+        !booking.userEmail || !booking.userName || !booking.rentalType || !booking.userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot approve old booking. Please create a new booking with the updated system.'
+      });
+    }
+
     if (booking.bookingStatus === 'CONFIRMED') {
       return res.status(400).json({
         success: false,
@@ -185,6 +194,15 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Booking not found'
+      });
+    }
+
+    // Check if this is an old booking without the new schema
+    if (!booking.startTime || !booking.endTime || !booking.duration || 
+        !booking.userEmail || !booking.userName || !booking.rentalType || !booking.userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot reject old booking. Please delete it manually from the database.'
       });
     }
 

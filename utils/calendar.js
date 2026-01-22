@@ -24,8 +24,14 @@ const generateCalendarInvite = (options) => {
       attendees = []
     } = options;
 
+    // Convert startDate to string if it's a Date object
+    let dateStr = startDate;
+    if (startDate instanceof Date) {
+      dateStr = startDate.toISOString().split('T')[0];
+    }
+
     // Parse date and time
-    const [year, month, day] = startDate.split('-').map(Number);
+    const [year, month, day] = dateStr.split('-').map(Number);
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const [endHour, endMinute] = endTime.split(':').map(Number);
 

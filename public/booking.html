@@ -373,15 +373,18 @@
         // Load settings
         const loadSettings = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/settings`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                console.log('Loading settings from:', `${API_URL}/api/bookings/settings`);
+                const res = await fetch(`${API_URL}/api/bookings/settings`);
+                console.log('Settings response status:', res.status);
 
                 if (res.ok) {
                     const data = await res.json();
+                    console.log('Settings data received:', data);
                     settings = data.settings;
+                    console.log('Rental types count:', settings?.rentalTypes?.length);
                     populateRentalTypes();
+                } else {
+                    console.error('Settings response not OK:', res.status, res.statusText);
                 }
             } catch (error) {
                 console.error('Failed to load settings:', error);
