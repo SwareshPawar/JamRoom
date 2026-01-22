@@ -1180,6 +1180,9 @@ Notes: ${booking.notes || 'N/A'}`);
                                     <button onclick="approveBooking('${booking._id}')" class="btn btn-success btn-sm">Approve</button>
                                     <button onclick="rejectBooking('${booking._id}')" class="btn btn-danger btn-sm">Reject</button>
                                 ` : ''}
+                                ${booking.bookingStatus === 'CONFIRMED' ? `
+                                    <button onclick="sendEBill('${booking._id}')" class="btn btn-primary btn-sm" title="Send eBill to Customer">📧 Send eBill</button>
+                                ` : ''}
                                 <button onclick="editBooking('${booking._id}', ${JSON.stringify(booking).replace(/"/g, '&quot;')})" class="btn btn-warning btn-sm">Edit</button>
                                 <button onclick="deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Delete</button>
                             </td>
@@ -1324,6 +1327,39 @@ Notes: ${booking.notes || 'N/A'}`);
                         await loadStats();
                         await loadBookings();
                     } catch (error) {
+                        showAlert('bookingAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
+        };
+
+        // Send eBill to customer
+        const sendEBill = async (bookingId) => {
+            showConfirmationModal(
+                'Send eBill',
+                'This will generate and send an electronic bill to the customer via email. The bill will include all booking details, pricing, and payment information.',
+                'Send eBill',
+                async () => {
+                    try {
+                        showLoading('Generating and sending eBill...');
+                        
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/send-ebill`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        if (!res.ok) {
+                            const error = await res.json();
+                            throw new Error(error.message || 'Failed to send eBill');
+                        }
+
+                        const result = await res.json();
+                        showAlert('bookingAlert', 'eBill sent successfully to customer!', 'success');
+                    } catch (error) {
+                        console.error('Send eBill error:', error);
                         showAlert('bookingAlert', error.message, 'error');
                     } finally {
                         hideLoading();

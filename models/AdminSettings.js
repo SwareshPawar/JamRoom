@@ -48,7 +48,11 @@ const adminSettingsSchema = new mongoose.Schema({
   },
   studioAddress: {
     type: String,
-    default: 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057'
+    default: 'Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057'
+  },
+  studioPhone: {
+    type: String,
+    default: '+91 9172706306'
   },
   businessHours: {
     startTime: {

@@ -456,6 +456,165 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
   }
 });
 
+// @route   POST /api/admin/bookings/:id/send-ebill
+// @desc    Send electronic bill to customer
+// @access  Private/Admin
+router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
+  try {
+    // Import bill generator
+    const { generateBill, generateBillFilename } = require('../utils/billGenerator');
+    
+    const booking = await Booking.findById(req.params.id)
+      .populate('userId');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    // Check if booking is confirmed
+    if (booking.bookingStatus !== 'CONFIRMED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only confirmed bookings can have eBills generated'
+      });
+    }
+
+    // Check if this is an old booking without the new schema
+    if (!booking.startTime || !booking.endTime || !booking.duration || 
+        !booking.userEmail || !booking.userName || !booking.rentalType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot generate eBill for old booking. Missing required fields.'
+      });
+    }
+
+    // Get admin settings for company info
+    const settings = await AdminSettings.getSettings();
+
+    // Generate PDF bill
+    const pdfBuffer = await generateBill(booking);
+    const filename = generateBillFilename(booking, settings);
+
+    // Get customer email
+    const customerEmail = booking.userEmail || booking.userId?.email;
+    if (!customerEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'No customer email available for this booking'
+      });
+    }
+
+    const bookingDate = new Date(booking.date);
+    const displayDate = bookingDate.toLocaleDateString('en-IN');
+
+    // Calculate total with tax
+    const subtotal = booking.price;
+    const taxAmount = subtotal * 0.18; // 18% GST
+    const totalAmount = subtotal + taxAmount;
+
+    // Send email with PDF attachment
+    await sendEmail({
+      to: customerEmail,
+      subject: `Invoice for Your ${settings?.studioName || 'JamRoom'} Booking - ${displayDate}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 24px;">Invoice - ${settings?.studioName || 'JamRoom'} Booking</h1>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
+              Dear ${booking.userName},
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              Thank you for booking with ${settings?.studioName || 'JamRoom'}! Please find your electronic invoice attached to this email.
+            </p>
+            
+            <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <h3 style="color: #667eea; margin-top: 0;">Booking Summary</h3>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Date:</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${displayDate}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Time:</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${booking.startTime} - ${booking.endTime}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Service:</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${booking.rentalType}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Duration:</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${booking.duration} hour(s)</td>
+                </tr>
+                <tr style="font-weight: bold; font-size: 16px; color: #667eea;">
+                  <td style="padding: 12px 0; border-top: 2px solid #667eea;">Total Amount:</td>
+                  <td style="padding: 12px 0; border-top: 2px solid #667eea;">₹${totalAmount.toFixed(2)}</td>
+                </tr>
+              </table>
+            </div>
+            
+            ${booking.paymentStatus === 'PENDING' ? `
+              <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin: 20px 0;">
+                <h4 style="color: #856404; margin-top: 0;">Payment Pending</h4>
+                <p style="color: #856404; margin: 0;">
+                  Please make the payment before your booking slot to confirm your reservation.
+                </p>
+              </div>
+            ` : `
+              <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; margin: 20px 0;">
+                <h4 style="color: #155724; margin-top: 0;">Payment Confirmed</h4>
+                <p style="color: #155724; margin: 0;">
+                  Your payment has been received and your booking is confirmed!
+                </p>
+              </div>
+            `}
+            
+            <p style="color: #666; line-height: 1.6; margin-top: 20px;">
+              If you have any questions about your booking or this invoice, please don't hesitate to contact us.
+            </p>
+            
+            <div style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 30px; text-align: center; color: #888; font-size: 14px;">
+              <p><strong>${settings?.studioName || 'JamRoom Studio'}</strong></p>
+              <p>${settings?.studioAddress || 'Studio Address'}</p>
+              <p>Email: ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</p>
+              ${settings?.studioPhone ? `<p>Phone: ${settings.studioPhone}</p>` : ''}
+            </div>
+          </div>
+        </div>
+      `,
+      attachments: [{
+        filename: filename,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }]
+    });
+
+    // Log the eBill generation
+    console.log(`eBill sent for booking ${booking._id} to ${customerEmail} by admin ${req.user.name}`);
+
+    res.json({
+      success: true,
+      message: 'Electronic bill sent successfully to customer',
+      filename: filename,
+      customerEmail: customerEmail
+    });
+
+  } catch (error) {
+    console.error('Send eBill error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate and send electronic bill: ' + error.message
+    });
+  }
+});
+
 // @route   PUT /api/admin/bookings/:id/reject
 // @desc    Reject a booking
 // @access  Private/Admin
