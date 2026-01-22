@@ -252,7 +252,6 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
     ]);
 
     const recentBookings = await Booking.find()
-      .populate('slotId')
       .populate('userId', 'name email')
       .sort({ createdAt: -1 })
       .limit(5);
