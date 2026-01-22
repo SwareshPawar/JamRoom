@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JamRoom - Book Your Jam Session</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        nav {
+            background: #333;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 15px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        nav a:hover {
+            background: #555;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        main {
+            padding: 40px;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border-radius: 10px;
+            margin-bottom: 40px;
+        }
+
+        .hero h2 {
+            font-size: 2em;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .hero p {
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .feature-card {
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .feature-card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .feature-card p {
+            color: #666;
+        }
+
+        .cta {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .cta h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎸 JamRoom Studio</h1>
+            <p>Premium Jam Room Rental & Music Production Space</p>
+        </header>
+
+        <nav>
+            <div>
+                <a href="/">Home</a>
+                <a href="/booking.html" id="bookingLink" class="hidden">Book Now</a>
+                <a href="/admin.html" id="adminLink" class="hidden">Admin Panel</a>
+            </div>
+            <div class="user-info">
+                <span id="userName" class="hidden"></span>
+                <a href="/login.html" id="loginLink">Login</a>
+                <a href="/register.html" id="registerLink">Register</a>
+                <button id="logoutBtn" class="btn btn-danger hidden">Logout</button>
+            </div>
+        </nav>
+
+        <main>
+            <div class="hero">
+                <h2>Book Your Perfect Jam Session</h2>
+                <p>Professional equipment, soundproof rooms, and flexible booking options</p>
+            </div>
+
+            <div class="features">
+                <div class="feature-card">
+                    <h3>🎵 Professional Equipment</h3>
+                    <p>High-quality instruments, amplifiers, and sound systems available for rent</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔇 Soundproof Rooms</h3>
+                    <p>Fully isolated jam rooms for the best acoustic experience</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⏰ Flexible Timing</h3>
+                    <p>Book slots according to your schedule with easy online booking</p>
+                </div>
+                <div class="feature-card">
+                    <h3>💰 Affordable Rates</h3>
+                    <p>Competitive pricing with various packages to suit your needs</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📱 Easy Booking</h3>
+                    <p>Simple online booking system with instant confirmation</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🎤 Recording Studio</h3>
+                    <p>Professional recording equipment and mixing facilities available</p>
+                </div>
+            </div>
+
+            <div class="cta">
+                <h2>Ready to Rock?</h2>
+                <a href="/booking.html" class="btn btn-primary" style="font-size: 1.2em; padding: 15px 30px;">Book Your Slot Now</a>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 JamRoom Studio. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+        if (token && user.name) {
+            document.getElementById('loginLink').classList.add('hidden');
+            document.getElementById('registerLink').classList.add('hidden');
+            document.getElementById('userName').textContent = `Hello, ${user.name}`;
+            document.getElementById('userName').classList.remove('hidden');
+            document.getElementById('logoutBtn').classList.remove('hidden');
+            document.getElementById('bookingLink').classList.remove('hidden');
+
+            if (user.role === 'admin') {
+                document.getElementById('adminLink').classList.remove('hidden');
+            }
+        }
+
+        // Logout handler
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.reload();
+        });
+    </script>
+</body>
+</html>

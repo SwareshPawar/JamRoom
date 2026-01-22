@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - JamRoom</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            max-width: 450px;
+            width: 100%;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .links {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        .back-home {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-home a {
+            color: #666;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>🎸 JamRoom Login</h1>
+            <p>Sign in to book your jam session</p>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required minlength="6">
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">Login</button>
+        </form>
+
+        <div class="links">
+            <a href="/register.html">Don't have an account? Register</a>
+            <span>|</span>
+            <a href="/reset-password.html">Forgot Password?</a>
+        </div>
+
+        <div class="back-home">
+            <a href="/">&larr; Back to Home</a>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        const form = document.getElementById('loginForm');
+        const alertDiv = document.getElementById('alert');
+        const submitBtn = document.getElementById('submitBtn');
+
+        function showAlert(message, type = 'error') {
+            alertDiv.textContent = message;
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                showAlert('Please fill in all fields');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Logging in...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store token and user info
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    showAlert('Login successful! Redirecting...', 'success');
+                    
+                    setTimeout(() => {
+                        // Redirect based on role
+                        if (data.user.role === 'admin') {
+                            window.location.href = '/admin.html';
+                        } else {
+                            window.location.href = '/booking.html';
+                        }
+                    }, 1000);
+                } else {
+                    showAlert(data.message || 'Login failed');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Login';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showAlert('An error occurred. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Login';
+            }
+        });
+
+        // Check if already logged in
+        if (localStorage.getItem('token')) {
+            window.location.href = '/booking.html';
+        }
+    </script>
+</body>
+</html>

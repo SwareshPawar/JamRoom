@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Slot - JamRoom</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 { font-size: 2em; }
+        .user-info { display: flex; gap: 15px; align-items: center; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        main { padding: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        @media (max-width: 968px) {
+            main { grid-template-columns: 1fr; }
+        }
+        .section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+        }
+        .section h2 { margin-bottom: 20px; color: #333; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #333; font-weight: 500; }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .slots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .slot-card {
+            padding: 15px;
+            background: white;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .slot-card:hover:not(.booked):not(.blocked) {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+        .slot-card.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .slot-card.booked {
+            background: #f8d7da;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .slot-card.blocked {
+            background: #d6d6d6;
+            cursor: not-allowed;
+        }
+        .bookings-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .booking-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        .booking-card.pending { border-left-color: #ffc107; }
+        .booking-card.confirmed { border-left-color: #28a745; }
+        .booking-card.rejected { border-left-color: #dc3545; }
+        .booking-card.cancelled { border-left-color: #6c757d; }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-confirmed { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .status-cancelled { background: #e2e3e5; color: #383d41; }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-error { background: #f8d7da; color: #721c24; }
+        .upi-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        .upi-section img {
+            max-width: 300px;
+            margin: 20px auto;
+            display: block;
+        }
+        .loading { text-align: center; padding: 20px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎸 Book Your Jam Session</h1>
+            <div class="user-info">
+                <span id="userName"></span>
+                <a href="/" class="btn btn-secondary">Home</a>
+                <button id="logoutBtn" class="btn btn-danger">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="section">
+                <h2>Book a Slot</h2>
+                <div id="bookingAlert" class="alert"></div>
+
+                <form id="bookingForm">
+                    <div class="form-group">
+                        <label for="bookingDate">Select Date</label>
+                        <input type="date" id="bookingDate" required>
+                    </div>
+
+                    <div id="slotsContainer">
+                        <label>Available Slots</label>
+                        <div id="slotsLoading" class="loading">Select a date to view available slots</div>
+                        <div id="slotsGrid" class="slots-grid" style="display: none;"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rentalType">Rental Type</label>
+                        <select id="rentalType" required>
+                            <option value="">Select rental type</option>
+                            <option value="JamRoom">JamRoom (₹500/hr)</option>
+                            <option value="Instruments">Instruments (₹300/hr)</option>
+                            <option value="Sound System">Sound System (₹400/hr)</option>
+                            <option value="JamRoom + Instruments">JamRoom + Instruments (₹700/hr)</option>
+                            <option value="Full Package">Full Package (₹1000/hr)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bandName">Band Name (Optional)</label>
+                        <input type="text" id="bandName">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notes">Additional Notes (Optional)</label>
+                        <textarea id="notes" rows="3"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-success" style="width: 100%;" id="bookBtn">
+                        Book Now
+                    </button>
+                </form>
+
+                <div id="upiSection" class="upi-section">
+                    <h3>💳 Payment Details</h3>
+                    <p><strong>UPI ID:</strong> <span id="upiId"></span></p>
+                    <p><strong>Amount:</strong> <span id="upiAmount"></span></p>
+                    <img id="upiQR" src="" alt="UPI QR Code">
+                    <p style="color: #666; margin-top: 10px;">Scan the QR code or use the UPI ID to complete payment</p>
+                    <button class="btn btn-primary" onclick="location.reload()">Done</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>My Bookings</h2>
+                <div id="bookingsLoading" class="loading">Loading your bookings...</div>
+                <div id="bookingsList" class="bookings-list" style="display: none;"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        let selectedSlot = null;
+        let availableSlots = [];
+
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        document.getElementById('userName').textContent = `Hello, ${user.name}`;
+
+        // Set min date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('bookingDate').min = today;
+        document.getElementById('bookingDate').value = today;
+
+        // Fetch slots when date changes
+        document.getElementById('bookingDate').addEventListener('change', fetchSlots);
+
+        async function fetchSlots() {
+            const date = document.getElementById('bookingDate').value;
+            if (!date) return;
+
+            document.getElementById('slotsLoading').style.display = 'block';
+            document.getElementById('slotsGrid').style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_URL}/api/slots?date=${date}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    availableSlots = data.slots;
+                    renderSlots();
+                } else {
+                    showAlert('Failed to load slots', 'error');
+                }
+            } catch (error) {
+                console.error('Fetch slots error:', error);
+                showAlert('Error loading slots', 'error');
+            } finally {
+                document.getElementById('slotsLoading').style.display = 'none';
+            }
+        }
+
+        function renderSlots() {
+            const grid = document.getElementById('slotsGrid');
+            grid.innerHTML = '';
+            grid.style.display = 'grid';
+
+            if (availableSlots.length === 0) {
+                grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #666;">No slots available for this date</p>';
+                return;
+            }
+
+            availableSlots.forEach(slot => {
+                const card = document.createElement('div');
+                card.className = 'slot-card';
+                
+                if (slot.isBooked) {
+                    card.classList.add('booked');
+                    card.innerHTML = `<div>${slot.startTime}</div><div style="font-size: 0.85em; color: #721c24;">Booked</div>`;
+                } else if (slot.isBlocked) {
+                    card.classList.add('blocked');
+                    card.innerHTML = `<div>${slot.startTime}</div><div style="font-size: 0.85em;">Blocked</div>`;
+                } else {
+                    card.innerHTML = `<div>${slot.startTime} - ${slot.endTime}</div>`;
+                    card.onclick = () => selectSlot(slot, card);
+                }
+
+                grid.appendChild(card);
+            });
+        }
+
+        function selectSlot(slot, element) {
+            document.querySelectorAll('.slot-card').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedSlot = slot;
+        }
+
+        document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!selectedSlot) {
+                showAlert('Please select a time slot', 'error');
+                return;
+            }
+
+            const rentalType = document.getElementById('rentalType').value;
+            const bandName = document.getElementById('bandName').value;
+            const notes = document.getElementById('notes').value;
+
+            const bookBtn = document.getElementById('bookBtn');
+            bookBtn.disabled = true;
+            bookBtn.textContent = 'Booking...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/bookings`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        slotId: selectedSlot._id,
+                        rentalType,
+                        bandName,
+                        notes
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('Booking created successfully!', 'success');
+                    
+                    // Show UPI details
+                    document.getElementById('upiId').textContent = data.upiDetails.upiId;
+                    document.getElementById('upiAmount').textContent = `₹${data.upiDetails.amount}`;
+                    document.getElementById('upiQR').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=${data.upiDetails.upiId}&pn=${data.upiDetails.upiName}&am=${data.upiDetails.amount}&cu=INR`;
+                    document.getElementById('upiSection').style.display = 'block';
+                    
+                    // Reset form
+                    document.getElementById('bookingForm').reset();
+                    selectedSlot = null;
+                    
+                    // Reload bookings
+                    fetchMyBookings();
+                    fetchSlots();
+                } else {
+                    showAlert(data.message || 'Booking failed', 'error');
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                showAlert('Error creating booking', 'error');
+            } finally {
+                bookBtn.disabled = false;
+                bookBtn.textContent = 'Book Now';
+            }
+        });
+
+        async function fetchMyBookings() {
+            try {
+                const response = await fetch(`${API_URL}/api/bookings/my-bookings`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    renderBookings(data.bookings);
+                }
+            } catch (error) {
+                console.error('Fetch bookings error:', error);
+            } finally {
+                document.getElementById('bookingsLoading').style.display = 'none';
+            }
+        }
+
+        function renderBookings(bookings) {
+            const list = document.getElementById('bookingsList');
+            list.style.display = 'block';
+            list.innerHTML = '';
+
+            if (bookings.length === 0) {
+                list.innerHTML = '<p style="text-align: center; color: #666;">No bookings yet</p>';
+                return;
+            }
+
+            bookings.forEach(booking => {
+                const card = document.createElement('div');
+                card.className = `booking-card ${booking.bookingStatus.toLowerCase()}`;
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <strong>${booking.slotId.date}</strong>
+                        <span class="status-badge status-${booking.bookingStatus.toLowerCase()}">${booking.bookingStatus}</span>
+                    </div>
+                    <p><i class="fas fa-clock"></i> ${booking.slotId.startTime} - ${booking.slotId.endTime}</p>
+                    <p><i class="fas fa-music"></i> ${booking.rentalType}</p>
+                    <p><i class="fas fa-rupee-sign"></i> ₹${booking.price}</p>
+                    ${booking.bandName ? `<p><i class="fas fa-users"></i> ${booking.bandName}</p>` : ''}
+                    ${booking.bookingStatus === 'PENDING' ? `
+                        <button class="btn btn-danger" style="margin-top: 10px;" onclick="cancelBooking('${booking._id}')">
+                            Cancel Booking
+                        </button>
+                    ` : ''}
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        async function cancelBooking(id) {
+            if (!confirm('Are you sure you want to cancel this booking?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/bookings/${id}/cancel`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Booking cancelled successfully');
+                    fetchMyBookings();
+                    fetchSlots();
+                } else {
+                    alert(data.message || 'Failed to cancel booking');
+                }
+            } catch (error) {
+                alert('Error cancelling booking');
+            }
+        }
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('bookingAlert');
+            alert.textContent = message;
+            alert.className = `alert alert-${type}`;
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 5000);
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.clear();
+            window.location.href = '/';
+        });
+
+        // Initial load
+        fetchSlots();
+        fetchMyBookings();
+    </script>
+</body>
+</html>
