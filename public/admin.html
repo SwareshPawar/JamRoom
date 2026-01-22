@@ -1170,11 +1170,15 @@
                 },
                 eventClick: function(info) {
                     const booking = info.event.extendedProps;
+                    const rentalsDisplay = booking.rentals && booking.rentals.length > 0 
+                        ? booking.rentals.map(r => `  - ${r.name} × ${r.quantity}`).join('\n')
+                        : booking.rentalType;
                     alert(`Booking Details:
 Name: ${booking.userName}
 Email: ${booking.userEmail}
 Band: ${booking.bandName || 'N/A'}
-Type: ${booking.rentalType}
+Rentals:
+${rentalsDisplay}
 Price: ₹${booking.price}
 Status: ${booking.status}
 Payment: ${booking.paymentStatus}
@@ -1182,7 +1186,10 @@ Notes: ${booking.notes || 'N/A'}`);
                 },
                 eventDidMount: function(info) {
                     const booking = info.event.extendedProps;
-                    info.el.setAttribute('title', `${booking.userName} - ${booking.rentalType} (${booking.status})`);
+                    const rentalSummary = booking.rentals && booking.rentals.length > 0 
+                        ? `${booking.rentals.length} item(s)`
+                        : booking.rentalType;
+                    info.el.setAttribute('title', `${booking.userName} - ${rentalSummary} (${booking.status})`);
                 }
             });
 
@@ -1321,9 +1328,19 @@ Notes: ${booking.notes || 'N/A'}`);
                                 <td>${booking.userName}<br><small>${booking.userEmail}</small></td>
                                 <td>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</td>
                                 <td>${booking.duration}h</td>
-                                <td>${booking.rentalType}</td>
+                                <td>
+                                    ${booking.rentals && booking.rentals.length > 0 ? 
+                                        booking.rentals.map(r => `${r.name} × ${r.quantity}`).join('<br>') :
+                                        booking.rentalType
+                                    }
+                                </td>
                                 <td>${booking.bandName || 'N/A'}</td>
-                                <td><strong>₹${booking.price}</strong></td>
+                                <td>
+                                    <strong>₹${booking.price}</strong>
+                                    ${booking.subtotal !== undefined && booking.taxAmount !== undefined ? 
+                                        `<br><small>Subtotal: ₹${booking.subtotal}<br>Tax: ₹${booking.taxAmount}</small>` : ''
+                                    }
+                                </td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -1393,8 +1410,18 @@ Notes: ${booking.notes || 'N/A'}`);
                             <td>${formatDate(booking.date)}</td>
                             <td>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</td>
                             <td>${booking.duration} hour(s)</td>
-                            <td>${booking.rentalType}</td>
-                            <td>₹${booking.price}</td>
+                            <td>
+                                ${booking.rentals && booking.rentals.length > 0 ? 
+                                    booking.rentals.map(r => `${r.name} × ${r.quantity}`).join('<br>') :
+                                    booking.rentalType
+                                }
+                            </td>
+                            <td>
+                                ₹${booking.price}
+                                ${booking.subtotal !== undefined && booking.taxAmount !== undefined ? 
+                                    `<br><small>Subtotal: ₹${booking.subtotal}<br>Tax: ₹${booking.taxAmount}</small>` : ''
+                                }
+                            </td>
                             <td><span class="status-badge status-${statusClass}">${booking.bookingStatus}</span></td>
                             <td>
                                 ${booking.bookingStatus === 'PENDING' ? `

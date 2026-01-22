@@ -25,14 +25,48 @@ const bookingSchema = new mongoose.Schema({
     required: [true, 'Duration is required'],
     min: [1, 'Duration must be at least 1 hour']
   },
+  // Legacy single rental type (kept for backward compatibility)
   rentalType: {
     type: String,
-    enum: ['JamRoom', 'Instruments', 'Sound System', 'JamRoom + Instruments', 'Full Package'],
-    required: [true, 'Rental type is required']
+    default: 'Multiple Items'
   },
+  // New multiple rentals structure
+  rentals: [{
+    name: {
+      type: String,
+      required: [true, 'Rental name is required']
+    },
+    description: {
+      type: String,
+      default: ''
+    },
+    price: {
+      type: Number,
+      required: [true, 'Rental price is required'],
+      min: 0
+    },
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1
+    }
+  }],
+  // Total price for all rentals
   price: {
     type: Number,
     required: [true, 'Price is required'],
+    min: 0
+  },
+  // Subtotal before taxes
+  subtotal: {
+    type: Number,
+    required: [true, 'Subtotal is required'],
+    min: 0
+  },
+  // Tax amount (18% GST)
+  taxAmount: {
+    type: Number,
+    required: [true, 'Tax amount is required'],
     min: 0
   },
   paymentStatus: {

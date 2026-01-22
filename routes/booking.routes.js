@@ -35,17 +35,27 @@ const calculateEndTime = (startTime, duration) => {
 };
 
 // @route   POST /api/bookings
-// @desc    Create a new booking with flexible duration
+// @desc    Create a new booking with multiple rentals
 // @access  Private
 router.post('/', protect, async (req, res) => {
   try {
-    const { date, startTime, duration, rentalType, bandName, notes } = req.body;
+    const { date, startTime, endTime, duration, rentals, subtotal, taxAmount, totalAmount, bandName, notes } = req.body;
 
-    if (!date || !startTime || !duration || !rentalType) {
+    if (!date || !startTime || !endTime || !duration || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide date, startTime, duration, and rentalType'
+        message: 'Please provide date, startTime, endTime, duration, and at least one rental'
       });
+    }
+
+    // Validate rentals data
+    for (const rental of rentals) {
+      if (!rental.name || !rental.price || !rental.quantity) {
+        return res.status(400).json({
+          success: false,
+          message: 'Each rental must have name, price, and quantity'
+        });
+      }
     }
 
     // Validate duration
@@ -55,9 +65,6 @@ router.post('/', protect, async (req, res) => {
         message: 'Duration must be at least 1 hour'
       });
     }
-
-    // Calculate end time
-    const endTime = calculateEndTime(startTime, duration);
 
     // Convert date to start of day
     const bookingDate = new Date(date);
@@ -92,21 +99,24 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
-    // Get pricing from admin settings
+    // Get admin settings for UPI details
     const settings = await AdminSettings.getSettings();
-    const rentalTypeInfo = settings.rentalTypes.find(rt => rt.name === rentalType);
-    const basePrice = rentalTypeInfo ? rentalTypeInfo.basePrice : 500;
-    const totalPrice = basePrice * duration;
 
-    // Create booking
+    // Create rental type summary for backward compatibility
+    const rentalTypeSummary = rentals.length === 1 ? rentals[0].name : `Multiple Items (${rentals.length})`;
+
+    // Create booking with multiple rentals
     const booking = await Booking.create({
       userId: req.user._id,
       date: bookingDate,
       startTime,
       endTime,
       duration,
-      rentalType,
-      price: totalPrice,
+      rentalType: rentalTypeSummary, // Legacy field
+      rentals: rentals, // New multiple rentals array
+      subtotal: subtotal || 0,
+      taxAmount: taxAmount || 0,
+      price: totalAmount || subtotal || 0, // Total amount including tax
       userName: req.user.name,
       userEmail: req.user.email,
       bandName,
@@ -123,6 +133,11 @@ router.post('/', protect, async (req, res) => {
       day: 'numeric'
     });
 
+    // Create rentals summary for email
+    const rentalsSummary = rentals.map(rental => 
+      `<li>${rental.name} × ${rental.quantity} - ₹${rental.price * rental.quantity * duration}</li>`
+    ).join('');
+
     // Send confirmation email to user
     try {
       await sendEmail({
@@ -137,14 +152,22 @@ router.post('/', protect, async (req, res) => {
             <li><strong>Date:</strong> ${displayDate}</li>
             <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
             <li><strong>Duration:</strong> ${duration} hour(s)</li>
-            <li><strong>Rental Type:</strong> ${rentalType}</li>
-            <li><strong>Price:</strong> ₹${totalPrice} (₹${basePrice}/hour × ${duration} hours)</li>
+          </ul>
+          <h3>Rentals:</h3>
+          <ul>
+            ${rentalsSummary}
+          </ul>
+          <h3>Price Breakdown:</h3>
+          <ul>
+            <li><strong>Subtotal:</strong> ₹${subtotal}</li>
+            <li><strong>GST (18%):</strong> ₹${taxAmount}</li>
+            <li><strong>Total Amount:</strong> ₹${totalAmount || subtotal}</li>
             <li><strong>Status:</strong> PENDING</li>
           </ul>
           <h3>Payment Details:</h3>
           <p><strong>UPI ID:</strong> ${settings.upiId}</p>
           <p><strong>Name:</strong> ${settings.upiName}</p>
-          <p><strong>Amount:</strong> ₹${totalPrice}</p>
+          <p><strong>Amount:</strong> ₹${totalAmount || subtotal}</p>
           <p>Please complete the payment and wait for admin approval.</p>
           <p>You will receive a confirmation email once approved.</p>
         `
@@ -167,10 +190,18 @@ router.post('/', protect, async (req, res) => {
               <li><strong>Date:</strong> ${displayDate}</li>
               <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
               <li><strong>Duration:</strong> ${duration} hour(s)</li>
-              <li><strong>Rental Type:</strong> ${rentalType}</li>
-              <li><strong>Price:</strong> ₹${totalPrice}</li>
-              ${bandName ? `<li><strong>Band Name:</strong> ${bandName}</li>` : ''}
             </ul>
+            <h3>Rentals:</h3>
+            <ul>
+              ${rentalsSummary}
+            </ul>
+            <h3>Price Details:</h3>
+            <ul>
+              <li><strong>Subtotal:</strong> ₹${subtotal}</li>
+              <li><strong>GST (18%):</strong> ₹${taxAmount}</li>
+              <li><strong>Total:</strong> ₹${totalAmount || subtotal}</li>
+            </ul>
+            ${bandName ? `<p><strong>Band Name:</strong> ${bandName}</p>` : ''}
             <p>Please review and approve/reject this booking in the admin panel.</p>
           `
         });
@@ -186,7 +217,7 @@ router.post('/', protect, async (req, res) => {
       upiDetails: {
         upiId: settings.upiId,
         upiName: settings.upiName,
-        amount: totalPrice
+        amount: totalAmount || subtotal
       }
     });
   } catch (error) {

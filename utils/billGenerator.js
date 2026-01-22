@@ -10,11 +10,21 @@ const generateBillHTML = async (booking, settings) => {
   const bookingDate = new Date(booking.date);
   const currentDate = new Date();
   
-  // Calculate tax (18% GST)
-  const subtotal = booking.price;
-  const taxRate = 0.18;
-  const taxAmount = subtotal * taxRate;
-  const totalAmount = subtotal + taxAmount;
+  // Calculate pricing - use booking amounts if available, otherwise calculate from booking.price
+  let subtotal, taxAmount, totalAmount;
+  
+  if (booking.subtotal !== undefined && booking.taxAmount !== undefined) {
+    // Use the amounts calculated during booking creation
+    subtotal = booking.subtotal;
+    taxAmount = booking.taxAmount;
+    totalAmount = booking.price; // This should be the total including tax
+  } else {
+    // Fallback to old calculation method for legacy bookings
+    subtotal = booking.price;
+    const taxRate = 0.18;
+    taxAmount = subtotal * taxRate;
+    totalAmount = subtotal + taxAmount;
+  }
   
   return `
 <!DOCTYPE html>
@@ -639,26 +649,53 @@ const generateBillHTML = async (booking, settings) => {
             <thead>
                 <tr>
                     <th>Service Description</th>
+                    <th style="width: 80px; text-align: center;">Qty</th>
                     <th style="width: 100px; text-align: center;">Duration</th>
                     <th style="width: 120px; text-align: right;">Rate</th>
                     <th style="width: 120px; text-align: right;">Amount</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>
-                        <strong>${booking.rentalType}</strong>
-                        <br>
-                        <small style="color: #666;">
-                            Studio booking for ${bookingDate.toLocaleDateString('en-IN')} 
-                            (${booking.startTime} - ${booking.endTime})
-                        </small>
-                        ${booking.notes ? `<br><small style="color: #888; font-style: italic;">Note: ${booking.notes}</small>` : ''}
-                    </td>
-                    <td style="text-align: center;">${booking.duration} hr(s)</td>
-                    <td class="amount-cell">₹${(booking.price / booking.duration).toFixed(2)}/hr</td>
-                    <td class="amount-cell">₹${booking.price.toFixed(2)}</td>
-                </tr>
+                ${booking.rentals && booking.rentals.length > 0 ? 
+                    booking.rentals.map(rental => `
+                        <tr>
+                            <td>
+                                <strong>${rental.name}</strong>
+                                <br>
+                                <small style="color: #666;">
+                                    ${rental.description || 'Studio rental service'}
+                                    <br>Booking: ${bookingDate.toLocaleDateString('en-IN')} (${booking.startTime} - ${booking.endTime})
+                                </small>
+                            </td>
+                            <td style="text-align: center;">${rental.quantity}</td>
+                            <td style="text-align: center;">${booking.duration} hr(s)</td>
+                            <td class="amount-cell">₹${rental.price}/hr</td>
+                            <td class="amount-cell">₹${(rental.price * rental.quantity * booking.duration).toFixed(2)}</td>
+                        </tr>
+                    `).join('') : `
+                        <tr>
+                            <td>
+                                <strong>${booking.rentalType || 'JamRoom Booking'}</strong>
+                                <br>
+                                <small style="color: #666;">
+                                    Studio booking for ${bookingDate.toLocaleDateString('en-IN')} 
+                                    (${booking.startTime} - ${booking.endTime})
+                                </small>
+                                ${booking.notes ? `<br><small style="color: #888; font-style: italic;">Note: ${booking.notes}</small>` : ''}
+                            </td>
+                            <td style="text-align: center;">1</td>
+                            <td style="text-align: center;">${booking.duration} hr(s)</td>
+                            <td class="amount-cell">₹${(booking.price / booking.duration).toFixed(2)}/hr</td>
+                            <td class="amount-cell">₹${booking.price.toFixed(2)}</td>
+                        </tr>
+                    `}
+                ${booking.notes && booking.rentals && booking.rentals.length > 0 ? `
+                    <tr>
+                        <td colspan="5" style="padding-top: 20px; border-top: 1px solid #eee;">
+                            <small style="color: #888; font-style: italic;"><strong>Additional Notes:</strong> ${booking.notes}</small>
+                        </td>
+                    </tr>
+                ` : ''}
             </tbody>
         </table>
         
