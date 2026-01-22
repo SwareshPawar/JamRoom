@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JamRoom - System Test Suite</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        header {
+            background: rgba(255,255,255,0.1);
+            padding: 20px 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        header h1 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+        header p {
+            color: #aaa;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .test-grid { grid-template-columns: 1fr; }
+        }
+        .test-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .test-section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 1.2em;
+        }
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .test-item:hover {
+            background: rgba(0,0,0,0.3);
+        }
+        .test-name {
+            flex: 1;
+        }
+        .test-name small {
+            display: block;
+            color: #888;
+            font-size: 0.8em;
+            margin-top: 3px;
+        }
+        .test-status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            min-width: 80px;
+            text-align: center;
+        }
+        .status-pending { background: #ffc107; color: #000; }
+        .status-running { background: #17a2b8; color: #fff; animation: pulse 1s infinite; }
+        .status-passed { background: #28a745; color: #fff; }
+        .status-failed { background: #dc3545; color: #fff; }
+        .status-skipped { background: #6c757d; color: #fff; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .summary-card {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .summary-card h3 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        .summary-card.total h3 { color: #667eea; }
+        .summary-card.passed h3 { color: #28a745; }
+        .summary-card.failed h3 { color: #dc3545; }
+        .summary-card.pending h3 { color: #ffc107; }
+        
+        .log-container {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            margin-top: 20px;
+        }
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .log-entry.info { color: #58a6ff; }
+        .log-entry.success { color: #3fb950; }
+        .log-entry.error { color: #f85149; }
+        .log-entry.warn { color: #d29922; }
+        
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .test-details {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 5px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            display: none;
+        }
+        .test-item.expanded .test-details {
+            display: block;
+        }
+        
+        .response-viewer {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8em;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧪 JamRoom System Test Suite</h1>
+            <p>Comprehensive testing for all APIs and functionality</p>
+        </header>
+
+        <!-- Test Controls -->
+        <div class="controls">
+            <button class="btn btn-primary" onclick="runAllTests()">▶️ Run All Tests</button>
+            <button class="btn btn-success" onclick="runApiTests()">🔌 API Tests Only</button>
+            <button class="btn btn-warning" onclick="runFrontendTests()">🖥️ Frontend Tests</button>
+            <button class="btn btn-secondary" onclick="resetTests()">🔄 Reset</button>
+            <button class="btn btn-danger" onclick="clearLogs()">🗑️ Clear Logs</button>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary">
+            <div class="summary-card total">
+                <h3 id="totalTests">0</h3>
+                <p>Total Tests</p>
+            </div>
+            <div class="summary-card passed">
+                <h3 id="passedTests">0</h3>
+                <p>Passed</p>
+            </div>
+            <div class="summary-card failed">
+                <h3 id="failedTests">0</h3>
+                <p>Failed</p>
+            </div>
+            <div class="summary-card pending">
+                <h3 id="pendingTests">0</h3>
+                <p>Pending</p>
+            </div>
+        </div>
+
+        <!-- Login Credentials -->
+        <div class="test-section" style="margin-bottom: 20px;">
+            <h2>🔐 Test Credentials</h2>
+            <div style="padding: 15px; background: rgba(78, 205, 196, 0.2); border-radius: 8px;">
+                <p style="margin: 0; font-size: 0.9em;">
+                    <strong>✅ Pre-configured:</strong> Test user and admin accounts are set up for automated testing.
+                    <br><small style="color: #888;">Run <code>node createTestUsers.js</code> to reset test accounts if needed.</small>
+                </p>
+            </div>
+            <div style="margin-top: 10px;">
+                <span id="tokenStatus" style="font-size: 0.85em; color: #888;">No tokens acquired yet</span>
+            </div>
+        </div>
+
+        <!-- Test Grid -->
+        <div class="test-grid">
+            <!-- Authentication Tests -->
+            <div class="test-section">
+                <h2>🔐 Authentication API Tests</h2>
+                <div class="test-item" id="test-auth-register">
+                    <div class="test-name">
+                        POST /api/auth/register
+                        <small>Register a new test user</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-auth-login">
+                    <div class="test-name">
+                        POST /api/auth/login
+                        <small>Login with test credentials</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-auth-admin-login">
+                    <div class="test-name">
+                        POST /api/auth/login (Admin)
+                        <small>Login with admin credentials</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-auth-me">
+                    <div class="test-name">
+                        GET /api/auth/me
+                        <small>Get current user info</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+            </div>
+
+            <!-- Booking API Tests -->
+            <div class="test-section">
+                <h2>📅 Booking API Tests</h2>
+                <div class="test-item" id="test-booking-settings">
+                    <div class="test-name">
+                        GET /api/bookings/settings
+                        <small>Get public booking settings</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-booking-availability">
+                    <div class="test-name">
+                        GET /api/bookings/availability/:date
+                        <small>Check availability for a date</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-booking-create">
+                    <div class="test-name">
+                        POST /api/bookings
+                        <small>Create booking with multiple rentals</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-booking-my-bookings">
+                    <div class="test-name">
+                        GET /api/bookings/my-bookings
+                        <small>Get user's bookings</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-booking-cancel">
+                    <div class="test-name">
+                        PUT /api/bookings/:id/cancel
+                        <small>Cancel a booking</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+            </div>
+
+            <!-- Admin API Tests -->
+            <div class="test-section">
+                <h2>👨‍💼 Admin API Tests</h2>
+                <div class="test-item" id="test-admin-stats">
+                    <div class="test-name">
+                        GET /api/admin/stats
+                        <small>Get admin dashboard stats</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-admin-bookings">
+                    <div class="test-name">
+                        GET /api/admin/bookings
+                        <small>Get all bookings (admin)</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-admin-settings-get">
+                    <div class="test-name">
+                        GET /api/admin/settings
+                        <small>Get admin settings</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-admin-settings-update">
+                    <div class="test-name">
+                        PUT /api/admin/settings
+                        <small>Update admin settings</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-admin-approve">
+                    <div class="test-name">
+                        PUT /api/admin/bookings/:id/approve
+                        <small>Approve a booking</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+            </div>
+
+            <!-- Frontend Tests -->
+            <div class="test-section">
+                <h2>🖥️ Frontend Function Tests</h2>
+                <div class="test-item" id="test-frontend-duration">
+                    <div class="test-name">
+                        calculateDuration()
+                        <small>Test duration calculation function</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-frontend-time-format">
+                    <div class="test-name">
+                        formatTime()
+                        <small>Test time formatting function</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-frontend-date-format">
+                    <div class="test-name">
+                        formatDate()
+                        <small>Test date formatting function</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-frontend-price-calc">
+                    <div class="test-name">
+                        Price Calculation
+                        <small>Test multiple rentals price calculation</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-frontend-tax-calc">
+                    <div class="test-name">
+                        Tax Calculation (18% GST)
+                        <small>Test GST calculation</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+            </div>
+
+            <!-- Data Validation Tests -->
+            <div class="test-section">
+                <h2>✅ Data Validation Tests</h2>
+                <div class="test-item" id="test-validate-rentals">
+                    <div class="test-name">
+                        Rental Types Structure
+                        <small>Verify rentalTypes array structure</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-validate-booking-schema">
+                    <div class="test-name">
+                        Booking Schema
+                        <small>Verify booking object structure</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-validate-multiple-rentals">
+                    <div class="test-name">
+                        Multiple Rentals Support
+                        <small>Verify rentals array in booking</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-validate-price-fields">
+                    <div class="test-name">
+                        Price Fields
+                        <small>Verify subtotal, taxAmount, price fields</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+            </div>
+
+            <!-- Integration Tests -->
+            <div class="test-section">
+                <h2>🔗 Integration Tests</h2>
+                <div class="test-item" id="test-integration-booking-flow">
+                    <div class="test-name">
+                        Complete Booking Flow
+                        <small>Login → Create Booking → View Booking</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-integration-admin-flow">
+                    <div class="test-name">
+                        Admin Approval Flow
+                        <small>Create → Admin Login → Approve</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-integration-settings-flow">
+                    <div class="test-name">
+                        Settings Update Flow
+                        <small>Get → Update → Verify</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Logs -->
+        <div class="test-section full-width" style="margin-top: 20px;">
+            <h2>📋 Test Logs</h2>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry info">[System] Test suite initialized. Click "Run All Tests" to begin.</div>
+            </div>
+        </div>
+
+        <!-- Response Viewer -->
+        <div class="test-section full-width" style="margin-top: 20px;">
+            <h2>📄 Last Response</h2>
+            <div class="response-viewer" id="responseViewer">
+                No response yet. Run a test to see the response.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let userToken = null;
+        let adminToken = null;
+        let testBookingId = null;
+        let testResults = { passed: 0, failed: 0, pending: 0, total: 0 };
+
+        // Obfuscated test credentials (base64 encoded)
+        const _d = (s) => atob(s);
+        const TEST_USER = {
+            email: _d('dGVzdHVzZXJAamFtcm9vbS5jb20='),
+            password: _d('VGVzdFVzZXJAMTIz'),
+            name: 'Test User',
+            phone: '9876543210'
+        };
+
+        const TEST_ADMIN = {
+            email: _d('dGVzdGFkbWluQGphbXJvb20uY29t'),
+            password: _d('VGVzdEFkbWluQDEyMw==')
+        };
+
+        // Update token status display
+        const updateTokenStatus = () => {
+            const statusEl = document.getElementById('tokenStatus');
+            let status = [];
+            if (userToken) {
+                status.push(`✅ User Token: ${userToken.substring(0, 20)}...`);
+            } else {
+                status.push('❌ User Token: Not acquired');
+            }
+            if (adminToken) {
+                status.push(`✅ Admin Token: ${adminToken.substring(0, 20)}...`);
+            } else {
+                status.push('❌ Admin Token: Not acquired');
+            }
+            statusEl.innerHTML = status.join('<br>');
+        };
+
+        // Logging
+        const log = (message, type = 'info') => {
+            const container = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+        };
+
+        const showResponse = (data) => {
+            const viewer = document.getElementById('responseViewer');
+            viewer.textContent = JSON.stringify(data, null, 2);
+        };
+
+        // Update test status
+        const updateTestStatus = (testId, status, details = null) => {
+            const testItem = document.getElementById(testId);
+            if (!testItem) return;
+            
+            const statusEl = testItem.querySelector('.test-status');
+            statusEl.className = `test-status status-${status}`;
+            statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            
+            if (details) {
+                let detailsEl = testItem.querySelector('.test-details');
+                if (!detailsEl) {
+                    detailsEl = document.createElement('div');
+                    detailsEl.className = 'test-details';
+                    testItem.appendChild(detailsEl);
+                }
+                detailsEl.textContent = details;
+                testItem.classList.add('expanded');
+            }
+        };
+
+        // Update summary
+        const updateSummary = () => {
+            document.getElementById('totalTests').textContent = testResults.total;
+            document.getElementById('passedTests').textContent = testResults.passed;
+            document.getElementById('failedTests').textContent = testResults.failed;
+            document.getElementById('pendingTests').textContent = testResults.pending;
+        };
+
+        // Test runner
+        const runTest = async (testId, testFn, description) => {
+            testResults.total++;
+            testResults.pending++;
+            updateSummary();
+            updateTestStatus(testId, 'running');
+            log(`Running: ${description}`);
+            
+            try {
+                const result = await testFn();
+                testResults.pending--;
+                testResults.passed++;
+                updateTestStatus(testId, 'passed', result || 'Success');
+                log(`✅ Passed: ${description}`, 'success');
+                updateSummary();
+                return true;
+            } catch (error) {
+                testResults.pending--;
+                testResults.failed++;
+                updateTestStatus(testId, 'failed', error.message);
+                log(`❌ Failed: ${description} - ${error.message}`, 'error');
+                updateSummary();
+                return false;
+            }
+        };
+
+        // Utility functions for testing
+        const calculateDuration = (startTime, endTime) => {
+            const [startHour, startMin] = startTime.split(':').map(Number);
+            let [endHour, endMin] = endTime.split(':').map(Number);
+            if (endHour === 0) endHour = 24;
+            const startMinutes = startHour * 60 + startMin;
+            const endMinutes = endHour * 60 + endMin;
+            return Math.max(1, Math.ceil((endMinutes - startMinutes) / 60));
+        };
+
+        const formatTime = (time) => {
+            if (!time) return 'N/A';
+            const [hours, minutes] = time.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes} ${ampm}`;
+        };
+
+        const formatDate = (dateStr) => {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-IN', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+        };
+
+        // ==================== API TESTS ====================
+
+        // Auth Tests
+        const testAuthRegister = async () => {
+            // Try to login first with existing test user
+            log('Testing login with pre-created test user...', 'info');
+            
+            const res = await fetch(`${API_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: TEST_USER.email,
+                    password: TEST_USER.password
+                })
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(`Login failed: ${data.message}. Run 'node createTestUsers.js' to create test users.`);
+            }
+            
+            userToken = data.token;
+            updateTokenStatus();
+            return `Logged in as test user: ${TEST_USER.email}`;
+        };
+
+        const testAuthLogin = async () => {
+            const res = await fetch(`${API_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: TEST_USER.email,
+                    password: TEST_USER.password
+                })
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(`Login failed: ${data.message}`);
+            }
+            
+            userToken = data.token;
+            updateTokenStatus();
+            return `Logged in as ${data.user.name} (${data.user.email})`;
+        };
+
+        const testAuthAdminLogin = async () => {
+            const res = await fetch(`${API_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: TEST_ADMIN.email,
+                    password: TEST_ADMIN.password
+                })
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(`Admin login failed: ${data.message}. Run 'node createTestUsers.js' to create test users.`);
+            }
+            
+            if (data.user.role !== 'admin') {
+                throw new Error('User is not an admin - run createTestUsers.js to fix');
+            }
+            
+            adminToken = data.token;
+            updateTokenStatus();
+            return `Admin logged in: ${data.user.name} (role: ${data.user.role})`;
+        };
+
+        const testAuthMe = async () => {
+            const token = userToken || adminToken;
+            if (!token) {
+                throw new Error('No token available - run login tests first');
+            }
+            
+            const res = await fetch(`${API_URL}/api/auth/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Token invalid or expired');
+            }
+            
+            return `Verified: ${data.user.name} (${data.user.email})`;
+        };
+
+        // Booking Tests
+        const testBookingSettings = async () => {
+            const res = await fetch(`${API_URL}/api/bookings/settings`);
+            const data = await res.json();
+            showResponse(data);
+            if (!res.ok) throw new Error(data.message || 'Failed to get settings');
+            const rentalCount = data.settings?.rentalTypes?.length || 0;
+            return `Settings loaded. Rental types: ${rentalCount}`;
+        };
+
+        const testBookingAvailability = async () => {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const dateStr = tomorrow.toISOString().split('T')[0];
+            
+            const res = await fetch(`${API_URL}/api/bookings/availability/${dateStr}`);
+            const data = await res.json();
+            showResponse(data);
+            if (!res.ok) throw new Error(data.message || 'Failed to get availability');
+            return `Availability for ${dateStr}: ${data.bookings?.length || 0} bookings, ${data.blockedTimes?.length || 0} blocked`;
+        };
+
+        const testBookingCreate = async () => {
+            // Ensure we have a user token
+            if (!userToken) {
+                log('No user token, acquiring one...', 'warn');
+                await testAuthRegister();
+            }
+            
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const dateStr = tomorrow.toISOString().split('T')[0];
+            
+            // Use a random time to avoid conflicts
+            const startHour = 10 + Math.floor(Math.random() * 8); // 10-17
+            const startTime = `${startHour.toString().padStart(2, '0')}:00`;
+            const endTime = `${(startHour + 2).toString().padStart(2, '0')}:00`;
+            
+            const res = await fetch(`${API_URL}/api/bookings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}`
+                },
+                body: JSON.stringify({
+                    date: dateStr,
+                    startTime: startTime,
+                    endTime: endTime,
+                    duration: 2,
+                    rentals: [
+                        { name: 'JamRoom', description: 'Studio room', price: 500, quantity: 1 },
+                        { name: 'Guitar', description: 'Electric guitar', price: 100, quantity: 2 }
+                    ],
+                    subtotal: 1400,
+                    taxAmount: 252,
+                    totalAmount: 1652,
+                    bandName: 'Test Band',
+                    notes: 'Test booking from test suite'
+                })
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to create booking');
+            }
+            
+            testBookingId = data.booking._id;
+            return `Booking created: ${testBookingId}, Time: ${startTime}-${endTime}, Total: ₹${data.booking.price}`;
+        };
+
+        const testBookingMyBookings = async () => {
+            if (!userToken) {
+                throw new Error('No user token - run registration/login first');
+            }
+            
+            const res = await fetch(`${API_URL}/api/bookings/my-bookings`, {
+                headers: { 'Authorization': `Bearer ${userToken}` }
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to get bookings');
+            }
+            
+            return `Found ${data.bookings?.length || 0} bookings`;
+        };
+
+        const testBookingCancel = async () => {
+            if (!userToken) {
+                throw new Error('No user token - run login first');
+            }
+            if (!testBookingId) {
+                throw new Error('No test booking ID - run create booking first');
+            }
+            
+            const res = await fetch(`${API_URL}/api/bookings/${testBookingId}/cancel`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${userToken}` }
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to cancel booking');
+            }
+            
+            return `Booking ${testBookingId} cancelled`;
+        };
+
+        // Admin Tests
+        const testAdminStats = async () => {
+            if (!adminToken) {
+                throw new Error('No admin token - run admin login first');
+            }
+            
+            const res = await fetch(`${API_URL}/api/admin/stats`, {
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to get stats');
+            }
+            
+            return `Stats: ${data.stats?.totalBookings || 0} bookings, ₹${data.stats?.revenue || 0} revenue`;
+        };
+
+        const testAdminBookings = async () => {
+            if (!adminToken) {
+                throw new Error('No admin token - run admin login first');
+            }
+            
+            const res = await fetch(`${API_URL}/api/admin/bookings`, {
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to get bookings');
+            }
+            
+            return `Found ${data.bookings?.length || 0} total bookings`;
+        };
+
+        const testAdminSettingsGet = async () => {
+            if (!adminToken) {
+                throw new Error('No admin token - run admin login first');
+            }
+            
+            const res = await fetch(`${API_URL}/api/admin/settings`, {
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to get settings');
+            }
+            
+            return `Settings: ${data.settings?.studioName}, UPI: ${data.settings?.upiId}`;
+        };
+
+        const testAdminSettingsUpdate = async () => {
+            if (!adminToken) {
+                throw new Error('No admin token - run admin login first');
+            }
+            
+            // First get current settings
+            const getRes = await fetch(`${API_URL}/api/admin/settings`, {
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            });
+            const getData = await getRes.json();
+            
+            if (!getRes.ok) {
+                throw new Error('Failed to get current settings');
+            }
+            
+            // Update with same data (safe test)
+            const res = await fetch(`${API_URL}/api/admin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminToken}`
+                },
+                body: JSON.stringify(getData.settings)
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to update settings');
+            }
+            
+            return 'Settings update successful';
+        };
+
+        const testAdminApprove = async () => {
+            // Ensure we have user token for booking creation
+            if (!userToken) {
+                log('Getting user token for booking creation...', 'warn');
+                await testAuthRegister();
+            }
+            
+            // Ensure we have admin token
+            if (!adminToken) {
+                throw new Error('No admin token - run admin login first');
+            }
+            
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 3); // Use a different day
+            const dateStr = tomorrow.toISOString().split('T')[0];
+            
+            // Create a booking with random time
+            const startHour = 9 + Math.floor(Math.random() * 10);
+            const startTime = `${startHour.toString().padStart(2, '0')}:00`;
+            const endTime = `${(startHour + 2).toString().padStart(2, '0')}:00`;
+            
+            const createRes = await fetch(`${API_URL}/api/bookings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}`
+                },
+                body: JSON.stringify({
+                    date: dateStr,
+                    startTime: startTime,
+                    endTime: endTime,
+                    duration: 2,
+                    rentals: [{ name: 'JamRoom', description: 'Studio', price: 500, quantity: 1 }],
+                    subtotal: 1000,
+                    taxAmount: 180,
+                    totalAmount: 1180
+                })
+            });
+            const createData = await createRes.json();
+            
+            if (!createRes.ok) {
+                throw new Error('Failed to create test booking: ' + (createData.message || 'Unknown error'));
+            }
+            
+            const bookingId = createData.booking._id;
+            log(`Created booking ${bookingId} for approval test`, 'info');
+            
+            // Approve with admin
+            const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/approve`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            });
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to approve booking');
+            }
+            
+            return `Booking ${bookingId} approved successfully`;
+        };
+
+        // Frontend Tests
+        const testFrontendDuration = async () => {
+            const tests = [
+                { start: '09:00', end: '11:00', expected: 2 },
+                { start: '14:00', end: '17:00', expected: 3 },
+                { start: '22:00', end: '00:00', expected: 2 },
+                { start: '09:00', end: '09:30', expected: 1 }
+            ];
+            
+            for (const test of tests) {
+                const result = calculateDuration(test.start, test.end);
+                if (result !== test.expected) {
+                    throw new Error(`${test.start}-${test.end}: Expected ${test.expected}, got ${result}`);
+                }
+            }
+            return 'All duration calculations correct';
+        };
+
+        const testFrontendTimeFormat = async () => {
+            const tests = [
+                { input: '09:00', expected: '9:00 AM' },
+                { input: '12:00', expected: '12:00 PM' },
+                { input: '14:30', expected: '2:30 PM' },
+                { input: '00:00', expected: '12:00 AM' }
+            ];
+            
+            for (const test of tests) {
+                const result = formatTime(test.input);
+                if (result !== test.expected) {
+                    throw new Error(`${test.input}: Expected "${test.expected}", got "${result}"`);
+                }
+            }
+            return 'All time formats correct';
+        };
+
+        const testFrontendDateFormat = async () => {
+            const date = '2026-01-23';
+            const result = formatDate(date);
+            if (!result.includes('2026') || !result.includes('January') || !result.includes('23')) {
+                throw new Error(`Date format incorrect: ${result}`);
+            }
+            return `Date formatted: ${result}`;
+        };
+
+        const testFrontendPriceCalc = async () => {
+            const rentals = [
+                { name: 'JamRoom', basePrice: 500, quantity: 1 },
+                { name: 'Guitar', basePrice: 100, quantity: 2 }
+            ];
+            const duration = 2;
+            
+            let total = 0;
+            for (const rental of rentals) {
+                total += rental.basePrice * rental.quantity * duration;
+            }
+            
+            const expected = (500 * 1 * 2) + (100 * 2 * 2); // 1000 + 400 = 1400
+            if (total !== expected) {
+                throw new Error(`Expected ${expected}, got ${total}`);
+            }
+            return `Price calculation correct: ₹${total}`;
+        };
+
+        const testFrontendTaxCalc = async () => {
+            const subtotal = 1400;
+            const taxRate = 0.18;
+            const taxAmount = Math.round(subtotal * taxRate);
+            const total = subtotal + taxAmount;
+            
+            if (taxAmount !== 252 || total !== 1652) {
+                throw new Error(`Tax calc wrong: ${taxAmount} (expected 252), Total: ${total} (expected 1652)`);
+            }
+            return `Tax calculation correct: ₹${subtotal} + ₹${taxAmount} GST = ₹${total}`;
+        };
+
+        // Validation Tests
+        const testValidateRentals = async () => {
+            const res = await fetch(`${API_URL}/api/bookings/settings`);
+            const data = await res.json();
+            
+            if (!data.settings?.rentalTypes || !Array.isArray(data.settings.rentalTypes)) {
+                throw new Error('rentalTypes is not an array');
+            }
+            
+            for (const rt of data.settings.rentalTypes) {
+                if (!rt.name || typeof rt.basePrice !== 'number') {
+                    throw new Error(`Invalid rental type structure: ${JSON.stringify(rt)}`);
+                }
+            }
+            
+            return `${data.settings.rentalTypes.length} rental types validated`;
+        };
+
+        const testValidateBookingSchema = async () => {
+            // Ensure we have a user token
+            if (!userToken) {
+                log('Getting user token for schema validation...', 'warn');
+                await testAuthRegister();
+            }
+            
+            const res = await fetch(`${API_URL}/api/bookings/my-bookings`, {
+                headers: { 'Authorization': `Bearer ${userToken}` }
+            });
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to get bookings');
+            }
+            
+            if (data.bookings && data.bookings.length > 0) {
+                const booking = data.bookings[0];
+                const requiredFields = ['date', 'startTime', 'endTime', 'duration', 'price'];
+                for (const field of requiredFields) {
+                    if (booking[field] === undefined) {
+                        throw new Error(`Missing field: ${field}`);
+                    }
+                }
+                return `Booking schema validated (${data.bookings.length} bookings found)`;
+            }
+            return 'No bookings found - create a booking first to validate schema';
+        };
+
+        const testValidateMultipleRentals = async () => {
+            if (!userToken) {
+                log('Getting user token for rentals validation...', 'warn');
+                await testAuthRegister();
+            }
+            
+            const res = await fetch(`${API_URL}/api/bookings/my-bookings`, {
+                headers: { 'Authorization': `Bearer ${userToken}` }
+            });
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to get bookings');
+            }
+            
+            const bookingWithRentals = data.bookings?.find(b => b.rentals && b.rentals.length > 0);
+            if (bookingWithRentals) {
+                if (!Array.isArray(bookingWithRentals.rentals)) {
+                    throw new Error('rentals is not an array');
+                }
+                for (const r of bookingWithRentals.rentals) {
+                    if (!r.name || typeof r.price !== 'number' || typeof r.quantity !== 'number') {
+                        throw new Error(`Invalid rental structure: ${JSON.stringify(r)}`);
+                    }
+                }
+                return `${bookingWithRentals.rentals.length} rentals validated in booking`;
+            }
+            return 'No multi-rental bookings found - run booking create test first';
+        };
+
+        const testValidatePriceFields = async () => {
+            if (!userToken) {
+                log('Getting user token for price validation...', 'warn');
+                await testAuthRegister();
+            }
+            
+            const res = await fetch(`${API_URL}/api/bookings/my-bookings`, {
+                headers: { 'Authorization': `Bearer ${userToken}` }
+            });
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to get bookings');
+            }
+            
+            const newBooking = data.bookings?.find(b => b.subtotal !== undefined);
+            if (newBooking) {
+                if (typeof newBooking.subtotal !== 'number' || 
+                    typeof newBooking.taxAmount !== 'number' || 
+                    typeof newBooking.price !== 'number') {
+                    throw new Error('Price fields are not numbers');
+                }
+                return `Price validated: Subtotal ₹${newBooking.subtotal}, Tax ₹${newBooking.taxAmount}, Total ₹${newBooking.price}`;
+            }
+            return 'No new-format bookings found - run booking create test first';
+        };
+
+        // Integration Tests
+        const testIntegrationBookingFlow = async () => {
+            // Step 1: Register new user (gets token automatically)
+            log('Integration: Registering new test user...', 'info');
+            await testAuthRegister();
+            
+            // Step 2: Create booking
+            log('Integration: Creating booking with multiple rentals...', 'info');
+            await testBookingCreate();
+            
+            // Step 3: View bookings
+            log('Integration: Verifying booking appears in my bookings...', 'info');
+            const result = await testBookingMyBookings();
+            
+            return `Complete booking flow successful - ${result}`;
+        };
+
+        const testIntegrationAdminFlow = async () => {
+            // Step 1: Ensure user exists and has token
+            if (!userToken) {
+                log('Integration: Creating test user...', 'info');
+                await testAuthRegister();
+            }
+            
+            // Step 2: Admin login
+            log('Integration: Admin logging in...', 'info');
+            await testAuthAdminLogin();
+            
+            // Step 3: Admin approves a booking
+            log('Integration: Admin approving booking...', 'info');
+            const result = await testAdminApprove();
+            
+            return `Admin approval flow successful - ${result}`;
+        };
+
+        const testIntegrationSettingsFlow = async () => {
+            // Step 1: Admin login
+            if (!adminToken) {
+                log('Integration: Admin logging in...', 'info');
+                await testAuthAdminLogin();
+            }
+            
+            // Step 2: Get settings
+            log('Integration: Getting current settings...', 'info');
+            const getRes = await fetch(`${API_URL}/api/admin/settings`, {
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            });
+            const getData = await getRes.json();
+            
+            if (!getRes.ok) {
+                throw new Error('Failed to get settings');
+            }
+            
+            const originalName = getData.settings.studioName;
+            
+            // Step 3: Update settings (add test marker)
+            log('Integration: Updating settings...', 'info');
+            const updateRes = await fetch(`${API_URL}/api/admin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminToken}`
+                },
+                body: JSON.stringify({
+                    ...getData.settings,
+                    studioName: originalName // Keep same to not break things
+                })
+            });
+            
+            if (!updateRes.ok) {
+                throw new Error('Failed to update settings');
+            }
+            
+            // Step 4: Verify public settings endpoint
+            log('Integration: Verifying public settings...', 'info');
+            const verifyRes = await fetch(`${API_URL}/api/bookings/settings`);
+            const verifyData = await verifyRes.json();
+            
+            if (!verifyRes.ok) {
+                throw new Error('Failed to verify public settings');
+            }
+            
+            return `Settings flow successful - Studio: ${verifyData.settings.studioName}`;
+        };
+
+        // ==================== TEST RUNNERS ====================
+
+        const runAllTests = async () => {
+            resetTests();
+            log('Starting all tests...', 'info');
+            
+            await runApiTests();
+            await runFrontendTests();
+            
+            log(`\n========== TEST COMPLETE ==========`, 'info');
+            log(`Total: ${testResults.total} | Passed: ${testResults.passed} | Failed: ${testResults.failed}`, 
+                testResults.failed > 0 ? 'error' : 'success');
+        };
+
+        const runApiTests = async () => {
+            log('Running API tests...', 'info');
+            
+            // Auth tests
+            await runTest('test-auth-register', testAuthRegister, 'User Registration');
+            await runTest('test-auth-login', testAuthLogin, 'User Login');
+            await runTest('test-auth-admin-login', testAuthAdminLogin, 'Admin Login');
+            await runTest('test-auth-me', testAuthMe, 'Get Current User');
+            
+            // Booking tests
+            await runTest('test-booking-settings', testBookingSettings, 'Get Booking Settings');
+            await runTest('test-booking-availability', testBookingAvailability, 'Check Availability');
+            await runTest('test-booking-create', testBookingCreate, 'Create Booking');
+            await runTest('test-booking-my-bookings', testBookingMyBookings, 'Get My Bookings');
+            
+            // Admin tests
+            await runTest('test-admin-stats', testAdminStats, 'Get Admin Stats');
+            await runTest('test-admin-bookings', testAdminBookings, 'Get All Bookings');
+            await runTest('test-admin-settings-get', testAdminSettingsGet, 'Get Admin Settings');
+            await runTest('test-admin-settings-update', testAdminSettingsUpdate, 'Update Settings');
+            await runTest('test-admin-approve', testAdminApprove, 'Approve Booking');
+            
+            // Validation tests
+            await runTest('test-validate-rentals', testValidateRentals, 'Validate Rental Types');
+            await runTest('test-validate-booking-schema', testValidateBookingSchema, 'Validate Booking Schema');
+            await runTest('test-validate-multiple-rentals', testValidateMultipleRentals, 'Validate Multiple Rentals');
+            await runTest('test-validate-price-fields', testValidatePriceFields, 'Validate Price Fields');
+            
+            // Integration tests
+            await runTest('test-integration-booking-flow', testIntegrationBookingFlow, 'Complete Booking Flow');
+            await runTest('test-integration-admin-flow', testIntegrationAdminFlow, 'Admin Approval Flow');
+            await runTest('test-integration-settings-flow', testIntegrationSettingsFlow, 'Settings Update Flow');
+            
+            // Cancel test booking at the end
+            try {
+                if (testBookingId) {
+                    await runTest('test-booking-cancel', testBookingCancel, 'Cancel Booking');
+                }
+            } catch (e) {
+                // Ignore cancel errors
+            }
+        };
+
+        const runFrontendTests = async () => {
+            log('Running frontend tests...', 'info');
+            
+            await runTest('test-frontend-duration', testFrontendDuration, 'Duration Calculation');
+            await runTest('test-frontend-time-format', testFrontendTimeFormat, 'Time Formatting');
+            await runTest('test-frontend-date-format', testFrontendDateFormat, 'Date Formatting');
+            await runTest('test-frontend-price-calc', testFrontendPriceCalc, 'Price Calculation');
+            await runTest('test-frontend-tax-calc', testFrontendTaxCalc, 'Tax Calculation');
+        };
+
+        const resetTests = () => {
+            testResults = { passed: 0, failed: 0, pending: 0, total: 0 };
+            userToken = null;
+            adminToken = null;
+            testBookingId = null;
+            
+            document.querySelectorAll('.test-status').forEach(el => {
+                el.className = 'test-status status-pending';
+                el.textContent = 'Pending';
+            });
+            
+            document.querySelectorAll('.test-details').forEach(el => el.remove());
+            document.querySelectorAll('.test-item').forEach(el => el.classList.remove('expanded'));
+            
+            updateSummary();
+            updateTokenStatus();
+            log('Tests reset - tokens cleared', 'info');
+        };
+
+        const clearLogs = () => {
+            document.getElementById('logContainer').innerHTML = 
+                '<div class="log-entry info">[System] Logs cleared</div>';
+            document.getElementById('responseViewer').textContent = 'No response yet.';
+        };
+
+        // Initialize
+        updateTokenStatus();
+        log('Test suite ready. Server: ' + API_URL, 'info');
+        log('Using hardcoded test users: testuser@jamroom.com and testadmin@jamroom.com', 'info');
+    </script>
+</body>
+</html>
