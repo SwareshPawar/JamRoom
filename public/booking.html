@@ -413,6 +413,14 @@
         </div>
     </div>
 
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loader"></div>
+            <div id="loadingMessage">Processing...</div>
+        </div>
+    </div>
+    
     <!-- Alert Backdrop -->
     <div id="alertBackdrop" class="alert-backdrop"></div>
     
@@ -504,6 +512,23 @@
             }
         };
 
+        // Show/Hide Loading Overlay
+        const showLoadingOverlay = (message = 'Processing...') => {
+            const overlay = document.getElementById('loadingOverlay');
+            const messageEl = document.getElementById('loadingMessage');
+            if (overlay && messageEl) {
+                messageEl.textContent = message;
+                overlay.classList.add('show');
+            }
+        };
+        
+        const hideLoadingOverlay = () => {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        };
+
         // Load settings
         const loadSettings = async () => {
             try {
@@ -519,9 +544,11 @@
                     populateRentalTypes();
                 } else {
                     console.error('Settings response not OK:', res.status, res.statusText);
+                    showAlert('Failed to load booking settings. Please refresh the page.', 'error');
                 }
             } catch (error) {
                 console.error('Failed to load settings:', error);
+                showAlert('Connection error while loading settings. Please check your internet connection.', 'error');
             }
         };
 
@@ -681,6 +708,15 @@
         // Book slot
         const bookSlot = async (e) => {
             e.preventDefault();
+            
+            // Show loading state
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.classList.add('loading');
+            submitBtn.textContent = 'Creating Booking...';
+            submitBtn.disabled = true;
+            
+            showLoadingOverlay('Creating your booking...');
 
             const formData = {
                 date: document.getElementById('bookingDate').value,
@@ -708,6 +744,7 @@
                     throw new Error(data.message || 'Booking failed');
                 }
 
+                hideLoadingOverlay();
                 showAlert('Booking created successfully! Pending admin approval.', 'success');
                 
                 // Show UPI details
@@ -724,12 +761,29 @@
                 document.getElementById('bookingForm').reset();
                 document.getElementById('priceDisplay').style.display = 'none';
                 
+                // Reset button state
+                submitBtn.classList.remove('loading');
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                
+                // Reset form
+                document.getElementById('bookingForm').reset();
+                document.getElementById('priceDisplay').style.display = 'none';
+                
                 // Reload bookings
                 await loadMyBookings();
                 await loadAvailability(formData.date);
 
             } catch (error) {
+                hideLoadingOverlay();
+                
+                // Reset button state on error
+                submitBtn.classList.remove('loading');
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                
                 showAlert(error.message, 'error');
+                console.error('Booking submission error:', error);
             }
         };
 

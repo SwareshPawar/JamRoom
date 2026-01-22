@@ -10,6 +10,7 @@ const ical = require('ical-generator').default || require('ical-generator');
  * @param {string} options.startTime - Start time (HH:MM)
  * @param {string} options.endTime - End time (HH:MM)
  * @param {Array} options.attendees - Array of attendee emails
+ * @param {string} options.studioName - Studio name for organizer (optional)
  * @returns {string} iCal string
  */
 const generateCalendarInvite = (options) => {
@@ -21,7 +22,8 @@ const generateCalendarInvite = (options) => {
       startDate,
       startTime,
       endTime,
-      attendees = []
+      attendees = [],
+      studioName = 'Swar JamRoom & Music Studio (SwarJRS)'
     } = options;
 
     // Convert startDate to string if it's a Date object
@@ -59,7 +61,7 @@ const generateCalendarInvite = (options) => {
       location: location,
       url: process.env.BASE_URL,
       organizer: {
-        name: 'JamRoom Studio',
+        name: studioName,
         email: process.env.EMAIL_USER
       }
     });
@@ -85,9 +87,10 @@ const generateCalendarInvite = (options) => {
 /**
  * Generate iCal for multiple events
  * @param {Array} events - Array of event options
+ * @param {string} studioName - Studio name for organizer (optional)
  * @returns {string} iCal string with multiple events
  */
-const generateMultipleEvents = (events) => {
+const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studio (SwarJRS)') => {
   try {
     const calendar = ical({
       name: 'JamRoom Bookings',
@@ -120,7 +123,7 @@ const generateMultipleEvents = (events) => {
         location: location,
         url: process.env.BASE_URL,
         organizer: {
-          name: 'JamRoom Studio',
+          name: studioName,
           email: process.env.EMAIL_USER
         }
       });

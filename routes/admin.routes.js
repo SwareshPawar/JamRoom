@@ -9,6 +9,25 @@ const { isAdmin } = require('../middleware/admin');
 const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
 
+// @route   GET /api/admin/debug-settings
+// @desc    Debug settings values (temporary)
+// @access  Private/Admin
+router.get('/debug-settings', protect, isAdmin, async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+    res.json({
+      success: true,
+      settings: {
+        studioName: settings.studioName,
+        studioAddress: settings.studioAddress,
+        adminEmails: settings.adminEmails
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // @route   GET /api/admin/revenue
 // @desc    Get revenue analytics with filtering
 // @access  Private/Admin
@@ -313,6 +332,12 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       bookingStatus: 'PENDING'
     });
 
+    const settings = await AdminSettings.getSettings();
+    console.log('DEBUG: Settings for calendar invite:', {
+      studioName: settings.studioName,
+      studioAddress: settings.studioAddress
+    });
+    
     const rejectedBookings = [];
     for (const pendingBooking of overlappingBookings) {
       if (checkTimeConflict(booking.startTime, booking.endTime, pendingBooking.startTime, pendingBooking.endTime)) {
@@ -324,7 +349,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
         try {
           await sendEmail({
             to: pendingBooking.userEmail,
-            subject: 'Booking Request Update - JamRoom',
+        subject: `Booking Request Update - ${settings.studioName || 'Swar JamRoom'}`,
             html: `
               <h2>Booking Request Update</h2>
               <p>Hi ${pendingBooking.userName},</p>
@@ -339,8 +364,6 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       }
     }
 
-    const settings = await AdminSettings.getSettings();
-
     const displayDate = booking.date.toLocaleDateString('en-IN', {
       weekday: 'long',
       year: 'numeric',
@@ -350,20 +373,21 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
 
     // Generate calendar invite
     const calendarInvite = generateCalendarInvite({
-      title: `${settings.studioName || 'JamRoom Studio'} Booking - ${booking.rentalType}`,
+      title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
       description: `Booking confirmed for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
-      location: `${settings.studioName || 'JamRoom Studio'}${settings.studioAddress ? ', ' + settings.studioAddress : ''}`,
+      location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
       startDate: booking.date,
       startTime: booking.startTime,
       endTime: booking.endTime,
-      attendees: [booking.userEmail, ...settings.adminEmails]
+      attendees: [booking.userEmail, ...settings.adminEmails],
+      studioName: settings.studioName || 'Swar JamRoom'
     });
 
     // Send confirmation email to user with calendar invite
     try {
       await sendEmail({
         to: booking.userEmail,
-        subject: 'Booking Confirmed - JamRoom',
+        subject: `Booking Confirmed - ${settings.studioName || 'Swar JamRoom'}`,
         html: `
           <h2>🎉 Booking Confirmed!</h2>
           <p>Hi ${booking.userName},</p>
@@ -378,7 +402,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
             ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
           </ul>
           <p>A calendar invite is attached to this email.</p>
-          <p>Looking forward to seeing you at JamRoom Studio!</p>
+          <p>Looking forward to seeing you at ${settings.studioName || 'Swar JamRoom Studio'}!</p>
         `,
         attachments: [{
           filename: 'booking.ics',
@@ -394,7 +418,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       for (const adminEmail of settings.adminEmails) {
         await sendEmail({
           to: adminEmail,
-          subject: 'Booking Approved - JamRoom',
+          subject: `Booking Approved - ${settings.studioName || 'Swar JamRoom Studio'}`,
           html: `
             <h2>Booking Approved</h2>
             <p>A booking has been approved by ${req.user.name}.</p>
@@ -464,6 +488,8 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
     }
     await booking.save();
 
+    const settings = await AdminSettings.getSettings();
+
     const displayDate = booking.date.toLocaleDateString('en-IN', {
       weekday: 'long',
       year: 'numeric',
@@ -475,7 +501,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
     try {
       await sendEmail({
         to: booking.userEmail,
-        subject: 'Booking Update - JamRoom',
+        subject: `Booking Update - ${settings.studioName || 'Swar JamRoom Studio'}`,
         html: `
           <h2>Booking Update</h2>
           <p>Hi ${booking.userName},</p>
@@ -604,6 +630,153 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/admin/bookings/:id
+// @desc    Delete a booking (Admin only)
+// @access  Private/Admin
+router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    const settings = await AdminSettings.getSettings();
+    const displayDate = booking.date.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric', 
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Send notification email to user
+    try {
+      await sendEmail({
+        to: booking.userEmail,
+        subject: `Booking Deleted - ${settings.studioName || 'Swar JamRoom'}`,
+        html: `
+          <h2>Booking Deleted</h2>
+          <p>Hi ${booking.userName},</p>
+          <p>Your booking has been deleted by the admin team.</p>
+          <h3>Deleted Booking Details:</h3>
+          <ul>
+            <li><strong>Date:</strong> ${displayDate}</li>
+            <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
+            <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
+            <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
+            <li><strong>Price:</strong> ₹${booking.price}</li>
+          </ul>
+          <p>If you have any questions, please contact us.</p>
+          <p>If you paid for this booking, please contact us for refund information.</p>
+        `
+      });
+    } catch (emailError) {
+      console.log('Deletion notification email failed:', emailError.message);
+    }
+
+    // Delete the booking
+    await Booking.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Booking deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete booking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error deleting booking'
+    });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/edit
+// @desc    Edit a booking (Admin only)
+// @access  Private/Admin
+router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
+  try {
+    const { date, startTime, endTime, duration, rentalType, notes, price } = req.body;
+    
+    const booking = await Booking.findById(req.params.id);
+    
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    // Store old values for comparison
+    const oldValues = {
+      date: booking.date,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      duration: booking.duration,
+      rentalType: booking.rentalType,
+      price: booking.price
+    };
+
+    // Update booking fields
+    if (date) booking.date = new Date(date);
+    if (startTime) booking.startTime = startTime;
+    if (endTime) booking.endTime = endTime;
+    if (duration) booking.duration = duration;
+    if (rentalType) booking.rentalType = rentalType;
+    if (notes !== undefined) booking.notes = notes;
+    if (price) booking.price = price;
+    
+    await booking.save();
+
+    const settings = await AdminSettings.getSettings();
+    const displayDate = booking.date.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long', 
+      day: 'numeric'
+    });
+
+    // Send update notification to user
+    try {
+      await sendEmail({
+        to: booking.userEmail,
+        subject: `Booking Updated - ${settings.studioName || 'Swar JamRoom'}`,
+        html: `
+          <h2>Booking Updated</h2>
+          <p>Hi ${booking.userName},</p>
+          <p>Your booking has been updated by the admin team.</p>
+          <h3>Updated Booking Details:</h3>
+          <ul>
+            <li><strong>Date:</strong> ${displayDate}</li>
+            <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
+            <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
+            <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
+            <li><strong>Price:</strong> ₹${booking.price}</li>
+            ${booking.notes ? `<li><strong>Notes:</strong> ${booking.notes}</li>` : ''}
+          </ul>
+          <p>If you have any questions about these changes, please contact us.</p>
+        `
+      });
+    } catch (emailError) {
+      console.log('Update notification email failed:', emailError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Booking updated successfully',
+      booking
+    });
+  } catch (error) {
+    console.error('Edit booking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating booking'
+    });
+  }
+});
+
 // @route   POST /api/admin/make-admin
 // @desc    Grant admin privileges to a user
 // @access  Private/Admin
@@ -648,7 +821,7 @@ router.post('/make-admin', protect, isAdmin, async (req, res) => {
     try {
       await sendEmail({
         to: email,
-        subject: 'Admin Access Granted - JamRoom',
+        subject: `Admin Access Granted - ${settings.studioName || 'Swar JamRoom Studio'}`,
         html: `
           <h2>Admin Access Granted</h2>
           <p>Hi ${user.name},</p>
