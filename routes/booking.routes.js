@@ -1,67 +1,112 @@
 const express = require('express');
 const router = express.Router();
 const Booking = require('../models/Booking');
-const Slot = require('../models/Slot');
+const BlockedTime = require('../models/BlockedTime');
 const User = require('../models/User');
 const AdminSettings = require('../models/AdminSettings');
 const { protect } = require('../middleware/auth');
 const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
 
+/**
+ * Helper function to check time conflicts
+ */
+const checkTimeConflict = (start1, end1, start2, end2) => {
+  return (start1 < end2 && end1 > start2);
+};
+
+/**
+ * Helper function to convert time string to minutes
+ */
+const timeToMinutes = (time) => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+/**
+ * Helper function to calculate end time from start time and duration
+ */
+const calculateEndTime = (startTime, duration) => {
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = startMinutes + (duration * 60);
+  const hours = Math.floor(endMinutes / 60) % 24;
+  const minutes = endMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
 // @route   POST /api/bookings
-// @desc    Create a new booking
+// @desc    Create a new booking with flexible duration
 // @access  Private
 router.post('/', protect, async (req, res) => {
   try {
-    const { slotId, rentalType, bandName, notes } = req.body;
+    const { date, startTime, duration, rentalType, bandName, notes } = req.body;
 
-    if (!slotId || !rentalType) {
+    if (!date || !startTime || !duration || !rentalType) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide slotId and rentalType'
+        message: 'Please provide date, startTime, duration, and rentalType'
       });
     }
 
-    // Check if slot exists and is available
-    const slot = await Slot.findById(slotId);
-    if (!slot) {
-      return res.status(404).json({
-        success: false,
-        message: 'Slot not found'
-      });
-    }
-
-    if (slot.isBlocked) {
+    // Validate duration
+    if (duration < 1) {
       return res.status(400).json({
         success: false,
-        message: 'This slot is blocked'
+        message: 'Duration must be at least 1 hour'
       });
     }
 
-    // Check if slot is already booked
-    const existingBooking = await Booking.findOne({
-      slotId,
+    // Calculate end time
+    const endTime = calculateEndTime(startTime, duration);
+
+    // Convert date to start of day
+    const bookingDate = new Date(date);
+    bookingDate.setHours(0, 0, 0, 0);
+
+    // Check for conflicts with existing bookings
+    const existingBookings = await Booking.find({
+      date: bookingDate,
       bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
     });
 
-    if (existingBooking) {
-      return res.status(400).json({
-        success: false,
-        message: 'This slot is already booked'
-      });
+    for (const booking of existingBookings) {
+      if (checkTimeConflict(startTime, endTime, booking.startTime, booking.endTime)) {
+        return res.status(400).json({
+          success: false,
+          message: `Time conflict with existing booking (${booking.startTime} - ${booking.endTime})`
+        });
+      }
+    }
+
+    // Check for conflicts with blocked times
+    const blockedTimes = await BlockedTime.find({
+      date: bookingDate
+    });
+
+    for (const blocked of blockedTimes) {
+      if (checkTimeConflict(startTime, endTime, blocked.startTime, blocked.endTime)) {
+        return res.status(400).json({
+          success: false,
+          message: `This time slot is blocked by admin (${blocked.startTime} - ${blocked.endTime})`
+        });
+      }
     }
 
     // Get pricing from admin settings
     const settings = await AdminSettings.getSettings();
     const rentalTypeInfo = settings.rentalTypes.find(rt => rt.name === rentalType);
-    const price = rentalTypeInfo ? rentalTypeInfo.basePrice : 500;
+    const basePrice = rentalTypeInfo ? rentalTypeInfo.basePrice : 500;
+    const totalPrice = basePrice * duration;
 
     // Create booking
     const booking = await Booking.create({
       userId: req.user._id,
-      slotId,
+      date: bookingDate,
+      startTime,
+      endTime,
+      duration,
       rentalType,
-      price,
+      price: totalPrice,
       userName: req.user.name,
       userEmail: req.user.email,
       bandName,
@@ -70,8 +115,13 @@ router.post('/', protect, async (req, res) => {
       bookingStatus: 'PENDING'
     });
 
-    // Populate slot details
-    await booking.populate('slotId');
+    // Format date for display
+    const displayDate = bookingDate.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
 
     // Send confirmation email to user
     try {
@@ -84,14 +134,17 @@ router.post('/', protect, async (req, res) => {
           <p>Your booking request has been received and is pending admin approval.</p>
           <h3>Booking Details:</h3>
           <ul>
-            <li><strong>Date:</strong> ${slot.date}</li>
-            <li><strong>Time:</strong> ${slot.startTime} - ${slot.endTime}</li>
+            <li><strong>Date:</strong> ${displayDate}</li>
+            <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
+            <li><strong>Duration:</strong> ${duration} hour(s)</li>
             <li><strong>Rental Type:</strong> ${rentalType}</li>
-            <li><strong>Price:</strong> ₹${price}</li>
+            <li><strong>Price:</strong> ₹${totalPrice} (₹${basePrice}/hour × ${duration} hours)</li>
             <li><strong>Status:</strong> PENDING</li>
           </ul>
           <h3>Payment Details:</h3>
           <p><strong>UPI ID:</strong> ${settings.upiId}</p>
+          <p><strong>Name:</strong> ${settings.upiName}</p>
+          <p><strong>Amount:</strong> ₹${totalPrice}</p>
           <p>Please complete the payment and wait for admin approval.</p>
           <p>You will receive a confirmation email once approved.</p>
         `
@@ -111,10 +164,11 @@ router.post('/', protect, async (req, res) => {
             <h3>Booking Details:</h3>
             <ul>
               <li><strong>User:</strong> ${req.user.name} (${req.user.email})</li>
-              <li><strong>Date:</strong> ${slot.date}</li>
-              <li><strong>Time:</strong> ${slot.startTime} - ${slot.endTime}</li>
+              <li><strong>Date:</strong> ${displayDate}</li>
+              <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
+              <li><strong>Duration:</strong> ${duration} hour(s)</li>
               <li><strong>Rental Type:</strong> ${rentalType}</li>
-              <li><strong>Price:</strong> ₹${price}</li>
+              <li><strong>Price:</strong> ₹${totalPrice}</li>
               ${bandName ? `<li><strong>Band Name:</strong> ${bandName}</li>` : ''}
             </ul>
             <p>Please review and approve/reject this booking in the admin panel.</p>
@@ -132,7 +186,7 @@ router.post('/', protect, async (req, res) => {
       upiDetails: {
         upiId: settings.upiId,
         upiName: settings.upiName,
-        amount: price
+        amount: totalPrice
       }
     });
   } catch (error) {
@@ -144,14 +198,47 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/bookings/availability
+// @desc    Check availability for a specific date (for reference)
+// @access  Public
+router.get('/availability/:date', async (req, res) => {
+  try {
+    const date = new Date(req.params.date);
+    date.setHours(0, 0, 0, 0);
+
+    // Get all bookings for the date
+    const bookings = await Booking.find({
+      date,
+      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
+    }).select('startTime endTime rentalType bookingStatus');
+
+    // Get all blocked times for the date
+    const blockedTimes = await BlockedTime.find({
+      date
+    }).select('startTime endTime reason');
+
+    res.json({
+      success: true,
+      date: date.toISOString().split('T')[0],
+      bookings,
+      blockedTimes
+    });
+  } catch (error) {
+    console.error('Get availability error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching availability'
+    });
+  }
+});
+
 // @route   GET /api/bookings/my-bookings
 // @desc    Get user's bookings
 // @access  Private
 router.get('/my-bookings', protect, async (req, res) => {
   try {
     const bookings = await Booking.find({ userId: req.user._id })
-      .populate('slotId')
-      .sort({ createdAt: -1 });
+      .sort({ date: -1, startTime: -1 });
 
     res.json({
       success: true,
@@ -173,7 +260,6 @@ router.get('/my-bookings', protect, async (req, res) => {
 router.get('/:id', protect, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate('slotId')
       .populate('userId', 'name email');
 
     if (!booking) {
@@ -209,7 +295,7 @@ router.get('/:id', protect, async (req, res) => {
 // @access  Private
 router.put('/:id/cancel', protect, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id).populate('slotId');
+    const booking = await Booking.findById(req.params.id);
 
     if (!booking) {
       return res.status(404).json({
@@ -237,6 +323,13 @@ router.put('/:id/cancel', protect, async (req, res) => {
     booking.bookingStatus = 'CANCELLED';
     await booking.save();
 
+    const displayDate = booking.date.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
     // Send cancellation email
     try {
       await sendEmail({
@@ -248,8 +341,8 @@ router.put('/:id/cancel', protect, async (req, res) => {
           <p>Your booking has been cancelled.</p>
           <h3>Cancelled Booking Details:</h3>
           <ul>
-            <li><strong>Date:</strong> ${booking.slotId.date}</li>
-            <li><strong>Time:</strong> ${booking.slotId.startTime} - ${booking.slotId.endTime}</li>
+            <li><strong>Date:</strong> ${displayDate}</li>
+            <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
             <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
           </ul>
           <p>If you paid for this booking, please contact us for a refund.</p>

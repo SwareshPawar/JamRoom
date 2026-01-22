@@ -24,10 +24,12 @@ const createIndexes = async () => {
     const User = require('../models/User');
     const Booking = require('../models/Booking');
     const Slot = require('../models/Slot');
+    const BlockedTime = require('../models/BlockedTime');
     
     await User.createIndexes();
     await Booking.createIndexes();
     await Slot.createIndexes();
+    await BlockedTime.createIndexes();
     
     console.log('Database indexes created successfully');
   } catch (error) {

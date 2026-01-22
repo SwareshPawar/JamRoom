@@ -6,10 +6,24 @@ const bookingSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'User ID is required']
   },
-  slotId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Slot',
-    required: [true, 'Slot ID is required']
+  date: {
+    type: Date,
+    required: [true, 'Date is required']
+  },
+  startTime: {
+    type: String,
+    required: [true, 'Start time is required'],
+    match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)']
+  },
+  endTime: {
+    type: String,
+    required: [true, 'End time is required'],
+    match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)']
+  },
+  duration: {
+    type: Number,
+    required: [true, 'Duration is required'],
+    min: [1, 'Duration must be at least 1 hour']
   },
   rentalType: {
     type: String,
@@ -63,9 +77,10 @@ const bookingSchema = new mongoose.Schema({
 
 // Indexes for efficient queries
 bookingSchema.index({ userId: 1, createdAt: -1 });
-bookingSchema.index({ slotId: 1 });
+bookingSchema.index({ date: 1, startTime: 1 });
 bookingSchema.index({ bookingStatus: 1 });
 bookingSchema.index({ paymentStatus: 1 });
+bookingSchema.index({ date: 1, bookingStatus: 1 });
 
 // Update updatedAt on save
 bookingSchema.pre('save', function(next) {
