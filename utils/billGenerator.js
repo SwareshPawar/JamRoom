@@ -306,14 +306,8 @@ const generateBillHTML = async (booking, settings) => {
                 <div class="company-name">${settings?.studioName || 'JamRoom'}</div>
                 <div class="company-tagline">Professional Music Studio Rental</div>
                 <div class="company-details">
-                    ${settings?.studioAddress ? `
-                        Zen Business Center - 202<br>
-                        Bhumkar Chowk Rd, Above Cafe Coffee Day<br>
-                        Shankar Kalat Nagar, Wakad<br>
-                        Pune, Pimpri-Chinchwad<br>
-                        Maharashtra 411057
-                    ` : 'Studio Address'}<br>
-                    Email: ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}<br>
+                    ${settings?.studioAddress || 'Studio Address'}<br>
+                    Email: ${settings?.adminEmails?.[0] || 'swarjrs@gmail.com'}<br>
                     Phone: ${settings?.studioPhone || '+91 XXXX XXXXXX'}
                 </div>
             </div>

@@ -44,7 +44,7 @@ const adminSettingsSchema = new mongoose.Schema({
   }],
   studioName: {
     type: String,
-    default: 'Swar JamRoom & Music Studio (SwarJRS)'
+    default: 'Swar JamRoom & Music Studio'
   },
   studioAddress: {
     type: String,
