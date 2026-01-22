@@ -386,6 +386,7 @@
         };
 
         const formatTime = (time) => {
+            if (!time) return 'N/A';
             const [hours, minutes] = time.split(':');
             const hour = parseInt(hours);
             const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -497,10 +498,19 @@
                 let html = '<table><thead><tr><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
                 
                 data.bookings.forEach(booking => {
+                    // Skip old bookings that don't have the new schema
+                    if (!booking.startTime || !booking.endTime || !booking.duration) {
+                        console.log('Skipping old booking:', booking._id);
+                        return;
+                    }
+                    
                     const statusClass = booking.bookingStatus.toLowerCase();
+                    const userName = booking.userId?.name || booking.userName || 'N/A';
+                    const userEmail = booking.userId?.email || booking.userEmail || 'N/A';
+                    
                     html += `
                         <tr>
-                            <td>${booking.userName}<br><small>${booking.userEmail}</small></td>
+                            <td>${userName}<br><small>${userEmail}</small></td>
                             <td>${formatDate(booking.date)}</td>
                             <td>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</td>
                             <td>${booking.duration} hour(s)</td>
@@ -520,8 +530,9 @@
                 html += '</tbody></table>';
                 document.getElementById('bookingsTable').innerHTML = html;
             } catch (error) {
+                console.error('Load bookings error:', error);
                 document.getElementById('bookingsTable').innerHTML = 
-                    '<p style="color: #dc3545;">Failed to load bookings</p>';
+                    '<p style="color: #dc3545;">Failed to load bookings: ' + error.message + '</p>';
             }
         };
 

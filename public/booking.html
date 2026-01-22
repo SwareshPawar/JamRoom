@@ -327,6 +327,7 @@
         };
 
         const formatTime = (time) => {
+            if (!time) return 'N/A';
             const [hours, minutes] = time.split(':');
             const hour = parseInt(hours);
             const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -550,6 +551,12 @@
 
                 let html = '';
                 data.bookings.forEach(booking => {
+                    // Skip old bookings that don't have the new schema
+                    if (!booking.startTime || !booking.endTime || !booking.duration) {
+                        console.log('Skipping old booking:', booking._id);
+                        return;
+                    }
+                    
                     const statusClass = booking.bookingStatus.toLowerCase();
                     const date = new Date(booking.date);
                     html += `
@@ -569,10 +576,11 @@
                     `;
                 });
 
-                document.getElementById('bookingsList').innerHTML = html;
+                document.getElementById('bookingsList').innerHTML = html || '<p style="text-align:center; color:#666;">No valid bookings found</p>';
             } catch (error) {
+                console.error('Load bookings error:', error);
                 document.getElementById('bookingsList').innerHTML = 
-                    '<p style="color: #dc3545;">Failed to load bookings</p>';
+                    '<p style="color: #dc3545;">Failed to load bookings: ' + error.message + '</p>';
             }
         };
 
