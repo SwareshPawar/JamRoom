@@ -1,43 +1,58 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs').promises;
-const path = require('path');
-const AdminSettings = require('../models/AdminSettings');
+/**
+ * Client-Side PDF Generation
+ * This generates PDFs exactly matching the server-side version
+ */
 
-// Check if we're in a serverless environment
-const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
+// Load external libraries dynamically
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
 
-console.log('Environment setup:');
-console.log('- VERCEL:', process.env.VERCEL);
-console.log('- VERCEL_ENV:', process.env.VERCEL_ENV);
-console.log('- isServerless:', isServerless);
-
-// For Vercel, we'll use regular puppeteer with optimized settings
-// chrome-aws-lambda is deprecated and causes issues on Vercel
+// Initialize PDF libraries
+let pdfLibsLoaded = false;
+async function loadPDFLibraries() {
+    if (pdfLibsLoaded) return;
+    
+    try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+        pdfLibsLoaded = true;
+        console.log('PDF libraries loaded successfully');
+    } catch (error) {
+        console.error('Failed to load PDF libraries:', error);
+        throw error;
+    }
+}
 
 /**
- * Generate HTML content for the bill
+ * Generate the exact same HTML content as server-side
  */
-const generateBillHTML = async (booking, settings) => {
-  const bookingDate = new Date(booking.date);
-  const currentDate = new Date();
-  
-  // Calculate pricing - use booking amounts if available, otherwise calculate from booking.price
-  let subtotal, taxAmount, totalAmount;
-  
-  if (booking.subtotal !== undefined && booking.taxAmount !== undefined) {
-    // Use the amounts calculated during booking creation
-    subtotal = booking.subtotal;
-    taxAmount = booking.taxAmount;
-    totalAmount = booking.price; // This should be the total including tax
-  } else {
-    // Fallback to old calculation method for legacy bookings
-    subtotal = booking.price;
-    const taxRate = 0.18;
-    taxAmount = subtotal * taxRate;
-    totalAmount = subtotal + taxAmount;
-  }
-  
-  return `
+function generateBillHTML(booking, settings) {
+    const bookingDate = new Date(booking.date);
+    const currentDate = new Date();
+    
+    // Calculate pricing - use booking amounts if available, otherwise calculate from booking.price
+    let subtotal, taxAmount, totalAmount;
+    
+    if (booking.subtotal !== undefined && booking.taxAmount !== undefined) {
+        // Use the amounts calculated during booking creation
+        subtotal = booking.subtotal;
+        taxAmount = booking.taxAmount;
+        totalAmount = booking.price; // This should be the total including tax
+    } else {
+        // Fallback to old calculation method for legacy bookings
+        subtotal = booking.price;
+        const taxRate = 0.18;
+        taxAmount = subtotal * taxRate;
+        totalAmount = subtotal + taxAmount;
+    }
+    
+    return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -463,92 +478,6 @@ const generateBillHTML = async (booking, settings) => {
             font-weight: 600;
         }
         
-        /* Responsive Design */
-        @media screen and (max-width: 768px) {
-            .invoice-content {
-                padding: 30px 20px;
-            }
-            
-            .header {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .logo-section {
-                max-width: 100%;
-                margin-bottom: 30px;
-            }
-            
-            .invoice-title {
-                text-align: center;
-            }
-            
-            .billing-section {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-            
-            .company-name {
-                font-size: 24px;
-            }
-            
-            .invoice-title h1 {
-                font-size: 32px;
-            }
-            
-            .items-table th,
-            .items-table td {
-                padding: 12px 8px;
-                font-size: 12px;
-            }
-            
-            .totals-container {
-                min-width: 100%;
-            }
-        }
-        
-        @media screen and (max-width: 480px) {
-            .invoice-content {
-                padding: 20px 15px;
-            }
-            
-            .company-name {
-                font-size: 20px;
-            }
-            
-            .invoice-title h1 {
-                font-size: 28px;
-            }
-            
-            .invoice-number {
-                font-size: 14px;
-                padding: 10px 16px;
-            }
-            
-            .bill-card {
-                padding: 20px;
-            }
-            
-            .items-table th,
-            .items-table td {
-                padding: 10px 6px;
-                font-size: 11px;
-            }
-        }
-        
-        /* Print Styles */
-        @media print {
-            .invoice {
-                box-shadow: none;
-                border-radius: 0;
-                max-width: 100%;
-            }
-            
-            .invoice-content {
-                padding: 20px;
-            }
-        }
-        
         .payment-title {
             font-size: 16px;
             font-weight: bold;
@@ -755,251 +684,66 @@ const generateBillHTML = async (booking, settings) => {
     </div>
 </body>
 </html>
-  `;
-};
+    `;
+}
 
 /**
- * Generate PDF bill for a booking (optimized for email - stable config)
+ * Generate PDF from booking data (client-side)
  */
-const generateBill = async (booking) => {
-  let browser;
-  
-  try {
-    console.log('Starting PDF generation for booking:', booking._id);
+async function generatePDFClient(booking, settings) {
+    await loadPDFLibraries();
     
-    // Get admin settings for company info
-    const settings = await AdminSettings.getSettings();
-    console.log('Retrieved admin settings');
+    console.log('Starting client-side PDF generation...');
     
     // Generate HTML content
-    const htmlContent = await generateBillHTML(booking, settings);
-    console.log('Generated HTML content, length:', htmlContent.length);
+    const htmlContent = generateBillHTML(booking, settings);
     
-    // Launch puppeteer with stable configuration (same as working email version)
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu'
-      ],
-      timeout: 30000
-    });
-
-    console.log('Puppeteer browser launched');
-    const page = await browser.newPage();
-
-    // Set content and generate PDF
-    await page.setContent(htmlContent, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30000
-    });
-
-    console.log('HTML content set, generating PDF...');
+    // Create a temporary container
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = htmlContent;
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.width = '800px';
+    document.body.appendChild(tempContainer);
     
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '20px',
-        right: '20px',
-        bottom: '20px',
-        left: '20px'
-      }
-    });
+    const invoiceElement = tempContainer.querySelector('.invoice');
     
-    console.log('PDF generated successfully, size:', pdfBuffer.length);
+    const options = {
+        margin: 0.5,
+        filename: `JamRoom_Invoice_${booking._id.toString().slice(-6).toUpperCase()}_${new Date(booking.date).toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            allowTaint: true,
+            backgroundColor: '#f7fafc',
+            width: 800,
+            height: invoiceElement.scrollHeight,
+            scrollX: 0,
+            scrollY: 0
+        },
+        jsPDF: { 
+            unit: 'in', 
+            format: 'a4', 
+            orientation: 'portrait',
+            compress: true
+        }
+    };
     
-    await browser.close();
-    return pdfBuffer;
-    
-  } catch (error) {
-    console.error('PDF generation error:', error.message);
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (closeError) {
-        console.error('Error closing browser:', closeError.message);
-      }
-    }
-    throw new Error(`PDF generation failed: ${error.message}`);
-  }
-};
-
-/**
- * Generate PDF bill for download (optimized for Vercel serverless)
- */
-const generateBillForDownload = async (booking) => {
-  let browser;
-  
-  try {
-    console.log('=== PDF DOWNLOAD GENERATION START ===');
-    console.log('Booking ID:', booking._id);
-    console.log('Environment details:');
-    console.log('- NODE_ENV:', process.env.NODE_ENV);
-    console.log('- VERCEL:', process.env.VERCEL);
-    console.log('- AWS_LAMBDA_FUNCTION_NAME:', process.env.AWS_LAMBDA_FUNCTION_NAME);
-    console.log('- isServerless:', isServerless);
-    console.log('- chromium available:', !!chromium);
-    console.log('- Memory usage:', process.memoryUsage());
-    
-    // Get admin settings for company info
-    console.log('🔌 Checking database connection for PDF download...');
-    const mongoose = require('mongoose');
-    
-    // Ensure database connection in serverless environment
-    if (mongoose.connection.readyState !== 1) {
-      console.log('🔌 Database not connected, attempting connection...');
-      if (!process.env.MONGO_URI) {
-        throw new Error('MONGO_URI environment variable is not set');
-      }
-      await mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 8000, // 8 second timeout
-        socketTimeoutMS: 15000, // 15 second socket timeout
-      });
-      console.log('✅ Database connected successfully');
-    }
-    
-    const settings = await AdminSettings.getSettings();
-    console.log('Retrieved admin settings:', settings ? '✅ Found' : '❌ Not found');
-    
-    // Generate HTML content
-    const htmlContent = await generateBillHTML(booking, settings);
-    console.log('Generated HTML content, length:', htmlContent.length);
-    
-    // Launch puppeteer with Vercel-optimized configuration
-    console.log('Launching puppeteer with Vercel-optimized config');
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-extensions',
-        '--disable-plugins',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-features=TranslateUI',
-        '--disable-ipc-flooding-protection',
-        '--memory-pressure-off'
-      ],
-      timeout: 30000
-    });
-    console.log('Puppeteer browser launched successfully');
-
-    console.log('Browser launched for PDF download');
-    const page = await browser.newPage();
-    
-    // Set smaller viewport to reduce memory usage
-    await page.setViewport({ width: 800, height: 600 });
-    
-    // Set content with optimized timeout
-    await page.setContent(htmlContent, {
-      waitUntil: 'domcontentloaded',
-      timeout: 20000
-    });
-
-    console.log('HTML content set, generating PDF for download...');
-    
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '20px',
-        right: '20px',
-        bottom: '20px',
-        left: '20px'
-      },
-      timeout: 20000
-    });
-    
-    console.log('PDF download generated successfully, size:', pdfBuffer.length);
-    
-    await browser.close();
-    return pdfBuffer;
-    
-  } catch (error) {
-    console.error('PDF download generation error:', error.message);
-    console.error('Error stack:', error.stack);
-    
-    // Ensure browser is closed even on error
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (closeError) {
-        console.error('Error closing browser:', closeError.message);
-      }
-    }
-    
-    // Provide more specific error messages for debugging
-    if (error.message.includes('timeout')) {
-      throw new Error('PDF generation timed out. Please try again or contact support.');
-    } else if (error.message.includes('browser')) {
-      throw new Error('Browser initialization failed. This may be a temporary server issue.');
-    } else if (error.message.includes('memory')) {
-      throw new Error('Server memory limit exceeded. Please try again later.');
-    } else {
-      throw new Error(`PDF download failed: ${error.message}`);
-    }
-  }
-};
-
-/**
- * Generate bill filename
- */
-const generateBillFilename = (booking, settings) => {
-  const bookingDate = new Date(booking.date);
-  const dateStr = bookingDate.toISOString().split('T')[0];
-  const bookingId = booking._id.toString().slice(-6).toUpperCase();
-  const studioPrefix = (settings?.studioName || 'JamRoom').replace(/[^a-zA-Z0-9]/g, '_');
-  return `${studioPrefix}_Invoice_${bookingId}_${dateStr}.pdf`;
-};
-
-/**
- * Generate PDF for download with filename (single database call)
- */
-const generateBillForDownloadWithFilename = async (booking) => {
-  // Check if we're in a serverless environment
-  const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
-  
-  // Explicit database connection for serverless
-  if (isServerless) {
-    console.log('Serverless environment detected, ensuring MongoDB connection...');
     try {
-      const mongoose = require('mongoose');
-      if (mongoose.connection.readyState !== 1) {
-        // Set serverless-specific connection timeouts
-        mongoose.connection.serverSelectionTimeoutMS = 8000;
-        mongoose.connection.socketTimeoutMS = 15000;
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log('✅ MongoDB connected for PDF generation');
-      }
+        await html2pdf().from(invoiceElement).set(options).save();
+        console.log('Client-side PDF generated successfully');
+        
+        // Clean up
+        document.body.removeChild(tempContainer);
+        
+        return true;
     } catch (error) {
-      console.error('❌ MongoDB connection failed:', error);
-      throw new Error('Database connection failed');
+        console.error('Client-side PDF generation failed:', error);
+        document.body.removeChild(tempContainer);
+        throw error;
     }
-  }
-  
-  const settings = await AdminSettings.getSettings();
-  const pdfBuffer = await generateBillForDownload(booking);
-  const filename = generateBillFilename(booking, settings);
-  
-  return { pdfBuffer, filename };
-};
+}
 
-module.exports = {
-  generateBill,
-  generateBillForDownload,
-  generateBillForDownloadWithFilename,
-  generateBillFilename,
-  generateBillHTML
-};
+// Export for use in HTML pages
+window.generatePDFClient = generatePDFClient;

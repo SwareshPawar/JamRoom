@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book Your Jam Session - JamRoom</title>
+    <!-- Client-side PDF Generation -->
+    <script src="/js/client-pdf-generator.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1671,34 +1673,71 @@
                 showLoadingOverlay('Generating your bill PDF...');
                 
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/bookings/${bookingId}/download-pdf`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                
+                // First, try server-side PDF generation
+                try {
+                    console.log('Attempting server-side PDF generation...');
+                    const res = await fetch(`${API_URL}/api/bookings/${bookingId}/download-pdf`, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
 
-                if (!res.ok) {
-                    const error = await res.json();
-                    throw new Error(error.message || 'Failed to generate PDF');
+                    if (res.ok) {
+                        // Server-side generation successful
+                        const blob = await res.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `jamroom-booking-${bookingId}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        showAlert('Your bill PDF has been downloaded successfully!', 'success');
+                        return; // Success, exit early
+                    } else {
+                        const error = await res.json();
+                        console.log('Server-side PDF failed:', error.message);
+                        throw new Error(error.message || 'Server-side PDF generation failed');
+                    }
+                } catch (serverError) {
+                    console.log('Server-side PDF generation failed, trying client-side...', serverError.message);
+                    
+                    // Fallback to client-side PDF generation
+                    showLoadingOverlay('Server unavailable, generating PDF locally...');
+                    
+                    // Get booking data and admin settings for client-side generation
+                    const [bookingRes, settingsRes] = await Promise.all([
+                        fetch(`${API_URL}/api/bookings/${bookingId}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        }),
+                        fetch(`${API_URL}/api/admin/debug-settings`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        })
+                    ]);
+                    
+                    if (!bookingRes.ok) {
+                        throw new Error('Could not fetch booking data for PDF generation');
+                    }
+                    
+                    const bookingData = await bookingRes.json();
+                    let settingsData = null;
+                    
+                    if (settingsRes.ok) {
+                        const settings = await settingsRes.json();
+                        settingsData = settings.settings;
+                    }
+                    
+                    // Generate PDF on client-side
+                    await generatePDFClient(bookingData.booking, settingsData);
+                    showAlert('Your bill PDF has been downloaded successfully! (Generated locally)', 'success');
                 }
-
-                // Create blob from response
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
                 
-                // Create temporary download link
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `jamroom-booking-${bookingId}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                
-                // Cleanup
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                
-                showAlert('Your bill PDF has been downloaded successfully!', 'success');
             } catch (error) {
-                console.error('Download PDF error:', error);
+                console.error('PDF download error:', error);
                 
                 let userMessage = error.message;
                 
@@ -1708,6 +1747,10 @@
                     userMessage = 'Unable to generate PDF at this time. Please try again later or contact support.';
                 } else if (error.message.includes('Not authorized')) {
                     userMessage = 'You are not authorized to download this bill. Please make sure you are logged in.';
+                } else if (error.message.includes('generatePDFClient is not defined')) {
+                    userMessage = 'PDF generation library not loaded. Please refresh the page and try again.';
+                } else {
+                    userMessage = 'Unable to generate PDF. Please try again or contact support if the problem persists.';
                 }
                 
                 showAlert(userMessage, 'error');
