@@ -3,15 +3,6 @@ const fs = require('fs').promises;
 const path = require('path');
 const AdminSettings = require('../models/AdminSettings');
 
-// Import chrome-aws-lambda for serverless environments
-let chromium;
-try {
-  chromium = require('chrome-aws-lambda');
-} catch (error) {
-  // chrome-aws-lambda not available, will use regular puppeteer
-  chromium = null;
-}
-
 /**
  * Generate HTML content for the bill
  */
@@ -773,45 +764,39 @@ const generateBill = async (booking) => {
     const htmlContent = await generateBillHTML(booking, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
     
-    // Launch puppeteer with serverless-compatible configuration
-    let browser;
-    
-    if (chromium && process.env.VERCEL) {
-      // Use chrome-aws-lambda for Vercel serverless environment
-      console.log('Using chrome-aws-lambda for serverless environment');
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath,
-        headless: chromium.headless,
-        ignoreHTTPSErrors: true,
-        timeout: 30000
-      });
-    } else {
-      // Use regular puppeteer for local development
-      console.log('Using regular puppeteer for local environment');
-      browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ],
-        timeout: 30000
-      });
-    }
+    // Launch puppeteer with serverless-optimized configuration
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-ipc-flooding-protection'
+      ],
+      timeout: 60000 // Increased timeout for serverless
+    });
     
     console.log('Puppeteer browser launched');
     const page = await browser.newPage();
     
-    // Set content and generate PDF
+    // Set page configurations for better compatibility
+    await page.setViewport({ width: 1024, height: 768 });
+    
+    // Set content with increased timeout
     await page.setContent(htmlContent, { 
-      waitUntil: 'domcontentloaded',
-      timeout: 30000
+      waitUntil: ['domcontentloaded', 'networkidle0'],
+      timeout: 45000
     });
     
     console.log('HTML content set, generating PDF...');
@@ -819,12 +804,15 @@ const generateBill = async (booking) => {
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
+      preferCSSPageSize: false,
+      displayHeaderFooter: false,
       margin: {
         top: '20px',
         right: '20px',
         bottom: '20px',
         left: '20px'
-      }
+      },
+      timeout: 45000
     });
     
     console.log('PDF generated successfully, size:', pdfBuffer.length);
@@ -834,6 +822,9 @@ const generateBill = async (booking) => {
     
   } catch (error) {
     console.error('PDF generation error:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Ensure browser is closed even on error
     if (browser) {
       try {
         await browser.close();
@@ -841,7 +832,15 @@ const generateBill = async (booking) => {
         console.error('Error closing browser:', closeError.message);
       }
     }
-    throw new Error(`PDF generation failed: ${error.message}`);
+    
+    // Provide more specific error messages
+    if (error.message.includes('timeout')) {
+      throw new Error('PDF generation timed out. Please try again.');
+    } else if (error.message.includes('browser')) {
+      throw new Error('Browser initialization failed. Please try again later.');
+    } else {
+      throw new Error(`PDF generation failed: ${error.message}`);
+    }
   }
 };
 
