@@ -5,7 +5,7 @@ const AdminSettings = require('../models/AdminSettings');
 
 // For Vercel deployment, try to use chrome-aws-lambda
 let chromium;
-const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
 
 try {
   if (isServerless) {
@@ -16,6 +16,7 @@ try {
   }
 } catch (error) {
   console.log('chrome-aws-lambda not available, using regular puppeteer:', error.message);
+  chromium = null;
 }
 
 /**
@@ -860,25 +861,30 @@ const generateBillForDownload = async (booking) => {
     console.log('Generated HTML content, length:', htmlContent.length);
     
     // Use chrome-aws-lambda if available and in serverless environment
+    let browserLaunched = false;
+    
     if (chromium && isServerless) {
-      console.log('Using chrome-aws-lambda for serverless deployment');
+      console.log('Attempting chrome-aws-lambda for serverless deployment');
       try {
         browser = await chromium.puppeteer.launch({
-          args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+          args: [...(chromium.args || []), '--no-sandbox', '--disable-setuid-sandbox'],
           defaultViewport: chromium.defaultViewport,
           executablePath: await chromium.executablePath,
-          headless: chromium.headless,
+          headless: chromium.headless !== false,
           ignoreHTTPSErrors: true,
         });
         console.log('chrome-aws-lambda browser launched successfully');
+        browserLaunched = true;
       } catch (chromiumError) {
         console.error('chrome-aws-lambda launch failed:', chromiumError.message);
-        console.log('Falling back to regular puppeteer...');
-        throw chromiumError; // Let it fallback to regular puppeteer
+        console.log('Will fallback to regular puppeteer...');
+        // Don't throw error, let it fallback
       }
-    } else {
-      console.log('Using regular puppeteer with optimized config');
-      // Launch puppeteer with optimized configuration for local/non-serverless
+    }
+    
+    if (!browserLaunched) {
+      console.log('Using regular puppeteer with serverless-optimized config');
+      // Launch puppeteer with optimized configuration
       browser = await puppeteer.launch({
         headless: 'new',
         args: [
@@ -889,7 +895,7 @@ const generateBillForDownload = async (booking) => {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          // Remove serverless-specific args for local development
+          // Add serverless-specific args when in serverless environment
           ...(isServerless ? [
             '--single-process',
             '--disable-extensions',

@@ -14,6 +14,7 @@
   ],
   "env": {
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
-    "PUPPETEER_CACHE_DIR": "/tmp/.cache/puppeteer"
+    "PUPPETEER_CACHE_DIR": "/tmp/.cache/puppeteer",
+    "VERCEL": "1"
   }
 }
