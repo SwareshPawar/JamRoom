@@ -527,41 +527,56 @@ function generateBillHTML(booking, settings) {
             color: #856404;
         }
         
-        /* PDF-specific optimizations for client-side rendering */
+        /* PDF-specific enhancements for better client-side rendering */
         .invoice {
-            box-shadow: none !important;
-            border-radius: 0 !important;
             max-width: 800px !important;
             width: 800px !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
         }
         
         .invoice-content {
             padding: 40px !important;
         }
         
-        /* Ensure gradients render properly in PDF - use solid colors as fallback */
+        /* Enhance text rendering for PDF */
+        * {
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+            text-rendering: optimizeLegibility !important;
+        }
+        
+        /* Ensure proper gradient rendering */
         .company-name, .invoice-title h1 {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            /* Fallback for PDF */
-            color: #667eea;
         }
         
+        /* Force solid backgrounds for better PDF compatibility */
         .invoice-number {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #667eea !important;
+            color: white !important;
         }
         
-        .total-row {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        .total-row td {
+            background: #667eea !important;
             color: white !important;
         }
         
         .items-table th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #667eea !important;
+            color: white !important;
+        }
+        
+        /* Improve table rendering */
+        .items-table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+        }
+        
+        .items-table td, .items-table th {
+            border: 1px solid #e2e8f0 !important;
         }
     </style>
 </head>
@@ -743,19 +758,27 @@ async function generatePDFClient(booking, settings) {
     tempContainer.style.top = '0';
     tempContainer.style.width = '800px';
     tempContainer.style.height = 'auto';
+    tempContainer.style.background = '#f7fafc';
+    tempContainer.style.fontFamily = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    tempContainer.style.fontSize = '14px';
+    tempContainer.style.lineHeight = '1.6';
+    tempContainer.style.webkitFontSmoothing = 'antialiased';
     document.body.appendChild(tempContainer);
     
-    // Wait for fonts and styles to load
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Ensure fonts are loaded
+    await document.fonts.ready;
+    
+    // Additional delay for complete rendering
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     const invoiceElement = tempContainer.querySelector('.invoice');
     
     const options = {
         margin: [0.28, 0.28, 0.28, 0.28], // 20px converted to inches (20/72 ≈ 0.28)
         filename: `JamRoom_Invoice_${booking._id.toString().slice(-6).toUpperCase()}_${new Date(booking.date).toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
+        image: { type: 'jpeg', quality: 0.98 }, // High quality JPEG
         html2canvas: { 
-            scale: 2, 
+            scale: 2.5, // Higher scale for better quality
             useCORS: true, 
             allowTaint: true,
             backgroundColor: '#f7fafc',
@@ -763,14 +786,20 @@ async function generatePDFClient(booking, settings) {
             height: invoiceElement.scrollHeight,
             scrollX: 0,
             scrollY: 0,
-            logging: false
+            logging: false,
+            removeContainer: true,
+            letterRendering: true, // Better text rendering
+            allowTaint: false,
+            foreignObjectRendering: true // Better CSS support
         },
         jsPDF: { 
             unit: 'in', 
             format: 'a4', 
             orientation: 'portrait',
-            compress: true
-        }
+            compress: true,
+            precision: 16
+        },
+        pagebreak: { mode: 'avoid-all' } // Avoid breaking content
     };
     
     try {

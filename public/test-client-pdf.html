@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client-side PDF Test</title>
+    <script src="/js/client-pdf-generator.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .btn { 
+            background: #667eea; color: white; padding: 12px 24px; 
+            border: none; border-radius: 6px; cursor: pointer; 
+            font-size: 16px; margin: 10px; 
+        }
+        .btn:hover { background: #5a6fd8; }
+        .status { 
+            margin: 20px 0; padding: 15px; background: #f0f0f0; 
+            border-radius: 6px; font-family: monospace; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Client-side PDF Test</h1>
+        <p>This page tests the enhanced client-side PDF generation with a sample booking.</p>
+        
+        <button class="btn" onclick="testClientPDF()">🔥 Test Enhanced Client-side PDF</button>
+        <button class="btn" onclick="fetchAndTestRealBooking()">📋 Test with Real Booking Data</button>
+        
+        <div id="status" class="status">Ready to test...</div>
+    </div>
+
+    <script>
+        // Sample booking data for testing
+        const sampleBooking = {
+            _id: "697327ca3ab113bf23a6c0bb",
+            date: "2026-01-22T00:00:00.000Z",
+            startTime: "18:00",
+            endTime: "20:00",
+            duration: 2,
+            userName: "Swaresh Pawar",
+            userEmail: "swareshpawar@gmail.com",
+            bandName: "Test Band",
+            bookingStatus: "CONFIRMED",
+            paymentStatus: "PAID",
+            price: 1180,
+            subtotal: 1000,
+            taxAmount: 180,
+            rentalType: "JamRoom Booking",
+            notes: "Test booking for PDF generation",
+            rentals: [
+                {
+                    name: "JamRoom Base",
+                    description: "Studio rental service",
+                    quantity: 1,
+                    price: 400
+                },
+                {
+                    name: "Guitar (In-house)",
+                    description: "Guitar rental",
+                    quantity: 1,
+                    price: 200
+                },
+                {
+                    name: "Keyboard (In-house)", 
+                    description: "Keyboard rental",
+                    quantity: 1,
+                    price: 200
+                }
+            ]
+        };
+
+        const sampleSettings = {
+            studioName: "Swar JamRoom & Music Studio",
+            studioAddress: "123 Music Street, Studio City, Mumbai 400001",
+            adminEmails: ["admin@jamroom.com"],
+            studioPhone: "+91 9876 543210"
+        };
+
+        function updateStatus(message, isError = false) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.style.background = isError ? '#ffe6e6' : '#e6f7ff';
+            statusEl.style.color = isError ? '#d63384' : '#0969da';
+            console.log(message);
+        }
+
+        async function testClientPDF() {
+            try {
+                updateStatus('🚀 Starting enhanced client-side PDF generation test...');
+                
+                await generatePDFClient(sampleBooking, sampleSettings);
+                
+                updateStatus('✅ Success! Enhanced client-side PDF generated and downloaded!');
+            } catch (error) {
+                console.error('Client-side PDF test failed:', error);
+                updateStatus(`❌ Error: ${error.message}`, true);
+            }
+        }
+
+        async function fetchAndTestRealBooking() {
+            try {
+                updateStatus('📡 Fetching real booking data...');
+                
+                // Try to get token from localStorage (if user is logged in)
+                const token = localStorage.getItem('token') || prompt('Enter JWT token (login to admin/booking page first):');
+                if (!token) {
+                    throw new Error('No token provided');
+                }
+                
+                // Fetch real booking data
+                const bookingRes = await fetch('http://localhost:5000/api/bookings/697327ca3ab113bf23a6c0bb', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!bookingRes.ok) {
+                    throw new Error('Failed to fetch booking data');
+                }
+                
+                const bookingData = await bookingRes.json();
+                
+                // Fetch admin settings
+                const settingsRes = await fetch('http://localhost:5000/api/admin/debug-settings', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                let settingsData = sampleSettings;
+                if (settingsRes.ok) {
+                    const settings = await settingsRes.json();
+                    settingsData = settings.settings;
+                }
+                
+                updateStatus('🎯 Generating PDF with real data...');
+                
+                await generatePDFClient(bookingData.booking, settingsData);
+                
+                updateStatus('✅ Success! Real booking PDF generated with enhanced client-side rendering!');
+            } catch (error) {
+                console.error('Real booking PDF test failed:', error);
+                updateStatus(`❌ Error: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>
