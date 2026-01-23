@@ -150,27 +150,24 @@ function generateBillHTML(booking, settings) {
         }
         
         .company-name {
-            font-size: 28px;
-            font-weight: 700;
-            color: #667eea;
-            margin-bottom: 8px;
-            line-height: 1.2;
-            /* Gradient effect for supported browsers */
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            background-clip: text;
-            /* Ensure text is visible in all contexts */
-            -webkit-text-fill-color: #667eea;
-            text-shadow: 1px 1px 2px rgba(102, 126, 234, 0.2);
+            font-size: 32px;
+            font-weight: 800;
+            color: #1a202c;
+            margin-bottom: 6px;
+            line-height: 1.1;
+            letter-spacing: -0.5px;
+            /* Clean styling for PDF compatibility - no gradients */
+            background: none;
+            text-shadow: none;
         }
         
         .company-tagline {
-            color: var(--text-muted);
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 16px;
+            color: #667eea;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 18px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1.2px;
         }
         
         .company-details {
@@ -195,22 +192,18 @@ function generateBillHTML(booking, settings) {
         }
         
         .invoice-title h1 {
-            font-size: 42px;
-            font-weight: 700;
+            font-size: 48px;
+            font-weight: 800;
             color: #667eea;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
-            /* Gradient effect for supported browsers */
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            background-clip: text;
-            /* Ensure text is visible in all contexts */
-            -webkit-text-fill-color: #667eea;
-            text-shadow: 1px 1px 3px rgba(102, 126, 234, 0.3);
+            margin-bottom: 16px;
+            letter-spacing: -1px;
+            /* Clean styling for PDF compatibility - no gradients */
+            background: none;
+            text-shadow: none;
         }
         
         .invoice-number {
-            background: var(--primary-gradient);
+            background: #667eea;
             color: white;
             padding: 12px 20px;
             border-radius: var(--border-radius-lg);
@@ -346,7 +339,7 @@ function generateBillHTML(booking, settings) {
         }
         
         .items-table th {
-            background: var(--primary-gradient);
+            background: #667eea;
             color: white;
             padding: 20px 16px;
             text-align: left;
@@ -422,7 +415,7 @@ function generateBillHTML(booking, settings) {
         }
         
         .total-row {
-            background: var(--primary-gradient) !important;
+            background: #667eea !important;
             color: white !important;
         }
         
@@ -481,12 +474,7 @@ function generateBillHTML(booking, settings) {
         .footer-highlight {
             color: #667eea;
             font-weight: 600;
-            /* Gradient effect for supported browsers */
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            background-clip: text;
-            /* Ensure text is visible in all contexts */
-            -webkit-text-fill-color: #667eea;
+            background: none;
         }
         
         .payment-title {
@@ -550,38 +538,39 @@ function generateBillHTML(booking, settings) {
             padding: 40px !important;
         }
         
-        /* Ensure gradients render properly in PDF - use solid colors as fallback */
-        .company-name, .invoice-title h1 {
-            /* Primary styling - solid color for PDF compatibility */
-            color: #667eea !important;
-            font-weight: 700 !important;
-            /* Optional gradient overlay for browsers that support it */
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
+        /* PDF-optimized styles - clean and simple */
+        .company-name {
+            font-size: 32px !important;
+            font-weight: 800 !important;
+            color: #1a202c !important;
+            line-height: 1.1 !important;
+            margin-bottom: 6px !important;
+            letter-spacing: -0.5px !important;
+            background: none !important;
         }
         
-        /* Additional fallback for PDF generation */
-        .company-name {
-            font-size: 28px !important;
-            line-height: 1.2 !important;
-            margin-bottom: 8px !important;
-            text-shadow: 1px 1px 2px rgba(102, 126, 234, 0.3);
+        .invoice-title h1 {
+            font-size: 48px !important;
+            font-weight: 800 !important;
+            color: #667eea !important;
+            letter-spacing: -1px !important;
+            margin-bottom: 16px !important;
+            background: none !important;
         }
         
         .invoice-number {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #667eea !important;
+            color: white !important;
         }
         
         .total-row {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background: #667eea !important;
             color: white !important;
         }
         
         .items-table th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #667eea !important;
+            color: white !important;
         }
     </style>
 </head>
@@ -635,7 +624,7 @@ function generateBillHTML(booking, settings) {
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">✅ Status:</span>
-                            <span class="status-badge status-${booking.bookingStatus.toLowerCase()}">${booking.bookingStatus}</span>
+                            <span class="status-badge status-${booking.bookingStatus?.toLowerCase() || 'confirmed'}">${booking.bookingStatus || 'Confirmed'}</span>
                         </div>
                     </div>
                 </div>
