@@ -1181,25 +1181,39 @@
                 // Calculate item total based on rental type
                 let itemTotal;
                 let durationText;
+                let displayQuantity;
                 
                 if (rental.rentalType === 'perday') {
                     // Per-day rentals: flat rate regardless of duration
                     itemTotal = rental.price * rental.quantity;
+                    displayQuantity = rental.quantity;
                     durationText = 'per day';
                 } else if (rental.isRequired || rental.fullId.includes('_base')) {
                     // JamRoom base rentals
                     itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
+                    displayQuantity = rental.quantity;
                     durationText = `${duration}h`;
+                } else if (rental.price === 0) {
+                    // Free add-ons (mics, jacks): allow quantities, no cost
+                    itemTotal = 0;
+                    displayQuantity = rental.quantity;
+                    durationText = 'FREE';
+                } else if (rental.name.includes('IEM')) {
+                    // IEM: special case - allow quantities but duration-based pricing
+                    itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
+                    displayQuantity = rental.quantity;
+                    durationText = `${duration}h (tied to JamRoom)`;
                 } else {
-                    // In-house rentals: tied to jamroom duration (always quantity 1, but duration varies)
-                    itemTotal = (rental.price || rental.basePrice) * 1 * duration; // Force quantity = 1 for in-house
+                    // Paid in-house rentals: tied to jamroom duration (quantity 1, but duration varies)
+                    itemTotal = (rental.price || rental.basePrice) * 1 * duration;
+                    displayQuantity = 1; // Show as 1 for display consistency
                     durationText = `${duration}h (tied to JamRoom)`;
                 }
                 subtotal += itemTotal;
                 
                 selectedRentalsHTML += `
                     <div class="rental-item">
-                        <span>${rental.name} × ${rental.quantity} (${durationText})</span>
+                        <span>${rental.name} × ${displayQuantity} (${durationText})</span>
                         <span>₹${itemTotal}</span>
                     </div>
                 `;
@@ -1448,9 +1462,17 @@
                     // JamRoom base rentals
                     itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
                     effectiveQuantity = rental.quantity;
+                } else if (rental.price === 0) {
+                    // Free add-ons (mics, jacks): allow quantities, no cost
+                    itemTotal = 0;
+                    effectiveQuantity = rental.quantity;
+                } else if (rental.name.includes('IEM')) {
+                    // IEM: special case - allow quantities but duration-based pricing
+                    itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
+                    effectiveQuantity = rental.quantity;
                 } else {
-                    // In-house rentals: tied to jamroom duration (always quantity 1, but duration varies)
-                    itemTotal = (rental.price || rental.basePrice) * 1 * duration; // Force quantity = 1 for in-house
+                    // Paid in-house rentals (guitars, keyboards): tied to jamroom duration (quantity 1)
+                    itemTotal = (rental.price || rental.basePrice) * 1 * duration; // Force quantity = 1 for paid in-house
                     effectiveQuantity = 1;
                 }
                 subtotal += itemTotal;
@@ -1599,9 +1621,14 @@
                                     `<small>(Subtotal: ₹${booking.subtotal} + Tax: ₹${booking.taxAmount})</small>` : ''}
                             </p>
                             ${booking.bandName ? `<p><strong>🎵 Band:</strong> ${booking.bandName}</p>` : ''}
-                            ${booking.bookingStatus === 'PENDING' ? 
-                                `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger" style="margin-top: 10px;">Cancel Booking</button>` 
-                                : ''}
+                            <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                ${booking.bookingStatus === 'PENDING' ? 
+                                    `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger">Cancel Booking</button>` 
+                                    : ''}
+                                ${(booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED') ? 
+                                    `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary" title="Download Bill PDF">📄 Download Bill</button>` 
+                                    : ''}
+                            </div>
                         </div>
                     `;
                 });
@@ -1631,6 +1658,57 @@
                 await loadMyBookings();
             } catch (error) {
                 showAlert(error.message, 'error');
+            }
+        };
+
+        // Download PDF bill for user
+        const downloadUserPDF = async (bookingId) => {
+            try {
+                showLoading('Generating your bill PDF...');
+                
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/bookings/${bookingId}/download-pdf`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.message || 'Failed to generate PDF');
+                }
+
+                // Create blob from response
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                
+                // Create temporary download link
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `jamroom-booking-${bookingId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showAlert('Your bill PDF has been downloaded successfully!', 'success');
+            } catch (error) {
+                console.error('Download PDF error:', error);
+                
+                let userMessage = error.message;
+                
+                if (error.message.includes('Booking not found')) {
+                    userMessage = 'Booking not found. It may have been cancelled or removed.';
+                } else if (error.message.includes('PDF generation failed')) {
+                    userMessage = 'Unable to generate PDF at this time. Please try again later or contact support.';
+                } else if (error.message.includes('Not authorized')) {
+                    userMessage = 'You are not authorized to download this bill. Please make sure you are logged in.';
+                }
+                
+                showAlert(userMessage, 'error');
+            } finally {
+                hideLoading();
             }
         };
 

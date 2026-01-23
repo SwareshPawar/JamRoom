@@ -754,22 +754,41 @@ const generateBill = async (booking) => {
   let browser;
   
   try {
+    console.log('Starting PDF generation for booking:', booking._id);
+    
     // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
+    console.log('Retrieved admin settings');
     
     // Generate HTML content
     const htmlContent = await generateBillHTML(booking, settings);
+    console.log('Generated HTML content, length:', htmlContent.length);
     
-    // Launch puppeteer
+    // Launch puppeteer with stable configuration (same as working email version)
     browser = await puppeteer.launch({
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ],
+      timeout: 30000
     });
     
+    console.log('Puppeteer browser launched');
     const page = await browser.newPage();
     
     // Set content and generate PDF
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { 
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+    
+    console.log('HTML content set, generating PDF...');
     
     const pdfBuffer = await page.pdf({
       format: 'A4',
@@ -782,14 +801,21 @@ const generateBill = async (booking) => {
       }
     });
     
-    await browser.close();
+    console.log('PDF generated successfully, size:', pdfBuffer.length);
     
+    await browser.close();
     return pdfBuffer;
+    
   } catch (error) {
+    console.error('PDF generation error:', error.message);
     if (browser) {
-      await browser.close();
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('Error closing browser:', closeError.message);
+      }
     }
-    throw error;
+    throw new Error(`PDF generation failed: ${error.message}`);
   }
 };
 

@@ -949,15 +949,17 @@
             const alert = document.getElementById('centeredAlert');
             const messageEl = document.getElementById('centeredAlertMessage');
             
-            messageEl.textContent = message;
+            // Handle multi-line messages by preserving line breaks
+            messageEl.innerHTML = message.replace(/\n/g, '<br>');
             alert.className = `alert alert-${type} show`;
             backdrop.classList.add('show');
             
-            // Auto-hide after 4 seconds
+            // Auto-hide after longer time for detailed messages
+            const hideDelay = message.length > 200 ? 8000 : 4000;
             setTimeout(() => {
                 alert.classList.remove('show');
                 backdrop.classList.remove('show');
-            }, 4000);
+            }, hideDelay);
             
             // Also allow clicking backdrop to close
             backdrop.onclick = () => {
@@ -1453,6 +1455,7 @@ Notes: ${booking.notes || 'N/A'}`);
                                 ` : ''}
                                 ${booking.bookingStatus === 'CONFIRMED' ? `
                                     <button onclick="sendEBill('${booking._id}')" class="btn btn-primary btn-sm" title="Send eBill to Customer">📧 Send eBill</button>
+                                    <button onclick="downloadPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download PDF Bill">📄 Download PDF</button>
                                 ` : ''}
                                 <button onclick="editBooking('${booking._id}', ${JSON.stringify(booking).replace(/"/g, '&quot;')})" class="btn btn-warning btn-sm">Edit</button>
                                 <button onclick="deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Delete</button>
@@ -1492,7 +1495,29 @@ Notes: ${booking.notes || 'N/A'}`);
                         await loadStats();
                         await loadBookings();
                     } catch (error) {
-                        showAlert('bookingAlert', error.message, 'error');
+                        console.error('Approve booking error:', error);
+                        
+                        // Improve error messages for common email issues
+                        let userMessage = error.message;
+                        
+                        if (error.message.includes('Daily user sending limit exceeded')) {
+                            userMessage = '📧 Gmail Daily Limit Reached!\n\n' +
+                                'Booking was approved but notification email failed due to Gmail\'s daily sending limit.\n\n' +
+                                'Solutions:\n' +
+                                '• Manually inform the customer about approval\n' +
+                                '• Wait 24 hours for limit reset\n' +
+                                '• Use "Send eBill" later to send confirmation\n\n' +
+                                'The booking is still successfully approved!';
+                        } else if (error.message.includes('Authentication failed') || error.message.includes('invalid credentials')) {
+                            userMessage = '✅ Booking Approved! 🔐 Email Setup Issue\n\n' +
+                                'Booking was approved but notification failed due to email configuration.\n\n' +
+                                'Check:\n' +
+                                '• EMAIL_USER and EMAIL_PASS in .env file\n' +
+                                '• Gmail App Password validity\n' +
+                                '• 2-Factor Authentication enabled';
+                        }
+                        
+                        showAlert('bookingAlert', userMessage, error.message.includes('Daily user sending limit') || error.message.includes('Authentication') ? 'warning' : 'error');
                     } finally {
                         hideLoading();
                     }
@@ -1528,7 +1553,29 @@ Notes: ${booking.notes || 'N/A'}`);
                         await loadStats();
                         await loadBookings();
                     } catch (error) {
-                        showAlert('bookingAlert', error.message, 'error');
+                        console.error('Reject booking error:', error);
+                        
+                        // Improve error messages for common email issues
+                        let userMessage = error.message;
+                        
+                        if (error.message.includes('Daily user sending limit exceeded')) {
+                            userMessage = '📧 Gmail Daily Limit Reached!\n\n' +
+                                'Booking was rejected but notification email failed due to Gmail\'s daily sending limit.\n\n' +
+                                'Solutions:\n' +
+                                '• Manually inform the customer about rejection\n' +
+                                '• Wait 24 hours for limit reset\n' +
+                                '• Call customer directly if urgent\n\n' +
+                                'The booking is still successfully rejected!';
+                        } else if (error.message.includes('Authentication failed') || error.message.includes('invalid credentials')) {
+                            userMessage = '✅ Booking Rejected! 🔐 Email Setup Issue\n\n' +
+                                'Booking was rejected but notification failed due to email configuration.\n\n' +
+                                'Check:\n' +
+                                '• EMAIL_USER and EMAIL_PASS in .env file\n' +
+                                '• Gmail App Password validity\n' +
+                                '• 2-Factor Authentication enabled';
+                        }
+                        
+                        showAlert('bookingAlert', userMessage, error.message.includes('Daily user sending limit') || error.message.includes('Authentication') ? 'warning' : 'error');
                     } finally {
                         hideLoading();
                     }
@@ -1631,12 +1678,98 @@ Notes: ${booking.notes || 'N/A'}`);
                         showAlert('bookingAlert', 'eBill sent successfully to customer!', 'success');
                     } catch (error) {
                         console.error('Send eBill error:', error);
-                        showAlert('bookingAlert', error.message, 'error');
+                        
+                        // Improve error messages for common Gmail issues
+                        let userMessage = error.message;
+                        
+                        if (error.message.includes('Daily user sending limit exceeded')) {
+                            userMessage = '📧 Gmail Daily Limit Reached!\n\n' +
+                                'You\'ve exceeded Gmail\'s daily sending limit. This typically resets within 24 hours.\n\n' +
+                                'Solutions:\n' +
+                                '• Wait 24 hours and try again\n' +
+                                '• Use a different Gmail account\n' +
+                                '• Consider upgrading to Google Workspace for higher limits\n\n' +
+                                'Learn more: https://support.google.com/a/answer/166852';
+                        } else if (error.message.includes('Authentication failed') || error.message.includes('invalid credentials')) {
+                            userMessage = '🔐 Gmail Authentication Issue!\n\n' +
+                                'Your Gmail credentials may be invalid or expired.\n\n' +
+                                'Solutions:\n' +
+                                '• Check EMAIL_USER and EMAIL_PASS in .env file\n' +
+                                '• Regenerate Gmail App Password\n' +
+                                '• Ensure 2-Factor Authentication is enabled\n\n' +
+                                'Setup Guide: https://support.google.com/mail/answer/185833';
+                        } else if (error.message.includes('Recipient address rejected') || error.message.includes('Invalid recipients')) {
+                            userMessage = '📮 Invalid Email Address!\n\n' +
+                                'The customer\'s email address appears to be invalid.\n\n' +
+                                'Solutions:\n' +
+                                '• Verify the email address in booking details\n' +
+                                '• Contact customer for correct email\n' +
+                                '• Edit booking with valid email address';
+                        } else if (error.message.includes('Network')) {
+                            userMessage = '🌐 Network Connection Issue!\n\n' +
+                                'Unable to connect to Gmail servers.\n\n' +
+                                'Solutions:\n' +
+                                '• Check your internet connection\n' +
+                                '• Try again in a few minutes\n' +
+                                '• Verify firewall settings';
+                        }
+                        
+                        showAlert('bookingAlert', userMessage, 'error');
                     } finally {
                         hideLoading();
                     }
                 }
             );
+        };
+
+        // Download PDF bill
+        const downloadPDF = async (bookingId) => {
+            try {
+                showLoading('Generating PDF bill...');
+                
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/download-pdf`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.message || 'Failed to generate PDF');
+                }
+
+                // Create blob from response
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                
+                // Create temporary download link
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `jamroom-bill-${bookingId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showAlert('bookingAlert', 'PDF bill downloaded successfully!', 'success');
+            } catch (error) {
+                console.error('Download PDF error:', error);
+                
+                // Improve error messages
+                let userMessage = error.message;
+                
+                if (error.message.includes('Booking not found')) {
+                    userMessage = '❌ Booking Not Found!\n\nThe booking may have been deleted or the ID is invalid.\n\nTry refreshing the page and locating the booking again.';
+                } else if (error.message.includes('PDF generation failed')) {
+                    userMessage = '📄 PDF Generation Failed!\n\nThere was an issue creating the PDF document.\n\nSolutions:\n• Try again in a few moments\n• Check if all booking data is complete\n• Contact support if the issue persists';
+                }
+                
+                showAlert('bookingAlert', userMessage, 'error');
+            } finally {
+                hideLoading();
+            }
         };
 
         // Load blocked times

@@ -147,6 +147,15 @@ JamRoom (1h) + Keyboard Per-day + 3 IEMs
 - [ ] Cancellation email received
 - [ ] Slot becomes available again
 
+### Download PDF (User)
+- [ ] PDF download button visible in My Bookings
+- [ ] PDF downloads successfully with correct filename
+- [ ] PDF contains complete booking details
+- [ ] PDF formatting matches booking data
+- [ ] User can only download own booking PDFs
+- [ ] Access denied for other users' bookings
+- [ ] Error handling for invalid booking IDs
+
 ---
 
 ## 🛠️ Admin Features Tests
@@ -218,6 +227,16 @@ JamRoom (1h) + Keyboard Per-day + 3 IEMs
 - [ ] User receives notification email
 - [ ] User added to admin emails list
 - [ ] User can access admin panel
+
+### Download PDF (Admin)
+- [ ] PDF download button visible for all bookings
+- [ ] Admin can download PDF for any booking
+- [ ] PDF downloads with correct filename format
+- [ ] PDF contains complete booking information
+- [ ] PDF shows studio branding and contact info
+- [ ] Pricing breakdown matches booking data
+- [ ] Error handling for non-existent bookings
+- [ ] PDF generation works for all booking types
 
 ---
 

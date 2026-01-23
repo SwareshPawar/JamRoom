@@ -28,6 +28,7 @@ A **production-ready, full-stack JamRoom rental booking system** with:
 - [x] **Dynamic Pricing**: Real-time price calculation with different rental models
 - [x] Track booking status (Pending/Confirmed/Rejected)
 - [x] Cancel pending bookings
+- [x] **PDF Download**: Download booking invoices in PDF format
 - [x] Receive email notifications
 - [x] Get calendar invites (.ics) on confirmation
 - [x] UPI QR code for payments
@@ -36,6 +37,7 @@ A **production-ready, full-stack JamRoom rental booking system** with:
 - [x] Dashboard with statistics
 - [x] View all bookings with filters
 - [x] Approve/Reject booking requests
+- [x] **PDF Download**: Download invoices for any booking
 - [x] Create time slots (single & bulk)
 - [x] Block/Unblock time slots
 - [x] Manage rental types and prices

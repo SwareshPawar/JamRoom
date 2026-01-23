@@ -424,6 +424,34 @@ Authorization: Bearer <token>
 
 ---
 
+### Download Booking PDF
+**GET** `/api/bookings/:id/download-pdf`
+
+Download PDF invoice for user's own booking.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Response:** `200 OK`  
+Returns PDF file for download
+
+**Response Headers:**
+```
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="booking-65def....pdf"
+```
+
+**Access Control:** Users can only download PDFs of their own bookings.
+
+**Error Responses:**
+- `404`: Booking not found
+- `403`: Access denied (not user's booking)
+- `500`: Server error generating PDF
+
+---
+
 ## 👨‍💼 Admin Endpoints
 
 ### Get All Bookings (Admin)
@@ -667,6 +695,33 @@ Authorization: Bearer <admin_token>
   }
 }
 ```
+
+---
+
+### Download Booking PDF (Admin)
+**GET** `/api/admin/bookings/:id/download-pdf`
+
+Download PDF invoice for any booking (admin access).
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Response:** `200 OK`  
+Returns PDF file for download
+
+**Response Headers:**
+```
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="booking-65def....pdf"
+```
+
+**Access Control:** Admins can download PDFs for any booking.
+
+**Error Responses:**
+- `404`: Booking not found
+- `500`: Server error generating PDF
 
 ---
 

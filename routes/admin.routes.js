@@ -8,6 +8,7 @@ const { protect } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/admin');
 const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
+const { generateBill } = require('../utils/billGenerator');
 
 // @route   GET /api/admin/debug-settings
 // @desc    Debug settings values (temporary)
@@ -1138,6 +1139,53 @@ router.delete('/blocked-times/:id', protect, isAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error removing blocked time'
+    });
+  }
+});
+
+// @route   GET /api/admin/bookings/:id/download-pdf
+// @desc    Download booking PDF for admin
+// @access  Private/Admin
+router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
+  try {
+    console.log('Admin PDF download requested for booking:', req.params.id);
+    
+    // Import bill generator like email function does
+    const { generateBill, generateBillFilename } = require('../utils/billGenerator');
+    
+    const booking = await Booking.findById(req.params.id).populate('userId');
+    
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    // Get admin settings for company info (like email function)
+    const settings = await AdminSettings.getSettings();
+
+    // Generate PDF bill (same as email function)
+    const pdfBuffer = await generateBill(booking);
+    const filename = generateBillFilename(booking, settings);
+    
+    console.log('Admin PDF generated successfully, filename:', filename);
+    
+    // Set response headers for PDF download with proper binary handling
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
+    // Send the PDF buffer as binary data
+    res.end(pdfBuffer, 'binary');
+  } catch (error) {
+    console.error('Download PDF error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error generating PDF'
     });
   }
 });
