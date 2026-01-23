@@ -152,12 +152,16 @@ function generateBillHTML(booking, settings) {
         .company-name {
             font-size: 28px;
             font-weight: 700;
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #667eea;
             margin-bottom: 8px;
             line-height: 1.2;
+            /* Gradient effect for supported browsers */
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            /* Ensure text is visible in all contexts */
+            -webkit-text-fill-color: #667eea;
+            text-shadow: 1px 1px 2px rgba(102, 126, 234, 0.2);
         }
         
         .company-tagline {
@@ -193,12 +197,16 @@ function generateBillHTML(booking, settings) {
         .invoice-title h1 {
             font-size: 42px;
             font-weight: 700;
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #667eea;
             margin-bottom: 12px;
             letter-spacing: -0.5px;
+            /* Gradient effect for supported browsers */
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            /* Ensure text is visible in all contexts */
+            -webkit-text-fill-color: #667eea;
+            text-shadow: 1px 1px 3px rgba(102, 126, 234, 0.3);
         }
         
         .invoice-number {
@@ -471,11 +479,14 @@ function generateBillHTML(booking, settings) {
         }
         
         .footer-highlight {
+            color: #667eea;
+            font-weight: 600;
+            /* Gradient effect for supported browsers */
             background: var(--primary-gradient);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             background-clip: text;
-            font-weight: 600;
+            /* Ensure text is visible in all contexts */
+            -webkit-text-fill-color: #667eea;
         }
         
         .payment-title {
@@ -541,12 +552,21 @@ function generateBillHTML(booking, settings) {
         
         /* Ensure gradients render properly in PDF - use solid colors as fallback */
         .company-name, .invoice-title h1 {
+            /* Primary styling - solid color for PDF compatibility */
+            color: #667eea !important;
+            font-weight: 700 !important;
+            /* Optional gradient overlay for browsers that support it */
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             background-clip: text;
-            /* Fallback for PDF */
-            color: #667eea;
+        }
+        
+        /* Additional fallback for PDF generation */
+        .company-name {
+            font-size: 28px !important;
+            line-height: 1.2 !important;
+            margin-bottom: 8px !important;
+            text-shadow: 1px 1px 2px rgba(102, 126, 234, 0.3);
         }
         
         .invoice-number {
