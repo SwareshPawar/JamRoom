@@ -528,39 +528,40 @@ function generateBillHTML(booking, settings) {
         }
         
         /* PDF-specific optimizations for client-side rendering */
-        @media screen {
-            .invoice {
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                max-width: 800px !important;
-                width: 800px !important;
-            }
-            
-            .invoice-content {
-                padding: 40px !important;
-            }
-            
-            /* Ensure gradients render properly in PDF */
-            .company-name, .invoice-title h1, .footer-highlight {
-                background: #667eea !important;
-                -webkit-background-clip: text !important;
-                -webkit-text-fill-color: transparent !important;
-                background-clip: text !important;
-            }
-            
-            .invoice-number, .total-row {
-                background: #667eea !important;
-            }
-            
-            .items-table th {
-                background: #667eea !important;
-            }
-            
-            /* Force font rendering */
-            * {
-                -webkit-font-smoothing: antialiased !important;
-                -moz-osx-font-smoothing: grayscale !important;
-            }
+        .invoice {
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            max-width: 800px !important;
+            width: 800px !important;
+        }
+        
+        .invoice-content {
+            padding: 40px !important;
+        }
+        
+        /* Ensure gradients render properly in PDF - use solid colors as fallback */
+        .company-name, .invoice-title h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            /* Fallback for PDF */
+            color: #667eea;
+        }
+        
+        .invoice-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .total-row {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+        }
+        
+        .items-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
     </style>
 </head>
@@ -742,46 +743,34 @@ async function generatePDFClient(booking, settings) {
     tempContainer.style.top = '0';
     tempContainer.style.width = '800px';
     tempContainer.style.height = 'auto';
-    tempContainer.style.overflow = 'hidden';
-    tempContainer.style.background = '#f7fafc';
-    tempContainer.style.fontFamily = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-    tempContainer.style.fontSize = '14px';
-    tempContainer.style.lineHeight = '1.6';
     document.body.appendChild(tempContainer);
     
     // Wait for fonts and styles to load
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     const invoiceElement = tempContainer.querySelector('.invoice');
     
     const options = {
         margin: [0.28, 0.28, 0.28, 0.28], // 20px converted to inches (20/72 ≈ 0.28)
         filename: `JamRoom_Invoice_${booking._id.toString().slice(-6).toUpperCase()}_${new Date(booking.date).toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 1.0 }, // Maximum quality for perfect rendering
+        image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { 
-            scale: 3, // Higher scale for better quality 
+            scale: 2, 
             useCORS: true, 
             allowTaint: true,
-            backgroundColor: '#f7fafc', // Same as server-side CSS
-            width: 800, // Match server-side viewport width
+            backgroundColor: '#f7fafc',
+            width: 800,
             height: invoiceElement.scrollHeight,
             scrollX: 0,
             scrollY: 0,
-            logging: false,
-            removeContainer: true,
-            async: true,
-            foreignObjectRendering: true, // Better CSS rendering
-            letterRendering: true // Better text rendering
+            logging: false
         },
         jsPDF: { 
             unit: 'in', 
             format: 'a4', 
             orientation: 'portrait',
-            compress: false, // No compression for best quality
-            precision: 16,
-            userUnit: 1.0
-        },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } // Better page breaks
+            compress: true
+        }
     };
     
     try {
