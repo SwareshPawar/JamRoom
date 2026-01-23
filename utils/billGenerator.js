@@ -3,21 +3,16 @@ const fs = require('fs').promises;
 const path = require('path');
 const AdminSettings = require('../models/AdminSettings');
 
-// For Vercel deployment, try to use chrome-aws-lambda
-let chromium;
+// Check if we're in a serverless environment
 const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
 
-try {
-  if (isServerless) {
-    chromium = require('chrome-aws-lambda');
-    console.log('chrome-aws-lambda loaded for serverless environment');
-  } else {
-    console.log('Local development detected, using regular puppeteer');
-  }
-} catch (error) {
-  console.log('chrome-aws-lambda not available, using regular puppeteer:', error.message);
-  chromium = null;
-}
+console.log('Environment setup:');
+console.log('- VERCEL:', process.env.VERCEL);
+console.log('- VERCEL_ENV:', process.env.VERCEL_ENV);
+console.log('- isServerless:', isServerless);
+
+// For Vercel, we'll use regular puppeteer with optimized settings
+// chrome-aws-lambda is deprecated and causes issues on Vercel
 
 /**
  * Generate HTML content for the bill
@@ -876,59 +871,31 @@ const generateBillForDownload = async (booking) => {
     const htmlContent = await generateBillHTML(booking, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
     
-    // Use chrome-aws-lambda if available and in serverless environment
-    let browserLaunched = false;
-    
-    if (chromium && isServerless) {
-      console.log('Attempting chrome-aws-lambda for serverless deployment');
-      try {
-        browser = await chromium.puppeteer.launch({
-          args: [...(chromium.args || []), '--no-sandbox', '--disable-setuid-sandbox'],
-          defaultViewport: chromium.defaultViewport,
-          executablePath: await chromium.executablePath,
-          headless: chromium.headless !== false,
-          ignoreHTTPSErrors: true,
-        });
-        console.log('chrome-aws-lambda browser launched successfully');
-        browserLaunched = true;
-      } catch (chromiumError) {
-        console.error('chrome-aws-lambda launch failed:', chromiumError.message);
-        console.log('Will fallback to regular puppeteer...');
-        // Don't throw error, let it fallback
-      }
-    }
-    
-    if (!browserLaunched) {
-      console.log('Using regular puppeteer with serverless-optimized config');
-      // Launch puppeteer with optimized configuration
-      browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          // Add serverless-specific args when in serverless environment
-          ...(isServerless ? [
-            '--single-process',
-            '--disable-extensions',
-            '--disable-plugins',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding',
-            '--disable-features=TranslateUI',
-            '--disable-ipc-flooding-protection',
-            '--memory-pressure-off',
-            '--max_old_space_size=512'
-          ] : [])
-        ],
-        timeout: isServerless ? 45000 : 30000
-      });
-      console.log('Regular puppeteer browser launched successfully');
-    }
+    // Launch puppeteer with Vercel-optimized configuration
+    console.log('Launching puppeteer with Vercel-optimized config');
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-ipc-flooding-protection',
+        '--memory-pressure-off',
+        '--max-memory-usage=512'
+      ],
+      timeout: 30000
+    });
+    console.log('Puppeteer browser launched successfully');
 
     console.log('Browser launched for PDF download');
     const page = await browser.newPage();
@@ -936,10 +903,10 @@ const generateBillForDownload = async (booking) => {
     // Set smaller viewport to reduce memory usage
     await page.setViewport({ width: 800, height: 600 });
     
-    // Set content with timeout optimized for environment
+    // Set content with optimized timeout
     await page.setContent(htmlContent, {
       waitUntil: 'domcontentloaded',
-      timeout: isServerless && chromium ? 30000 : 25000
+      timeout: 20000
     });
 
     console.log('HTML content set, generating PDF for download...');
@@ -953,7 +920,7 @@ const generateBillForDownload = async (booking) => {
         bottom: '20px',
         left: '20px'
       },
-      timeout: isServerless && chromium ? 25000 : 20000
+      timeout: 20000
     });
     
     console.log('PDF download generated successfully, size:', pdfBuffer.length);
@@ -1014,7 +981,7 @@ const generateBillForDownloadWithFilename = async (booking) => {
         // Set serverless-specific connection timeouts
         mongoose.connection.serverSelectionTimeoutMS = 8000;
         mongoose.connection.socketTimeoutMS = 15000;
-        await mongoose.connect(process.env.DATABASE_URL);
+        await mongoose.connect(process.env.MONGO_URI);
         console.log('✅ MongoDB connected for PDF generation');
       }
     } catch (error) {
