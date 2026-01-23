@@ -433,7 +433,7 @@ router.get('/:id/download-pdf', protect, async (req, res) => {
     console.log('User making request:', req.user?.email);
     
     // Import bill generator with optimized download function
-    const { generateBillForDownload, generateBillFilename } = require('../utils/billGenerator');
+    const { generateBillForDownloadWithFilename } = require('../utils/billGenerator');
     
     const booking = await Booking.findById(req.params.id).populate('userId');
     
@@ -456,17 +456,12 @@ router.get('/:id/download-pdf', protect, async (req, res) => {
       });
     }
 
-    // Get admin settings for company info
-    const settings = await AdminSettings.getSettings();
-    console.log('Admin settings retrieved');
-
-    // Generate PDF bill with Vercel-optimized function
+    // Generate PDF bill and filename with single database call
     console.log('Starting PDF generation for environment:', process.env.NODE_ENV);
     console.log('VERCEL environment:', process.env.VERCEL);
     console.log('Available memory:', process.memoryUsage());
     
-    const pdfBuffer = await generateBillForDownload(booking);
-    const filename = generateBillFilename(booking, settings);
+    const { pdfBuffer, filename } = await generateBillForDownloadWithFilename(booking);
     
     console.log('User PDF generated successfully, size:', pdfBuffer.length, 'filename:', filename);
     

@@ -1152,7 +1152,7 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
     console.log('User making request:', req.user?.email);
     
     // Import bill generator with optimized download function
-    const { generateBillForDownload, generateBillFilename } = require('../utils/billGenerator');
+    const { generateBillForDownloadWithFilename } = require('../utils/billGenerator');
     
     const booking = await Booking.findById(req.params.id).populate('userId');
     
@@ -1166,14 +1166,11 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
 
     console.log('Booking found:', booking.userName, booking.userEmail);
     
-    // Get admin settings for company info
-    const settings = await AdminSettings.getSettings();
-    console.log('Admin settings retrieved');
-
-    // Generate PDF bill with Vercel-optimized function
-    console.log('Starting PDF generation...');
-    const pdfBuffer = await generateBillForDownload(booking);
-    const filename = generateBillFilename(booking, settings);
+    // Generate PDF bill and filename with single database call
+    console.log('Starting PDF generation with filename...');
+    const { pdfBuffer, filename } = await generateBillForDownloadWithFilename(booking);
+    
+    console.log('Admin PDF generated successfully, filename:', filename);
     
     console.log('Admin PDF generated successfully, filename:', filename);
     

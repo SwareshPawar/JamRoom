@@ -998,9 +998,42 @@ const generateBillFilename = (booking, settings) => {
   return `${studioPrefix}_Invoice_${bookingId}_${dateStr}.pdf`;
 };
 
+/**
+ * Generate PDF for download with filename (single database call)
+ */
+const generateBillForDownloadWithFilename = async (booking) => {
+  // Check if we're in a serverless environment
+  const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
+  
+  // Explicit database connection for serverless
+  if (isServerless) {
+    console.log('Serverless environment detected, ensuring MongoDB connection...');
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState !== 1) {
+        // Set serverless-specific connection timeouts
+        mongoose.connection.serverSelectionTimeoutMS = 8000;
+        mongoose.connection.socketTimeoutMS = 15000;
+        await mongoose.connect(process.env.DATABASE_URL);
+        console.log('✅ MongoDB connected for PDF generation');
+      }
+    } catch (error) {
+      console.error('❌ MongoDB connection failed:', error);
+      throw new Error('Database connection failed');
+    }
+  }
+  
+  const settings = await AdminSettings.getSettings();
+  const pdfBuffer = await generateBillForDownload(booking);
+  const filename = generateBillFilename(booking, settings);
+  
+  return { pdfBuffer, filename };
+};
+
 module.exports = {
   generateBill,
   generateBillForDownload,
+  generateBillForDownloadWithFilename,
   generateBillFilename,
   generateBillHTML
 };
