@@ -470,9 +470,104 @@
         
         .upi-section.show { display: block; }
         
-        .upi-section img {
-            max-width: 250px;
-            margin: 15px auto;
+        .payment-methods {
+            display: grid;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .payment-method {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .payment-method:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+        }
+        
+        .payment-btn {
+            width: 100%;
+            padding: 12px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .payment-btn.primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .payment-btn.primary:hover {
+            background: #5a67d8;
+        }
+        
+        .payment-btn.secondary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .payment-btn.secondary:hover {
+            background: #218838;
+        }
+        
+        .payment-btn.copy {
+            background: #6c757d;
+            color: white;
+            font-size: 0.9em;
+        }
+        
+        .payment-btn.copy:hover {
+            background: #5a6268;
+        }
+        
+        .payment-info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        
+        .payment-divider {
+            margin: 20px 0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .payment-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #dee2e6;
+        }
+        
+        .payment-divider span {
+            background: #f8f9fa;
+            padding: 0 15px;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        
+        .qr-section {
+            margin-top: 15px;
+        }
+        
+        .qr-section img {
+            max-width: 200px;
+            margin: 10px auto;
             display: block;
         }
         
@@ -661,34 +756,20 @@
 
                     <!-- Reference View - Schedule for selected date -->
                     <div class="reference-view">
-                        <h3>Today's Schedule (Reference)</h3>
-                        <p><small>Shows bookings and blocked times for selected date</small></p>
+                        <h3>Availability for Selected Date</h3>
+                        <p><small>Shows unavailable time slots</small></p>
                         <div id="referenceTimeline" class="timeline">
-                            <div class="loading">Select a date to view schedule</div>
+                            <div class="loading">Select a date to view availability</div>
                         </div>
                     </div>
 
                     <div class="time-container">
                         <div class="form-group">
                             <label for="startTime">Start Time*</label>
-                            <select id="startTime" required>
-                                <option value="">Select time</option>
-                                <option value="09:00">9:00 AM</option>
-                                <option value="10:00">10:00 AM</option>
-                                <option value="11:00">11:00 AM</option>
-                                <option value="12:00">12:00 PM</option>
-                                <option value="13:00">1:00 PM</option>
-                                <option value="14:00">2:00 PM</option>
-                                <option value="15:00">3:00 PM</option>
-                                <option value="16:00">4:00 PM</option>
-                                <option value="17:00">5:00 PM</option>
-                                <option value="18:00">6:00 PM</option>
-                                <option value="19:00">7:00 PM</option>
-                                <option value="20:00">8:00 PM</option>
-                                <option value="21:00">9:00 PM</option>
-                                <option value="22:00">10:00 PM</option>
-                                <option value="23:00">11:00 PM</option>
+                            <select id="startTime" required disabled>
+                                <option value="">Select date first</option>
                             </select>
+                            <div id="startTimeLoading" class="loading" style="display: none; margin-top: 5px; font-size: 0.9em; color: #666;">Loading available times...</div>
                         </div>
 
                         <div class="form-group">
@@ -741,13 +822,47 @@
                 </form>
 
                 <div id="upiSection" class="upi-section">
-                    <h3>Payment Details</h3>
-                    <p><strong>UPI ID:</strong> <span id="upiId"></span></p>
-                    <p><strong>Amount:</strong> <span id="upiAmount"></span></p>
-                    <p><strong>Name:</strong> <span id="upiName"></span></p>
-                    <img id="upiQR" alt="UPI QR Code">
-                    <p><small>Scan to pay or enter UPI ID manually</small></p>
-                    <button onclick="document.getElementById('upiSection').classList.remove('show')" class="btn btn-secondary">Close</button>
+                    <h3>💳 Payment Options</h3>
+                    
+                    <div class="payment-methods">
+                        <!-- Mobile-Friendly UPI Payment -->
+                        <div class="payment-method">
+                            <h4>📱 Pay with UPI App</h4>
+                            <p><strong>Amount:</strong> <span id="upiAmount"></span></p>
+                            <button id="payWithUPI" class="payment-btn primary">Open UPI App & Pay</button>
+                            <button id="payWithPhonePe" class="payment-btn secondary">Pay with PhonePe</button>
+                            <button id="payWithGPay" class="payment-btn secondary">Pay with Google Pay</button>
+                            <small style="color: #666; display: block; margin-top: 8px;">Tap to open your UPI app with payment details pre-filled</small>
+                        </div>
+                        
+                        <!-- Copy UPI Details -->
+                        <div class="payment-method">
+                            <h4>📋 Copy Payment Details</h4>
+                            <div class="payment-info">
+                                <strong>UPI ID:</strong> <span id="upiId"></span>
+                                <button id="copyUpiId" class="payment-btn copy">Copy UPI ID</button>
+                            </div>
+                            <div class="payment-info">
+                                <strong>Amount:</strong> <span id="upiAmountCopy"></span>
+                                <button id="copyAmount" class="payment-btn copy">Copy Amount</button>
+                            </div>
+                            <div class="payment-info">
+                                <strong>Name:</strong> <span id="upiName"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- QR Code (for desktop users) -->
+                        <div class="payment-divider">
+                            <span>or scan QR code (for desktop users)</span>
+                        </div>
+                        
+                        <div class="qr-section">
+                            <img id="upiQR" alt="UPI QR Code">
+                            <small style="color: #666;">Scan with any UPI app</small>
+                        </div>
+                    </div>
+                    
+                    <button onclick="document.getElementById('upiSection').classList.remove('show')" class="btn btn-secondary" style="margin-top: 20px;">Close</button>
                 </div>
                 </div>
             </div>
@@ -1288,52 +1403,164 @@
             { value: '00:00', label: '12:00 AM (Midnight)', hour: 24 }
         ];
 
-        // Populate start time slots based on selected date
-        const populateStartTimeSlots = () => {
-            const dateInput = document.getElementById('bookingDate');
+        // Populate start time slots based on selected date and availability
+        const populateStartTimeSlots = async (selectedDate, availabilityData) => {
             const startTimeSelect = document.getElementById('startTime');
             const endTimeSelect = document.getElementById('endTime');
-            const selectedDate = dateInput.value;
+            const loadingEl = document.getElementById('startTimeLoading');
+            
+            // Show loading state
+            loadingEl.style.display = 'block';
+            startTimeSelect.disabled = true;
             
             // Reset end time when start time changes
             endTimeSelect.innerHTML = '<option value="">Select start time first</option>';
             endTimeSelect.disabled = true;
             
-            startTimeSelect.innerHTML = '<option value="">Select time</option>';
+            startTimeSelect.innerHTML = '<option value="">Loading...</option>';
             
             if (!selectedDate) {
-                // No date selected, show all times
-                allTimeSlots.forEach(slot => {
-                    const option = document.createElement('option');
-                    option.value = slot.value;
-                    option.textContent = slot.label;
-                    startTimeSelect.appendChild(option);
-                });
+                startTimeSelect.innerHTML = '<option value="">Select date first</option>';
+                loadingEl.style.display = 'none';
                 return;
             }
 
-            const now = new Date();
-            const todayStr = now.toISOString().split('T')[0];
-            const currentHour = now.getHours();
-            
-            allTimeSlots.forEach(slot => {
-                // If today, only show times after current hour
-                if (selectedDate === todayStr && slot.hour <= currentHour) {
-                    return; // Skip past times
+            try {
+                const now = new Date();
+                const todayStr = now.toISOString().split('T')[0];
+                const currentHour = now.getHours();
+                const currentMinute = now.getMinutes();
+                
+                // Get booked and blocked time ranges
+                const unavailableRanges = [];
+                
+                // Add booked times to unavailable ranges
+                if (availabilityData && availabilityData.bookings) {
+                    availabilityData.bookings.forEach(booking => {
+                        if (booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'PENDING') {
+                            unavailableRanges.push({
+                                start: booking.startTime,
+                                end: booking.endTime,
+                                type: 'booking'
+                            });
+                        }
+                    });
                 }
                 
-                const option = document.createElement('option');
-                option.value = slot.value;
-                option.textContent = slot.label;
-                startTimeSelect.appendChild(option);
+                // Add blocked times to unavailable ranges
+                if (availabilityData && availabilityData.blockedTimes) {
+                    availabilityData.blockedTimes.forEach(blocked => {
+                        unavailableRanges.push({
+                            start: blocked.startTime,
+                            end: blocked.endTime,
+                            type: 'blocked'
+                        });
+                    });
+                }
+                
+                // Reset and populate start time options
+                startTimeSelect.innerHTML = '<option value="">Select time</option>';
+                
+                let hasAvailableSlots = false;
+                
+                allTimeSlots.forEach(slot => {
+                    // Skip past times for today
+                    if (selectedDate === todayStr) {
+                        // Convert current time and slot time to minutes for accurate comparison
+                        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+                        const slotTimeInMinutes = slot.hour * 60; // Slot minutes are always 0 (:00)
+                        
+                        // Skip slots that are in the past
+                        if (slotTimeInMinutes <= currentTimeInMinutes) {
+                            return;
+                        }
+                    }
+                    
+                    // Check if this time slot is available (not overlapping with bookings/blocks)
+                    const isAvailable = !isTimeSlotUnavailable(slot.value, unavailableRanges);
+                    
+                    if (isAvailable) {
+                        const option = document.createElement('option');
+                        option.value = slot.value;
+                        option.textContent = slot.label;
+                        startTimeSelect.appendChild(option);
+                        hasAvailableSlots = true;
+                    }
+                });
+                
+                if (!hasAvailableSlots) {
+                    startTimeSelect.innerHTML = '<option value="">No available time slots for this date</option>';
+                    startTimeSelect.disabled = true;
+                } else {
+                    startTimeSelect.disabled = false;
+                }
+                
+            } catch (error) {
+                console.error('Error populating time slots:', error);
+                startTimeSelect.innerHTML = '<option value="">Error loading times</option>';
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        };
+
+        // Helper function to check if a time slot overlaps with unavailable ranges
+        const isTimeSlotUnavailable = (timeSlot, unavailableRanges) => {
+            const [slotHour, slotMinute] = timeSlot.split(':').map(Number);
+            const slotTimeInMinutes = slotHour * 60 + slotMinute;
+            
+            return unavailableRanges.some(range => {
+                const [startHour, startMinute] = range.start.split(':').map(Number);
+                const [endHour, endMinute] = range.end.split(':').map(Number);
+                
+                const startTimeInMinutes = startHour * 60 + startMinute;
+                let endTimeInMinutes = endHour * 60 + endMinute;
+                
+                // Handle midnight crossover
+                if (endTimeInMinutes <= startTimeInMinutes) {
+                    endTimeInMinutes += 24 * 60;
+                }
+                
+                // Check if slot time falls within the unavailable range
+                return slotTimeInMinutes >= startTimeInMinutes && slotTimeInMinutes < endTimeInMinutes;
+            });
+        };
+        
+        // Helper function to check if a time range overlaps with unavailable ranges
+        const isTimeRangeUnavailable = (startTime, endTime, unavailableRanges) => {
+            const [startHour, startMinute] = startTime.split(':').map(Number);
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+            
+            const startTimeInMinutes = startHour * 60 + startMinute;
+            let endTimeInMinutes = endHour * 60 + endMinute;
+            
+            // Handle midnight crossover
+            if (endTimeInMinutes <= startTimeInMinutes) {
+                endTimeInMinutes += 24 * 60;
+            }
+            
+            return unavailableRanges.some(range => {
+                const [rangeStartHour, rangeStartMinute] = range.start.split(':').map(Number);
+                const [rangeEndHour, rangeEndMinute] = range.end.split(':').map(Number);
+                
+                const rangeStartInMinutes = rangeStartHour * 60 + rangeStartMinute;
+                let rangeEndInMinutes = rangeEndHour * 60 + rangeEndMinute;
+                
+                if (rangeEndInMinutes <= rangeStartInMinutes) {
+                    rangeEndInMinutes += 24 * 60;
+                }
+                
+                // Check for any overlap between the ranges
+                return !(endTimeInMinutes <= rangeStartInMinutes || startTimeInMinutes >= rangeEndInMinutes);
             });
         };
 
-        // Populate end time slots based on selected start time
+        // Populate end time slots based on selected start time and check availability
         const populateEndTimeSlots = () => {
             const startTimeSelect = document.getElementById('startTime');
             const endTimeSelect = document.getElementById('endTime');
+            const dateInput = document.getElementById('bookingDate');
             const selectedStartTime = startTimeSelect.value;
+            const selectedDate = dateInput.value;
             
             endTimeSelect.innerHTML = '<option value="">Select end time</option>';
             
@@ -1346,15 +1573,35 @@
             endTimeSelect.disabled = false;
             const [startHour] = selectedStartTime.split(':').map(Number);
             
+            // Get current availability data if available
+            const unavailableRanges = window.currentAvailabilityData ? 
+                [...(window.currentAvailabilityData.bookings || []).filter(b => 
+                    b.bookingStatus === 'CONFIRMED' || b.bookingStatus === 'PENDING'
+                ).map(b => ({ start: b.startTime, end: b.endTime, type: 'booking' })),
+                ...(window.currentAvailabilityData.blockedTimes || []).map(b => 
+                    ({ start: b.startTime, end: b.endTime, type: 'blocked' })
+                )] : [];
+            
             allEndTimeSlots.forEach(slot => {
                 // Only show times after the selected start time
                 if (slot.hour > startHour) {
-                    const option = document.createElement('option');
-                    option.value = slot.value;
-                    option.textContent = slot.label;
-                    endTimeSelect.appendChild(option);
+                    // Check if the time range from start to this end time is available
+                    const isRangeAvailable = !isTimeRangeUnavailable(selectedStartTime, slot.value, unavailableRanges);
+                    
+                    if (isRangeAvailable) {
+                        const option = document.createElement('option');
+                        option.value = slot.value;
+                        option.textContent = slot.label;
+                        endTimeSelect.appendChild(option);
+                    }
                 }
             });
+            
+            // Check if any options were added
+            if (endTimeSelect.children.length <= 1) {
+                endTimeSelect.innerHTML = '<option value="">No available end times</option>';
+                endTimeSelect.disabled = true;
+            }
         };
 
         // Legacy function for backward compatibility
@@ -1372,34 +1619,48 @@
                 if (!res.ok) throw new Error('Failed to load availability');
 
                 const data = await res.json();
+                
+                // Store availability data globally for time slot filtering
+                window.currentAvailabilityData = data;
+                
+                // Update the timeline display
                 displayAvailability(data);
+                
+                // Update available time slots based on this data
+                await populateStartTimeSlots(date, data);
+                
             } catch (error) {
+                console.error('Error loading availability:', error);
                 container.innerHTML = '<p>Failed to load schedule</p>';
+                
+                // Clear availability data on error
+                window.currentAvailabilityData = null;
+                
+                // Still try to populate basic time slots
+                await populateStartTimeSlots(date, null);
             }
         };
 
-        // Display availability timeline
+        // Display availability timeline with simplified user view
         const displayAvailability = (data) => {
             const container = document.getElementById('referenceTimeline');
             
             if (data.bookings.length === 0 && data.blockedTimes.length === 0) {
-                container.innerHTML = '<p style="color: #28a745;">✓ No bookings or blocks for this date</p>';
+                container.innerHTML = '<p style="color: #28a745;">✓ All time slots available for this date</p>';
                 return;
             }
 
             let html = '';
             
-            // Show bookings
+            // Show bookings with simplified information for users
             data.bookings.forEach(booking => {
-                const statusClass = booking.bookingStatus.toLowerCase();
-                const rentalsDisplay = booking.rentals && booking.rentals.length > 0 
-                    ? booking.rentals.map(r => `${r.name} × ${r.quantity}`).join(', ')
-                    : booking.rentalType;
+                const statusColor = booking.bookingStatus === 'CONFIRMED' ? '#dc3545' : '#fd7e14';
+                const statusText = booking.bookingStatus === 'CONFIRMED' ? 'Booked' : 'Pending';
+                
                 html += `
-                    <div class="timeline-item booked">
+                    <div class="timeline-item booked" style="border-left-color: ${statusColor};">
                         <strong>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</strong>
-                        <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
-                        <br><small>${rentalsDisplay}</small>
+                        <span style="color: ${statusColor}; font-weight: 500; margin-left: 10px;">${statusText}</span>
                     </div>
                 `;
             });
@@ -1409,8 +1670,7 @@
                 html += `
                     <div class="timeline-item blocked">
                         <strong>${formatTime(blocked.startTime)} - ${formatTime(blocked.endTime)}</strong>
-                        <span style="color: #666;">🚫 Blocked</span>
-                        <br><small>${blocked.reason}</small>
+                        <span style="color: #6c757d; font-weight: 500; margin-left: 10px;">Unavailable</span>
                     </div>
                 `;
             });
@@ -1530,13 +1790,59 @@
                 hideLoadingOverlay();
                 showAlert('Booking created successfully! Pending admin approval.', 'success');
                 
-                // Show UPI details
+                // Show UPI details with enhanced payment methods
                 if (data.upiDetails) {
-                    document.getElementById('upiId').textContent = data.upiDetails.upiId;
-                    document.getElementById('upiAmount').textContent = `₹${data.upiDetails.amount}`;
-                    document.getElementById('upiName').textContent = data.upiDetails.upiName;
+                    const { upiId, amount, upiName } = data.upiDetails;
+                    
+                    // Update display elements
+                    document.getElementById('upiId').textContent = upiId;
+                    document.getElementById('upiAmount').textContent = `₹${amount}`;
+                    document.getElementById('upiAmountCopy').textContent = `₹${amount}`;
+                    document.getElementById('upiName').textContent = upiName;
+                    
+                    // Generate UPI payment link
+                    const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(upiName)}&am=${amount}&cu=INR`;
+                    
+                    // Set up payment buttons
+                    document.getElementById('payWithUPI').onclick = () => window.open(upiLink, '_self');
+                    document.getElementById('payWithPhonePe').onclick = () => window.open(`phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(upiName)}&am=${amount}&cu=INR`, '_self');
+                    document.getElementById('payWithGPay').onclick = () => window.open(`tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(upiName)}&am=${amount}&cu=INR`, '_self');
+                    
+                    // Copy functions
+                    document.getElementById('copyUpiId').onclick = () => {
+                        navigator.clipboard.writeText(upiId).then(() => {
+                            showAlert('UPI ID copied to clipboard!', 'success');
+                        }).catch(() => {
+                            // Fallback for older browsers
+                            const textArea = document.createElement('textarea');
+                            textArea.value = upiId;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            showAlert('UPI ID copied to clipboard!', 'success');
+                        });
+                    };
+                    
+                    document.getElementById('copyAmount').onclick = () => {
+                        navigator.clipboard.writeText(amount.toString()).then(() => {
+                            showAlert('Amount copied to clipboard!', 'success');
+                        }).catch(() => {
+                            const textArea = document.createElement('textarea');
+                            textArea.value = amount.toString();
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            showAlert('Amount copied to clipboard!', 'success');
+                        });
+                    };
+                    
+                    // Generate QR code
                     document.getElementById('upiQR').src = 
-                        `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${data.upiDetails.upiId}&pn=${encodeURIComponent(data.upiDetails.upiName)}&am=${data.upiDetails.amount}&cu=INR`;
+                        `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`;
+                    
+                    // Show payment section
                     document.getElementById('upiSection').classList.add('show');
                 }
 
@@ -1774,11 +2080,28 @@
         });
         document.getElementById('endTime').addEventListener('change', updatePriceDisplay);
 
-        document.getElementById('bookingDate').addEventListener('change', (e) => {
-            if (e.target.value) {
-                loadAvailability(e.target.value);
-                populateStartTimeSlots(); // Update start time slots based on selected date
+        document.getElementById('bookingDate').addEventListener('change', async (e) => {
+            const selectedDate = e.target.value;
+            const startTimeSelect = document.getElementById('startTime');
+            const endTimeSelect = document.getElementById('endTime');
+            
+            // Reset time selections
+            startTimeSelect.innerHTML = '<option value="">Select date first</option>';
+            endTimeSelect.innerHTML = '<option value="">Select start time first</option>';
+            startTimeSelect.disabled = true;
+            endTimeSelect.disabled = true;
+            
+            if (selectedDate) {
+                // Load availability data and populate time slots
+                await loadAvailability(selectedDate);
+            } else {
+                // Clear reference timeline if no date selected
+                document.getElementById('referenceTimeline').innerHTML = '<div class="loading">Select a date to view schedule</div>';
+                window.currentAvailabilityData = null;
             }
+            
+            // Update price display
+            updatePriceDisplay();
         });
 
         // Set minimum date to today
