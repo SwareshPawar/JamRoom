@@ -1,19 +1,12 @@
-require('dotenv').config({ path: __dirname + '/.env' });
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-const app = express();
-const PORT = process.env.PORT || 5000;
+// ⚠️ OBSOLETE SERVER - USE server.js IN ROOT DIRECTORY
+// This file is kept for reference only and should not be used
+// Main production server is at: ../server.js
+// To start the application, run: node server.js from the root directory
 
-app.use(cors());
-app.use(express.json());
-console.log('MONGODB_URI:', process.env.MONGODB_URI);
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+console.log('❌ WARNING: This is an obsolete server file!');
+console.log('🔧 Use the main server instead: node server.js');
+console.log('📁 Located at: ../server.js');
+process.exit(1);
 
 app.get('/', (req, res) => {
   res.send('JamRoom API is running');
