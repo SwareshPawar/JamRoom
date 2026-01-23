@@ -461,11 +461,14 @@ router.get('/:id/download-pdf', protect, async (req, res) => {
     console.log('Admin settings retrieved');
 
     // Generate PDF bill with Vercel-optimized function
-    console.log('Starting PDF generation...');
+    console.log('Starting PDF generation for environment:', process.env.NODE_ENV);
+    console.log('VERCEL environment:', process.env.VERCEL);
+    console.log('Available memory:', process.memoryUsage());
+    
     const pdfBuffer = await generateBillForDownload(booking);
     const filename = generateBillFilename(booking, settings);
     
-    console.log('User PDF generated successfully, filename:', filename);
+    console.log('User PDF generated successfully, size:', pdfBuffer.length, 'filename:', filename);
     
     // Set response headers for PDF download with proper binary handling
     res.setHeader('Content-Type', 'application/pdf');
@@ -478,10 +481,20 @@ router.get('/:id/download-pdf', protect, async (req, res) => {
     // Send the PDF buffer as binary data
     res.end(pdfBuffer, 'binary');
   } catch (error) {
-    console.error('Download PDF error:', error);
+    console.error('Download PDF error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code
+    });
+    
+    // Return more specific error message in development
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development';
+    
     res.status(500).json({
       success: false,
-      message: 'Server error generating PDF'
+      message: 'Server error generating PDF',
+      ...(isDevelopment && { error: error.message, stack: error.stack })
     });
   }
 });

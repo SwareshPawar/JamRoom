@@ -841,7 +841,15 @@ const generateBillForDownload = async (booking) => {
   let browser;
   
   try {
-    console.log('Starting PDF download generation for booking:', booking._id);
+    console.log('=== PDF DOWNLOAD GENERATION START ===');
+    console.log('Booking ID:', booking._id);
+    console.log('Environment details:');
+    console.log('- NODE_ENV:', process.env.NODE_ENV);
+    console.log('- VERCEL:', process.env.VERCEL);
+    console.log('- AWS_LAMBDA_FUNCTION_NAME:', process.env.AWS_LAMBDA_FUNCTION_NAME);
+    console.log('- isServerless:', isServerless);
+    console.log('- chromium available:', !!chromium);
+    console.log('- Memory usage:', process.memoryUsage());
     
     // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
@@ -854,13 +862,20 @@ const generateBillForDownload = async (booking) => {
     // Use chrome-aws-lambda if available and in serverless environment
     if (chromium && isServerless) {
       console.log('Using chrome-aws-lambda for serverless deployment');
-      browser = await chromium.puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath,
-        headless: chromium.headless,
-        ignoreHTTPSErrors: true,
-      });
+      try {
+        browser = await chromium.puppeteer.launch({
+          args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath,
+          headless: chromium.headless,
+          ignoreHTTPSErrors: true,
+        });
+        console.log('chrome-aws-lambda browser launched successfully');
+      } catch (chromiumError) {
+        console.error('chrome-aws-lambda launch failed:', chromiumError.message);
+        console.log('Falling back to regular puppeteer...');
+        throw chromiumError; // Let it fallback to regular puppeteer
+      }
     } else {
       console.log('Using regular puppeteer with optimized config');
       // Launch puppeteer with optimized configuration for local/non-serverless
@@ -890,6 +905,7 @@ const generateBillForDownload = async (booking) => {
         ],
         timeout: isServerless ? 45000 : 30000
       });
+      console.log('Regular puppeteer browser launched successfully');
     }
 
     console.log('Browser launched for PDF download');
