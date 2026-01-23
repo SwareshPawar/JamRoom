@@ -3,6 +3,15 @@ const fs = require('fs').promises;
 const path = require('path');
 const AdminSettings = require('../models/AdminSettings');
 
+// Import chrome-aws-lambda for serverless environments
+let chromium;
+try {
+  chromium = require('chrome-aws-lambda');
+} catch (error) {
+  // chrome-aws-lambda not available, will use regular puppeteer
+  chromium = null;
+}
+
 /**
  * Generate HTML content for the bill
  */
@@ -764,20 +773,37 @@ const generateBill = async (booking) => {
     const htmlContent = await generateBillHTML(booking, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
     
-    // Launch puppeteer with stable configuration (same as working email version)
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu'
-      ],
-      timeout: 30000
-    });
+    // Launch puppeteer with serverless-compatible configuration
+    let browser;
+    
+    if (chromium && process.env.VERCEL) {
+      // Use chrome-aws-lambda for Vercel serverless environment
+      console.log('Using chrome-aws-lambda for serverless environment');
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath,
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
+        timeout: 30000
+      });
+    } else {
+      // Use regular puppeteer for local development
+      console.log('Using regular puppeteer for local environment');
+      browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ],
+        timeout: 30000
+      });
+    }
     
     console.log('Puppeteer browser launched');
     const page = await browser.newPage();
