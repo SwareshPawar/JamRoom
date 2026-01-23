@@ -844,7 +844,7 @@ const generateBillForDownload = async (booking) => {
     console.log('- VERCEL:', process.env.VERCEL);
     console.log('- AWS_LAMBDA_FUNCTION_NAME:', process.env.AWS_LAMBDA_FUNCTION_NAME);
     console.log('- isServerless:', isServerless);
-    console.log('- chromium available:', !!chromium);
+    console.log('- Using regular Puppeteer (chrome-aws-lambda removed)');
     console.log('- Memory usage:', process.memoryUsage());
     
     // Get admin settings for company info
