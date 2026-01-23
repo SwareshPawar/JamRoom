@@ -1149,6 +1149,7 @@ router.delete('/blocked-times/:id', protect, isAdmin, async (req, res) => {
 router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
   try {
     console.log('Admin PDF download requested for booking:', req.params.id);
+    console.log('User making request:', req.user?.email);
     
     // Import bill generator with optimized download function
     const { generateBillForDownload, generateBillFilename } = require('../utils/billGenerator');
@@ -1156,16 +1157,21 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
     const booking = await Booking.findById(req.params.id).populate('userId');
     
     if (!booking) {
+      console.log('Booking not found:', req.params.id);
       return res.status(404).json({
         success: false,
         message: 'Booking not found'
       });
     }
 
+    console.log('Booking found:', booking.userName, booking.userEmail);
+    
     // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
+    console.log('Admin settings retrieved');
 
     // Generate PDF bill with Vercel-optimized function
+    console.log('Starting PDF generation...');
     const pdfBuffer = await generateBillForDownload(booking);
     const filename = generateBillFilename(booking, settings);
     

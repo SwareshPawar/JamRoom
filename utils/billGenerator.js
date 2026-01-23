@@ -5,10 +5,17 @@ const AdminSettings = require('../models/AdminSettings');
 
 // For Vercel deployment, try to use chrome-aws-lambda
 let chromium;
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
 try {
-  chromium = require('chrome-aws-lambda');
+  if (isServerless) {
+    chromium = require('chrome-aws-lambda');
+    console.log('chrome-aws-lambda loaded for serverless environment');
+  } else {
+    console.log('Local development detected, using regular puppeteer');
+  }
 } catch (error) {
-  console.log('chrome-aws-lambda not available, using regular puppeteer');
+  console.log('chrome-aws-lambda not available, using regular puppeteer:', error.message);
 }
 
 /**
@@ -844,9 +851,9 @@ const generateBillForDownload = async (booking) => {
     const htmlContent = await generateBillHTML(booking, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
     
-    // Use chrome-aws-lambda if available (for Vercel), otherwise use regular puppeteer
-    if (chromium) {
-      console.log('Using chrome-aws-lambda for Vercel deployment');
+    // Use chrome-aws-lambda if available and in serverless environment
+    if (chromium && isServerless) {
+      console.log('Using chrome-aws-lambda for serverless deployment');
       browser = await chromium.puppeteer.launch({
         args: chromium.args,
         defaultViewport: chromium.defaultViewport,
@@ -855,8 +862,8 @@ const generateBillForDownload = async (booking) => {
         ignoreHTTPSErrors: true,
       });
     } else {
-      console.log('Using regular puppeteer');
-      // Launch puppeteer with Vercel-optimized configuration
+      console.log('Using regular puppeteer with optimized config');
+      // Launch puppeteer with optimized configuration for local/non-serverless
       browser = await puppeteer.launch({
         headless: 'new',
         args: [
@@ -867,18 +874,21 @@ const generateBillForDownload = async (booking) => {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--single-process', // Important for Vercel
-          '--disable-extensions',
-          '--disable-plugins',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--disable-features=TranslateUI',
-          '--disable-ipc-flooding-protection',
-          '--memory-pressure-off', // Prevent memory issues
-          '--max_old_space_size=512' // Limit memory usage
+          // Remove serverless-specific args for local development
+          ...(isServerless ? [
+            '--single-process',
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-features=TranslateUI',
+            '--disable-ipc-flooding-protection',
+            '--memory-pressure-off',
+            '--max_old_space_size=512'
+          ] : [])
         ],
-        timeout: 45000 // Increased timeout for serverless cold starts
+        timeout: isServerless ? 45000 : 30000
       });
     }
 
@@ -888,10 +898,10 @@ const generateBillForDownload = async (booking) => {
     // Set smaller viewport to reduce memory usage
     await page.setViewport({ width: 800, height: 600 });
     
-    // Set content with timeout optimized for serverless
+    // Set content with timeout optimized for environment
     await page.setContent(htmlContent, {
       waitUntil: 'domcontentloaded',
-      timeout: chromium ? 30000 : 40000
+      timeout: isServerless && chromium ? 30000 : 25000
     });
 
     console.log('HTML content set, generating PDF for download...');
@@ -905,7 +915,7 @@ const generateBillForDownload = async (booking) => {
         bottom: '20px',
         left: '20px'
       },
-      timeout: chromium ? 25000 : 40000
+      timeout: isServerless && chromium ? 25000 : 20000
     });
     
     console.log('PDF download generated successfully, size:', pdfBuffer.length);
