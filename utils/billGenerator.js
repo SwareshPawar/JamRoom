@@ -3,6 +3,14 @@ const fs = require('fs').promises;
 const path = require('path');
 const AdminSettings = require('../models/AdminSettings');
 
+// For Vercel deployment, try to use chrome-aws-lambda
+let chromium;
+try {
+  chromium = require('chrome-aws-lambda');
+} catch (error) {
+  console.log('chrome-aws-lambda not available, using regular puppeteer');
+}
+
 /**
  * Generate HTML content for the bill
  */
@@ -748,7 +756,7 @@ const generateBillHTML = async (booking, settings) => {
 };
 
 /**
- * Generate PDF bill for a booking
+ * Generate PDF bill for a booking (optimized for email - stable config)
  */
 const generateBill = async (booking) => {
   let browser;
@@ -820,6 +828,118 @@ const generateBill = async (booking) => {
 };
 
 /**
+ * Generate PDF bill for download (optimized for Vercel serverless)
+ */
+const generateBillForDownload = async (booking) => {
+  let browser;
+  
+  try {
+    console.log('Starting PDF download generation for booking:', booking._id);
+    
+    // Get admin settings for company info
+    const settings = await AdminSettings.getSettings();
+    console.log('Retrieved admin settings');
+    
+    // Generate HTML content
+    const htmlContent = await generateBillHTML(booking, settings);
+    console.log('Generated HTML content, length:', htmlContent.length);
+    
+    // Use chrome-aws-lambda if available (for Vercel), otherwise use regular puppeteer
+    if (chromium) {
+      console.log('Using chrome-aws-lambda for Vercel deployment');
+      browser = await chromium.puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath,
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
+      });
+    } else {
+      console.log('Using regular puppeteer');
+      // Launch puppeteer with Vercel-optimized configuration
+      browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process', // Important for Vercel
+          '--disable-extensions',
+          '--disable-plugins',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--disable-features=TranslateUI',
+          '--disable-ipc-flooding-protection',
+          '--memory-pressure-off', // Prevent memory issues
+          '--max_old_space_size=512' // Limit memory usage
+        ],
+        timeout: 45000 // Increased timeout for serverless cold starts
+      });
+    }
+
+    console.log('Browser launched for PDF download');
+    const page = await browser.newPage();
+    
+    // Set smaller viewport to reduce memory usage
+    await page.setViewport({ width: 800, height: 600 });
+    
+    // Set content with timeout optimized for serverless
+    await page.setContent(htmlContent, {
+      waitUntil: 'domcontentloaded',
+      timeout: chromium ? 30000 : 40000
+    });
+
+    console.log('HTML content set, generating PDF for download...');
+    
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20px',
+        right: '20px',
+        bottom: '20px',
+        left: '20px'
+      },
+      timeout: chromium ? 25000 : 40000
+    });
+    
+    console.log('PDF download generated successfully, size:', pdfBuffer.length);
+    
+    await browser.close();
+    return pdfBuffer;
+    
+  } catch (error) {
+    console.error('PDF download generation error:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Ensure browser is closed even on error
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('Error closing browser:', closeError.message);
+      }
+    }
+    
+    // Provide more specific error messages for debugging
+    if (error.message.includes('timeout')) {
+      throw new Error('PDF generation timed out. Please try again or contact support.');
+    } else if (error.message.includes('browser')) {
+      throw new Error('Browser initialization failed. This may be a temporary server issue.');
+    } else if (error.message.includes('memory')) {
+      throw new Error('Server memory limit exceeded. Please try again later.');
+    } else {
+      throw new Error(`PDF download failed: ${error.message}`);
+    }
+  }
+};
+
+/**
  * Generate bill filename
  */
 const generateBillFilename = (booking, settings) => {
@@ -832,6 +952,7 @@ const generateBillFilename = (booking, settings) => {
 
 module.exports = {
   generateBill,
+  generateBillForDownload,
   generateBillFilename,
   generateBillHTML
 };

@@ -431,8 +431,8 @@ router.get('/:id/download-pdf', protect, async (req, res) => {
   try {
     console.log('User PDF download requested for booking:', req.params.id);
     
-    // Import bill generator like email function does
-    const { generateBill, generateBillFilename } = require('../utils/billGenerator');
+    // Import bill generator with optimized download function
+    const { generateBillForDownload, generateBillFilename } = require('../utils/billGenerator');
     
     const booking = await Booking.findById(req.params.id).populate('userId');
     
@@ -451,11 +451,11 @@ router.get('/:id/download-pdf', protect, async (req, res) => {
       });
     }
 
-    // Get admin settings for company info (like email function)
+    // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
 
-    // Generate PDF bill (same as email function)
-    const pdfBuffer = await generateBill(booking);
+    // Generate PDF bill with Vercel-optimized function
+    const pdfBuffer = await generateBillForDownload(booking);
     const filename = generateBillFilename(booking, settings);
     
     console.log('User PDF generated successfully, filename:', filename);
