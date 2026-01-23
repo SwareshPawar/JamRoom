@@ -248,11 +248,16 @@
 
         <!-- Login Credentials -->
         <div class="test-section" style="margin-bottom: 20px;">
-            <h2>🔐 Test Credentials</h2>
-            <div style="padding: 15px; background: rgba(78, 205, 196, 0.2); border-radius: 8px;">
+            <h2>🔐 Test Credentials & Environment</h2>\n            <div style="padding: 15px; background: rgba(78, 205, 196, 0.2); border-radius: 8px; margin-bottom: 15px;">
                 <p style="margin: 0; font-size: 0.9em;">
                     <strong>✅ Pre-configured:</strong> Test user and admin accounts are set up for automated testing.
                     <br><small style="color: #888;">Run <code>node createTestUsers.js</code> to reset test accounts if needed.</small>
+                </p>
+            </div>
+            <div style="padding: 15px; background: rgba(255, 193, 7, 0.2); border-radius: 8px;">
+                <p style="margin: 0; font-size: 0.9em;">
+                    <strong>⚙️ Environment Setup:</strong> Missing .env file or configuration issues?
+                    <br><small style="color: #888;">Run <code>node createEnvFile.js</code> for interactive environment setup with secure defaults.</small>
                 </p>
             </div>
             <div style="margin-top: 10px;">
@@ -469,6 +474,60 @@
                     <div class="test-name">
                         Settings Update Flow
                         <small>Get → Update → Verify</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+            </div>
+
+            <!-- Enhanced Rental System Tests -->
+            <div class="test-section">
+                <h2>🎸 Enhanced Rental System Tests</h2>
+                <div class="test-item" id="test-rental-hierarchical-structure">
+                    <div class="test-name">
+                        Hierarchical Rental Structure
+                        <small>Verify categories have sub-items with rentalType</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-rental-inhouse-pricing">
+                    <div class="test-name">
+                        In-house Rental Pricing
+                        <small>Verify hourly pricing for in-house rentals</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-rental-perday-pricing">
+                    <div class="test-name">
+                        Per-day Rental Pricing
+                        <small>Verify flat pricing for per-day rentals</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-rental-jamroom-category">
+                    <div class="test-name">
+                        JamRoom Category Structure
+                        <small>Verify JamRoom base + add-ons structure</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-rental-free-addons">
+                    <div class="test-name">
+                        Free Add-ons Validation
+                        <small>Verify mics/jacks have price 0</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-rental-dual-variants">
+                    <div class="test-name">
+                        Dual Rental Variants
+                        <small>Verify Guitar/Keyboard have both in-house and per-day</small>
+                    </div>
+                    <span class="test-status status-pending">Pending</span>
+                </div>
+                <div class="test-item" id="test-rental-pricing-calculation">
+                    <div class="test-name">
+                        Mixed Pricing Calculation
+                        <small>Test booking with both in-house and per-day items</small>
                     </div>
                     <span class="test-status status-pending">Pending</span>
                 </div>
@@ -1248,6 +1307,229 @@
             return `Settings flow successful - Studio: ${verifyData.settings.studioName}`;
         };
 
+        // Enhanced Rental System Tests
+        const testRentalHierarchicalStructure = async () => {
+            const res = await fetch(`${API_URL}/api/bookings/settings`);
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) throw new Error(data.message || 'Failed to get settings');
+            
+            const jamroomCategory = data.settings?.rentalTypes?.find(rt => rt.name === 'JamRoom');
+            const instrumentsCategory = data.settings?.rentalTypes?.find(rt => rt.name === 'Instrument Rentals');
+            
+            if (!jamroomCategory || !instrumentsCategory) {
+                throw new Error('Missing required categories: JamRoom or Instrument Rentals');
+            }
+            
+            if (!jamroomCategory.subItems || !Array.isArray(jamroomCategory.subItems)) {
+                throw new Error('JamRoom category missing subItems array');
+            }
+            
+            if (!instrumentsCategory.subItems || !Array.isArray(instrumentsCategory.subItems)) {
+                throw new Error('Instrument Rentals category missing subItems array');
+            }
+            
+            return `JamRoom: ${jamroomCategory.subItems.length} items, Instruments: ${instrumentsCategory.subItems.length} items`;
+        };
+
+        const testRentalInhousePricing = async () => {
+            const res = await fetch(`${API_URL}/api/bookings/settings`);
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.message || 'Failed to get settings');
+            
+            const instrumentsCategory = data.settings?.rentalTypes?.find(rt => rt.name === 'Instrument Rentals');
+            if (!instrumentsCategory) throw new Error('Instrument Rentals category not found');
+            
+            const inhouseItems = instrumentsCategory.subItems.filter(item => item.rentalType === 'inhouse');
+            if (inhouseItems.length === 0) {
+                throw new Error('No in-house rental items found');
+            }
+            
+            for (const item of inhouseItems) {
+                if (typeof item.price !== 'number' || item.price < 0) {
+                    throw new Error(`Invalid in-house price for ${item.name}: ${item.price}`);
+                }
+                if (item.rentalType !== 'inhouse') {
+                    throw new Error(`Expected rentalType 'inhouse' for ${item.name}`);
+                }
+            }
+            
+            return `${inhouseItems.length} in-house items validated (e.g., ${inhouseItems[0].name}: ₹${inhouseItems[0].price}/hr)`;
+        };
+
+        const testRentalPerdayPricing = async () => {
+            const res = await fetch(`${API_URL}/api/bookings/settings`);
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.message || 'Failed to get settings');
+            
+            const instrumentsCategory = data.settings?.rentalTypes?.find(rt => rt.name === 'Instrument Rentals');
+            if (!instrumentsCategory) throw new Error('Instrument Rentals category not found');
+            
+            const perdayItems = instrumentsCategory.subItems.filter(item => item.rentalType === 'perday');
+            if (perdayItems.length === 0) {
+                throw new Error('No per-day rental items found');
+            }
+            
+            for (const item of perdayItems) {
+                if (item.rentalType !== 'perday') {
+                    throw new Error(`Expected rentalType 'perday' for ${item.name}`);
+                }
+                if (typeof item.perdayPrice !== 'number' || item.perdayPrice <= 0) {
+                    throw new Error(`Invalid per-day price for ${item.name}: ${item.perdayPrice}`);
+                }
+            }
+            
+            return `${perdayItems.length} per-day items validated (e.g., ${perdayItems[0].name}: ₹${perdayItems[0].perdayPrice}/day)`;
+        };
+
+        const testRentalJamroomCategory = async () => {
+            const res = await fetch(`${API_URL}/api/bookings/settings`);
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.message || 'Failed to get settings');
+            
+            const jamroomCategory = data.settings?.rentalTypes?.find(rt => rt.name === 'JamRoom');
+            if (!jamroomCategory) throw new Error('JamRoom category not found');
+            
+            // Check for expected sub-items
+            const expectedItems = ['Microphone', 'Audio Jacks', 'IEM'];
+            const foundItems = [];
+            
+            for (const expectedItem of expectedItems) {
+                const found = jamroomCategory.subItems.find(item => item.name === expectedItem);
+                if (found) {
+                    foundItems.push(`${expectedItem} (₹${found.price})`);
+                } else {
+                    log(`Warning: ${expectedItem} not found in JamRoom category`, 'warn');
+                }
+            }
+            
+            return `JamRoom structure: Base (₹${jamroomCategory.basePrice}) + [${foundItems.join(', ')}]`;
+        };
+
+        const testRentalFreeAddons = async () => {
+            const res = await fetch(`${API_URL}/api/bookings/settings`);
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.message || 'Failed to get settings');
+            
+            const jamroomCategory = data.settings?.rentalTypes?.find(rt => rt.name === 'JamRoom');
+            if (!jamroomCategory) throw new Error('JamRoom category not found');
+            
+            const freeItems = jamroomCategory.subItems.filter(item => item.price === 0);
+            if (freeItems.length === 0) {
+                throw new Error('No free add-ons found in JamRoom category');
+            }
+            
+            const freeItemNames = freeItems.map(item => item.name);
+            const expectedFreeItems = ['Microphone', 'Audio Jacks'];
+            
+            for (const expectedFree of expectedFreeItems) {
+                if (!freeItemNames.includes(expectedFree)) {
+                    log(`Warning: Expected free item '${expectedFree}' not found`, 'warn');
+                }
+            }
+            
+            return `${freeItems.length} free add-ons validated: ${freeItemNames.join(', ')}`;
+        };
+
+        const testRentalDualVariants = async () => {
+            const res = await fetch(`${API_URL}/api/bookings/settings`);
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.message || 'Failed to get settings');
+            
+            const instrumentsCategory = data.settings?.rentalTypes?.find(rt => rt.name === 'Instrument Rentals');
+            if (!instrumentsCategory) throw new Error('Instrument Rentals category not found');
+            
+            // Check for dual variants
+            const instruments = ['Guitar', 'Keyboard'];
+            const results = [];
+            
+            for (const instrument of instruments) {
+                const inhouseVariant = instrumentsCategory.subItems.find(item => 
+                    item.name.includes(instrument) && item.name.includes('In-house')
+                );
+                const perdayVariant = instrumentsCategory.subItems.find(item => 
+                    item.name.includes(instrument) && item.name.includes('Per-day')
+                );
+                
+                if (inhouseVariant && perdayVariant) {
+                    results.push(`${instrument} (✓ In-house: ₹${inhouseVariant.price}/hr, ✓ Per-day: ₹${perdayVariant.perdayPrice}/day)`);
+                } else {
+                    throw new Error(`Missing variants for ${instrument}: In-house: ${!!inhouseVariant}, Per-day: ${!!perdayVariant}`);
+                }
+            }
+            
+            return results.join(', ');
+        };
+
+        const testRentalPricingCalculation = async () => {
+            // Test the pricing logic for mixed rental types
+            const duration = 2; // 2 hours
+            
+            // Simulate mixed booking: JamRoom + In-house Guitar + Per-day Keyboard
+            const jamroomPrice = 300; // per hour
+            const guitarInhousePrice = 200; // per hour
+            const keyboardPerdayPrice = 800; // flat rate
+            
+            // Calculate expected totals
+            const jamroomTotal = jamroomPrice * 1 * duration; // 300 * 1 * 2 = 600
+            const guitarTotal = guitarInhousePrice * 1 * duration; // 200 * 1 * 2 = 400
+            const keyboardTotal = keyboardPerdayPrice * 1; // 800 * 1 (no duration factor) = 800
+            
+            const subtotal = jamroomTotal + guitarTotal + keyboardTotal; // 600 + 400 + 800 = 1800
+            const taxAmount = Math.round(subtotal * 0.18); // 18% GST = 324
+            const totalAmount = subtotal + taxAmount; // 1800 + 324 = 2124
+            
+            // Create actual booking to test
+            if (!userToken) {
+                await testAuthRegister();
+            }
+            
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 2);
+            const dateStr = tomorrow.toISOString().split('T')[0];
+            
+            const res = await fetch(`${API_URL}/api/bookings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}`
+                },
+                body: JSON.stringify({
+                    date: dateStr,
+                    startTime: '15:00',
+                    endTime: '17:00',
+                    duration: duration,
+                    rentals: [
+                        { name: 'JamRoom', description: 'Studio room', price: jamroomPrice, quantity: 1, rentalType: 'inhouse' },
+                        { name: 'Guitar (In-house)', description: 'Electric guitar', price: guitarInhousePrice, quantity: 1, rentalType: 'inhouse' },
+                        { name: 'Keyboard (Per-day)', description: 'Digital keyboard', price: 0, quantity: 1, rentalType: 'perday', perdayPrice: keyboardPerdayPrice }
+                    ],
+                    subtotal: subtotal,
+                    taxAmount: taxAmount,
+                    totalAmount: totalAmount,
+                    bandName: 'Mixed Rental Test',
+                    notes: 'Testing mixed in-house and per-day pricing'
+                })
+            });
+            
+            const data = await res.json();
+            showResponse(data);
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to create mixed rental booking');
+            }
+            
+            createdBookingIds.push(data.booking._id); // Track for cleanup
+            
+            return `Mixed rental booking created: JamRoom(₹${jamroomTotal}) + Guitar In-house(₹${guitarTotal}) + Keyboard Per-day(₹${keyboardTotal}) = ₹${totalAmount} total`;
+        };
+
         // ==================== TEST RUNNERS ====================
 
         // Cleanup function to delete all test bookings
@@ -1310,7 +1592,7 @@
         };
 
         const runApiTests = async () => {
-            log('Running API tests...', 'info');
+            log('Running API and Enhanced Rental System tests...', 'info');
             
             // Auth tests
             await runTest('test-auth-register', testAuthRegister, 'User Registration');
@@ -1336,6 +1618,15 @@
             await runTest('test-validate-booking-schema', testValidateBookingSchema, 'Validate Booking Schema');
             await runTest('test-validate-multiple-rentals', testValidateMultipleRentals, 'Validate Multiple Rentals');
             await runTest('test-validate-price-fields', testValidatePriceFields, 'Validate Price Fields');
+            
+            // Enhanced rental system tests
+            await runTest('test-rental-hierarchical-structure', testRentalHierarchicalStructure, 'Hierarchical Rental Structure');
+            await runTest('test-rental-inhouse-pricing', testRentalInhousePricing, 'In-house Rental Pricing');
+            await runTest('test-rental-perday-pricing', testRentalPerdayPricing, 'Per-day Rental Pricing');
+            await runTest('test-rental-jamroom-category', testRentalJamroomCategory, 'JamRoom Category Structure');
+            await runTest('test-rental-free-addons', testRentalFreeAddons, 'Free Add-ons Validation');
+            await runTest('test-rental-dual-variants', testRentalDualVariants, 'Dual Rental Variants');
+            await runTest('test-rental-pricing-calculation', testRentalPricingCalculation, 'Mixed Pricing Calculation');
             
             // Integration tests
             await runTest('test-integration-booking-flow', testIntegrationBookingFlow, 'Complete Booking Flow');

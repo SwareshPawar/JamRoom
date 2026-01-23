@@ -13,7 +13,39 @@ const adminSettingsSchema = new mongoose.Schema({
       type: Number,
       required: true,
       min: 0
-    }
+    },
+    // Indicates if base price is always charged when category is selected
+    alwaysChargeBase: {
+      type: Boolean,
+      default: true
+    },
+    // Sub-items for categories like "Synths", "Guitars" with individual pricing
+    subItems: [{
+      name: {
+        type: String,
+        required: true
+      },
+      description: {
+        type: String
+      },
+      price: {
+        type: Number,
+        required: true,
+        min: 0
+      },
+      // Rental type: 'inhouse' (tied to jamroom duration) or 'perday' (independent)
+      rentalType: {
+        type: String,
+        enum: ['inhouse', 'perday'],
+        default: 'inhouse'
+      },
+      // Per-day price (only used when rentalType is 'perday')
+      perdayPrice: {
+        type: Number,
+        min: 0,
+        default: 0
+      }
+    }]
   }],
   prices: {
     hourlyRate: {

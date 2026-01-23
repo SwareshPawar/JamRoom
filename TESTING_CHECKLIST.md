@@ -4,7 +4,71 @@ Use this checklist to verify that everything is working correctly.
 
 ---
 
-## 🔧 Pre-Testing Setup
+## � **Enhanced Rental System Testing (January 2026)**
+
+### 🎸 **Rental Category Testing**
+
+#### **JamRoom Base Quantity Restrictions**
+- [ ] JamRoom base shows "Fixed: 1 room" instead of quantity controls
+- [ ] Clicking +/- on JamRoom base has no effect
+- [ ] Price changes only with duration: 2h = ₹600 (300×2)
+
+#### **Free Add-ons Quantity Limits**
+- [ ] Microphone: Can increase to max 4, then + button stops working
+- [ ] Audio Jacks: Can increase to max 4, then + button stops working
+- [ ] Both display as "FREE" in pricing summary
+
+#### **IEM Special Case**
+- [ ] IEM has quantity controls (not fixed at 1 like other in-house)
+- [ ] Price: ₹50 × quantity × duration
+- [ ] 3 IEMs, 2h = ₹300 total
+
+#### **In-house vs Per-day Logic**
+- [ ] Guitar (In-house): No +/- buttons, shows "Tied to JamRoom duration"
+- [ ] Guitar (Per-day): Has +/- buttons, shows "₹800/day"
+- [ ] In-house scales with duration: 2h = ₹400
+- [ ] Per-day flat rate: any duration = ₹800
+
+### 🎯 **UI/UX Testing**
+
+#### **Collapsible Categories**
+- [ ] Click "JamRoom" header → content expands/collapses
+- [ ] Click "Instrument Rentals" header → content expands/collapses
+- [ ] Icons change: − (expanded) ↔ + (collapsed)
+- [ ] Gradient headers display correctly
+
+#### **Visual Indicators**
+- [ ] 🆓 Free items (mics, jacks)
+- [ ] 🔗 In-house items (guitar, keyboard in-house)
+- [ ] 📅 Per-day items (guitar, keyboard per-day)
+- [ ] 🏠 Base categories (JamRoom base)
+
+### 💰 **Complex Pricing Scenarios**
+
+#### **Scenario 1: Band Session**
+JamRoom (2h) + 2 Mics + Guitar In-house + 1 IEM
+- [ ] JamRoom: ₹600 (300×2)
+- [ ] Mics: FREE
+- [ ] Guitar: ₹400 (200×2)
+- [ ] IEM: ₹100 (50×1×2)
+- [ ] **Expected Total**: ₹1,100 + GST
+
+#### **Scenario 2: Mixed Rental Types**
+JamRoom (1h) + Keyboard Per-day + 3 IEMs
+- [ ] JamRoom: ₹300 (300×1)
+- [ ] Keyboard: ₹800 (flat rate)
+- [ ] IEMs: ₹150 (50×3×1)
+- [ ] **Expected Total**: ₹1,250 + GST
+
+### ⚡ **Real-time Updates**
+- [ ] Change duration from 1h→3h: in-house items update automatically
+- [ ] Change duration: per-day items stay same price
+- [ ] Add/remove items: price summary updates instantly
+- [ ] Quantity changes: pricing reflects immediately
+
+---
+
+## �🔧 Pre-Testing Setup
 
 - [ ] Dependencies installed (`npm install`)
 - [ ] `.env` file created with all required variables

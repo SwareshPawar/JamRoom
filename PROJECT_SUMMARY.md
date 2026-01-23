@@ -4,6 +4,12 @@
 
 A **production-ready, full-stack JamRoom rental booking system** with:
 
+### 🚀 **LATEST ENHANCEMENTS (January 2026)**
+- **🎸 Hierarchical Rental System**: Categorized rentals with in-house and per-day options
+- **🎛️ Collapsible Categories**: Organized rental selection with expandable sections
+- **⚖️ Smart Quantity Controls**: Context-aware quantity limits and restrictions
+- **💰 Dynamic Pricing**: Different pricing models for various rental types
+
 ### ✨ Core Features Implemented
 
 #### 🔐 Authentication & Security
@@ -18,6 +24,8 @@ A **production-ready, full-stack JamRoom rental booking system** with:
 - [x] View available time slots by date
 - [x] Book jam room/instruments/sound system
 - [x] View personal booking history
+- [x] **Enhanced Rental Selection**: Hierarchical categories with smart controls
+- [x] **Dynamic Pricing**: Real-time price calculation with different rental models
 - [x] Track booking status (Pending/Confirmed/Rejected)
 - [x] Cancel pending bookings
 - [x] Receive email notifications
@@ -188,6 +196,62 @@ Password: Admin@123
 - POST `/api/admin/make-admin` - Grant admin
 
 📖 **Full API Docs:** See [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
+
+---
+
+## 🎸 **Enhanced Rental System (January 2026)**
+
+### 📋 **Rental Categories & Pricing**
+
+#### 🏠 **JamRoom Category**
+- **JamRoom Base**: ₹300/hr (Fixed quantity: 1 room)
+  - Price varies only with duration, not quantity
+  - Always required as base rental
+- **Free Add-ons**:
+  - 🎤 **Microphone**: FREE (Max 4 units)
+  - 🔌 **Audio Jacks**: FREE (Max 4 units)
+- **Premium Add-ons**:
+  - 🎧 **IEM** (In-ear Monitors): ₹50/hr 
+    - Variable quantity (multiple users)
+    - Price = ₹50 × quantity × duration
+
+#### 🎸 **Instrument Rentals Category**
+- **In-house Rentals** (Tied to JamRoom duration):
+  - 🎸 **Guitar**: ₹200/hr (Fixed quantity: 1)
+  - 🎹 **Keyboard**: ₹200/hr (Fixed quantity: 1)
+  - Automatically matches JamRoom booking duration
+- **Per-day Rentals** (Independent pricing):
+  - 🎸 **Guitar**: ₹800/day (Variable quantity)
+  - 🎹 **Keyboard**: ₹800/day (Variable quantity)
+  - Flat rate regardless of JamRoom duration
+
+### 💡 **Smart Pricing Logic**
+- **JamRoom Base**: Always 1 room × ₹300/hr × duration
+- **In-house Rentals**: 1 unit × price/hr × JamRoom duration
+- **Per-day Rentals**: quantity × flat daily rate
+- **Free Add-ons**: No pricing, quantity limits only
+- **Premium Add-ons**: quantity × price/hr × duration
+
+### 🎯 **User Experience Features**
+- **Collapsible Categories**: Click headers to expand/collapse sections
+- **Smart Controls**: Context-aware quantity buttons
+- **Visual Indicators**: 
+  - 🆓 Free items | 🔗 In-house | 📅 Per-day | 🏠 Base
+- **Real-time Pricing**: Instant updates with changes
+- **Organized Layout**: Clean, categorized rental selection
+
+### 🔧 **Example Pricing Scenarios**
+1. **Basic Session**: JamRoom (2h) = ₹600
+2. **Band Setup**: JamRoom (2h) + 3 Mics + Guitar In-house + 2 IEMs
+   - JamRoom: ₹300×2 = ₹600
+   - Mics: FREE
+   - Guitar: ₹200×2 = ₹400
+   - IEMs: ₹50×2×2 = ₹200
+   - **Total**: ₹1,200 + GST
+3. **Extended Rental**: JamRoom (1h) + Keyboard Per-day
+   - JamRoom: ₹300×1 = ₹300
+   - Keyboard: ₹800×1 = ₹800
+   - **Total**: ₹1,100 + GST
 
 ---
 

@@ -29,6 +29,32 @@
 - **User Features**: Register, login, book sessions, view bookings, cancel bookings
 - **Admin Features**: Approve/reject bookings, edit/delete bookings, block time slots, manage settings, revenue analytics
 - **System Features**: Email notifications, calendar invites (.ics files), UPI payment integration
+- **Enhanced Rental System**: Hierarchical categories, dual pricing models, smart quantity controls
+
+### 🆕 Enhanced Rental System (Latest Update)
+
+**Overview**: The rental system has been completely overhauled to support complex instrument rental scenarios with sophisticated pricing logic and user experience improvements.
+
+**Key Features**:
+1. **Hierarchical Categories**: 
+   - JamRoom (base room + add-ons)
+   - Instrument Rentals (guitars, keyboards, etc.)
+   
+2. **Dual Pricing Models**:
+   - **In-house Rentals**: Price scales with session duration (₹/hour)
+   - **Per-day Rentals**: Flat rate regardless of session duration
+   
+3. **Smart Quantity Controls**:
+   - Fixed quantities for certain items (JamRoom base: always 1)
+   - Limited quantities for free add-ons (mics/jacks: max 4 each)
+   - Flexible quantities for per-day rentals
+   - Special case handling (IEM: quantity-based but duration-tied)
+   
+4. **UI/UX Enhancements**:
+   - Collapsible category sections
+   - Visual indicators for rental types (emojis, colors)
+   - Real-time price calculations
+   - Context-aware controls
 
 ---
 
@@ -94,7 +120,14 @@
   rentalTypes: [{ 
     name: String (required),
     description: String,
-    basePrice: Number (required, min: 0)
+    basePrice: Number (required, min: 0),
+    // ENHANCED: New fields for hierarchical rental system
+    subItems: [{
+      name: String,
+      price: Number (min: 0),
+      rentalType: String (enum: ['inhouse', 'perday'], default: 'inhouse'),
+      perdayPrice: Number (default: 0)
+    }]
   }],
   prices: {
     hourlyRate: Number (default: 500),
@@ -114,6 +147,11 @@
   updatedAt: Date (default: Date.now)
 }
 ```
+
+**Enhanced Rental System Schema Explanation**:
+- `rentalType`: Determines pricing model ('inhouse' = hourly, 'perday' = flat)
+- `perdayPrice`: Used when rentalType is 'perday', overrides hourly calculation
+- `subItems`: Hierarchical structure supporting complex rental categories
 
 ### 4. BlockedTime Model (`/models/BlockedTime.js`)
 ```javascript
@@ -580,7 +618,140 @@ curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer <toke
 
 ---
 
-## 📚 Additional Resources
+## � Enhanced Rental System - Technical Implementation
+
+### Database Migration (December 2024)
+The rental system was enhanced with the following database changes:
+
+**Migration Script**: `updateInstrumentRentals.js`
+- Updated AdminSettings to include hierarchical rental structure
+- Added rentalType enum: ['inhouse', 'perday']
+- Added perdayPrice field for flat-rate rentals
+- Created sub-items for JamRoom category (mics, jacks, IEM)
+- Created dual variants for Instrument Rentals (in-house vs per-day)
+
+**Example Data Structure**:
+```javascript
+// JamRoom Category
+{
+  name: "JamRoom",
+  basePrice: 300,
+  subItems: [
+    { name: "Microphone", price: 0, rentalType: "inhouse" },
+    { name: "Audio Jacks", price: 0, rentalType: "inhouse" },
+    { name: "IEM", price: 50, rentalType: "inhouse" }
+  ]
+}
+
+// Instrument Rentals Category
+{
+  name: "Instrument Rentals",
+  basePrice: 0,
+  subItems: [
+    { name: "Guitar (In-house)", price: 200, rentalType: "inhouse" },
+    { name: "Guitar (Per-day)", price: 0, rentalType: "perday", perdayPrice: 800 },
+    { name: "Keyboard (In-house)", price: 300, rentalType: "inhouse" },
+    { name: "Keyboard (Per-day)", price: 0, rentalType: "perday", perdayPrice: 800 }
+  ]
+}
+```
+
+### Frontend Implementation Details
+
+**Key Files Modified**:
+1. `public/booking.html` - Complete UI overhaul with collapsible categories
+2. `public/admin.html` - Enhanced rental type management interface
+3. `routes/booking.routes.js` - Fixed validation for price=0 items
+
+**Critical UI Logic**:
+```javascript
+// Smart Quantity Control Logic
+function updateQuantity(itemId, change) {
+    const item = document.getElementById(itemId);
+    // JamRoom base: always fixed at 1
+    if (itemId === 'jamroom-base-quantity') return;
+    
+    // Free items: limit to 4
+    if (isFreeItem(itemId) && currentQty >= 4 && change > 0) return;
+    
+    // Per-day items: allow quantities
+    if (isPerDayItem(itemId)) {
+        // Allow quantity changes
+    }
+    
+    // In-house instruments: typically fixed at 1
+    // Exception: IEM can have quantities
+}
+
+// Price Calculation Logic
+function calculatePrice(item, quantity, duration) {
+    if (item.rentalType === 'perday') {
+        return item.perdayPrice * quantity; // No duration factor
+    } else {
+        return item.price * quantity * duration; // Duration-based
+    }
+}
+```
+
+### Testing & Quality Assurance
+
+**Test Page Created**: `public/test-rental-system.html`
+- Comprehensive test scenarios for all rental features
+- Visual test cards with step-by-step instructions
+- Expected results for validation
+- Direct links to all system components
+
+**Comprehensive Test Suite**: `public/test.html`
+- API endpoint testing
+- Frontend function validation
+- Integration test scenarios
+- Enhanced rental system verification
+
+**Key Test Cases**:
+1. JamRoom base fixed quantity behavior
+2. Free add-ons quantity limits (max 4)
+3. IEM special case (quantity + duration-tied)
+4. In-house vs per-day pricing differences
+5. Collapsible category functionality
+6. Real-time price updates
+7. Complex booking scenarios
+
+### Utility Scripts Documentation
+
+**Environment & Setup**:
+- `createEnvFile.js` - Interactive environment variable setup with secure defaults
+- `.env.example` - Template file for manual environment configuration
+
+**Database Management**:
+- `clearDatabase.js` - Selective or complete database clearing
+- `checkDatabase.js` - Database status and health verification
+- `updateInstrumentRentals.js` - Rental system migration/enhancement
+
+**User Management**:
+- `createAdmin.js` - Default admin account creation
+- `createTestUsers.js` - Test account generation for automated testing
+- `makeAdmin.js` - User privilege elevation
+
+**Usage Patterns**:
+```bash
+# First-time setup
+node createEnvFile.js          # Setup environment variables
+node clearDatabase.js --all    # Complete reset
+node createAdmin.js            # Setup admin
+node updateInstrumentRentals.js  # Apply enhancements
+
+# Development cycle
+node clearDatabase.js          # Clear bookings only
+node checkDatabase.js          # Verify clean state
+# Run tests and development
+node updateInstrumentRentals.js  # Apply enhancements
+
+# Testing preparation
+node createTestUsers.js      # Create test accounts
+# Access test pages: /test.html, /test-rental-system.html
+```
+
+## �📚 Additional Resources
 
 ### Documentation Files
 - `README.md` - Project overview and quick start

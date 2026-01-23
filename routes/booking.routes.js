@@ -50,7 +50,7 @@ router.post('/', protect, async (req, res) => {
 
     // Validate rentals data
     for (const rental of rentals) {
-      if (!rental.name || !rental.price || !rental.quantity) {
+      if (!rental.name || rental.price === undefined || rental.price === null || !rental.quantity) {
         return res.status(400).json({
           success: false,
           message: 'Each rental must have name, price, and quantity'

@@ -60,6 +60,15 @@
             gap: 30px;
         }
         
+        /* Desktop: Hide collapse functionality */
+        .section-header {
+            cursor: default;
+        }
+        
+        .collapse-icon {
+            display: none;
+        }
+        
         @media (max-width: 768px) {
             body {
                 padding: 10px;
@@ -104,6 +113,51 @@
             
             .section h2 {
                 font-size: 1.3em;
+            }
+            
+            /* Collapsible sections for mobile */
+            .section-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: pointer;
+                padding: 10px 0;
+                margin: -10px 0 10px 0;
+                -webkit-tap-highlight-color: transparent;
+            }
+            
+            .section-header h2 {
+                margin: 0;
+            }
+            
+            .collapse-icon {
+                display: inline-block;
+                width: 24px;
+                height: 24px;
+                line-height: 24px;
+                text-align: center;
+                background: #667eea;
+                color: white;
+                border-radius: 50%;
+                font-size: 16px;
+                font-weight: bold;
+                transition: transform 0.3s ease;
+            }
+            
+            .section.collapsed .collapse-icon {
+                transform: rotate(180deg);
+            }
+            
+            .section-content {
+                max-height: 5000px;
+                overflow: hidden;
+                transition: max-height 0.4s ease-in-out, opacity 0.3s ease;
+                opacity: 1;
+            }
+            
+            .section.collapsed .section-content {
+                max-height: 0;
+                opacity: 0;
             }
             
             .time-container {
@@ -254,6 +308,35 @@
             border-radius: 8px;
             padding: 15px;
             background: #fafbfc;
+        }
+        
+        .rental-category {
+            margin-top: 0;
+        }
+        
+        .rental-category:first-child {
+            margin-top: 0;
+        }
+        
+        .category-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px 8px 0 0;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-weight: 600;
+        }
+        
+        .category-header:first-child {
+            margin-top: 0;
+        }
+        
+        .category-header span {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-left: 10px;
+            font-weight: 400;
         }
         
         .rental-option {
@@ -551,23 +634,36 @@
     <div class="container">
         <header>
             <h1>🎸 Book Your Jam Session</h1>
-            <div class="user-info">
+            <div class="user-info"> </div>
                 <span id="userName"></span>
-                <a href="/index.html" class="btn btn-secondary">Home</a>
+            <div > <a href="/index.html" class="btn btn-secondary">Home</a>
                 <button id="logoutBtn" class="btn btn-danger">Logout</button>
             </div>
         </header>
 
         <div class="main-content">
             <!-- Booking Form -->
-            <div class="section">
-                <h2>New Booking</h2>
+            <div class="section" id="bookingSection">
+                <div class="section-header" onclick="toggleSection('bookingSection')">
+                    <h2>New Booking</h2>
+                    <span class="collapse-icon">−</span>
+                </div>
+                <div class="section-content">
                 <div id="bookingAlert" class="alert"></div>
 
                 <form id="bookingForm">
                     <div class="form-group">
                         <label for="bookingDate">Select Date*</label>
                         <input type="date" id="bookingDate" required>
+                    </div>
+
+                    <!-- Reference View - Schedule for selected date -->
+                    <div class="reference-view">
+                        <h3>Today's Schedule (Reference)</h3>
+                        <p><small>Shows bookings and blocked times for selected date</small></p>
+                        <div id="referenceTimeline" class="timeline">
+                            <div class="loading">Select a date to view schedule</div>
+                        </div>
                     </div>
 
                     <div class="time-container">
@@ -651,22 +747,19 @@
                     <p><small>Scan to pay or enter UPI ID manually</small></p>
                     <button onclick="document.getElementById('upiSection').classList.remove('show')" class="btn btn-secondary">Close</button>
                 </div>
-
-                <!-- Reference View -->
-                <div class="reference-view">
-                    <h3>Today's Schedule (Reference)</h3>
-                    <p><small>Shows bookings and blocked times for selected date</small></p>
-                    <div id="referenceTimeline" class="timeline">
-                        <div class="loading">Select a date to view schedule</div>
-                    </div>
                 </div>
             </div>
 
             <!-- My Bookings -->
-            <div class="section">
-                <h2>My Bookings</h2>
-                <div id="bookingsLoading" class="loading">Loading...</div>
-                <div id="bookingsList" class="bookings-list" style="display:none;"></div>
+            <div class="section" id="myBookingsSection">
+                <div class="section-header" onclick="toggleSection('myBookingsSection')">
+                    <h2>My Bookings</h2>
+                    <span class="collapse-icon">−</span>
+                </div>
+                <div class="section-content">
+                    <div id="bookingsLoading" class="loading">Loading...</div>
+                    <div id="bookingsList" class="bookings-list" style="display:none;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -691,6 +784,21 @@
         const API_URL = window.location.origin;
         let currentUser = null;
         let settings = null;
+
+        // Toggle section collapse (mobile only)
+        function toggleSection(sectionId) {
+            // Only work on mobile (768px or less)
+            if (window.innerWidth > 768) return;
+            
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.classList.toggle('collapsed');
+                const icon = section.querySelector('.collapse-icon');
+                if (icon) {
+                    icon.textContent = section.classList.contains('collapsed') ? '+' : '−';
+                }
+            }
+        }
 
         // Utility functions
         const showAlert = (message, type = 'info') => {
@@ -818,29 +926,157 @@
             const container = document.getElementById('rentalsList');
             container.innerHTML = '';
             
+            console.log('populateRentalTypes called, settings:', settings);
+            
             if (settings && settings.rentalTypes) {
-                settings.rentalTypes.forEach(type => {
-                    const rentalDiv = document.createElement('div');
-                    rentalDiv.className = 'rental-option';
-                    rentalDiv.dataset.rentalId = type.name;
+                console.log('Found rental types:', settings.rentalTypes);
+                settings.rentalTypes.forEach((type, index) => {
+                    console.log(`Processing rental type ${index}:`, type);
+                    console.log('Has subItems:', type.subItems, 'Length:', type.subItems?.length);
                     
-                    rentalDiv.innerHTML = `
-                        <div class="rental-info">
-                            <div class="rental-name">${type.name}</div>
-                            <div class="rental-description">${type.description || 'No description available'}</div>
-                            <div class="rental-price">₹${type.basePrice}/hr</div>
-                        </div>
-                        <div class="rental-controls">
-                            <div class="quantity-controls">
-                                <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}', -1)">−</button>
-                                <span class="quantity-display">1</span>
-                                <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}', 1)">+</button>
-                            </div>
-                            <input type="checkbox" class="rental-checkbox" onchange="toggleRental('${type.name}', ${type.basePrice}, '${type.description || ''}')">
-                        </div>
+                    const hasSubItems = type.subItems && type.subItems.length > 0;
+                    
+                    // Create collapsible category section
+                    const categorySection = document.createElement('div');
+                    categorySection.className = 'rental-category';
+                    categorySection.style.cssText = 'margin-bottom: 20px; border: 2px solid #e1e8ed; border-radius: 12px; background: #f8f9fa;';
+                    
+                    // Category header (clickable to toggle)
+                    const categoryHeader = document.createElement('div');
+                    categoryHeader.className = 'category-header';
+                    categoryHeader.style.cssText = 'padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px 10px 0 0; font-weight: 600;';
+                    categoryHeader.innerHTML = `
+                        <span>${type.name}</span>
+                        <span class="toggle-icon" style="font-size: 18px; font-weight: bold;">−</span>
                     `;
                     
-                    container.appendChild(rentalDiv);
+                    // Category content (collapsible)
+                    const categoryContent = document.createElement('div');
+                    categoryContent.className = 'category-content';
+                    categoryContent.style.cssText = 'padding: 15px; display: block;';
+                    
+                    categorySection.appendChild(categoryHeader);
+                    categorySection.appendChild(categoryContent);
+                    container.appendChild(categorySection);
+                    
+                    // Add click handler for toggle
+                    categoryHeader.addEventListener('click', () => {
+                        const content = categoryContent;
+                        const icon = categoryHeader.querySelector('.toggle-icon');
+                        if (content.style.display === 'none') {
+                            content.style.display = 'block';
+                            icon.textContent = '−';
+                        } else {
+                            content.style.display = 'none';
+                            icon.textContent = '+';
+                        }
+                    });
+                    
+                    if (hasSubItems) {
+                        
+                        // Add base category option (always charges base price)
+                        const baseCategoryDiv = document.createElement('div');
+                        baseCategoryDiv.className = 'rental-option';
+                        baseCategoryDiv.dataset.rentalId = `${type.name}_base`;
+                        baseCategoryDiv.style.borderRadius = '8px';
+                        baseCategoryDiv.style.marginBottom = '10px';
+                        baseCategoryDiv.style.background = '#f8f9ff';
+                        
+                        // Special handling for JamRoom base - no quantity controls
+                        const isJamRoomBase = type.name === 'JamRoom';
+                        
+                        baseCategoryDiv.innerHTML = `
+                            <div class="rental-info">
+                                <div class="rental-name">🏠 ${type.name} (Base)</div>
+                                <div class="rental-description">${type.description || 'Base rental'} - ${isJamRoomBase ? 'Always 1 room' : 'Required category'}</div>
+                                <div class="rental-price">₹${type.basePrice}/hr</div>
+                            </div>
+                            <div class="rental-controls">
+                                ${!isJamRoomBase ? `
+                                    <div class="quantity-controls">
+                                        <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}_base', -1)">−</button>
+                                        <span class="quantity-display">1</span>
+                                        <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}_base', 1)">+</button>
+                                    </div>
+                                ` : `
+                                    <div class="quantity-info" style="font-size: 12px; color: #666; padding: 8px; text-align: center;">
+                                        Fixed: 1 room
+                                    </div>
+                                `}
+                                <input type="checkbox" class="rental-checkbox" onchange="toggleRental('${type.name}_base', ${type.basePrice}, '${(type.description || 'Base rental').replace(/'/g, "\\'")}', '${type.name}', true)">
+                            </div>
+                        `;
+                        categoryContent.appendChild(baseCategoryDiv);
+                        
+                        // Add each sub-item as an optional add-on
+                        type.subItems.forEach((subItem, subIndex) => {
+                            console.log(`Adding sub-item: ${subItem.name} - ₹${subItem.price}`);
+                            const itemId = `${type.name}__${subItem.name}`;
+                            const rentalDiv = document.createElement('div');
+                            rentalDiv.className = 'rental-option';
+                            rentalDiv.dataset.rentalId = itemId;
+                            rentalDiv.style.borderRadius = '8px';
+                            rentalDiv.style.marginBottom = '8px';
+                            
+                            const isPerday = subItem.rentalType === 'perday';
+                            const displayPrice = isPerday ? subItem.perdayPrice || 0 : subItem.price || 0;
+                            const priceUnit = isPerday ? '/day' : '/hr';
+                            rentalDiv.style.background = displayPrice === 0 ? '#f0fff0' : isPerday ? '#fff5f5' : '#fff';
+                            
+                            // Only show quantity controls for per-day rentals, free add-ons (price = 0), and IEM
+                            // In-house rentals (except IEM) are tied to jamroom duration and shouldn't have separate quantity controls
+                            const showQuantityControls = isPerday || displayPrice === 0 || subItem.name.includes('IEM');
+                            
+                            rentalDiv.innerHTML = `
+                                <div class="rental-info">
+                                    <div class="rental-name">${displayPrice === 0 ? '🆓 ' : isPerday ? '📅 ' : '🔗 '}${subItem.name}${isPerday ? ' (Per-day)' : displayPrice === 0 ? '' : ' (In-house)'}</div>
+                                    <div class="rental-description">${subItem.description || type.description || ''} ${displayPrice === 0 ? '(Free add-on)' : isPerday ? '(Independent pricing)' : '(Tied to jamroom duration)'}</div>
+                                    <div class="rental-price">${displayPrice === 0 ? 'FREE' : '₹' + displayPrice + priceUnit}</div>
+                                </div>
+                                <div class="rental-controls">
+                                    ${showQuantityControls ? `
+                                        <div class="quantity-controls">
+                                            <button type="button" class="quantity-btn" onclick="updateQuantity('${itemId}', -1)">−</button>
+                                            <span class="quantity-display">1</span>
+                                            <button type="button" class="quantity-btn" onclick="updateQuantity('${itemId}', 1)">+</button>
+                                        </div>
+                                    ` : `
+                                        <div class="quantity-info" style="font-size: 12px; color: #666; padding: 5px;">
+                                            Tied to JamRoom duration
+                                        </div>
+                                    `}
+                                    <input type="checkbox" class="rental-checkbox" onchange="toggleRental('${itemId}', ${displayPrice}, '${(subItem.description || type.description || '').replace(/'/g, "\\'")}', '${type.name}', false, '${subItem.rentalType || 'inhouse'}')">
+                                </div>
+                            `;
+                            
+                            categoryContent.appendChild(rentalDiv);
+                        });
+                    } else {
+                        console.log(`Creating regular rental option for: ${type.name}`);
+                        // Regular rental type without sub-items
+                        const rentalDiv = document.createElement('div');
+                        rentalDiv.className = 'rental-option';
+                        rentalDiv.dataset.rentalId = type.name;
+                        rentalDiv.style.marginTop = '15px';
+                        
+                        rentalDiv.innerHTML = `
+                            <div class="rental-info">
+                                <div class="rental-name">${type.name}</div>
+                                <div class="rental-description">${type.description || 'No description available'}</div>
+                                <div class="rental-price">₹${type.basePrice}/hr</div>
+                            </div>
+                            <div class="rental-controls">
+                                <div class="quantity-controls">
+                                    <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}', -1)">−</button>
+                                    <span class="quantity-display">1</span>
+                                    <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}', 1)">+</button>
+                                </div>
+                                <input type="checkbox" class="rental-checkbox" onchange="toggleRental('${type.name}', ${type.basePrice}, '${(type.description || '').replace(/'/g, "\\'")}', null, false)">
+                            </div>
+                        `;
+                        
+                        container.appendChild(rentalDiv);
+                    }
                 });
             } else {
                 container.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 20px;">No rental options available. Please contact admin.</p>';
@@ -848,24 +1084,35 @@
         };
 
         // Toggle rental selection
-        const toggleRental = (rentalName, basePrice, description) => {
+        const toggleRental = (rentalName, basePrice, description, category = null, isRequired = false, rentalType = 'inhouse') => {
             const rentalDiv = document.querySelector(`[data-rental-id="${rentalName}"]`);
             const checkbox = rentalDiv.querySelector('.rental-checkbox');
             
+            // Extract display name (remove category prefix if present)
+            const displayName = rentalName.includes('__') ? rentalName.split('__')[1] : 
+                              rentalName.includes('_base') ? rentalName.replace('_base', ' (Base)') : rentalName;
+            
             if (checkbox.checked) {
                 selectedRentals.set(rentalName, {
-                    name: rentalName,
+                    name: displayName,
+                    fullId: rentalName,
+                    category: category,
                     description: description,
                     basePrice: basePrice,
-                    quantity: 1
+                    price: basePrice,
+                    quantity: 1,
+                    isRequired: isRequired,
+                    rentalType: rentalType  // Add rental type to track pricing model
                 });
                 rentalDiv.classList.add('selected');
             } else {
                 selectedRentals.delete(rentalName);
                 rentalDiv.classList.remove('selected');
-                // Reset quantity to 1
+                // Reset quantity to 1 (only if quantity display exists)
                 const quantityDisplay = rentalDiv.querySelector('.quantity-display');
-                quantityDisplay.textContent = '1';
+                if (quantityDisplay) {
+                    quantityDisplay.textContent = '1';
+                }
             }
             
             updatePriceDisplay();
@@ -876,13 +1123,35 @@
             if (!selectedRentals.has(rentalName)) return;
             
             const rental = selectedRentals.get(rentalName);
-            const newQuantity = Math.max(1, rental.quantity + change);
+            
+            // Skip quantity updates for JamRoom base (always 1) and paid in-house items
+            // Allow free items (price = 0), per-day rentals, and IEM to have quantity controls
+            if (rentalName === 'JamRoom_base') {
+                return; // JamRoom base always stays at 1
+            }
+            
+            // Allow quantity changes for free items (price = 0), per-day rentals, or IEM
+            if (rental.rentalType === 'inhouse' && rental.price > 0 && !rentalName.includes('_base') && !rentalName.includes('IEM')) {
+                return; // Paid in-house instruments (except IEM) don't have adjustable quantities
+            }
+            
+            // Define maximum limits for specific items
+            const maxLimits = {
+                'JamRoom__Microphone': 4,
+                'JamRoom__Audio Jacks': 4
+            };
+            
+            const maxLimit = maxLimits[rentalName] || 99; // Default max of 99 if no specific limit
+            const newQuantity = Math.max(1, Math.min(maxLimit, rental.quantity + change));
+            
             rental.quantity = newQuantity;
             
-            // Update display
+            // Update display (only if quantity display exists)
             const rentalDiv = document.querySelector(`[data-rental-id="${rentalName}"]`);
-            const quantityDisplay = rentalDiv.querySelector('.quantity-display');
-            quantityDisplay.textContent = newQuantity;
+            const quantityDisplay = rentalDiv?.querySelector('.quantity-display');
+            if (quantityDisplay) {
+                quantityDisplay.textContent = newQuantity;
+            }
             
             updatePriceDisplay();
         };
@@ -909,12 +1178,28 @@
             let selectedRentalsHTML = '';
             
             selectedRentals.forEach((rental) => {
-                const itemTotal = rental.basePrice * rental.quantity * duration;
+                // Calculate item total based on rental type
+                let itemTotal;
+                let durationText;
+                
+                if (rental.rentalType === 'perday') {
+                    // Per-day rentals: flat rate regardless of duration
+                    itemTotal = rental.price * rental.quantity;
+                    durationText = 'per day';
+                } else if (rental.isRequired || rental.fullId.includes('_base')) {
+                    // JamRoom base rentals
+                    itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
+                    durationText = `${duration}h`;
+                } else {
+                    // In-house rentals: tied to jamroom duration (always quantity 1, but duration varies)
+                    itemTotal = (rental.price || rental.basePrice) * 1 * duration; // Force quantity = 1 for in-house
+                    durationText = `${duration}h (tied to JamRoom)`;
+                }
                 subtotal += itemTotal;
                 
                 selectedRentalsHTML += `
                     <div class="rental-item">
-                        <span>${rental.name} × ${rental.quantity} (${duration}h)</span>
+                        <span>${rental.name} × ${rental.quantity} (${durationText})</span>
                         <span>₹${itemTotal}</span>
                     </div>
                 `;
@@ -1140,17 +1425,46 @@
             let subtotal = 0;
             const rentalsArray = [];
             
-            selectedRentals.forEach((rental) => {
-                const itemTotal = rental.basePrice * rental.quantity * duration;
+            console.log('Building rentals array from selectedRentals:', selectedRentals);
+            
+            selectedRentals.forEach((rental, key) => {
+                console.log(`Processing rental: ${key}`, rental);
+                
+                // Validate required properties
+                if (!rental.name || rental.price === undefined || !rental.quantity) {
+                    console.error('Missing required rental properties:', rental);
+                    throw new Error(`Invalid rental data for ${key}: missing name, price, or quantity`);
+                }
+                
+                // Calculate item total based on rental type
+                let itemTotal;
+                let effectiveQuantity;
+                
+                if (rental.rentalType === 'perday') {
+                    // Per-day rentals: flat rate regardless of duration
+                    itemTotal = rental.price * rental.quantity;
+                    effectiveQuantity = rental.quantity;
+                } else if (rental.isRequired || rental.fullId.includes('_base')) {
+                    // JamRoom base rentals
+                    itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
+                    effectiveQuantity = rental.quantity;
+                } else {
+                    // In-house rentals: tied to jamroom duration (always quantity 1, but duration varies)
+                    itemTotal = (rental.price || rental.basePrice) * 1 * duration; // Force quantity = 1 for in-house
+                    effectiveQuantity = 1;
+                }
                 subtotal += itemTotal;
                 
                 rentalsArray.push({
                     name: rental.name,
-                    description: rental.description,
-                    price: rental.basePrice,
-                    quantity: rental.quantity
+                    description: rental.description || '',
+                    price: rental.price || rental.basePrice,
+                    quantity: effectiveQuantity,
+                    rentalType: rental.rentalType || 'inhouse'  // Include rental type for backend processing
                 });
             });
+            
+            console.log('Final rentals array:', rentalsArray);
             
             const taxAmount = Math.round(subtotal * 0.18);
             const totalAmount = subtotal + taxAmount;
@@ -1207,7 +1521,10 @@
                 document.querySelectorAll('.rental-option').forEach(option => {
                     option.classList.remove('selected');
                     option.querySelector('.rental-checkbox').checked = false;
-                    option.querySelector('.quantity-display').textContent = '1';
+                    const quantityDisplay = option.querySelector('.quantity-display');
+                    if (quantityDisplay) {
+                        quantityDisplay.textContent = '1';
+                    }
                 });
                 
                 // Reset button state
@@ -1262,13 +1579,14 @@
                     const statusClass = booking.bookingStatus.toLowerCase();
                     const date = new Date(booking.date);
                     const rentalsDisplay = booking.rentals && booking.rentals.length > 0 
-                        ? booking.rentals.map(r => `<li>${r.name} × ${r.quantity} - ₹${r.price * r.quantity * booking.duration}</li>`).join('')
-                        : `<li>${booking.rentalType}</li>`;
+                        ? booking.rentals.filter(r => r && r.name && r.quantity !== undefined && r.price !== undefined)
+                                          .map(r => `<li>${r.name} × ${r.quantity} - ₹${r.price * r.quantity * booking.duration}</li>`).join('')
+                        : `<li>${booking.rentalType || 'Unknown rental'}</li>`;
                     html += `
                         <div class="booking-card ${statusClass}">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <h4 style="font-size: 1.25em; font-weight: 700; color: #2c3e50; margin: 0; letter-spacing: -0.01em;">
-                                    ${booking.rentals && booking.rentals.length > 0 ? `${booking.rentals.length} Rental(s)` : booking.rentalType}
+                                    ${booking.rentals && booking.rentals.length > 0 ? `${booking.rentals.filter(r => r && r.name).length} Rental(s)` : (booking.rentalType || 'Booking')}
                                 </h4>
                                 <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
                             </div>

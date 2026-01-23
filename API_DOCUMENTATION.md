@@ -8,6 +8,33 @@ All protected endpoints require JWT token in Authorization header:
 Authorization: Bearer <your_jwt_token>
 ```
 
+> **🆕 Enhanced Rental System Update**: The rental system now supports hierarchical categories with in-house vs per-day pricing models. Booking endpoints accept enhanced rental data structures with `rentalType` and `perdayPrice` fields. See AdminSettings schema for complete structure.
+
+## 🧪 Testing & Development Tools
+
+### Test Pages
+- **Comprehensive API Tests**: `/test.html` - Full test suite for all endpoints
+- **Rental System Tests**: `/test-rental-system.html` - Visual testing for enhanced rental features
+
+### Utility Scripts
+```bash
+# Setup test environment
+node createTestUsers.js    # Creates test accounts
+node clearDatabase.js      # Clear booking data only
+node checkDatabase.js      # Verify database state
+
+# Test credentials (auto-created):
+# User: testuser@jamroom.com / TestUser@123
+# Admin: testadmin@jamroom.com / TestAdmin@123
+```
+
+### Pre-configured Test Data
+The test suite includes realistic booking scenarios:
+- Mixed rental types (in-house + per-day)
+- Complex pricing calculations
+- Multi-item bookings with quantities
+- Duration-based vs flat-rate pricing validation
+
 ---
 
 ## 🔐 Authentication Endpoints

@@ -579,6 +579,8 @@
             <span id="adminName"></span>
             <a href="/index.html" class="btn btn-secondary">Home</a>
             <a href="/booking.html" class="btn btn-primary">Booking Page</a>
+            <a href="/test.html" class="btn btn-warning">🧪 Full Test Suite</a>
+            <a href="/test-rental-system.html" class="btn btn-success">🎸 Rental System Tests</a>
             <button onclick="logout()" class="btn btn-danger">Logout</button>
         </div>
     </div>
@@ -1891,17 +1893,58 @@ Notes: ${booking.notes || 'N/A'}`);
             container.innerHTML = '';
             
             rentalTypes.forEach((rental, index) => {
+                const hasSubItems = rental.subItems && rental.subItems.length > 0;
+                const subItemsHTML = hasSubItems ? rental.subItems.map((sub, subIndex) => {
+                    const isPerday = (sub.rentalType || 'inhouse') === 'perday';
+                    return `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 4px;" data-rental="${index}">
+                        <div>
+                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Item Name</label>
+                            <input type="text" value="${sub.name || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="name"
+                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Description</label>
+                            <input type="text" value="${sub.description || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="description"
+                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" placeholder="Optional">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Rental Type</label>
+                            <select data-rental="${index}" data-subitem="${subIndex}" data-field="rentalType" onchange="togglePerdayPrice(${index}, ${subIndex})"
+                                    style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                                <option value="inhouse" ${(sub.rentalType || 'inhouse') === 'inhouse' ? 'selected' : ''}>In-house</option>
+                                <option value="perday" ${(sub.rentalType || 'inhouse') === 'perday' ? 'selected' : ''}>Per-day</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Price (₹/hr)</label>
+                            <input type="number" value="${sub.price || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="price"
+                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" min="0">
+                        </div>
+                        <div class="perday-price-field" style="display: ${isPerday ? 'block' : 'none'};">
+                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Per-day Price (₹/day)</label>
+                            <input type="number" value="${sub.perdayPrice || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="perdayPrice"
+                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" min="0">
+                        </div>
+                        <button type="button" onclick="removeSubItem(${index}, ${subIndex})" 
+                                style="padding: 6px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">×</button>
+                    </div>
+                    `;
+                }).join('') : '';
+
                 const rentalDiv = document.createElement('div');
                 rentalDiv.style.cssText = 'border: 2px solid #e1e8ed; padding: 20px; margin-bottom: 15px; border-radius: 8px; background: #f8f9fa;';
+                rentalDiv.dataset.rentalIndex = index;
                 rentalDiv.innerHTML = `
                     <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end;">
                         <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Name*</label>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Category Name*</label>
                             <input type="text" value="${rental.name || ''}" onchange="updateRentalType(${index}, 'name', this.value)" 
-                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                                   placeholder="e.g., Synths, Guitars, JamRoom">
                         </div>
                         <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Base Price (₹)*</label>
+                            <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Base Price (₹/hr)* <small style="color:#6c757d;">(used if no sub-items)</small></label>
                             <input type="number" value="${rental.basePrice || ''}" onchange="updateRentalType(${index}, 'basePrice', parseInt(this.value))" 
                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" min="0">
                         </div>
@@ -1914,42 +1957,109 @@ Notes: ${booking.notes || 'N/A'}`);
                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; resize: vertical;" 
                                   rows="2" placeholder="Optional description">${rental.description || ''}</textarea>
                     </div>
+                    
+                    <!-- Sub-items Section -->
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label style="font-weight: 600; color: #667eea; font-size: 14px;">🎸 Individual Items (Optional)</label>
+                            <button type="button" onclick="addSubItem(${index})" 
+                                    style="padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">+ Add Item</button>
+                        </div>
+                        <p style="font-size: 12px; color: #6c757d; margin-bottom: 10px;">Add individual items with different prices (e.g., Moog Synth - ₹500/hr, Roland Synth - ₹400/hr)</p>
+                        <div class="sub-items-container" data-rental="${index}">
+                            ${subItemsHTML || '<p style="text-align: center; color: #aaa; font-size: 13px; padding: 10px;">No individual items. Users will see the base price above.</p>'}
+                        </div>
+                    </div>
                 `;
                 container.appendChild(rentalDiv);
             });
         }
         
-        function addRentalType() {
-            const container = document.getElementById('rentalTypesContainer');
-            const currentCount = container.children.length;
+        function addSubItem(rentalIndex) {
+            const subItemsContainer = document.querySelector(`.sub-items-container[data-rental="${rentalIndex}"]`);
+            if (!subItemsContainer) return;
             
-            const rentalDiv = document.createElement('div');
-            rentalDiv.style.cssText = 'border: 2px solid #e1e8ed; padding: 20px; margin-bottom: 15px; border-radius: 8px; background: #f8f9fa;';
-            rentalDiv.innerHTML = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end;">
-                    <div>
-                        <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Name*</label>
-                        <input type="text" value="" onchange="updateRentalType(${currentCount}, 'name', this.value)" 
-                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" 
-                               placeholder="e.g., Hourly, Half Day, Full Day">
-                    </div>
-                    <div>
-                        <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Base Price (₹)*</label>
-                        <input type="number" value="" onchange="updateRentalType(${currentCount}, 'basePrice', parseInt(this.value))" 
-                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" 
-                               min="0" placeholder="0">
-                    </div>
-                    <button type="button" onclick="removeRentalType(${currentCount})" 
-                            style="padding: 8px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Remove</button>
+            // Remove "No individual items" message if it exists
+            const noItemsMessage = subItemsContainer.querySelector('p');
+            if (noItemsMessage && noItemsMessage.textContent.includes('No individual items')) {
+                noItemsMessage.remove();
+            }
+            
+            // Find the current number of sub-items in this container
+            const existingSubItems = subItemsContainer.querySelectorAll('div[data-rental]');
+            const subIndex = existingSubItems.length;
+            
+            // Create new sub-item div
+            const newSubItem = document.createElement('div');
+            newSubItem.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 4px;';
+            newSubItem.setAttribute('data-rental', rentalIndex);
+            newSubItem.innerHTML = `
+                <div>
+                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Item Name</label>
+                    <input type="text" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="name"
+                           style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
                 </div>
-                <div style="margin-top: 10px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 5px; color: #2c3e50;">Description</label>
-                    <textarea onchange="updateRentalType(${currentCount}, 'description', this.value)" 
-                              style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; resize: vertical;" 
-                              rows="2" placeholder="Optional description"></textarea>
+                <div>
+                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Description</label>
+                    <input type="text" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="description"
+                           style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" placeholder="Optional">
                 </div>
-            `;
-            container.appendChild(rentalDiv);
+                <div>
+                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Rental Type</label>
+                    <select data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="rentalType" onchange="togglePerdayPrice(${rentalIndex}, ${subIndex})"
+                            style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                        <option value="inhouse" selected>In-house</option>
+                        <option value="perday">Per-day</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Price (₹/hr)</label>
+                    <input type="number" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="price"
+                           style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" min="0">
+                </div>
+                <div class="perday-price-field" style="display: none;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Per-day Price (₹/day)</label>
+                    <input type="number" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="perdayPrice"
+                           style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" min="0">
+                </div>
+                <button type="button" onclick="removeSubItem(${rentalIndex}, ${subIndex})" 
+                        style="padding: 6px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">×</button>`;
+            
+            subItemsContainer.appendChild(newSubItem);
+        }
+        
+        function removeSubItem(rentalIndex, subItemIndex) {
+            // Instead of re-rendering everything, just remove the specific sub-item and re-index
+            const currentData = getCurrentRentalTypes();
+            if (currentData[rentalIndex].subItems) {
+                currentData[rentalIndex].subItems.splice(subItemIndex, 1);
+            }
+            loadRentalTypes(currentData);
+        }
+        
+        function togglePerdayPrice(rentalIndex, subItemIndex) {
+            const selector = `[data-rental="${rentalIndex}"][data-subitem="${subItemIndex}"][data-field="rentalType"]`;
+            const rentalTypeSelect = document.querySelector(selector);
+            const perdayPriceField = rentalTypeSelect.closest('div').parentElement.querySelector('.perday-price-field');
+            
+            if (rentalTypeSelect && perdayPriceField) {
+                if (rentalTypeSelect.value === 'perday') {
+                    perdayPriceField.style.display = 'block';
+                } else {
+                    perdayPriceField.style.display = 'none';
+                }
+            }
+        }
+        
+        function addRentalType() {
+            const currentData = getCurrentRentalTypes();
+            currentData.push({
+                name: '',
+                basePrice: 0,
+                description: '',
+                subItems: []
+            });
+            loadRentalTypes(currentData);
         }
         
         function removeRentalType(index) {
@@ -1972,6 +2082,7 @@ Notes: ${booking.notes || 'N/A'}`);
             const rentalTypes = [];
             
             Array.from(container.children).forEach((div, index) => {
+                // Get main rental type fields
                 const nameInput = div.querySelector('input[type="text"]');
                 const priceInput = div.querySelector('input[type="number"]');
                 const descInput = div.querySelector('textarea');
@@ -1980,12 +2091,57 @@ Notes: ${booking.notes || 'N/A'}`);
                 const basePrice = parseInt(priceInput?.value) || 0;
                 const description = descInput?.value?.trim();
                 
-                if (name && basePrice > 0) {
-                    rentalTypes.push({
+                // Get sub-items
+                const subItemsContainer = div.querySelector('.sub-items-container');
+                const subItems = [];
+                
+                if (subItemsContainer) {
+                    const subItemDivs = subItemsContainer.querySelectorAll('div[data-rental]');
+                    subItemDivs.forEach((subDiv) => {
+                        const subNameInput = subDiv.querySelector('input[data-field="name"]');
+                        const subDescInput = subDiv.querySelector('input[data-field="description"]');
+                        const subPriceInput = subDiv.querySelector('input[data-field="price"]');
+                        const subRentalTypeSelect = subDiv.querySelector('select[data-field="rentalType"]');
+                        const subPerdayPriceInput = subDiv.querySelector('input[data-field="perdayPrice"]');
+                        
+                        const subName = subNameInput?.value?.trim() || '';
+                        const subDesc = subDescInput?.value?.trim() || '';
+                        const subPrice = parseInt(subPriceInput?.value) || 0;
+                        const subRentalType = subRentalTypeSelect?.value || 'inhouse';
+                        const subPerdayPrice = parseInt(subPerdayPriceInput?.value) || 0;
+                        
+                        // Only save sub-items that have at least a name
+                        if (subName) {
+                            const subItem = {
+                                name: subName,
+                                description: subDesc,
+                                price: subPrice,
+                                rentalType: subRentalType
+                            };
+                            
+                            // Add per-day price only for perday rentals
+                            if (subRentalType === 'perday') {
+                                subItem.perdayPrice = subPerdayPrice;
+                            }
+                            
+                            subItems.push(subItem);
+                        }
+                    });
+                }
+                
+                if (name && basePrice >= 0) {
+                    const rental = {
                         name,
                         basePrice,
                         description: description || ''
-                    });
+                    };
+                    
+                    // Only add subItems if there are valid ones
+                    if (subItems.length > 0) {
+                        rental.subItems = subItems;
+                    }
+                    
+                    rentalTypes.push(rental);
                 }
             });
             

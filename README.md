@@ -9,6 +9,9 @@ A production-ready, full-stack booking system for jam room rentals with admin pa
 - ✅ Password Reset via Email
 - ✅ View Available Time Slots
 - ✅ Book Jam Room / Instruments / Sound System
+- ✅ **Enhanced Instrument Rentals**: Hierarchical categories with in-house vs per-day pricing
+- ✅ **Smart Quantity Controls**: Context-aware limits and fixed quantities
+- ✅ **Collapsible Categories**: Organized rental selection interface
 - ✅ View Booking Status (Pending / Confirmed / Rejected)
 - ✅ Cancel Pending Bookings
 - ✅ UPI QR Code for Payments
@@ -22,6 +25,8 @@ A production-ready, full-stack booking system for jam room rentals with admin pa
 - ✅ Create & Manage Time Slots (Bulk Creation)
 - ✅ Block / Unblock Slots
 - ✅ Edit Rental Prices & Types
+- ✅ **Rental Type Management**: Configure in-house vs per-day pricing
+- ✅ **Category Management**: Organize rentals in hierarchical categories
 - ✅ Grant Admin Privileges to Users
 - ✅ Manage UPI Payment Details
 - ✅ Email Notifications to All Admins
@@ -44,7 +49,27 @@ A production-ready, full-stack booking system for jam room rentals with admin pa
 - Vercel / Render Ready
 - Environment Variables
 
-## 📁 Project Structure
+## �️ Utility Scripts
+
+The project includes powerful utility scripts for database management and testing:
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `createEnvFile.js` | Interactive environment setup | `node createEnvFile.js` |
+| `clearDatabase.js` | Clear booking data only | `node clearDatabase.js` |
+| `clearDatabase.js --all` | Complete database wipe | `node clearDatabase.js --all` |
+| `createTestUsers.js` | Create test accounts | `node createTestUsers.js` |
+| `createAdmin.js` | Create admin account | `node createAdmin.js` |
+| `makeAdmin.js` | Grant admin privileges | `node makeAdmin.js` |
+| `checkDatabase.js` | Verify database status | `node checkDatabase.js` |
+| `updateInstrumentRentals.js` | Enhanced rental migration | `node updateInstrumentRentals.js` |
+
+### 🧪 Testing Tools
+- **`/test.html`** - Comprehensive API test suite
+- **`/test-rental-system.html`** - Visual rental system testing
+- **Test Accounts**: Auto-created with `createTestUsers.js`
+
+## �📁 Project Structure
 
 ```
 jamroom-booking/
