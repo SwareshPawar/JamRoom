@@ -853,8 +853,24 @@ const generateBillForDownload = async (booking) => {
     console.log('- Memory usage:', process.memoryUsage());
     
     // Get admin settings for company info
+    console.log('🔌 Checking database connection for PDF download...');
+    const mongoose = require('mongoose');
+    
+    // Ensure database connection in serverless environment
+    if (mongoose.connection.readyState !== 1) {
+      console.log('🔌 Database not connected, attempting connection...');
+      if (!process.env.MONGO_URI) {
+        throw new Error('MONGO_URI environment variable is not set');
+      }
+      await mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 8000, // 8 second timeout
+        socketTimeoutMS: 15000, // 15 second socket timeout
+      });
+      console.log('✅ Database connected successfully');
+    }
+    
     const settings = await AdminSettings.getSettings();
-    console.log('Retrieved admin settings');
+    console.log('Retrieved admin settings:', settings ? '✅ Found' : '❌ Not found');
     
     // Generate HTML content
     const htmlContent = await generateBillHTML(booking, settings);
