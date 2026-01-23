@@ -207,11 +207,11 @@
         <div class="test-section">
             <h3>ℹ️ Test Information</h3>
             <ul style="color: #4a5568; line-height: 1.6;">
-                <li><strong>Purpose:</strong> Test client-side PDF generation with database data</li>
-                <li><strong>Data Source:</strong> Real bookings and settings from MongoDB</li>
-                <li><strong>API Endpoints:</strong> /api/bookings and /api/admin/settings</li>
-                <li><strong>Libraries:</strong> html2pdf.js (loaded dynamically)</li>
-                <li><strong>Expected Output:</strong> Professional invoice PDF with clean styling</li>
+                <li><strong>Purpose:</strong> Test client-side PDF generation with schema-accurate mock data</li>
+                <li><strong>Mock Data:</strong> Matches actual Booking + AdminSettings models exactly</li>
+                <li><strong>Libraries:</strong> html2pdf.js (loaded dynamically from CDN)</li>
+                <li><strong>Features:</strong> 12-hour time format, proper rentals array, all required fields</li>
+                <li><strong>Output:</strong> Professional invoice PDF with clean styling (no gradient issues)</li>
             </ul>
         </div>
     </div>
@@ -227,32 +227,51 @@
         let authToken = null;
         let isAuthenticated = false;
         
-        // Mock data for testing (fallback)
+        // Mock data matching actual database schema
         const mockBooking = {
             _id: "507f1f77bcf86cd799439011",
+            userId: "507f1f77bcf86cd799439012", // User ObjectId
             user: {
                 name: "John Doe",
                 email: "john.doe@example.com",
                 phone: "+91 9876543210"
             },
             date: "2026-01-25",
-            timeSlot: "10:00 AM - 12:00 PM",
+            startTime: "14:30", // 24-hour format to test conversion
+            endTime: "16:30",   // 24-hour format to test conversion
             duration: 2,
+            rentalType: "Multiple Items", // Legacy field
+            rentals: [ // New rentals array structure
+                {
+                    name: "Studio Recording Session",
+                    description: "2-hour professional recording session with equipment",
+                    price: 2000,
+                    quantity: 1
+                }
+            ],
             price: 2360, // Total including tax
-            subtotal: 2000,
-            taxAmount: 360,
-            bookingStatus: "confirmed", // Use the correct property name
+            subtotal: 2000, // Required field
+            taxAmount: 360, // Required field (18% GST)
+            paymentStatus: "PAID", // PENDING, PAID, REFUNDED
+            bookingStatus: "CONFIRMED", // PENDING, CONFIRMED, REJECTED, CANCELLED
+            paymentReference: "PAY_123456789",
+            userName: "John Doe", // Required field
+            userEmail: "john.doe@example.com", // Required field
+            bandName: "The Rock Stars", // Optional
+            notes: "Please ensure all equipment is ready",
             createdAt: new Date().toISOString()
         };
-        
+                
         const mockSettings = {
             studioName: "Swar JamRoom Studio",
             studioAddress: "123 Music Street\nBangalore, Karnataka 560001\nIndia",
             studioPhone: "+91 9876543210",
-            adminEmails: ["admin@swarjamroom.com"],
-            taxRate: 0.18,
+            adminEmails: ["admin@swarjamroom.com", "swarjrs@gmail.com"],
+            taxRate: 0.18, // 18% GST
             upiId: "swarjamroom@paytm",
-            companyRegistration: "CIN: U74999KA2023PTC123456"
+            companyRegistration: "CIN: U74999KA2023PTC123456",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
         
         // Authentication Functions

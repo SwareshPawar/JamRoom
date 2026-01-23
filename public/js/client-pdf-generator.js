@@ -36,6 +36,34 @@ function generateBillHTML(booking, settings) {
     const bookingDate = new Date(booking.date);
     const currentDate = new Date();
     
+    // Helper function to convert 24-hour time to 12-hour format
+    function formatTime12Hour(time24) {
+        if (!time24) return time24;
+        
+        // Handle different time formats
+        let timeStr = time24.toString();
+        
+        // If it already contains AM/PM, return as is
+        if (timeStr.includes('AM') || timeStr.includes('PM')) {
+            return timeStr;
+        }
+        
+        // Parse time (handle formats like "14:30", "2:30", "14:30:00")
+        const timeParts = timeStr.split(':');
+        if (timeParts.length < 2) return time24; // Invalid format
+        
+        let hours = parseInt(timeParts[0]);
+        const minutes = timeParts[1];
+        
+        if (isNaN(hours)) return time24; // Invalid hours
+        
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // 0 should be 12
+        
+        return `${hours}:${minutes} ${ampm}`;
+    }
+    
     // Calculate pricing - use booking amounts if available, otherwise calculate from booking.price
     let subtotal, taxAmount, totalAmount;
     
@@ -616,7 +644,7 @@ function generateBillHTML(booking, settings) {
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">🕒 Time:</span>
-                            <span class="detail-value">${booking.startTime} - ${booking.endTime}</span>
+                            <span class="detail-value">${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">⏱️ Duration:</span>
@@ -650,7 +678,7 @@ function generateBillHTML(booking, settings) {
                                 <br>
                                 <small style="color: #666;">
                                     ${rental.description || 'Studio rental service'}
-                                    <br>Booking: ${bookingDate.toLocaleDateString('en-IN')} (${booking.startTime} - ${booking.endTime})
+                                    <br>Booking: ${bookingDate.toLocaleDateString('en-IN')} (${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)})
                                 </small>
                             </td>
                             <td style="text-align: center;">${rental.quantity}</td>
@@ -665,7 +693,7 @@ function generateBillHTML(booking, settings) {
                                 <br>
                                 <small style="color: #666;">
                                     Studio booking for ${bookingDate.toLocaleDateString('en-IN')} 
-                                    (${booking.startTime} - ${booking.endTime})
+                                    (${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)})
                                 </small>
                                 ${booking.notes ? `<br><small style="color: #888; font-style: italic;">Note: ${booking.notes}</small>` : ''}
                             </td>

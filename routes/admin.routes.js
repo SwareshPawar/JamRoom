@@ -465,6 +465,30 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     // Import bill generator
     const { generateBill, generateBillFilename } = require('../utils/billGenerator');
     
+    // Helper function to convert 24-hour time to 12-hour format
+    function formatTime12Hour(time24) {
+      if (!time24) return time24;
+      
+      let timeStr = time24.toString();
+      if (timeStr.includes('AM') || timeStr.includes('PM')) {
+        return timeStr;
+      }
+      
+      const timeParts = timeStr.split(':');
+      if (timeParts.length < 2) return time24;
+      
+      let hours = parseInt(timeParts[0]);
+      const minutes = timeParts[1];
+      
+      if (isNaN(hours)) return time24;
+      
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      
+      return `${hours}:${minutes} ${ampm}`;
+    }
+    
     const booking = await Booking.findById(req.params.id)
       .populate('userId');
 
@@ -495,9 +519,21 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
 
-    // Generate PDF bill
-    const pdfBuffer = await generateBill(booking);
-    const filename = generateBillFilename(booking, settings);
+    // Generate PDF bill - skip server-side PDF for serverless environments
+    let pdfBuffer = null;
+    let filename = generateBillFilename(booking, settings);
+    
+    // Only generate PDF on server if not in serverless environment or if Chrome is available
+    const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+    
+    if (!isServerless) {
+      try {
+        pdfBuffer = await generateBill(booking);
+      } catch (error) {
+        console.warn('Server-side PDF generation failed:', error.message);
+        // Continue without PDF attachment
+      }
+    }
 
     // Get customer email
     const customerEmail = booking.userEmail || booking.userId?.email;
@@ -517,7 +553,7 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     const totalAmount = subtotal + taxAmount;
 
     // Send email with PDF attachment
-    await sendEmail({
+    const emailOptions = {
       to: customerEmail,
       subject: `Invoice for Your ${settings?.studioName || 'JamRoom'} Booking - ${displayDate}`,
       html: `
@@ -544,7 +580,7 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Time:</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${booking.startTime} - ${booking.endTime}</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Service:</td>
@@ -587,15 +623,29 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
               <p>Email: ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</p>
               ${settings?.studioPhone ? `<p>Phone: ${settings.studioPhone}</p>` : ''}
             </div>
+            
+            ${!pdfBuffer ? `
+              <div style="background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 8px; padding: 15px; margin: 20px auto; max-width: 500px;">
+                <p style="color: #1565c0; margin: 0; font-size: 14px; text-align: center;">
+                  📄 You can download your detailed invoice PDF from your booking dashboard or admin panel.
+                </p>
+              </div>
+            ` : ''}
           </div>
         </div>
-      `,
-      attachments: [{
+      `
+    };
+    
+    // Add PDF attachment only if successfully generated
+    if (pdfBuffer) {
+      emailOptions.attachments = [{
         filename: filename,
         content: pdfBuffer,
         contentType: 'application/pdf'
-      }]
-    });
+      }];
+    }
+    
+    await sendEmail(emailOptions);
 
     // Log the eBill generation
     console.log(`eBill sent for booking ${booking._id} to ${customerEmail} by admin ${req.user.name}`);
