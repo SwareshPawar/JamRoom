@@ -508,7 +508,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
 router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
   try {
     // Import bill generator
-    const { generateBill, generateBillFilename } = require('../utils/billGenerator');
+    const { generateBill, generateBillForDownload, generateBillFilename } = require('../utils/billGenerator');
     
     // Helper function to convert 24-hour time to 12-hour format
     function formatTime12Hour(time24) {
