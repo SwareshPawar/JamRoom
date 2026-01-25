@@ -10,6 +10,51 @@ const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
 const { generateBill } = require('../utils/billGenerator');
 
+// @route   GET /api/admin/debug-pdf
+// @desc    Debug PDF generation environment (for production troubleshooting)
+// @access  Private/Admin
+router.get('/debug-pdf', protect, isAdmin, async (req, res) => {
+  try {
+    const diagnostics = {
+      environment: {
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL: process.env.VERCEL,
+        VERCEL_ENV: process.env.VERCEL_ENV,
+        isServerless: !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV)
+      },
+      memory: process.memoryUsage(),
+      puppeteer: {
+        installed: true,
+        chromiumPackage: false
+      },
+      database: {
+        connected: require('mongoose').connection.readyState === 1,
+        readyState: require('mongoose').connection.readyState
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    // Check if chromium package is available
+    try {
+      require('@sparticuz/chromium');
+      diagnostics.puppeteer.chromiumPackage = true;
+    } catch (e) {
+      diagnostics.puppeteer.chromiumPackage = false;
+    }
+
+    res.json({
+      success: true,
+      diagnostics
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Debug failed',
+      error: error.message
+    });
+  }
+});
+
 // @route   GET /api/admin/debug-settings
 // @desc    Debug settings values (temporary)
 // @access  Private/Admin
@@ -523,13 +568,29 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     let pdfBuffer = null;
     let filename = generateBillFilename(booking, settings);
     
-    // Always try to generate PDF for email attachment
+    // Use Vercel-optimized PDF generation for serverless environments
     console.log('Generating PDF for eBill attachment...');
+    console.log('Environment check - VERCEL:', process.env.VERCEL, 'VERCEL_ENV:', process.env.VERCEL_ENV);
+    
     try {
-      pdfBuffer = await generateBill(booking);
+      // Use the download-optimized function which has better Vercel support
+      pdfBuffer = await generateBillForDownload(booking);
       console.log('PDF generated successfully for eBill, size:', pdfBuffer?.length);
     } catch (error) {
       console.error('PDF generation failed for eBill:', error.message);
+      console.error('Full error details:', error);
+      
+      // In serverless environments, provide more specific error info
+      if (process.env.VERCEL || process.env.VERCEL_ENV) {
+        console.error('🚨 Vercel serverless PDF generation failed. This might be due to:');
+        console.error('   - Missing Chromium binary (check PUPPETEER_SKIP_CHROMIUM_DOWNLOAD)');
+        console.error('   - Memory limitations (current: 1024MB)');
+        console.error('   - Timeout issues (function timeout: 60s)');
+        console.error('   - Cold start issues in serverless function');
+        
+        // For production, we'll send email without PDF but provide download link
+        console.log('📧 Proceeding with email without PDF attachment (PDF download link will be provided)');
+      }
       // Continue without PDF attachment but log the error
     }
 
@@ -637,9 +698,17 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
             
             ${!pdfBuffer ? `
               <div style="background: #fff3e0; border: 1px solid #ffcc02; border-radius: 8px; padding: 15px; margin: 20px auto; max-width: 500px;">
-                <p style="color: #e65100; margin: 0; font-size: 14px; text-align: center;">
-                  ⚠️ PDF invoice could not be attached due to technical issues.<br>
-                  You can download your detailed invoice PDF from your booking dashboard or contact us.
+                <p style="color: #e65100; margin: 0; font-size: 14px; text-align: center; margin-bottom: 12px;">
+                  ⚠️ PDF invoice could not be attached due to technical issues.
+                </p>
+                <div style="text-align: center;">
+                  <a href="${process.env.FRONTEND_URL || 'https://jamroom.vercel.app'}/booking.html" 
+                     style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
+                    📄 Download Your Invoice PDF
+                  </a>
+                </div>
+                <p style="color: #666; margin: 8px 0 0 0; font-size: 12px; text-align: center;">
+                  Login to your account and download your detailed invoice PDF
                 </p>
               </div>
             ` : `
@@ -666,13 +735,24 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     await sendEmail(emailOptions);
 
     // Log the eBill generation
-    console.log(`eBill sent for booking ${booking._id} to ${customerEmail} by admin ${req.user.name}. PDF attached: ${!!pdfBuffer}`);
+    const pdfAttached = !!pdfBuffer;
+    console.log(`eBill sent for booking ${booking._id} to ${customerEmail} by admin ${req.user.name}. PDF attached: ${pdfAttached}`);
+    
+    // Provide different success messages based on PDF attachment success
+    let successMessage;
+    if (pdfBuffer) {
+      successMessage = 'Electronic bill sent successfully with PDF attachment';
+    } else {
+      if (process.env.VERCEL || process.env.VERCEL_ENV) {
+        successMessage = 'Electronic bill sent successfully. PDF attachment failed due to serverless limitations - customer can download PDF from their dashboard';
+      } else {
+        successMessage = 'Electronic bill sent successfully (PDF attachment failed - customer can download separately)';
+      }
+    }
 
     res.json({
       success: true,
-      message: pdfBuffer ? 
-        'Electronic bill sent successfully with PDF attachment' : 
-        'Electronic bill sent successfully (PDF attachment failed - customer can download separately)',
+      message: successMessage,
       filename: filename,
       customerEmail: customerEmail
     });

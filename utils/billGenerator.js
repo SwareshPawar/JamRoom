@@ -27,6 +27,7 @@ const generateBill = async (booking) => {
   
   try {
     console.log('Starting PDF generation for booking:', booking._id);
+    console.log('Environment check:', { VERCEL: process.env.VERCEL, VERCEL_ENV: process.env.VERCEL_ENV });
     
     // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
@@ -36,8 +37,10 @@ const generateBill = async (booking) => {
     const htmlContent = await generateBillHTML(booking, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
     
-    // Launch puppeteer with stable configuration (same as working email version)
-    browser = await puppeteer.launch({
+    // Vercel/serverless-optimized Puppeteer configuration
+    const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+    
+    const puppeteerConfig = {
       headless: 'new',
       args: [
         '--no-sandbox',
@@ -46,10 +49,35 @@ const generateBill = async (booking) => {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--disable-gpu'
+        '--disable-gpu',
+        ...(isVercel ? [
+          '--disable-extensions',
+          '--disable-plugins',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--disable-features=TranslateUI',
+          '--disable-ipc-flooding-protection',
+          '--memory-pressure-off',
+          '--max-old-space-size=1024'
+        ] : [])
       ],
-      timeout: 30000
-    });
+      timeout: isVercel ? 25000 : 30000
+    };
+    
+    // For Vercel, try to use chrome-aws-lambda if available
+    if (isVercel) {
+      try {
+        const chromium = require('@sparticuz/chromium');
+        puppeteerConfig.executablePath = await chromium.executablePath();
+        console.log('Using Chromium for Vercel:', puppeteerConfig.executablePath);
+      } catch (chromiumError) {
+        console.log('Chrome-aws-lambda not available, using default Puppeteer');
+      }
+    }
+    
+    console.log('Launching puppeteer with config:', JSON.stringify(puppeteerConfig, null, 2));
+    browser = await puppeteer.launch(puppeteerConfig);
 
     console.log('Puppeteer browser launched');
     const page = await browser.newPage();
@@ -94,18 +122,18 @@ const generateBill = async (booking) => {
 /**
  * Generate PDF bill for download (optimized for Vercel serverless)
  */
-const generateBillForDownload = async (booking) => {
+const generateBillForDownload = async (booking, retryCount = 0) => {
   let browser;
   
   try {
     console.log('=== PDF DOWNLOAD GENERATION START ===');
     console.log('Booking ID:', booking._id);
+    console.log('Retry attempt:', retryCount);
     console.log('Environment details:');
     console.log('- NODE_ENV:', process.env.NODE_ENV);
     console.log('- VERCEL:', process.env.VERCEL);
     console.log('- AWS_LAMBDA_FUNCTION_NAME:', process.env.AWS_LAMBDA_FUNCTION_NAME);
     console.log('- isServerless:', isServerless);
-    console.log('- Using regular Puppeteer (chrome-aws-lambda removed)');
     console.log('- Memory usage:', process.memoryUsage());
     
     // Get admin settings for company info
@@ -201,13 +229,25 @@ const generateBillForDownload = async (booking) => {
       }
     }
     
+    // Retry logic for transient failures
+    const isTransientError = error.message.includes('timeout') || 
+                            error.message.includes('Connection refused') ||
+                            error.message.includes('Protocol error') ||
+                            error.message.includes('Target closed');
+    
+    if (isTransientError && retryCount < 2) {
+      console.log(`Retrying PDF generation due to transient error (attempt ${retryCount + 1}/3)...`);
+      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Progressive delay
+      return generateBillForDownload(booking, retryCount + 1);
+    }
+    
     // Provide more specific error messages for debugging
     if (error.message.includes('timeout')) {
-      throw new Error('PDF generation timed out. Please try again or contact support.');
-    } else if (error.message.includes('browser')) {
-      throw new Error('Browser initialization failed. This may be a temporary server issue.');
+      throw new Error('PDF generation timed out. This may be due to serverless cold start or memory constraints.');
+    } else if (error.message.includes('browser') || error.message.includes('launch')) {
+      throw new Error('Browser initialization failed. Chromium binary may not be available in serverless environment.');
     } else if (error.message.includes('memory')) {
-      throw new Error('Server memory limit exceeded. Please try again later.');
+      throw new Error('Server memory limit exceeded during PDF generation.');
     } else {
       throw new Error(`PDF download generation failed: ${error.message}`);
     }
