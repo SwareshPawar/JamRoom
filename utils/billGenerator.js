@@ -7,10 +7,47 @@ const { generateUnifiedPDFHTML } = require('./pdfHTMLTemplate');
 // Check if we're in a serverless environment
 const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
 
-console.log('Environment setup:');
-console.log('- VERCEL:', process.env.VERCEL);
-console.log('- VERCEL_ENV:', process.env.VERCEL_ENV);
-console.log('- isServerless:', isServerless);
+/**
+ * Create optimized puppeteer configuration for serverless environments
+ */
+const createPuppeteerConfig = async () => {
+  const baseConfig = {
+    headless: 'new',
+    timeout: isServerless ? 25000 : 30000,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox', 
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-extensions',
+      '--disable-plugins',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-features=TranslateUI',
+      '--disable-ipc-flooding-protection',
+      '--memory-pressure-off',
+      ...(isServerless ? ['--max-old-space-size=1024'] : [])
+    ]
+  };
+  
+  // Use Vercel chromium in production
+  if (process.env.VERCEL) {
+    try {
+      const chromium = require('@sparticuz/chromium');
+      baseConfig.executablePath = await chromium.executablePath();
+      baseConfig.args.push(...chromium.args);
+      console.log('✅ Using Vercel @sparticuz/chromium');
+    } catch (error) {
+      console.log('⚠️ Vercel chromium not available, using default puppeteer');
+    }
+  }
+  
+  return baseConfig;
+};
 
 /**
  * Generate HTML content for the bill using unified template
@@ -37,46 +74,8 @@ const generateBill = async (booking) => {
     const htmlContent = await generateBillHTML(booking, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
     
-    // Vercel/serverless-optimized Puppeteer configuration
-    const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
-    
-    const puppeteerConfig = {
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        ...(isVercel ? [
-          '--disable-extensions',
-          '--disable-plugins',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--disable-features=TranslateUI',
-          '--disable-ipc-flooding-protection',
-          '--memory-pressure-off',
-          '--max-old-space-size=1024'
-        ] : [])
-      ],
-      timeout: isVercel ? 25000 : 30000
-    };
-    
-    // For Vercel, try to use chrome-aws-lambda if available
-    if (isVercel) {
-      try {
-        const chromium = require('@sparticuz/chromium');
-        puppeteerConfig.executablePath = await chromium.executablePath();
-        console.log('Using Chromium for Vercel:', puppeteerConfig.executablePath);
-      } catch (chromiumError) {
-        console.log('Chrome-aws-lambda not available, using default Puppeteer');
-      }
-    }
-    
-    console.log('Launching puppeteer with config:', JSON.stringify(puppeteerConfig, null, 2));
+    console.log('🚀 Launching puppeteer...');
+    const puppeteerConfig = await createPuppeteerConfig();
     browser = await puppeteer.launch(puppeteerConfig);
 
     console.log('Puppeteer browser launched');
@@ -126,15 +125,10 @@ const generateBillForDownload = async (booking, retryCount = 0) => {
   let browser;
   
   try {
-    console.log('=== PDF DOWNLOAD GENERATION START ===');
-    console.log('Booking ID:', booking._id);
-    console.log('Retry attempt:', retryCount);
-    console.log('Environment details:');
-    console.log('- NODE_ENV:', process.env.NODE_ENV);
-    console.log('- VERCEL:', process.env.VERCEL);
-    console.log('- AWS_LAMBDA_FUNCTION_NAME:', process.env.AWS_LAMBDA_FUNCTION_NAME);
-    console.log('- isServerless:', isServerless);
-    console.log('- Memory usage:', process.memoryUsage());
+    console.log(`📄 Starting PDF generation for booking ${booking._id}${retryCount > 0 ? ` (retry ${retryCount})` : ''}`);
+    if (isServerless) {
+      console.log('⚡ Serverless mode - memory usage:', Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB');
+    }
     
     // Get admin settings for company info
     console.log('🔌 Checking database connection for PDF download...');
@@ -160,29 +154,9 @@ const generateBillForDownload = async (booking, retryCount = 0) => {
     const htmlContent = await generateBillHTML(booking, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
     
-    // Launch puppeteer with Vercel-optimized configuration
-    console.log('Launching puppeteer with Vercel-optimized config');
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-extensions',
-        '--disable-plugins',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-features=TranslateUI',
-        '--disable-ipc-flooding-protection',
-        '--memory-pressure-off'
-      ],
-      timeout: 30000
-    });
+    console.log('🚀 Launching puppeteer with serverless config...');
+    const browserConfig = await createPuppeteerConfig();
+    browser = await puppeteer.launch(browserConfig);
     console.log('Puppeteer browser launched successfully');
 
     console.log('Browser launched for PDF download');

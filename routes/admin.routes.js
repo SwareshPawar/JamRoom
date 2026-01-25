@@ -565,14 +565,13 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     let pdfBuffer = null;
     let filename = generateBillFilename(booking, settings);
     
-    // Use Vercel-optimized PDF generation for serverless environments
-    console.log('Generating PDF for eBill attachment...');
-    console.log('Environment check - VERCEL:', process.env.VERCEL, 'VERCEL_ENV:', process.env.VERCEL_ENV);
+    // Generate PDF for eBill attachment (optimized for serverless)
+    console.log('📄 Generating eBill PDF attachment...');
     
     try {
       // Use the download-optimized function which has better Vercel support
       pdfBuffer = await generateBillForDownload(booking);
-      console.log('PDF generated successfully for eBill, size:', pdfBuffer?.length);
+      console.log('✅ eBill PDF generated successfully, size:', pdfBuffer?.length);
     } catch (error) {
       console.error('PDF generation failed for eBill:', error.message);
       console.error('Full error details:', error);
@@ -1314,8 +1313,6 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
     // Generate PDF bill and filename with single database call
     console.log('Starting PDF generation with filename...');
     const { pdfBuffer, filename } = await generateBillForDownloadWithFilename(booking);
-    
-    console.log('Admin PDF generated successfully, filename:', filename);
     
     console.log('Admin PDF generated successfully, filename:', filename);
     
