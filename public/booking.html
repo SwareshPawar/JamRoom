@@ -1289,6 +1289,8 @@
             const subtotalElement = document.getElementById('subtotalAmount');
             const taxElement = document.getElementById('taxAmount');
             const totalElement = document.getElementById('totalPrice');
+            const taxSection = document.getElementById('taxSection');
+            const taxLabel = document.getElementById('taxLabel');
             
             if (selectedRentals.size === 0) {
                 priceDisplay.style.display = 'none';
@@ -1344,12 +1346,6 @@
                     </div>
                 `;
             });
-            
-            const subtotalElement = document.getElementById('subtotalAmount');
-            const taxElement = document.getElementById('taxAmount');
-            const taxSection = document.getElementById('taxSection');
-            const taxLabel = document.getElementById('taxLabel');
-            const totalElement = document.getElementById('totalPrice');
             
             // Use admin settings for GST calculation
             const gstEnabled = window.adminSettings?.gstConfig?.enabled || false;

@@ -8,7 +8,7 @@ const { protect } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/admin');
 const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
-const { generateBill } = require('../utils/billGenerator');
+const { generateBill, generateBillForDownload, generateBillFilename, generateBillForDownloadWithFilename } = require('../utils/billGenerator');
 
 // @route   GET /api/admin/debug-pdf
 // @desc    Debug PDF generation environment (for production troubleshooting)
@@ -507,9 +507,6 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
   try {
-    // Import bill generator
-    const { generateBill, generateBillForDownload, generateBillFilename } = require('../utils/billGenerator');
-    
     // Helper function to convert 24-hour time to 12-hour format
     function formatTime12Hour(time24) {
       if (!time24) return time24;
@@ -1301,9 +1298,6 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
   try {
     console.log('Admin PDF download requested for booking:', req.params.id);
     console.log('User making request:', req.user?.email);
-    
-    // Import bill generator with optimized download function
-    const { generateBillForDownloadWithFilename } = require('../utils/billGenerator');
     
     const booking = await Booking.findById(req.params.id).populate('userId');
     
