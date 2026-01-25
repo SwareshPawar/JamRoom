@@ -760,6 +760,32 @@
                         <textarea id="adminEmails" rows="3" placeholder="admin1@example.com, admin2@example.com"></textarea>
                     </div>
                     
+                    <!-- GST Configuration Section -->
+                    <h3 style="margin: 30px 0 20px 0; color: #2c3e50; border-bottom: 2px solid #667eea; padding-bottom: 10px;">🧾 GST/Tax Configuration</h3>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="gstEnabled" style="margin-right: 10px; transform: scale(1.2);">
+                                <span style="font-weight: 600;">Enable GST/Tax on Bills</span>
+                            </label>
+                            <small style="color: #6c757d; margin-top: 5px; display: block;">When disabled, all bills will show subtotal only without any tax</small>
+                        </div>
+                        <div id="gstDetails" style="margin-top: 15px; display: none;">
+                            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <label>GST Rate (%)</label>
+                                    <input type="number" id="gstRate" min="0" max="100" step="0.01" placeholder="18" style="width: 100%;">
+                                    <small style="color: #6c757d;">Enter percentage (e.g., 18 for 18%)</small>
+                                </div>
+                                <div>
+                                    <label>Display Name</label>
+                                    <input type="text" id="gstDisplayName" placeholder="GST" maxlength="20" style="width: 100%;">
+                                    <small style="color: #6c757d;">What to call it on bills (e.g., GST, Tax, VAT)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Rental Types and Pricing Section -->
                     <h3 style="margin: 30px 0 20px 0; color: #2c3e50; border-bottom: 2px solid #667eea; padding-bottom: 10px;">🏷️ Rental Types & Pricing</h3>
                     <div id="rentalTypesContainer">
@@ -1677,7 +1703,7 @@ Notes: ${booking.notes || 'N/A'}`);
                         }
 
                         const result = await res.json();
-                        showAlert('bookingAlert', 'eBill sent successfully to customer!', 'success');
+                        showAlert('bookingAlert', result.message || 'eBill sent successfully to customer!', 'success');
                     } catch (error) {
                         console.error('Send eBill error:', error);
                         
@@ -1994,6 +2020,26 @@ Notes: ${booking.notes || 'N/A'}`);
                 document.getElementById('upiName').value = settings.upiName;
                 document.getElementById('adminEmails').value = settings.adminEmails.join(', ');
                 
+                // Load GST configuration
+                const gstEnabled = document.getElementById('gstEnabled');
+                const gstRate = document.getElementById('gstRate');
+                const gstDisplayName = document.getElementById('gstDisplayName');
+                const gstDetails = document.getElementById('gstDetails');
+                
+                if (settings.gstConfig) {
+                    gstEnabled.checked = settings.gstConfig.enabled || false;
+                    gstRate.value = (settings.gstConfig.rate || 0.18) * 100; // Convert to percentage
+                    gstDisplayName.value = settings.gstConfig.displayName || 'GST';
+                } else {
+                    // Default values
+                    gstEnabled.checked = false;
+                    gstRate.value = 18;
+                    gstDisplayName.value = 'GST';
+                }
+                
+                // Show/hide GST details based on enabled state
+                gstDetails.style.display = gstEnabled.checked ? 'block' : 'none';
+                
                 // Load rental types
                 loadRentalTypes(settings.rentalTypes || []);
             } catch (error) {
@@ -2005,13 +2051,26 @@ Notes: ${booking.notes || 'N/A'}`);
         document.getElementById('settingsForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            const rentalTypes = getCurrentRentalTypes();
+            
+            // Check for validation errors
+            if (rentalTypes === null) {
+                // Validation failed, getCurrentRentalTypes() returned null
+                return;
+            }
+
             const formData = {
                 studioName: document.getElementById('studioName').value,
                 studioAddress: document.getElementById('studioAddress').value,
                 upiId: document.getElementById('upiId').value,
                 upiName: document.getElementById('upiName').value,
                 adminEmails: document.getElementById('adminEmails').value.split(',').map(e => e.trim()).filter(e => e),
-                rentalTypes: getCurrentRentalTypes()
+                rentalTypes: rentalTypes,
+                gstConfig: {
+                    enabled: document.getElementById('gstEnabled').checked,
+                    rate: parseFloat(document.getElementById('gstRate').value) / 100 || 0.18, // Convert percentage to decimal
+                    displayName: document.getElementById('gstDisplayName').value || 'GST'
+                }
             };
 
             try {
@@ -2031,6 +2090,12 @@ Notes: ${booking.notes || 'N/A'}`);
             } catch (error) {
                 showAlert('settingsAlert', error.message, 'error');
             }
+        });
+
+        // GST Configuration Toggle
+        document.getElementById('gstEnabled').addEventListener('change', function() {
+            const gstDetails = document.getElementById('gstDetails');
+            gstDetails.style.display = this.checked ? 'block' : 'none';
         });
 
         // Make admin
@@ -2092,15 +2157,19 @@ Notes: ${booking.notes || 'N/A'}`);
                                 <option value="perday" ${(sub.rentalType || 'inhouse') === 'perday' ? 'selected' : ''}>Per-day</option>
                             </select>
                         </div>
-                        <div>
-                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Price (₹/hr)</label>
+                        <div class="hourly-price-field">
+                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">
+                                Price (₹/hr) ${isPerday ? '<span style="color: #dc3545; font-size: 10px;">(not used for per-day)</span>' : '<span style="color: #28a745; font-size: 10px;">(active)</span>'}
+                            </label>
                             <input type="number" value="${sub.price || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="price"
-                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" min="0">
+                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; ${isPerday ? 'background-color: #f8f9fa; color: #6c757d;' : ''}" min="0" ${isPerday ? 'placeholder="Not used"' : ''}>
                         </div>
                         <div class="perday-price-field" style="display: ${isPerday ? 'block' : 'none'};">
-                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Per-day Price (₹/day)</label>
+                            <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">
+                                Per-day Price (₹/day) <span style="color: #28a745; font-size: 10px;">(active for per-day rentals)</span>
+                            </label>
                             <input type="number" value="${sub.perdayPrice || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="perdayPrice"
-                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" min="0">
+                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background-color: #e8f5e8;" min="0" placeholder="Required for per-day">
                         </div>
                         <button type="button" onclick="removeSubItem(${index}, ${subIndex})" 
                                 style="padding: 6px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">×</button>
@@ -2142,6 +2211,13 @@ Notes: ${booking.notes || 'N/A'}`);
                                     style="padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">+ Add Item</button>
                         </div>
                         <p style="font-size: 12px; color: #6c757d; margin-bottom: 10px;">Add individual items with different prices (e.g., Moog Synth - ₹500/hr, Roland Synth - ₹400/hr)</p>
+                        <div style="background: #e3f2fd; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid #2196f3;">
+                            <p style="font-size: 11px; color: #1565c0; margin: 0; font-weight: 500;">💡 Rental Types:</p>
+                            <p style="font-size: 11px; color: #1976d2; margin: 2px 0 0 0; line-height: 1.3;">
+                                <strong>🔗 In-house:</strong> Tied to jam session duration (e.g., guitar for 2-hour session = ₹200 × 2 = ₹400)<br>
+                                <strong>📅 Per-day:</strong> Flat daily rate regardless of session length (e.g., guitar for any session = ₹800/day)
+                            </p>
+                        </div>
                         <div class="sub-items-container" data-rental="${index}">
                             ${subItemsHTML || '<p style="text-align: center; color: #aaa; font-size: 13px; padding: 10px;">No individual items. Users will see the base price above.</p>'}
                         </div>
@@ -2188,15 +2264,19 @@ Notes: ${booking.notes || 'N/A'}`);
                         <option value="perday">Per-day</option>
                     </select>
                 </div>
-                <div>
-                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Price (₹/hr)</label>
+                <div class="hourly-price-field">
+                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">
+                        Price (₹/hr) <span style="color: #28a745; font-size: 10px;">(active)</span>
+                    </label>
                     <input type="number" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="price"
                            style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" min="0">
                 </div>
                 <div class="perday-price-field" style="display: none;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">Per-day Price (₹/day)</label>
+                    <label style="display: block; font-weight: 500; margin-bottom: 3px; color: #6c757d; font-size: 12px;">
+                        Per-day Price (₹/day) <span style="color: #28a745; font-size: 10px;">(active for per-day rentals)</span>
+                    </label>
                     <input type="number" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="perdayPrice"
-                           style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;" min="0">
+                           style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background-color: #e8f5e8;" min="0" placeholder="Required for per-day">
                 </div>
                 <button type="button" onclick="removeSubItem(${rentalIndex}, ${subIndex})" 
                         style="padding: 6px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">×</button>`;
@@ -2217,12 +2297,33 @@ Notes: ${booking.notes || 'N/A'}`);
             const selector = `[data-rental="${rentalIndex}"][data-subitem="${subItemIndex}"][data-field="rentalType"]`;
             const rentalTypeSelect = document.querySelector(selector);
             const perdayPriceField = rentalTypeSelect.closest('div').parentElement.querySelector('.perday-price-field');
+            const hourlyPriceField = rentalTypeSelect.closest('div').parentElement.querySelector('.hourly-price-field');
+            const hourlyPriceInput = hourlyPriceField?.querySelector('input[data-field="price"]');
+            const hourlyPriceLabel = hourlyPriceField?.querySelector('label');
             
-            if (rentalTypeSelect && perdayPriceField) {
+            if (rentalTypeSelect && perdayPriceField && hourlyPriceField) {
                 if (rentalTypeSelect.value === 'perday') {
+                    // Show per-day field, grey out hourly field
                     perdayPriceField.style.display = 'block';
+                    if (hourlyPriceInput) {
+                        hourlyPriceInput.style.backgroundColor = '#f8f9fa';
+                        hourlyPriceInput.style.color = '#6c757d';
+                        hourlyPriceInput.placeholder = 'Not used';
+                    }
+                    if (hourlyPriceLabel) {
+                        hourlyPriceLabel.innerHTML = 'Price (₹/hr) <span style="color: #dc3545; font-size: 10px;">(not used for per-day)</span>';
+                    }
                 } else {
+                    // Hide per-day field, activate hourly field
                     perdayPriceField.style.display = 'none';
+                    if (hourlyPriceInput) {
+                        hourlyPriceInput.style.backgroundColor = '';
+                        hourlyPriceInput.style.color = '';
+                        hourlyPriceInput.placeholder = '';
+                    }
+                    if (hourlyPriceLabel) {
+                        hourlyPriceLabel.innerHTML = 'Price (₹/hr) <span style="color: #28a745; font-size: 10px;">(active)</span>';
+                    }
                 }
             }
         }
@@ -2298,6 +2399,17 @@ Notes: ${booking.notes || 'N/A'}`);
                             // Add per-day price only for perday rentals
                             if (subRentalType === 'perday') {
                                 subItem.perdayPrice = subPerdayPrice;
+                                // Validate per-day price
+                                if (!subPerdayPrice || subPerdayPrice <= 0) {
+                                    alert(`⚠️ Per-day item "${subName}" must have a per-day price greater than 0`);
+                                    return null; // Stop form submission
+                                }
+                            } else {
+                                // For in-house items, allow price of 0 (free items like mics, jacks)
+                                // but warn if price is 0
+                                if (subPrice === 0) {
+                                    console.log(`ℹ️ In-house item "${subName}" has price ₹0 (free item)`);
+                                }
                             }
                             
                             subItems.push(subItem);

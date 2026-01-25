@@ -1482,8 +1482,11 @@
             const keyboardTotal = keyboardPerdayPrice * 1; // 800 * 1 (no duration factor) = 800
             
             const subtotal = jamroomTotal + guitarTotal + keyboardTotal; // 600 + 400 + 800 = 1800
-            const taxAmount = Math.round(subtotal * 0.18); // 18% GST = 324
-            const totalAmount = subtotal + taxAmount; // 1800 + 324 = 2124
+            
+            // Use configurable GST rate (currently disabled by default)
+            // const taxAmount = Math.round(subtotal * 0.18); // 18% GST = 324
+            const taxAmount = 0; // GST disabled by default
+            const totalAmount = subtotal + taxAmount; // 1800 + 0 = 1800
             
             // Create actual booking to test
             if (!userToken) {

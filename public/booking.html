@@ -796,8 +796,8 @@
                                     <span>Subtotal:</span>
                                     <span id="subtotalAmount">₹0</span>
                                 </div>
-                                <div class="tax">
-                                    <span>GST (18%):</span>
+                                <div class="tax" id="taxSection" style="display: none;">
+                                    <span id="taxLabel">GST (18%):</span>
                                     <span id="taxAmount">₹0</span>
                                 </div>
                                 <div class="total">
@@ -1027,7 +1027,12 @@
                     const data = await res.json();
                     console.log('Settings data received:', data);
                     settings = data.settings;
+                    
+                    // Store settings globally for GST calculations
+                    window.adminSettings = settings;
+                    
                     console.log('Rental types count:', settings?.rentalTypes?.length);
+                    console.log('GST Config:', settings?.gstConfig);
                     populateRentalTypes();
                 } else {
                     console.error('Settings response not OK:', res.status, res.statusText);
@@ -1340,13 +1345,34 @@
                 `;
             });
             
-            const taxAmount = Math.round(subtotal * 0.18);
-            const totalAmount = subtotal + taxAmount;
+            const subtotal = calculateSubtotal();
+            const subtotalElement = document.getElementById('subtotalAmount');
+            const taxElement = document.getElementById('taxAmount');
+            const taxSection = document.getElementById('taxSection');
+            const taxLabel = document.getElementById('taxLabel');
+            const totalElement = document.getElementById('totalPrice');
+            
+            // Use admin settings for GST calculation
+            const gstEnabled = window.adminSettings?.gstConfig?.enabled || false;
+            const gstRate = window.adminSettings?.gstConfig?.rate || 0.18;
+            const gstDisplayName = window.adminSettings?.gstConfig?.displayName || 'GST';
+            
+            // Show/hide tax section based on GST configuration
+            if (gstEnabled && subtotal > 0) {
+                taxSection.style.display = 'flex';
+                const taxAmount = Math.round(subtotal * gstRate);
+                const totalAmount = subtotal + taxAmount;
+                
+                taxLabel.textContent = `${gstDisplayName} (${Math.round(gstRate * 100)}%):`;
+                taxElement.textContent = `₹${taxAmount}`;
+                totalElement.innerHTML = `<strong>₹${totalAmount}</strong>`;
+            } else {
+                taxSection.style.display = 'none';
+                totalElement.innerHTML = `<strong>₹${subtotal}</strong>`;
+            }
             
             selectedRentalsDiv.innerHTML = selectedRentalsHTML;
             subtotalElement.textContent = `₹${subtotal}`;
-            taxElement.textContent = `₹${taxAmount}`;
-            totalElement.innerHTML = `<strong>₹${totalAmount}</strong>`;
             
             priceDisplay.style.display = 'block';
         };
@@ -1754,7 +1780,11 @@
             
             console.log('Final rentals array:', rentalsArray);
             
-            const taxAmount = Math.round(subtotal * 0.18);
+            // Calculate totals with configurable GST
+            const gstEnabled = window.adminSettings?.gstConfig?.enabled || false;
+            const gstRate = window.adminSettings?.gstConfig?.rate || 0.18;
+            
+            const taxAmount = gstEnabled ? Math.round(subtotal * gstRate) : 0;
             const totalAmount = subtotal + taxAmount;
 
             const formData = {

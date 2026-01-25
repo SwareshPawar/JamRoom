@@ -519,20 +519,18 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
 
-    // Generate PDF bill - skip server-side PDF for serverless environments
+    // Generate PDF bill and filename
     let pdfBuffer = null;
     let filename = generateBillFilename(booking, settings);
     
-    // Only generate PDF on server if not in serverless environment or if Chrome is available
-    const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
-    
-    if (!isServerless) {
-      try {
-        pdfBuffer = await generateBill(booking);
-      } catch (error) {
-        console.warn('Server-side PDF generation failed:', error.message);
-        // Continue without PDF attachment
-      }
+    // Always try to generate PDF for email attachment
+    console.log('Generating PDF for eBill attachment...');
+    try {
+      pdfBuffer = await generateBill(booking);
+      console.log('PDF generated successfully for eBill, size:', pdfBuffer?.length);
+    } catch (error) {
+      console.error('PDF generation failed for eBill:', error.message);
+      // Continue without PDF attachment but log the error
     }
 
     // Get customer email
@@ -547,9 +545,12 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     const bookingDate = new Date(booking.date);
     const displayDate = bookingDate.toLocaleDateString('en-IN');
 
-    // Calculate total with tax
-    const subtotal = booking.price;
-    const taxAmount = subtotal * 0.18; // 18% GST
+    // Calculate total with configurable GST
+    const subtotal = booking.subtotal || booking.price;
+    const gstEnabled = settings.gstConfig?.enabled || false;
+    const gstRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
+    const gstDisplayName = settings.gstConfig?.displayName || 'GST';
+    const taxAmount = gstEnabled ? Math.round(subtotal * gstRate) : 0;
     const totalAmount = subtotal + taxAmount;
 
     // Send email with PDF attachment
@@ -590,6 +591,16 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Duration:</td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${booking.duration} hour(s)</td>
                 </tr>
+                ${gstEnabled ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Subtotal:</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">₹${subtotal.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">${gstDisplayName} (${Math.round(gstRate * 100)}%):</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">₹${taxAmount.toFixed(2)}</td>
+                </tr>
+                ` : ''}
                 <tr style="font-weight: bold; font-size: 16px; color: #667eea;">
                   <td style="padding: 12px 0; border-top: 2px solid #667eea;">Total Amount:</td>
                   <td style="padding: 12px 0; border-top: 2px solid #667eea;">₹${totalAmount.toFixed(2)}</td>
@@ -625,12 +636,19 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
             </div>
             
             ${!pdfBuffer ? `
-              <div style="background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 8px; padding: 15px; margin: 20px auto; max-width: 500px;">
-                <p style="color: #1565c0; margin: 0; font-size: 14px; text-align: center;">
-                  📄 You can download your detailed invoice PDF from your booking dashboard or admin panel.
+              <div style="background: #fff3e0; border: 1px solid #ffcc02; border-radius: 8px; padding: 15px; margin: 20px auto; max-width: 500px;">
+                <p style="color: #e65100; margin: 0; font-size: 14px; text-align: center;">
+                  ⚠️ PDF invoice could not be attached due to technical issues.<br>
+                  You can download your detailed invoice PDF from your booking dashboard or contact us.
                 </p>
               </div>
-            ` : ''}
+            ` : `
+              <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 15px; margin: 20px auto; max-width: 500px;">
+                <p style="color: #2e7d32; margin: 0; font-size: 14px; text-align: center;">
+                  📎 Your detailed invoice PDF is attached to this email.
+                </p>
+              </div>
+            `}
           </div>
         </div>
       `
@@ -648,11 +666,13 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     await sendEmail(emailOptions);
 
     // Log the eBill generation
-    console.log(`eBill sent for booking ${booking._id} to ${customerEmail} by admin ${req.user.name}`);
+    console.log(`eBill sent for booking ${booking._id} to ${customerEmail} by admin ${req.user.name}. PDF attached: ${!!pdfBuffer}`);
 
     res.json({
       success: true,
-      message: 'Electronic bill sent successfully to customer',
+      message: pdfBuffer ? 
+        'Electronic bill sent successfully with PDF attachment' : 
+        'Electronic bill sent successfully (PDF attachment failed - customer can download separately)',
       filename: filename,
       customerEmail: customerEmail
     });
@@ -806,7 +826,7 @@ router.get('/settings', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.put('/settings', protect, isAdmin, async (req, res) => {
   try {
-    const { rentalTypes, prices, upiId, upiName, adminEmails, businessHours, slotDuration, studioName, studioAddress } = req.body;
+    const { rentalTypes, prices, upiId, upiName, adminEmails, businessHours, slotDuration, studioName, studioAddress, gstConfig } = req.body;
 
     let settings = await AdminSettings.findOne();
     
@@ -822,6 +842,7 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
       if (slotDuration) settings.slotDuration = slotDuration;
       if (studioName) settings.studioName = studioName;
       if (studioAddress) settings.studioAddress = studioAddress;
+      if (gstConfig) settings.gstConfig = gstConfig;
       
       await settings.save();
     }

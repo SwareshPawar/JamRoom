@@ -28,11 +28,12 @@ const formatTime12Hour = (time24) => {
 };
 
 /**
- * Calculate pricing breakdown
+ * Calculate pricing breakdown with configurable GST
  * @param {Object} booking - Booking object
+ * @param {Object} settings - Admin settings with GST config
  * @returns {Object} Price breakdown { subtotal, taxAmount, totalAmount }
  */
-const calculatePricing = (booking) => {
+const calculatePricing = (booking, settings = null) => {
     let subtotal, taxAmount, totalAmount;
     
     if (booking.subtotal !== undefined && booking.taxAmount !== undefined) {
@@ -41,10 +42,14 @@ const calculatePricing = (booking) => {
         taxAmount = booking.taxAmount;
         totalAmount = booking.price; // This should be the total including tax
     } else {
-        // Fallback to old calculation method for legacy bookings
+        // Calculate from booking price
         subtotal = booking.price;
-        const taxRate = 0.18;
-        taxAmount = Math.round(subtotal * taxRate);
+        
+        // Use GST configuration from settings
+        const gstEnabled = settings?.gstConfig?.enabled || false;
+        const taxRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
+        
+        taxAmount = gstEnabled ? Math.round(subtotal * taxRate) : 0;
         totalAmount = subtotal + taxAmount;
     }
     
@@ -59,7 +64,7 @@ const calculatePricing = (booking) => {
  */
 const generateUnifiedPDFHTML = (booking, settings) => {
     const bookingDate = new Date(booking.date);
-    const { subtotal, taxAmount, totalAmount } = calculatePricing(booking);
+    const { subtotal, taxAmount, totalAmount } = calculatePricing(booking, settings);
     
     return `
 <!DOCTYPE html>
@@ -548,10 +553,12 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                         <td class="label">💵 Subtotal:</td>
                         <td class="amount">₹${subtotal.toFixed(2)}</td>
                     </tr>
+                    ${(settings?.gstConfig?.enabled && taxAmount > 0) ? `
                     <tr>
-                        <td class="label">🧾 GST (18%):</td>
+                        <td class="label">🧾 ${settings.gstConfig.displayName || 'GST'} (${Math.round((settings.gstConfig.rate || 0.18) * 100)}%):</td>
                         <td class="amount">₹${taxAmount.toFixed(2)}</td>
                     </tr>
+                    ` : ''}
                     <tr class="total-row">
                         <td class="label">💳 Total Amount:</td>
                         <td class="amount">₹${totalAmount.toFixed(2)}</td>

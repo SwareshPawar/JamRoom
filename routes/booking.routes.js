@@ -100,8 +100,25 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
-    // Get admin settings for UPI details
+    // Get admin settings for UPI details and GST configuration
     const settings = await AdminSettings.getSettings();
+    
+    // Validate and recalculate totals based on admin settings
+    const calculatedSubtotal = subtotal || 0;
+    const gstEnabled = settings.gstConfig?.enabled || false;
+    const gstRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
+    
+    // Recalculate tax amount based on current admin settings
+    const calculatedTaxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
+    const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount;
+    
+    console.log('GST Calculation:', {
+      gstEnabled,
+      gstRate,
+      subtotal: calculatedSubtotal,
+      taxAmount: calculatedTaxAmount,
+      totalAmount: calculatedTotalAmount
+    });
 
     // Create rental type summary for backward compatibility
     const rentalTypeSummary = rentals.length === 1 ? rentals[0].name : `Multiple Items (${rentals.length})`;
@@ -115,9 +132,9 @@ router.post('/', protect, async (req, res) => {
       duration,
       rentalType: rentalTypeSummary, // Legacy field
       rentals: rentals, // New multiple rentals array
-      subtotal: subtotal || 0,
-      taxAmount: taxAmount || 0,
-      price: totalAmount || subtotal || 0, // Total amount including tax
+      subtotal: calculatedSubtotal,
+      taxAmount: calculatedTaxAmount,
+      price: calculatedTotalAmount, // Total amount including tax
       userName: req.user.name,
       userEmail: req.user.email,
       bandName,
@@ -160,9 +177,9 @@ router.post('/', protect, async (req, res) => {
           </ul>
           <h3>Price Breakdown:</h3>
           <ul>
-            <li><strong>Subtotal:</strong> ₹${subtotal}</li>
-            <li><strong>GST (18%):</strong> ₹${taxAmount}</li>
-            <li><strong>Total Amount:</strong> ₹${totalAmount || subtotal}</li>
+            <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
+            ${gstEnabled ? `<li><strong>${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%):</strong> ₹${calculatedTaxAmount}</li>` : ''}
+            <li><strong>Total Amount:</strong> ₹${calculatedTotalAmount}</li>
             <li><strong>Status:</strong> PENDING</li>
           </ul>
           <h3>Payment Details:</h3>
@@ -198,9 +215,9 @@ router.post('/', protect, async (req, res) => {
             </ul>
             <h3>Price Details:</h3>
             <ul>
-              <li><strong>Subtotal:</strong> ₹${subtotal}</li>
-              <li><strong>GST (18%):</strong> ₹${taxAmount}</li>
-              <li><strong>Total:</strong> ₹${totalAmount || subtotal}</li>
+              <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
+              ${gstEnabled ? `<li><strong>${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%):</strong> ₹${calculatedTaxAmount}</li>` : ''}
+              <li><strong>Total:</strong> ₹${calculatedTotalAmount}</li>
             </ul>
             ${bandName ? `<p><strong>Band Name:</strong> ${bandName}</p>` : ''}
             <p>Please review and approve/reject this booking in the admin panel.</p>
@@ -218,7 +235,7 @@ router.post('/', protect, async (req, res) => {
       upiDetails: {
         upiId: settings.upiId,
         upiName: settings.upiName,
-        amount: totalAmount || subtotal
+        amount: calculatedTotalAmount
       }
     });
   } catch (error) {
@@ -300,7 +317,8 @@ router.get('/settings', async (req, res) => {
       success: true,
       settings: {
         rentalTypes: settings.rentalTypes,
-        basePrice: settings.basePrice
+        basePrice: settings.basePrice,
+        gstConfig: settings.gstConfig || { enabled: false, rate: 0.18, displayName: 'GST' }
       }
     });
   } catch (error) {

@@ -100,6 +100,23 @@ const adminSettingsSchema = new mongoose.Schema({
     type: Number,
     default: 60 // minutes
   },
+  // GST Configuration
+  gstConfig: {
+    enabled: {
+      type: Boolean,
+      default: false // Default to disabled (no GST)
+    },
+    rate: {
+      type: Number,
+      default: 0.18, // 18% GST
+      min: 0,
+      max: 1
+    },
+    displayName: {
+      type: String,
+      default: 'GST'
+    }
+  },
   updatedAt: {
     type: Date,
     default: Date.now

@@ -142,10 +142,14 @@ function generateBillHTML(booking, settings) {
         taxAmount = booking.taxAmount;
         totalAmount = booking.price; // This should be the total including tax
     } else {
-        // Fallback to old calculation method for legacy bookings
+        // Calculate from booking price with configurable GST
         subtotal = booking.price;
-        const taxRate = 0.18;
-        taxAmount = subtotal * taxRate;
+        
+        // Use GST configuration from settings
+        const gstEnabled = settings?.gstConfig?.enabled || false;
+        const taxRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
+        
+        taxAmount = gstEnabled ? Math.round(subtotal * taxRate) : 0;
         totalAmount = subtotal + taxAmount;
     }
     
@@ -790,10 +794,12 @@ function generateBillHTML(booking, settings) {
                         <td class="label">💰 Subtotal:</td>
                         <td class="amount">₹${subtotal.toFixed(2)}</td>
                     </tr>
+                    ${(settings?.gstConfig?.enabled && taxAmount > 0) ? `
                     <tr>
-                        <td class="label">🧾 GST (18%):</td>
+                        <td class="label">🧾 ${settings.gstConfig.displayName || 'GST'} (${Math.round((settings.gstConfig.rate || 0.18) * 100)}%):</td>
                         <td class="amount">₹${taxAmount.toFixed(2)}</td>
                     </tr>
+                    ` : ''}
                     <tr class="total-row">
                         <td class="label">💳 Total Amount:</td>
                         <td class="amount">₹${totalAmount.toFixed(2)}</td>
