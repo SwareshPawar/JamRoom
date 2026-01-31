@@ -208,6 +208,69 @@
             margin: 5px 0;
         }
 
+        .whatsapp-btn {
+            background: #25d366;
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: inline-block;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .whatsapp-btn:hover {
+            background: #128c7e;
+            transform: translateY(-1px);
+            color: white;
+            text-decoration: none;
+        }
+
+        .qr-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .qr-container img {
+            border: 3px solid #e9ecef;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .qr-container img:hover {
+            transform: scale(1.05);
+        }
+
+        .setup-option {
+            margin-bottom: 20px;
+            padding: 18px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #25d366;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .setup-option.manual {
+            border-left-color: #ffc107;
+        }
+
+        .setup-option.qr {
+            border-left-color: #667eea;
+        }
+
+        .code-block {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 10px 0;
+            border: 1px solid #dee2e6;
+        }
+
         .booking-card {
             background: #f8f9ff;
             padding: 20px;
@@ -377,6 +440,37 @@
             <div id="settings" class="tab-pane">
                 <h2>Account Settings</h2>
                 
+                <!-- WhatsApp Notifications Section -->
+                <div class="whatsapp-section" style="margin-bottom: 40px;">
+                    <h3>📱 WhatsApp Notifications</h3>
+                    <p>Get booking confirmations and updates via WhatsApp (optional)</p>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="whatsappEnabled" style="margin-right: 8px;">
+                            Enable WhatsApp notifications
+                        </label>
+                    </div>
+                    
+                    <div id="whatsappSetup" style="display: none; margin-top: 20px; padding: 20px; background: #e7f3ff; border-radius: 8px;">
+                        <h4>📋 Setup Instructions</h4>
+                        <div id="setupInstructions"></div>
+                        
+                        <div style="margin-top: 15px;">
+                            <label>
+                                <input type="checkbox" id="sandboxJoined" style="margin-right: 8px;">
+                                I have completed the verification process
+                            </label>
+                        </div>
+                        
+                        <button type="button" id="saveWhatsAppBtn" class="btn btn-primary" style="margin-top: 10px;">
+                            Save WhatsApp Preferences
+                        </button>
+                    </div>
+                    
+                    <div id="whatsappStatus" style="margin-top: 15px;"></div>
+                </div>
+                
                 <div class="delete-section">
                     <h3>⚠️ Danger Zone</h3>
                     <p>Once you delete your account, there is no going back. Please be certain.</p>
@@ -470,6 +564,9 @@
                     document.getElementById('name').value = data.user.name;
                     document.getElementById('email').value = data.user.email;
                     document.getElementById('mobile').value = data.user.mobile || '';
+
+                    // Load WhatsApp preferences
+                    loadWhatsAppPreferences(data.user);
                 } else {
                     showAlert(data.message || 'Failed to load profile');
                 }
@@ -652,6 +749,178 @@
             } finally {
                 deleteBtn.disabled = false;
                 deleteBtn.textContent = 'Delete Account';
+            }
+        });
+
+        // WhatsApp Preferences Functions
+        function loadWhatsAppPreferences(user) {
+            const whatsappEnabled = document.getElementById('whatsappEnabled');
+            const sandboxJoined = document.getElementById('sandboxJoined');
+            const whatsappSetup = document.getElementById('whatsappSetup');
+            const whatsappStatus = document.getElementById('whatsappStatus');
+
+            const whatsapp = user.whatsappNotifications || {
+                enabled: false,
+                verified: false,
+                sandboxJoined: false
+            };
+
+            whatsappEnabled.checked = whatsapp.enabled;
+            sandboxJoined.checked = whatsapp.sandboxJoined;
+
+            // Show setup section if enabled but not verified
+            if (whatsapp.enabled && !whatsapp.verified) {
+                whatsappSetup.style.display = 'block';
+                loadWhatsAppInstructions();
+            } else if (whatsapp.enabled) {
+                whatsappSetup.style.display = 'none';
+            }
+
+            // Update status
+            updateWhatsAppStatus(whatsapp);
+
+            // Add event listeners
+            whatsappEnabled.addEventListener('change', function() {
+                if (this.checked) {
+                    if (!user.mobile) {
+                        showAlert('Please add a mobile number first to enable WhatsApp notifications');
+                        this.checked = false;
+                        return;
+                    }
+                    whatsappSetup.style.display = 'block';
+                    loadWhatsAppInstructions();
+                } else {
+                    whatsappSetup.style.display = 'none';
+                }
+            });
+        }
+
+        async function loadWhatsAppInstructions() {
+            try {
+                const response = await fetch(`${API_URL}/api/profile/whatsapp-setup`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const instructions = data.setupInstructions;
+                    const whatsappLink = `https://wa.me/14155238886?text=${encodeURIComponent(instructions.sandboxCode)}`;
+                    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(whatsappLink)}`;
+                    
+                    document.getElementById('setupInstructions').innerHTML = `
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                            <h4 style="color: #25d366; margin-bottom: 15px;">🚀 Quick Setup Options</h4>
+                            
+                            <!-- Option 1: Direct WhatsApp Link -->
+                            <div class="setup-option">
+                                <h5 style="margin: 0 0 10px 0;">📱 Option 1: One-Click Setup</h5>
+                                <p style="margin: 5px 0;">Click the button below to open WhatsApp with the message ready:</p>
+                                <a href="${whatsappLink}" target="_blank" class="whatsapp-btn">
+                                    📱 Open WhatsApp & Send Message
+                                </a>
+                            </div>
+                            
+                            <!-- Option 2: QR Code -->
+                            <div class="setup-option qr">
+                                <h5 style="margin: 0 0 10px 0;">📷 Option 2: Scan QR Code</h5>
+                                <p style="margin: 5px 0;">Scan this QR code with your phone's camera:</p>
+                                <div class="qr-container">
+                                    <img src="${qrCodeUrl}" alt="WhatsApp Setup QR Code">
+                                    <br><small style="color: #666;">Scan with your phone camera</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Option 3: Manual Setup -->
+                            <div class="setup-option manual">
+                                <h5 style="margin: 0 0 10px 0;">✍️ Option 3: Manual Setup</h5>
+                                <p style="margin: 5px 0;">If the above options don't work, send manually:</p>
+                                <div class="code-block">
+                                    <strong>Message:</strong> ${instructions.sandboxCode}<br>
+                                    <strong>To:</strong> ${instructions.twilioNumber}
+                                </div>
+                                <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+                                    <li>Open WhatsApp on your phone</li>
+                                    <li>Start a new chat with: <strong>${instructions.twilioNumber}</strong></li>
+                                    <li>Send the message: <strong>${instructions.sandboxCode}</strong></li>
+                                    <li>Wait for Twilio's confirmation message</li>
+                                    <li>Return here and check the verification box below</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #e7f3ff; padding: 15px; border-radius: 6px; margin-top: 15px;">
+                            <h5 style="color: #0066cc; margin: 0 0 8px 0;">📝 Important Notes:</h5>
+                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 14px;">
+                                <li>Make sure you send from your registered mobile: <strong>${instructions.userMobile || 'your mobile number'}</strong></li>
+                                <li>You should receive a confirmation message from Twilio</li>
+                                <li>This is a one-time setup process</li>
+                                <li>You can disable notifications anytime from this page</li>
+                            </ul>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading WhatsApp instructions:', error);
+            }
+        }
+
+        function updateWhatsAppStatus(whatsapp) {
+            const statusDiv = document.getElementById('whatsappStatus');
+            let statusHTML = '';
+
+            if (whatsapp.enabled) {
+                if (whatsapp.verified) {
+                    statusHTML = `<div style="color: #28a745; font-weight: bold;">✅ WhatsApp notifications are active!</div>`;
+                } else {
+                    statusHTML = `<div style="color: #ffc107; font-weight: bold;">⚠️ Verification required</div>`;
+                }
+            } else {
+                statusHTML = `<div style="color: #6c757d;">WhatsApp notifications are disabled</div>`;
+            }
+
+            statusDiv.innerHTML = statusHTML;
+        }
+
+        // Save WhatsApp preferences
+        document.getElementById('saveWhatsAppBtn').addEventListener('click', async function() {
+            try {
+                const enabled = document.getElementById('whatsappEnabled').checked;
+                const sandboxJoined = document.getElementById('sandboxJoined').checked;
+
+                if (enabled && !sandboxJoined) {
+                    showAlert('Please complete the verification process first');
+                    return;
+                }
+
+                const response = await fetch(`${API_URL}/api/profile/whatsapp`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        enabled,
+                        sandboxJoined
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('WhatsApp preferences saved successfully!', 'success');
+                    updateWhatsAppStatus(data.whatsappNotifications);
+                    if (enabled && sandboxJoined) {
+                        document.getElementById('whatsappSetup').style.display = 'none';
+                    }
+                } else {
+                    showAlert(data.message || 'Failed to save WhatsApp preferences');
+                }
+            } catch (error) {
+                console.error('Save WhatsApp preferences error:', error);
+                showAlert('Error saving WhatsApp preferences');
             }
         });
 

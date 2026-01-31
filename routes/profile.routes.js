@@ -27,7 +27,12 @@ router.get('/', protect, async (req, res) => {
         email: user.email,
         mobile: user.mobile || '',
         role: user.role,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        whatsappNotifications: user.whatsappNotifications || {
+          enabled: false,
+          verified: false,
+          sandboxJoined: false
+        }
       }
     });
   } catch (error) {
@@ -305,6 +310,97 @@ router.delete('/', protect, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error deleting account'
+    });
+  }
+});
+
+// @route   PUT /api/profile/whatsapp
+// @desc    Update WhatsApp notification preferences
+// @access  Private
+router.put('/whatsapp', protect, async (req, res) => {
+  try {
+    const { enabled, sandboxJoined } = req.body;
+    
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user has mobile number
+    if (!user.mobile && enabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mobile number is required for WhatsApp notifications'
+      });
+    }
+
+    // Update WhatsApp preferences
+    if (!user.whatsappNotifications) {
+      user.whatsappNotifications = {
+        enabled: false,
+        verified: false,
+        sandboxJoined: false
+      };
+    }
+
+    user.whatsappNotifications.enabled = enabled || false;
+    
+    if (sandboxJoined) {
+      user.whatsappNotifications.sandboxJoined = true;
+      user.whatsappNotifications.verified = true;
+      user.whatsappNotifications.verifiedAt = new Date();
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'WhatsApp preferences updated successfully',
+      whatsappNotifications: user.whatsappNotifications
+    });
+  } catch (error) {
+    console.error('Update WhatsApp preferences error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating WhatsApp preferences'
+    });
+  }
+});
+
+// @route   GET /api/profile/whatsapp-setup
+// @desc    Get WhatsApp setup instructions
+// @access  Private
+router.get('/whatsapp-setup', protect, async (req, res) => {
+  try {
+    const twilioNumber = process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886';
+    const sandboxCode = process.env.TWILIO_SANDBOX_CODE || 'join steel-market';
+    
+    res.json({
+      success: true,
+      setupInstructions: {
+        step1: `Send a WhatsApp message from your registered mobile number (${req.user.mobile || 'your mobile'})`,
+        step2: `Send message: "${sandboxCode}"`,
+        step3: `To WhatsApp number: ${twilioNumber}`,
+        step4: `Wait for confirmation message from Twilio`,
+        step5: `Return here and mark as completed`,
+        twilioNumber,
+        sandboxCode,
+        userMobile: req.user.mobile
+      },
+      currentStatus: req.user.whatsappNotifications || {
+        enabled: false,
+        verified: false,
+        sandboxJoined: false
+      }
+    });
+  } catch (error) {
+    console.error('WhatsApp setup instructions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching setup instructions'
     });
   }
 });

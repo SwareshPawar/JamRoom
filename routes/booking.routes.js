@@ -199,8 +199,8 @@ router.post('/', protect, async (req, res) => {
       console.log('Booking confirmation email failed:', emailError.message);
     }
 
-    // Send WhatsApp confirmation to customer if mobile provided
-    if (req.user.mobile) {
+    // Send WhatsApp confirmation to customer if mobile provided and opted in
+    if (req.user.mobile && req.user.whatsappNotifications?.enabled && req.user.whatsappNotifications?.verified) {
       try {
         await sendCustomerBookingRequestWhatsApp(req.user.mobile, {
           userName: req.user.name,
