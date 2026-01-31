@@ -156,10 +156,20 @@ router.post('/', protect, async (req, res) => {
       day: 'numeric'
     });
 
-    // Create rentals summary for email
-    const rentalsSummary = rentals.map(rental => 
-      `<li>${rental.name} × ${rental.quantity} - ₹${rental.price * rental.quantity * duration}</li>`
-    ).join('');
+    // Create rentals summary for email with correct per-day pricing
+    const rentalsSummary = rentals.map(rental => {
+      let itemTotal;
+      if (rental.rentalType === 'perday') {
+        // Per-day rentals: use perdayPrice, no duration factor
+        const perdayPrice = rental.perdayPrice || rental.price;
+        itemTotal = perdayPrice * rental.quantity;
+        return `<li>${rental.name} × ${rental.quantity} (per day) - ₹${itemTotal}</li>`;
+      } else {
+        // Hourly rentals: use price with duration factor
+        itemTotal = rental.price * rental.quantity * duration;
+        return `<li>${rental.name} × ${rental.quantity} × ${duration}h - ₹${itemTotal}</li>`;
+      }
+    }).join('');
 
     // Send confirmation email to user
     try {
@@ -367,6 +377,30 @@ router.get('/settings', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error fetching settings'
+    });
+  }
+});
+
+// @route   GET /api/bookings/payment-info
+// @desc    Get public payment information (UPI details)
+// @access  Public (no auth required)
+router.get('/payment-info', async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+    
+    res.json({
+      success: true,
+      paymentInfo: {
+        upiId: settings.upiId || 'Not configured',
+        upiName: settings.upiName || 'JamRoom Studio',
+        // Don't expose other sensitive admin settings
+      }
+    });
+  } catch (error) {
+    console.error('Get payment info error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching payment info'
     });
   }
 });

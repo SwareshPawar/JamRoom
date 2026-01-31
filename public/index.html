@@ -194,6 +194,95 @@
             padding: 40px;
         }
 
+        .tab-container {
+            margin-bottom: 30px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f1f1f1;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 15px 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .payment-info {
+            background: #f8f9ff;
+            padding: 30px;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .payment-method {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .upi-details {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .upi-id {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 15px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        .copy-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
         .hero {
             text-align: center;
             padding: 50px 20px;
@@ -306,30 +395,128 @@
                 <p>Professional equipment, soundproof rooms, and flexible booking options</p>
             </div>
 
-            <div class="features">
-                <div class="feature-card">
-                    <h3>🎵 Professional Equipment</h3>
-                    <p>High-quality instruments, amplifiers, and sound systems available for rent</p>
+            <!-- Tab Container -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="showTab('payment')">💳 Payment Info</button>
+                    <button class="tab-btn" onclick="showTab('home')">🏠 Home</button>
                 </div>
-                <div class="feature-card">
-                    <h3>🔇 Soundproof Rooms</h3>
-                    <p>Fully isolated jam rooms for the best acoustic experience</p>
+
+                <!-- Payment Tab -->
+                <div id="payment" class="tab-pane active">
+                    <div class="payment-info">
+                        <h2 style="margin-bottom: 25px; color: #667eea; text-align: center;">💳 Payment Information</h2>
+                        
+                        <!-- Quick Payment Section -->
+                        <div class="quick-payment" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
+                            <h3 style="margin-bottom: 20px;">🚀 Quick Payment Options</h3>
+                            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+                                <button id="payWithUPI" class="payment-btn primary" style="background: #28a745; border: none; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 14px;">📱 Open UPI App</button>
+                                <button id="payWithPhonePe" class="payment-btn secondary" style="background: #5f259f; border: none; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 14px;">📳 PhonePe</button>
+                                <button id="payWithGPay" class="payment-btn secondary" style="background: #4285f4; border: none; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 14px;">💳 Google Pay</button>
+                            </div>
+                            <p style="font-size: 14px; opacity: 0.9; margin: 0;">Enter amount when booking, then use these quick payment options</p>
+                        </div>
+                        
+                        <div class="upi-details">
+                            <h3 style="margin-bottom: 15px; color: #2c3e50;">📱 UPI Payment Details</h3>
+                            <p style="margin-bottom: 20px; opacity: 0.9;">Fast, secure, and instant payment method</p>
+                            
+                            <div class="upi-card" style="background: #e7f3ff; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 2px solid #3498db;">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; align-items: center;">
+                                    <div>
+                                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">UPI ID:</p>
+                                        <div class="upi-id" id="upiId" style="font-size: 18px; font-weight: 600; color: #2c3e50; font-family: monospace; padding: 8px 0;">Loading...</div>
+                                        <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Name: <span id="upiName" style="font-weight: 500;">Loading...</span></p>
+                                        <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                            <button class="copy-btn" onclick="copyUpiId()" style="background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 12px;">📋 Copy UPI ID</button>
+                                            <button class="copy-btn" onclick="copyUpiName()" style="background: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 12px;">📝 Copy Name</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- QR Code Section -->
+                                    <div style="text-align: center;">
+                                        <div style="background: white; padding: 15px; border-radius: 10px; display: inline-block; border: 2px solid #ddd;">
+                                            <img id="upiQR" alt="UPI QR Code" style="width: 150px; height: 150px; display: block;">
+                                        </div>
+                                        <p style="font-size: 12px; color: #666; margin-top: 8px;">Scan with any UPI app</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="payment-methods" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin: 25px 0;">
+                            <div class="payment-method" style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #3498db;">
+                                <h4 style="color: #2c3e50; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">📱 How to Pay via UPI</h4>
+                                <ol style="margin: 0; padding-left: 20px; line-height: 1.8; color: #555;">
+                                    <li><strong>Book your session</strong> to get the amount</li>
+                                    <li><strong>Use quick payment buttons</strong> above</li>
+                                    <li>Or <strong>copy UPI ID</strong> and open your UPI app</li>
+                                    <li><strong>Scan QR code</strong> for instant payment</li>
+                                    <li>Add <strong>booking ID</strong> in payment remarks</li>
+                                    <li>Complete payment and <strong>screenshot</strong> confirmation</li>
+                                    <li><strong>Share screenshot</strong> with us</li>
+                                </ol>
+                            </div>
+
+                            <div class="payment-method" style="background: #fff5f5; padding: 20px; border-radius: 10px; border-left: 4px solid #e74c3c;">
+                                <h4 style="color: #c0392b; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">⚠️ Important Notes</h4>
+                                <ul style="margin: 0; padding-left: 20px; line-height: 1.8; color: #555;">
+                                    <li><strong>Payment confirms</strong> your booking slot</li>
+                                    <li><strong>Include booking ID</strong> in payment remarks</li>
+                                    <li><strong>24-hour advance notice</strong> required for cancellation</li>
+                                    <li><strong>Screenshots required</strong> for payment verification</li>
+                                    <li><strong>No-shows</strong> will forfeit advance payment</li>
+                                    <li><strong>QR codes work</strong> with all UPI apps</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="contact-support" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 12px; text-align: center; margin-top: 25px;">
+                            <h4 style="margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 8px;">📞 Need Help with Payment?</h4>
+                            <p style="margin-bottom: 15px; opacity: 0.9;">Our team is here to assist you with any payment-related queries</p>
+                            <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                                <div>
+                                    <strong>📱 WhatsApp:</strong><br>
+                                    <a href="https://wa.me/919172706306" target="_blank" style="color: #fff; text-decoration: none; font-weight: 500;">+91 91727 06306</a>
+                                </div>
+                                <div>
+                                    <strong>✉️ Email:</strong><br>
+                                    <a href="mailto:support@jamroom.com" style="color: #fff; text-decoration: none; font-weight: 500;">support@jamroom.com</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <h3>⏰ Flexible Timing</h3>
-                    <p>Book slots according to your schedule with easy online booking</p>
-                </div>
-                <div class="feature-card">
-                    <h3>💰 Affordable Rates</h3>
-                    <p>Competitive pricing with various packages to suit your needs</p>
-                </div>
-                <div class="feature-card">
-                    <h3>📱 Easy Booking</h3>
-                    <p>Simple online booking system with instant confirmation</p>
-                </div>
-                <div class="feature-card">
-                    <h3>🎤 Recording Studio</h3>
-                    <p>Professional recording equipment and mixing facilities available</p>
+
+                <!-- Home Tab -->
+                <div id="home" class="tab-pane">
+                    <div class="features">
+                        <div class="feature-card">
+                            <h3>🎵 Professional Equipment</h3>
+                            <p>High-quality instruments, amplifiers, and sound systems available for rent</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>🔇 Soundproof Rooms</h3>
+                            <p>Fully isolated jam rooms for the best acoustic experience</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>⏰ Flexible Timing</h3>
+                            <p>Book slots according to your schedule with easy online booking</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>💰 Affordable Rates</h3>
+                            <p>Competitive pricing with various packages to suit your needs</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>📱 Easy Booking</h3>
+                            <p>Simple online booking system with instant confirmation</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>🎤 Recording Studio</h3>
+                            <p>Professional recording equipment and mixing facilities available</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -369,6 +556,176 @@
             localStorage.removeItem('user');
             window.location.reload();
         });
+
+        // Tab functionality
+        function showTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-pane');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Hide all tab buttons
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Copy UPI ID functionality
+        function copyUpiId() {
+            const upiText = document.getElementById('upiId').textContent;
+            if (upiText && upiText !== 'Loading...') {
+                navigator.clipboard.writeText(upiText).then(() => {
+                    showNotification('✅ UPI ID copied to clipboard!', 'success');
+                });
+            }
+        }
+
+        // Copy UPI Name functionality
+        function copyUpiName() {
+            const upiName = document.getElementById('upiName').textContent;
+            if (upiName && upiName !== 'Loading...') {
+                navigator.clipboard.writeText(upiName).then(() => {
+                    showNotification('✅ UPI Name copied to clipboard!', 'success');
+                });
+            }
+        }
+
+        // Generate QR Code for UPI payment
+        function generateQRCode() {
+            const upiId = document.getElementById('upiId').textContent;
+            const upiName = document.getElementById('upiName').textContent;
+            
+            if (upiId && upiId !== 'Loading...' && upiName && upiName !== 'Loading...') {
+                // Create UPI link
+                const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                
+                // Generate QR code using external API
+                const qrCodeURL = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiLink)}`;
+                
+                const qrImage = document.getElementById('upiQR');
+                if (qrImage) {
+                    qrImage.src = qrCodeURL;
+                    qrImage.style.display = 'block';
+                }
+            }
+        }
+
+        // Setup payment button handlers
+        function setupPaymentButtons() {
+            const upiId = document.getElementById('upiId').textContent;
+            const upiName = document.getElementById('upiName').textContent;
+            
+            if (upiId && upiId !== 'Loading...' && upiName && upiName !== 'Loading...') {
+                // Generic UPI payment
+                const payWithUPI = document.getElementById('payWithUPI');
+                if (payWithUPI) {
+                    payWithUPI.onclick = function() {
+                        const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                        window.location.href = upiLink;
+                    };
+                }
+                
+                // PhonePe payment
+                const payWithPhonePe = document.getElementById('payWithPhonePe');
+                if (payWithPhonePe) {
+                    payWithPhonePe.onclick = function() {
+                        const phonePeLink = `phonepe://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                        window.location.href = phonePeLink;
+                    };
+                }
+                
+                // Google Pay payment
+                const payWithGPay = document.getElementById('payWithGPay');
+                if (payWithGPay) {
+                    payWithGPay.onclick = function() {
+                        const gPayLink = `tez://upi/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                        window.location.href = gPayLink;
+                    };
+                }
+            }
+        }
+
+        // Show notification messages
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.innerHTML = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition: opacity 0.3s ease;
+                background: ${type === 'success' ? '#27ae60' : '#e74c3c'};
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Load payment information
+        async function loadPaymentInfo() {
+            try {
+                const response = await fetch('/api/bookings/payment-info');
+                const data = await response.json();
+                
+                if (data.success && data.paymentInfo) {
+                    const upiId = data.paymentInfo.upiId || 'Not configured';
+                    const upiName = data.paymentInfo.upiName || 'JamRoom Studio';
+                    
+                    // Update UPI ID display elements
+                    const upiIdElements = document.querySelectorAll('#upiId');
+                    upiIdElements.forEach(element => {
+                        element.textContent = upiId;
+                    });
+                    
+                    // Update UPI name display elements  
+                    const upiNameElements = document.querySelectorAll('#upiName');
+                    upiNameElements.forEach(element => {
+                        element.textContent = upiName;
+                    });
+                    
+                    // Generate QR code and setup payment buttons
+                    setTimeout(() => {
+                        generateQRCode();
+                        setupPaymentButtons();
+                    }, 100);
+                    
+                } else {
+                    // Update elements to show error state
+                    const upiIdElements = document.querySelectorAll('#upiId');
+                    upiIdElements.forEach(element => {
+                        element.textContent = 'Payment info unavailable';
+                        element.style.color = '#e74c3c';
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading payment info:', error);
+                // Update elements to show error state
+                const upiIdElements = document.querySelectorAll('#upiId');
+                upiIdElements.forEach(element => {
+                    element.textContent = 'Payment info unavailable';
+                    element.style.color = '#e74c3c';
+                });
+            }
+        }
+
+        // Load payment info when page loads
+        loadPaymentInfo();
     </script>
 </body>
 </html>

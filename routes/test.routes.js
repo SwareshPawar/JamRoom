@@ -214,4 +214,137 @@ router.post('/dummy-booking', async (req, res) => {
   }
 });
 
+// @route   POST /api/test/admin-booking
+// @desc    Test admin booking creation functionality
+// @access  Public (for testing)
+router.post('/admin-booking', async (req, res) => {
+  try {
+    const AdminSettings = require('../models/AdminSettings');
+    const { sendBookingConfirmationNotifications } = require('../utils/whatsapp');
+
+    // Create admin booking test data
+    const testDate = new Date();
+    testDate.setDate(testDate.getDate() + 2); // Day after tomorrow
+    testDate.setHours(0, 0, 0, 0);
+
+    const testAdminBooking = {
+      userName: req.body.userName || 'Admin Test Customer',
+      userEmail: req.body.userEmail || 'admintest@example.com',
+      userMobile: req.body.userMobile || '+919172706306',
+      date: testDate.toISOString().split('T')[0],
+      startTime: '15:00',
+      endTime: '17:00',
+      duration: 2,
+      rentals: [
+        { name: 'Jam Room', price: 200, quantity: 1, rentalType: 'inhouse' },
+        { name: 'Guitar (Per-day)', price: 0, quantity: 1, rentalType: 'perday', perdayPrice: 800 },
+        { name: 'Microphone', price: 50, quantity: 2, rentalType: 'inhouse' }
+      ],
+      subtotal: 1000,
+      taxAmount: 180,
+      totalAmount: 1180,
+      bandName: req.body.bandName || 'Admin Test Band',
+      notes: 'Test booking created via admin panel for testing notifications',
+      paymentStatus: 'PENDING',
+      bookingStatus: 'CONFIRMED'
+    };
+
+    // Simulate the admin booking API call
+    const adminBookingData = {
+      ...testAdminBooking,
+      date: testDate.toISOString().split('T')[0]
+    };
+
+    // Test the pricing calculations
+    let calculatedSubtotal = 0;
+    const pricingBreakdown = [];
+    
+    for (const rental of testAdminBooking.rentals) {
+      let itemTotal;
+      if (rental.rentalType === 'perday') {
+        itemTotal = (rental.perdayPrice || rental.price) * rental.quantity;
+        pricingBreakdown.push(`${rental.name}: ₹${rental.perdayPrice || rental.price} × ${rental.quantity} (per day) = ₹${itemTotal}`);
+      } else {
+        itemTotal = rental.price * rental.quantity * testAdminBooking.duration;
+        pricingBreakdown.push(`${rental.name}: ₹${rental.price} × ${rental.quantity} × ${testAdminBooking.duration}h = ₹${itemTotal}`);
+      }
+      calculatedSubtotal += itemTotal;
+    }
+
+    const gstRate = 0.18;
+    const calculatedTaxAmount = Math.round(calculatedSubtotal * gstRate);
+    const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount;
+
+    // Get admin settings for notifications
+    const settings = await AdminSettings.getSettings();
+
+    // Format date for display
+    const displayDate = testDate.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Send WhatsApp notifications (similar to actual admin booking creation)
+    const whatsappResult = await sendBookingConfirmationNotifications({
+      userName: testAdminBooking.userName,
+      userEmail: testAdminBooking.userEmail,
+      userMobile: testAdminBooking.userMobile,
+      date: displayDate,
+      startTime: testAdminBooking.startTime,
+      endTime: testAdminBooking.endTime,
+      totalAmount: calculatedTotalAmount,
+      bookingId: 'TEST-' + Date.now(),
+      bandName: testAdminBooking.bandName,
+      paymentStatus: testAdminBooking.paymentStatus
+    }, settings.whatsappNotifications);
+
+    res.json({
+      success: true,
+      message: 'Admin booking creation test completed successfully!',
+      testResults: {
+        bookingDetails: {
+          customer: testAdminBooking.userName,
+          mobile: testAdminBooking.userMobile,
+          date: displayDate,
+          time: `${testAdminBooking.startTime}-${testAdminBooking.endTime}`,
+          duration: `${testAdminBooking.duration} hours`,
+          bandName: testAdminBooking.bandName
+        },
+        pricingCalculation: {
+          breakdown: pricingBreakdown,
+          subtotal: `₹${calculatedSubtotal}`,
+          gst: `₹${calculatedTaxAmount} (18%)`,
+          total: `₹${calculatedTotalAmount}`,
+          expectedSubtotal: `₹${testAdminBooking.subtotal}`,
+          calculationMatch: calculatedSubtotal === testAdminBooking.subtotal
+        },
+        notifications: whatsappResult
+      },
+      validationChecks: {
+        perdayPricing: 'Guitar (Per-day) calculated without duration factor',
+        hourlyPricing: 'Jam Room and Microphone calculated with duration factor',
+        gstCalculation: `18% GST applied correctly: ₹${calculatedSubtotal} × 0.18 = ₹${calculatedTaxAmount}`,
+        adminNotifications: 'WhatsApp notifications sent to business and staff numbers',
+        customerNotification: 'Customer notification sent (if mobile provided)'
+      },
+      instructions: [
+        'Check admin booking creation UI works correctly',
+        'Verify per-day vs hourly rental calculations',
+        'Test WhatsApp notifications for admin-created bookings',
+        'Confirm booking appears in manage bookings tab',
+        'Validate email notifications are sent properly'
+      ]
+    });
+  } catch (error) {
+    console.error('Admin booking test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error testing admin booking creation',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

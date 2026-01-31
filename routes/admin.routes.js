@@ -1418,6 +1418,8 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.post('/bookings', protect, isAdmin, async (req, res) => {
   try {
+    console.log('📝 Admin booking creation request received:', req.body);
+    
     const { 
       userName, 
       userEmail, 
@@ -1435,6 +1437,12 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       paymentStatus = 'PENDING',
       bookingStatus = 'CONFIRMED' // Admin bookings are typically confirmed immediately
     } = req.body;
+
+    console.log('🔍 Extracted fields:', {
+      userName, userEmail, userMobile, date, startTime, endTime, 
+      duration, rentals, subtotal, taxAmount, totalAmount, 
+      bandName, notes, paymentStatus, bookingStatus
+    });
 
     // Validation
     if (!userName || !userEmail || !date || !startTime || !endTime || !duration || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
@@ -1568,14 +1576,34 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       day: 'numeric'
     });
 
-    // Create rentals summary for email/WhatsApp
-    const rentalsSummary = rentals.map(rental => 
-      `<li>${rental.name} × ${rental.quantity} - ₹${rental.price * rental.quantity * duration}</li>`
-    ).join('');
+    // Create rentals summary for email/WhatsApp with correct per-day pricing
+    const rentalsSummary = rentals.map(rental => {
+      let itemTotal;
+      if (rental.rentalType === 'perday') {
+        // Per-day rentals: use perdayPrice, no duration factor
+        const perdayPrice = rental.perdayPrice || rental.price;
+        itemTotal = perdayPrice * rental.quantity;
+        return `<li>${rental.name} × ${rental.quantity} (per day) - ₹${itemTotal}</li>`;
+      } else {
+        // Hourly rentals: use price with duration factor
+        itemTotal = rental.price * rental.quantity * duration;
+        return `<li>${rental.name} × ${rental.quantity} × ${duration}h - ₹${itemTotal}</li>`;
+      }
+    }).join('');
 
-    const rentalsWhatsAppSummary = rentals.map(rental => 
-      `${rental.name} × ${rental.quantity} - ₹${rental.price * rental.quantity * duration}`
-    ).join('\n');
+    const rentalsWhatsAppSummary = rentals.map(rental => {
+      let itemTotal;
+      if (rental.rentalType === 'perday') {
+        // Per-day rentals: use perdayPrice, no duration factor
+        const perdayPrice = rental.perdayPrice || rental.price;
+        itemTotal = perdayPrice * rental.quantity;
+        return `${rental.name} × ${rental.quantity} (per day) - ₹${itemTotal}`;
+      } else {
+        // Hourly rentals: use price with duration factor
+        itemTotal = rental.price * rental.quantity * duration;
+        return `${rental.name} × ${rental.quantity} × ${duration}h - ₹${itemTotal}`;
+      }
+    }).join('\n');
 
     // Send confirmation email to customer
     try {
@@ -1669,6 +1697,16 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
 
     // Populate booking with user details for response
     const populatedBooking = await Booking.findById(booking._id).populate('userId', 'name email mobile');
+
+    console.log('✅ Admin booking created successfully:', booking._id);
+    console.log('📝 Final booking details:', {
+      id: populatedBooking._id,
+      userName: populatedBooking.userName,
+      date: populatedBooking.date,
+      startTime: populatedBooking.startTime,
+      endTime: populatedBooking.endTime,
+      bookingStatus: populatedBooking.bookingStatus
+    });
 
     res.status(201).json({
       success: true,

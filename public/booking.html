@@ -1226,11 +1226,13 @@
                     category: category,
                     description: description,
                     basePrice: basePrice,
-                    price: basePrice,
+                    price: basePrice,  // This should be the correct price for both hourly and per-day
                     quantity: 1,
                     isRequired: isRequired,
-                    rentalType: rentalType  // Add rental type to track pricing model
+                    rentalType: rentalType,  // Add rental type to track pricing model
+                    perdayPrice: basePrice  // Store the per-day price for per-day items
                 });
+                console.log(`Added rental: ${rentalName}, price: ${basePrice}, rentalType: ${rentalType}`);
                 rentalDiv.classList.add('selected');
             } else {
                 selectedRentals.delete(rentalName);
