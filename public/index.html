@@ -410,12 +410,16 @@
                         <!-- Quick Payment Section -->
                         <div class="quick-payment" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
                             <h3 style="margin-bottom: 20px;">🚀 Quick Payment Options</h3>
-                            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
-                                <button id="payWithUPI" class="payment-btn primary" style="background: #28a745; border: none; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 14px;">📱 Open UPI App</button>
-                                <button id="payWithPhonePe" class="payment-btn secondary" style="background: #5f259f; border: none; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 14px;">📳 PhonePe</button>
-                                <button id="payWithGPay" class="payment-btn secondary" style="background: #4285f4; border: none; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 14px;">💳 Google Pay</button>
+                            <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
+                                <button id="payWithUPI" class="payment-btn primary" style="background: #28a745; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">📱 Any UPI App</button>
+                                <button id="payWithPhonePe" class="payment-btn secondary" style="background: #5f259f; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">📳 PhonePe</button>
+                                <button id="payWithGPay" class="payment-btn secondary" style="background: #4285f4; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">💳 Google Pay</button>
+                                <button id="payWithPaytm" class="payment-btn secondary" style="background: #00baf2; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">💰 Paytm</button>
                             </div>
-                            <p style="font-size: 14px; opacity: 0.9; margin: 0;">Enter amount when booking, then use these quick payment options</p>
+                            <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px; text-align: center;">
+                                <p style="font-size: 13px; opacity: 0.9; margin: 0 0 8px 0;">⚡ <strong>Quick Tip:</strong> If app doesn't open automatically</p>
+                                <p style="font-size: 12px; opacity: 0.8; margin: 0;">Copy UPI ID • Open your UPI app • Paste ID • Enter amount • Pay</p>
+                            </div>
                         </div>
                         
                         <div class="upi-details">
@@ -450,24 +454,31 @@
                                 <h4 style="color: #2c3e50; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">📱 How to Pay via UPI</h4>
                                 <ol style="margin: 0; padding-left: 20px; line-height: 1.8; color: #555;">
                                     <li><strong>Book your session</strong> to get the amount</li>
-                                    <li><strong>Use quick payment buttons</strong> above</li>
-                                    <li>Or <strong>copy UPI ID</strong> and open your UPI app</li>
-                                    <li><strong>Scan QR code</strong> for instant payment</li>
-                                    <li>Add <strong>booking ID</strong> in payment remarks</li>
-                                    <li>Complete payment and <strong>screenshot</strong> confirmation</li>
-                                    <li><strong>Share screenshot</strong> with us</li>
+                                    <li><strong>Try quick payment buttons</strong> above (may not work on all devices/browsers)</li>
+                                    <li><strong>Manual method (always works):</strong>
+                                        <ul style="margin-top: 8px; padding-left: 20px;">
+                                            <li>Copy UPI ID using button below</li>
+                                            <li>Open any UPI app on your phone</li>
+                                            <li>Choose "Pay to UPI ID" or "Send Money"</li>
+                                            <li>Paste the UPI ID</li>
+                                            <li>Enter amount and add booking ID in remarks</li>
+                                        </ul>
+                                    </li>
+                                    <li><strong>QR Code:</strong> Scan with any UPI app</li>
+                                    <li><strong>Screenshot</strong> payment confirmation and share with us</li>
                                 </ol>
                             </div>
 
                             <div class="payment-method" style="background: #fff5f5; padding: 20px; border-radius: 10px; border-left: 4px solid #e74c3c;">
                                 <h4 style="color: #c0392b; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">⚠️ Important Notes</h4>
                                 <ul style="margin: 0; padding-left: 20px; line-height: 1.8; color: #555;">
+                                    <li><strong>Direct app links</strong> may not work due to browser security policies</li>
+                                    <li><strong>Manual UPI ID entry</strong> is the most reliable method</li>
                                     <li><strong>Payment confirms</strong> your booking slot</li>
                                     <li><strong>Include booking ID</strong> in payment remarks</li>
                                     <li><strong>24-hour advance notice</strong> required for cancellation</li>
                                     <li><strong>Screenshots required</strong> for payment verification</li>
                                     <li><strong>No-shows</strong> will forfeit advance payment</li>
-                                    <li><strong>QR codes work</strong> with all UPI apps</li>
                                 </ul>
                             </div>
                         </div>
@@ -612,39 +623,218 @@
             }
         }
 
-        // Setup payment button handlers
+        // Setup payment button handlers with updated deep link formats
         function setupPaymentButtons() {
             const upiId = document.getElementById('upiId').textContent;
             const upiName = document.getElementById('upiName').textContent;
             
             if (upiId && upiId !== 'Loading...' && upiName && upiName !== 'Loading...') {
-                // Generic UPI payment
+                // Generic UPI payment with fallback
                 const payWithUPI = document.getElementById('payWithUPI');
                 if (payWithUPI) {
                     payWithUPI.onclick = function() {
+                        // Try multiple UPI formats for better compatibility
                         const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        window.location.href = upiLink;
+                        const intentLink = `intent://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR#Intent;scheme=upi;package=com.google.android.apps.nfc;end`;
+                        
+                        // Try to launch UPI app
+                        tryOpenUPIApp(upiLink, 'any UPI app');
                     };
                 }
                 
-                // PhonePe payment
+                // PhonePe payment with updated format
                 const payWithPhonePe = document.getElementById('payWithPhonePe');
                 if (payWithPhonePe) {
                     payWithPhonePe.onclick = function() {
+                        // Updated PhonePe deep link format
                         const phonePeLink = `phonepe://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        window.location.href = phonePeLink;
+                        const phonePeWeb = `https://phon.pe/ru_upi?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                        
+                        tryOpenUPIApp(phonePeLink, 'PhonePe', phonePeWeb);
                     };
                 }
                 
-                // Google Pay payment
+                // Google Pay payment with updated format
                 const payWithGPay = document.getElementById('payWithGPay');
                 if (payWithGPay) {
                     payWithGPay.onclick = function() {
-                        const gPayLink = `tez://upi/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        window.location.href = gPayLink;
+                        // Updated Google Pay deep link formats
+                        const gPayLink = `gpay://upi/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                        const gPayAlt = `tez://upi/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                        const gPayWeb = `https://pay.google.com/gp/v/save/${encodeURIComponent(upiId)}`;
+                        
+                        // Try GPay first, then Tez format as fallback
+                        tryOpenUPIApp(gPayLink, 'Google Pay', gPayWeb, gPayAlt);
+                    };
+                }
+                
+                // Paytm payment
+                const payWithPaytm = document.getElementById('payWithPaytm');
+                if (payWithPaytm) {
+                    payWithPaytm.onclick = function() {
+                        // Paytm deep link formats
+                        const paytmLink = `paytmmp://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                        const paytmUPI = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+                        
+                        tryOpenUPIApp(paytmLink, 'Paytm', null, paytmUPI);
                     };
                 }
             }
+        }
+
+        // Enhanced function to try opening UPI apps with fallbacks
+        function tryOpenUPIApp(deepLink, appName, webFallback = null, altDeepLink = null) {
+            let appOpened = false;
+            
+            // Create a hidden iframe to attempt deep link
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = deepLink;
+            document.body.appendChild(iframe);
+            
+            // Remove iframe after attempt
+            setTimeout(() => {
+                if (document.body.contains(iframe)) {
+                    document.body.removeChild(iframe);
+                }
+            }, 1000);
+            
+            // Set up detection for app launch failure
+            const startTime = Date.now();
+            
+            // Check if app opened (user left the page)
+            const checkAppLaunch = () => {
+                const timeDiff = Date.now() - startTime;
+                if (document.hidden || timeDiff > 2000) {
+                    appOpened = true;
+                    return;
+                }
+            };
+            
+            // Listen for visibility change (app opened)
+            document.addEventListener('visibilitychange', checkAppLaunch, { once: true });
+            
+            // Fallback after 3 seconds if app didn't open
+            setTimeout(() => {
+                if (!appOpened) {
+                    // Try alternative deep link if provided
+                    if (altDeepLink) {
+                        const altIframe = document.createElement('iframe');
+                        altIframe.style.display = 'none';
+                        altIframe.src = altDeepLink;
+                        document.body.appendChild(altIframe);
+                        
+                        setTimeout(() => {
+                            if (document.body.contains(altIframe)) {
+                                document.body.removeChild(altIframe);
+                            }
+                        }, 1000);
+                        
+                        // Final fallback after trying alternative
+                        setTimeout(() => {
+                            if (!appOpened) {
+                                showAppNotFoundDialog(appName, webFallback);
+                            }
+                        }, 2000);
+                    } else {
+                        showAppNotFoundDialog(appName, webFallback);
+                    }
+                }
+            }, 3000);
+        }
+        
+        // Show dialog when app is not found
+        function showAppNotFoundDialog(appName, webFallback) {
+            const upiId = document.getElementById('upiId').textContent;
+            const upiName = document.getElementById('upiName').textContent;
+            
+            const message = `
+                <div style="text-align: left;">
+                    <p><strong>${appName} app not found or couldn't be opened.</strong></p>
+                    <p>Here are alternative ways to pay:</p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li><strong>Copy UPI ID:</strong> ${upiId}</li>
+                        <li><strong>Open any UPI app manually</strong> (PhonePe, GPay, Paytm, etc.)</li>
+                        <li><strong>Scan the QR code</strong> shown above</li>
+                        ${webFallback ? `<li><a href="${webFallback}" target="_blank" style="color: #007bff;">Try ${appName} web version</a></li>` : ''}
+                    </ul>
+                    <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="copyUpiId(); this.parentElement.parentElement.parentElement.parentElement.remove();" 
+                                style="background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                            📋 Copy UPI ID
+                        </button>
+                        <button onclick="this.parentElement.parentElement.parentElement.parentElement.remove();" 
+                                style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                            ✕ Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            showCustomDialog('Payment App Not Found', message, 'warning');
+        }
+        
+        // Enhanced custom dialog function
+        function showCustomDialog(title, message, type = 'info') {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            `;
+            
+            const dialog = document.createElement('div');
+            dialog.style.cssText = `
+                background: white;
+                border-radius: 12px;
+                padding: 25px;
+                max-width: 500px;
+                width: 100%;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                position: relative;
+            `;
+            
+            const iconMap = {
+                'info': '💡',
+                'warning': '⚠️',
+                'error': '❌',
+                'success': '✅'
+            };
+            
+            dialog.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                    <span style="font-size: 24px;">${iconMap[type] || '💡'}</span>
+                    <h3 style="margin: 0; color: #2c3e50;">${title}</h3>
+                </div>
+                <div style="color: #555; line-height: 1.6;">
+                    ${message}
+                </div>
+            `;
+            
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            
+            // Close on overlay click
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    document.body.removeChild(overlay);
+                }
+            });
+            
+            // Auto-remove after 10 seconds if not manually closed
+            setTimeout(() => {
+                if (document.body.contains(overlay)) {
+                    document.body.removeChild(overlay);
+                }
+            }, 10000);
         }
 
         // Show notification messages
