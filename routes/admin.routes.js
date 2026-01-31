@@ -9,6 +9,14 @@ const { isAdmin } = require('../middleware/admin');
 const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
 const { generateBill, generateBillForDownload, generateBillFilename, generateBillForDownloadWithFilename } = require('../utils/billGenerator');
+const { 
+  sendBookingRequestNotifications, 
+  sendBookingConfirmationNotifications, 
+  sendBookingConfirmationWhatsApp,
+  sendPaymentUpdateNotifications,
+  sendCancellationNotifications,
+  sendWhatsApp
+} = require('../utils/whatsapp');
 
 // @route   GET /api/admin/debug-pdf
 // @desc    Debug PDF generation environment (for production troubleshooting)
@@ -488,6 +496,39 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       console.log('Admin notification email failed:', emailError.message);
     }
 
+    // Send WhatsApp confirmation to customer if mobile provided
+    if (booking.userMobile) {
+      try {
+        await sendBookingConfirmationWhatsApp(booking.userMobile, {
+          bookingId: booking._id,
+          date: displayDate,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          totalAmount: booking.price
+        });
+      } catch (whatsappError) {
+        console.log('Customer WhatsApp confirmation failed:', whatsappError.message);
+      }
+    }
+
+    // Send WhatsApp notifications to all staff
+    try {
+      await sendBookingConfirmationNotifications({
+        userName: booking.userName,
+        userEmail: booking.userEmail,
+        userMobile: booking.userMobile,
+        date: displayDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        totalAmount: booking.price,
+        bookingId: booking._id,
+        bandName: booking.bandName,
+        paymentStatus: booking.paymentStatus
+      }, settings.whatsappNotifications);
+    } catch (whatsappError) {
+      console.log('Staff WhatsApp notifications failed:', whatsappError.message);
+    }
+
     res.json({
       success: true,
       message: 'Booking approved and confirmation sent',
@@ -824,6 +865,43 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
       });
     } catch (emailError) {
       console.log('Rejection email failed:', emailError.message);
+    }
+
+    // Send WhatsApp cancellation notification to customer if mobile provided
+    if (booking.userMobile) {
+      try {
+        const message = `❌ JamRoom Booking Declined
+
+Hi ${booking.userName},
+Unfortunately, your booking request has been declined.
+
+📅 Date: ${displayDate}
+⏰ Time: ${booking.startTime}-${booking.endTime}
+${reason ? `📝 Reason: ${reason}` : ''}
+
+Please contact us for alternative slots. 📞`;
+
+        await sendWhatsApp(booking.userMobile, message);
+      } catch (whatsappError) {
+        console.log('Customer rejection WhatsApp failed:', whatsappError.message);
+      }
+    }
+
+    // Send WhatsApp notifications to staff about cancellation
+    try {
+      await sendCancellationNotifications({
+        userName: booking.userName,
+        userEmail: booking.userEmail,
+        userMobile: booking.userMobile,
+        date: displayDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        bookingId: booking._id,
+        totalAmount: booking.price,
+        reason: reason || 'Admin declined'
+      }, settings.whatsappNotifications);
+    } catch (whatsappError) {
+      console.log('Staff cancellation WhatsApp notifications failed:', whatsappError.message);
     }
 
     res.json({
@@ -1331,6 +1409,572 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error generating PDF'
+    });
+  }
+});
+
+// @route   POST /api/admin/bookings
+// @desc    Create a new booking as admin (for walk-in customers or phone bookings)
+// @access  Private/Admin
+router.post('/bookings', protect, isAdmin, async (req, res) => {
+  try {
+    const { 
+      userName, 
+      userEmail, 
+      userMobile,
+      date, 
+      startTime, 
+      endTime, 
+      duration, 
+      rentals, 
+      subtotal, 
+      taxAmount, 
+      totalAmount, 
+      bandName, 
+      notes,
+      paymentStatus = 'PENDING',
+      bookingStatus = 'CONFIRMED' // Admin bookings are typically confirmed immediately
+    } = req.body;
+
+    // Validation
+    if (!userName || !userEmail || !date || !startTime || !endTime || !duration || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide userName, userEmail, date, startTime, endTime, duration, and at least one rental'
+      });
+    }
+
+    // Validate rentals data
+    for (const rental of rentals) {
+      if (!rental.name || rental.price === undefined || rental.price === null || !rental.quantity) {
+        return res.status(400).json({
+          success: false,
+          message: 'Each rental must have name, price, and quantity'
+        });
+      }
+    }
+
+    // Validate duration
+    if (duration < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Duration must be at least 1 hour'
+      });
+    }
+
+    // Convert date to start of day
+    const bookingDate = new Date(date);
+    bookingDate.setHours(0, 0, 0, 0);
+
+    // Check for conflicts with existing bookings (only CONFIRMED bookings block slots)
+    const existingBookings = await Booking.find({
+      date: bookingDate,
+      bookingStatus: 'CONFIRMED'
+    });
+
+    // Helper function to check time conflicts
+    const checkTimeConflict = (start1, end1, start2, end2) => {
+      const timeToMinutes = (time) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+      };
+      const start1Min = timeToMinutes(start1);
+      const end1Min = timeToMinutes(end1);
+      const start2Min = timeToMinutes(start2);
+      const end2Min = timeToMinutes(end2);
+      return (start1Min < end2Min && end1Min > start2Min);
+    };
+
+    for (const booking of existingBookings) {
+      if (checkTimeConflict(startTime, endTime, booking.startTime, booking.endTime)) {
+        return res.status(400).json({
+          success: false,
+          message: `Time conflict with existing booking (${booking.startTime} - ${booking.endTime})`
+        });
+      }
+    }
+
+    // Check for conflicts with blocked times
+    const blockedTimes = await BlockedTime.find({
+      date: bookingDate
+    });
+
+    for (const blocked of blockedTimes) {
+      if (checkTimeConflict(startTime, endTime, blocked.startTime, blocked.endTime)) {
+        return res.status(400).json({
+          success: false,
+          message: `This time slot is blocked by admin (${blocked.startTime} - ${blocked.endTime})`
+        });
+      }
+    }
+
+    // Get admin settings for UPI details and GST configuration
+    const settings = await AdminSettings.getSettings();
+    
+    // Validate and recalculate totals based on admin settings
+    const calculatedSubtotal = subtotal || 0;
+    const gstEnabled = settings.gstConfig?.enabled || false;
+    const gstRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
+    
+    // Recalculate tax amount based on current admin settings
+    const calculatedTaxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
+    const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount;
+
+    // Create rental type summary for backward compatibility
+    const rentalTypeSummary = rentals.length === 1 ? rentals[0].name : `Multiple Items (${rentals.length})`;
+
+    // Try to find existing user or create user reference
+    let userId = null;
+    try {
+      const existingUser = await User.findOne({ email: userEmail });
+      if (existingUser) {
+        userId = existingUser._id;
+        // Update mobile if provided and not already set
+        if (userMobile && !existingUser.mobile) {
+          existingUser.mobile = userMobile;
+          await existingUser.save();
+        }
+      }
+    } catch (error) {
+      console.log('User lookup failed, proceeding without userId:', error.message);
+    }
+
+    // Create booking
+    const booking = await Booking.create({
+      userId: userId, // May be null for guest bookings
+      date: bookingDate,
+      startTime,
+      endTime,
+      duration,
+      rentalType: rentalTypeSummary, // Legacy field
+      rentals: rentals, // New multiple rentals array
+      subtotal: calculatedSubtotal,
+      taxAmount: calculatedTaxAmount,
+      price: calculatedTotalAmount, // Total amount including tax
+      userName,
+      userEmail,
+      userMobile,
+      bandName,
+      notes,
+      paymentStatus,
+      bookingStatus
+    });
+
+    // Format date for display
+    const displayDate = bookingDate.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Create rentals summary for email/WhatsApp
+    const rentalsSummary = rentals.map(rental => 
+      `<li>${rental.name} × ${rental.quantity} - ₹${rental.price * rental.quantity * duration}</li>`
+    ).join('');
+
+    const rentalsWhatsAppSummary = rentals.map(rental => 
+      `${rental.name} × ${rental.quantity} - ₹${rental.price * rental.quantity * duration}`
+    ).join('\n');
+
+    // Send confirmation email to customer
+    try {
+      await sendEmail({
+        to: userEmail,
+        subject: bookingStatus === 'CONFIRMED' ? 'Booking Confirmed - JamRoom' : 'Booking Request Created - JamRoom',
+        html: `
+          <h2>${bookingStatus === 'CONFIRMED' ? 'Booking Confirmed' : 'Booking Request Created'}</h2>
+          <p>Hi ${userName},</p>
+          <p>${bookingStatus === 'CONFIRMED' ? 
+            'Your booking has been confirmed by our admin.' : 
+            'Your booking request has been created by our admin and is pending final confirmation.'}</p>
+          <h3>Booking Details:</h3>
+          <ul>
+            <li><strong>Date:</strong> ${displayDate}</li>
+            <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
+            <li><strong>Duration:</strong> ${duration} hour(s)</li>
+          </ul>
+          <h3>Rentals:</h3>
+          <ul>
+            ${rentalsSummary}
+          </ul>
+          <h3>Price Breakdown:</h3>
+          <ul>
+            <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
+            ${gstEnabled ? `<li><strong>${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%):</strong> ₹${calculatedTaxAmount}</li>` : ''}
+            <li><strong>Total Amount:</strong> ₹${calculatedTotalAmount}</li>
+            <li><strong>Status:</strong> ${bookingStatus}</li>
+            <li><strong>Payment Status:</strong> ${paymentStatus}</li>
+          </ul>
+          <h3>Payment Details:</h3>
+          <p><strong>UPI ID:</strong> ${settings.upiId}</p>
+          <p><strong>Name:</strong> ${settings.upiName}</p>
+          <p><strong>Amount:</strong> ₹${calculatedTotalAmount}</p>
+          ${paymentStatus === 'PENDING' ? '<p>Please complete the payment to finalize your booking.</p>' : ''}
+        `
+      });
+    } catch (emailError) {
+      console.log('Customer confirmation email failed:', emailError.message);
+    }
+
+    // Send WhatsApp confirmation to customer if mobile provided
+    if (userMobile) {
+      try {
+        await sendBookingConfirmationWhatsApp(userMobile, {
+          bookingId: booking._id,
+          date: displayDate,
+          startTime,
+          endTime,
+          totalAmount: calculatedTotalAmount,
+          rentals: rentalsWhatsAppSummary,
+          status: bookingStatus,
+          paymentStatus
+        });
+      } catch (whatsappError) {
+        console.log('Customer WhatsApp failed:', whatsappError.message);
+      }
+    }
+
+    // Send WhatsApp notifications to all configured recipients
+    try {
+      if (bookingStatus === 'CONFIRMED') {
+        await sendBookingConfirmationNotifications({
+          userName,
+          userEmail,
+          userMobile,
+          date: displayDate,
+          startTime,
+          endTime,
+          totalAmount: calculatedTotalAmount,
+          bookingId: booking._id,
+          bandName,
+          paymentStatus
+        }, settings.whatsappNotifications);
+      } else {
+        await sendBookingRequestNotifications({
+          userName,
+          userEmail,
+          userMobile,
+          date: displayDate,
+          startTime,
+          endTime,
+          totalAmount: calculatedTotalAmount,
+          bandName,
+          status: `Admin Created - ${bookingStatus}`
+        }, settings.whatsappNotifications);
+      }
+    } catch (whatsappError) {
+      console.log('WhatsApp notifications failed:', whatsappError.message);
+    }
+
+    // Populate booking with user details for response
+    const populatedBooking = await Booking.findById(booking._id).populate('userId', 'name email mobile');
+
+    res.status(201).json({
+      success: true,
+      message: 'Admin booking created successfully',
+      booking: {
+        _id: populatedBooking._id,
+        userName: populatedBooking.userName,
+        userEmail: populatedBooking.userEmail,
+        userMobile: populatedBooking.userMobile,
+        date: populatedBooking.date,
+        startTime: populatedBooking.startTime,
+        endTime: populatedBooking.endTime,
+        duration: populatedBooking.duration,
+        rentals: populatedBooking.rentals,
+        subtotal: populatedBooking.subtotal,
+        taxAmount: populatedBooking.taxAmount,
+        price: populatedBooking.price,
+        bandName: populatedBooking.bandName,
+        notes: populatedBooking.notes,
+        paymentStatus: populatedBooking.paymentStatus,
+        bookingStatus: populatedBooking.bookingStatus,
+        createdAt: populatedBooking.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Admin booking creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error creating booking'
+    });
+  }
+});
+
+// @route   GET /api/admin/whatsapp-settings
+// @desc    Get WhatsApp notification settings
+// @access  Private/Admin
+router.get('/whatsapp-settings', protect, isAdmin, async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+    
+    res.json({
+      success: true,
+      whatsappSettings: settings.whatsappNotifications || {
+        enabled: true,
+        businessNumber: '+919172706306',
+        notificationNumbers: [],
+        businessNotifications: {
+          bookingRequests: true,
+          bookingConfirmations: true,
+          paymentUpdates: true,
+          cancellations: true
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get WhatsApp settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching WhatsApp settings'
+    });
+  }
+});
+
+// @route   PUT /api/admin/whatsapp-settings
+// @desc    Update WhatsApp notification settings
+// @access  Private/Admin
+router.put('/whatsapp-settings', protect, isAdmin, async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+    
+    if (req.body.whatsappNotifications) {
+      settings.whatsappNotifications = {
+        ...settings.whatsappNotifications,
+        ...req.body.whatsappNotifications
+      };
+    }
+    
+    await settings.save();
+    
+    res.json({
+      success: true,
+      message: 'WhatsApp settings updated successfully',
+      whatsappSettings: settings.whatsappNotifications
+    });
+  } catch (error) {
+    console.error('Update WhatsApp settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating WhatsApp settings'
+    });
+  }
+});
+
+// @route   POST /api/admin/whatsapp-settings/add-contact
+// @desc    Add a new WhatsApp notification contact
+// @access  Private/Admin
+router.post('/whatsapp-settings/add-contact', protect, isAdmin, async (req, res) => {
+  try {
+    const { number, role, notifications } = req.body;
+    
+    if (!number || !role) {
+      return res.status(400).json({
+        success: false,
+        message: 'Number and role are required'
+      });
+    }
+
+    // Validate mobile number format
+    const mobilePattern = /^(\+91[-\s]?)?[6-9]\d{9}$/;
+    if (!mobilePattern.test(number.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid Indian mobile number'
+      });
+    }
+
+    const settings = await AdminSettings.getSettings();
+    
+    if (!settings.whatsappNotifications) {
+      settings.whatsappNotifications = {
+        enabled: true,
+        businessNumber: '+919172706306',
+        notificationNumbers: [],
+        businessNotifications: {
+          bookingRequests: true,
+          bookingConfirmations: true,
+          paymentUpdates: true,
+          cancellations: true
+        }
+      };
+    }
+
+    // Check if number already exists
+    const existingContact = settings.whatsappNotifications.notificationNumbers.find(
+      contact => contact.number === number.trim()
+    );
+    
+    if (existingContact) {
+      return res.status(400).json({
+        success: false,
+        message: 'This number is already added'
+      });
+    }
+
+    // Add new contact
+    settings.whatsappNotifications.notificationNumbers.push({
+      number: number.trim(),
+      role: role.trim(),
+      notifications: notifications || {
+        bookingRequests: true,
+        bookingConfirmations: true,
+        paymentUpdates: false,
+        cancellations: true
+      }
+    });
+    
+    await settings.save();
+    
+    res.json({
+      success: true,
+      message: 'WhatsApp contact added successfully',
+      contact: settings.whatsappNotifications.notificationNumbers[settings.whatsappNotifications.notificationNumbers.length - 1]
+    });
+  } catch (error) {
+    console.error('Add WhatsApp contact error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error adding WhatsApp contact'
+    });
+  }
+});
+
+// @route   PUT /api/admin/whatsapp-settings/update-contact/:index
+// @desc    Update a WhatsApp notification contact
+// @access  Private/Admin
+router.put('/whatsapp-settings/update-contact/:index', protect, isAdmin, async (req, res) => {
+  try {
+    const { index } = req.params;
+    const { number, role, notifications } = req.body;
+    
+    const settings = await AdminSettings.getSettings();
+    
+    if (!settings.whatsappNotifications || !settings.whatsappNotifications.notificationNumbers) {
+      return res.status(404).json({
+        success: false,
+        message: 'WhatsApp settings not found'
+      });
+    }
+
+    const contactIndex = parseInt(index);
+    if (contactIndex < 0 || contactIndex >= settings.whatsappNotifications.notificationNumbers.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Contact not found'
+      });
+    }
+
+    // Validate mobile number format if provided
+    if (number) {
+      const mobilePattern = /^(\+91[-\s]?)?[6-9]\d{9}$/;
+      if (!mobilePattern.test(number.trim())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid Indian mobile number'
+        });
+      }
+    }
+
+    // Update contact
+    if (number) settings.whatsappNotifications.notificationNumbers[contactIndex].number = number.trim();
+    if (role) settings.whatsappNotifications.notificationNumbers[contactIndex].role = role.trim();
+    if (notifications) settings.whatsappNotifications.notificationNumbers[contactIndex].notifications = notifications;
+    
+    await settings.save();
+    
+    res.json({
+      success: true,
+      message: 'WhatsApp contact updated successfully',
+      contact: settings.whatsappNotifications.notificationNumbers[contactIndex]
+    });
+  } catch (error) {
+    console.error('Update WhatsApp contact error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating WhatsApp contact'
+    });
+  }
+});
+
+// @route   DELETE /api/admin/whatsapp-settings/remove-contact/:index
+// @desc    Remove a WhatsApp notification contact
+// @access  Private/Admin
+router.delete('/whatsapp-settings/remove-contact/:index', protect, isAdmin, async (req, res) => {
+  try {
+    const { index } = req.params;
+    
+    const settings = await AdminSettings.getSettings();
+    
+    if (!settings.whatsappNotifications || !settings.whatsappNotifications.notificationNumbers) {
+      return res.status(404).json({
+        success: false,
+        message: 'WhatsApp settings not found'
+      });
+    }
+
+    const contactIndex = parseInt(index);
+    if (contactIndex < 0 || contactIndex >= settings.whatsappNotifications.notificationNumbers.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Contact not found'
+      });
+    }
+
+    // Remove contact
+    const removedContact = settings.whatsappNotifications.notificationNumbers.splice(contactIndex, 1)[0];
+    
+    await settings.save();
+    
+    res.json({
+      success: true,
+      message: 'WhatsApp contact removed successfully',
+      removedContact
+    });
+  } catch (error) {
+    console.error('Remove WhatsApp contact error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error removing WhatsApp contact'
+    });
+  }
+});
+
+// @route   POST /api/admin/whatsapp-settings/test-notification
+// @desc    Send test WhatsApp notification to verify setup
+// @access  Private/Admin
+router.post('/whatsapp-settings/test-notification', protect, isAdmin, async (req, res) => {
+  try {
+    const { number, message } = req.body;
+    
+    if (!number) {
+      return res.status(400).json({
+        success: false,
+        message: 'Number is required'
+      });
+    }
+
+    const testMessage = message || `🧪 JamRoom WhatsApp Test
+
+This is a test message from JamRoom booking system.
+If you received this, WhatsApp notifications are working correctly! ✅
+
+Sent at: ${new Date().toLocaleString('en-IN')}`;
+
+    const result = await sendWhatsApp(number, testMessage);
+    
+    res.json({
+      success: result.success,
+      message: result.success ? 'Test notification sent successfully' : 'Test notification failed',
+      details: result
+    });
+  } catch (error) {
+    console.error('Test WhatsApp notification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error sending test notification'
     });
   }
 });

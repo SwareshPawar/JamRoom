@@ -8,6 +8,10 @@ const { protect } = require('../middleware/auth');
 const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
 const { generateBill } = require('../utils/billGenerator');
+const { 
+  sendBookingRequestNotifications, 
+  sendCustomerBookingRequestWhatsApp 
+} = require('../utils/whatsapp');
 
 /**
  * Helper function to check time conflicts
@@ -137,6 +141,7 @@ router.post('/', protect, async (req, res) => {
       price: calculatedTotalAmount, // Total amount including tax
       userName: req.user.name,
       userEmail: req.user.email,
+      userMobile: req.user.mobile,
       bandName,
       notes,
       paymentStatus: 'PENDING',
@@ -194,6 +199,25 @@ router.post('/', protect, async (req, res) => {
       console.log('Booking confirmation email failed:', emailError.message);
     }
 
+    // Send WhatsApp confirmation to customer if mobile provided
+    if (req.user.mobile) {
+      try {
+        await sendCustomerBookingRequestWhatsApp(req.user.mobile, {
+          userName: req.user.name,
+          date: displayDate,
+          startTime,
+          endTime,
+          duration,
+          totalAmount: calculatedTotalAmount,
+          upiId: settings.upiId,
+          upiName: settings.upiName
+        });
+        console.log('Customer booking WhatsApp sent to:', req.user.mobile);
+      } catch (whatsappError) {
+        console.log('Customer booking WhatsApp failed:', whatsappError.message);
+      }
+    }
+
     // Notify admins
     try {
       for (const adminEmail of settings.adminEmails) {
@@ -205,6 +229,7 @@ router.post('/', protect, async (req, res) => {
             <h3>Booking Details:</h3>
             <ul>
               <li><strong>User:</strong> ${req.user.name} (${req.user.email})</li>
+              ${req.user.mobile ? `<li><strong>Mobile:</strong> ${req.user.mobile}</li>` : ''}
               <li><strong>Date:</strong> ${displayDate}</li>
               <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
               <li><strong>Duration:</strong> ${duration} hour(s)</li>
@@ -226,6 +251,22 @@ router.post('/', protect, async (req, res) => {
       }
     } catch (emailError) {
       console.log('Admin notification email failed:', emailError.message);
+    }
+
+    // Send WhatsApp notification to admin and other notification recipients
+    try {
+      await sendBookingRequestNotifications({
+        userName: req.user.name,
+        userEmail: req.user.email,
+        userMobile: req.user.mobile,
+        date: displayDate,
+        startTime,
+        endTime,
+        totalAmount: calculatedTotalAmount,
+        bandName
+      }, settings.whatsappNotifications);
+    } catch (whatsappError) {
+      console.log('WhatsApp booking request notifications failed:', whatsappError.message);
     }
 
     res.status(201).json({

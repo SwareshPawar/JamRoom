@@ -74,6 +74,68 @@ const adminSettingsSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   }],
+  // WhatsApp Notification Settings
+  whatsappNotifications: {
+    enabled: {
+      type: Boolean,
+      default: true
+    },
+    // Business number (primary admin)
+    businessNumber: {
+      type: String,
+      default: '+919172706306'
+    },
+    // Additional notification numbers
+    notificationNumbers: [{
+      number: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      role: {
+        type: String,
+        required: true,
+        trim: true // e.g., 'Sound Engineer', 'Maintenance', 'Manager', etc.
+      },
+      notifications: {
+        bookingRequests: {
+          type: Boolean,
+          default: true
+        },
+        bookingConfirmations: {
+          type: Boolean,
+          default: true
+        },
+        paymentUpdates: {
+          type: Boolean,
+          default: false
+        },
+        cancellations: {
+          type: Boolean,
+          default: true
+        }
+      }
+    }],
+    // Notification preferences for business number
+    businessNotifications: {
+      bookingRequests: {
+        type: Boolean,
+        default: true
+      },
+      bookingConfirmations: {
+        type: Boolean,
+        default: true
+      },
+      paymentUpdates: {
+        type: Boolean,
+        default: true
+      },
+      cancellations: {
+        type: Boolean,
+        default: true
+      }
+    }
+  },
   studioName: {
     type: String,
     default: 'Swar JamRoom & Music Studio'
@@ -137,7 +199,49 @@ adminSettingsSchema.statics.getSettings = async function() {
         { name: 'JamRoom + Instruments', description: 'Room with instruments', basePrice: 700 },
         { name: 'Full Package', description: 'Everything included', basePrice: 1000 }
       ],
-      adminEmails: ['admin@jamroom.com']
+      adminEmails: ['admin@jamroom.com'],
+      whatsappNotifications: {
+        enabled: true,
+        businessNumber: '+919172706306',
+        notificationNumbers: [
+          {
+            number: '+919970011855',
+            role: 'Admin Staff',
+            notifications: {
+              bookingRequests: true,
+              bookingConfirmations: true,
+              paymentUpdates: true,
+              cancellations: true
+            }
+          },
+          {
+            number: '+919876543210',
+            role: 'Sound Engineer',
+            notifications: {
+              bookingRequests: true,
+              bookingConfirmations: true,
+              paymentUpdates: false,
+              cancellations: true
+            }
+          },
+          {
+            number: '+919876543211',
+            role: 'Maintenance Person',
+            notifications: {
+              bookingRequests: true,
+              bookingConfirmations: true,
+              paymentUpdates: false,
+              cancellations: true
+            }
+          }
+        ],
+        businessNotifications: {
+          bookingRequests: true,
+          bookingConfirmations: true,
+          paymentUpdates: true,
+          cancellations: true
+        }
+      }
     });
   }
   

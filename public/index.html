@@ -289,6 +289,7 @@
             <div>
                 <a href="/">Home</a>
                 <a href="/booking.html" id="bookingLink" class="hidden">Book Now</a>
+                <a href="/account.html" id="accountLink" class="hidden">My Account</a>
                 <a href="/admin.html" id="adminLink" class="hidden">Admin Panel</a>
             </div>
             <div class="user-info">
@@ -355,6 +356,7 @@
             document.getElementById('userName').classList.remove('hidden');
             document.getElementById('logoutBtn').classList.remove('hidden');
             document.getElementById('bookingLink').classList.remove('hidden');
+            document.getElementById('accountLink').classList.remove('hidden');
 
             if (user.role === 'admin') {
                 document.getElementById('adminLink').classList.remove('hidden');

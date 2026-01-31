@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Test - JamRoom</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .test-container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #25d366;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e1e1;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #25d366;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: #25d366;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-bottom: 15px;
+        }
+
+        .btn:hover {
+            background: #128c7e;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #007bff;
+        }
+
+        .btn-secondary:hover {
+            background: #0056b3;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .config-info {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .setup-steps {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .setup-steps h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .setup-steps ol {
+            color: #856404;
+            padding-left: 20px;
+        }
+
+        .setup-steps li {
+            margin-bottom: 8px;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: #25d366;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="header">
+            <h1>📱 WhatsApp Test</h1>
+            <p>Test your WhatsApp notification setup</p>
+        </div>
+
+        <form id="testForm">
+            <div class="form-group">
+                <label for="mobile">Mobile Number</label>
+                <input 
+                    type="tel" 
+                    id="mobile" 
+                    name="mobile" 
+                    placeholder="+919172706306" 
+                    value="+919172706306"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="message">Test Message (Optional)</label>
+                <textarea 
+                    id="message" 
+                    name="message" 
+                    rows="4" 
+                    placeholder="Leave empty for default test message"
+                ></textarea>
+            </div>
+
+            <button type="submit" class="btn" id="sendBtn">
+                Send Test WhatsApp Message
+            </button>
+
+            <button type="button" class="btn btn-secondary" id="configBtn">
+                Check Configuration
+            </button>
+
+            <button type="button" class="btn" id="dummyBookingBtn" style="background: #ff6b6b;">
+                🧪 Test Booking Notifications
+            </button>
+        </form>
+
+        <div id="result" class="result"></div>
+
+        <div id="configInfo" class="config-info" style="display: none;"></div>
+
+        <div class="setup-steps">
+            <h3>🚀 Quick Setup Guide</h3>
+            <ol>
+                <li>Sign up for <a href="https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn" target="_blank">Twilio WhatsApp Sandbox</a> (free for testing)</li>
+                <li>Get your Account SID and Auth Token from Twilio Console</li>
+                <li>Add them to your .env file:
+                    <br><code>TWILIO_ACCOUNT_SID=your_account_sid</code>
+                    <br><code>TWILIO_AUTH_TOKEN=your_auth_token</code>
+                </li>
+                <li>Join the sandbox by sending "join" to the Twilio sandbox number</li>
+                <li>Test using this page!</li>
+            </ol>
+        </div>
+
+        <div class="back-link">
+            <a href="/">&larr; Back to Home</a>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        const testForm = document.getElementById('testForm');
+        const configBtn = document.getElementById('configBtn');
+        const dummyBookingBtn = document.getElementById('dummyBookingBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const resultDiv = document.getElementById('result');
+        const configInfoDiv = document.getElementById('configInfo');
+
+        function showResult(message, isSuccess) {
+            resultDiv.style.display = 'block';
+            resultDiv.className = `result ${isSuccess ? 'success' : 'error'}`;
+            resultDiv.innerHTML = message;
+        }
+
+        // Test WhatsApp message
+        testForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const mobile = document.getElementById('mobile').value;
+            const message = document.getElementById('message').value;
+
+            if (!mobile) {
+                showResult('Please enter a mobile number', false);
+                return;
+            }
+
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/test/whatsapp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ mobile, message })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    let resultMessage = `✅ ${data.message}<br><br>`;
+                    
+                    if (data.details.provider === 'console') {
+                        resultMessage += `📝 Message logged to server console (check terminal)<br>`;
+                        resultMessage += `⚠️ To send actual WhatsApp messages, configure your Twilio credentials<br>`;
+                    } else if (data.details.provider === 'twilio') {
+                        resultMessage += `📱 WhatsApp message sent via Twilio!<br>`;
+                        resultMessage += `📧 Message ID: ${data.details.data?.sid}<br>`;
+                    }
+
+                    if (data.instructions) {
+                        resultMessage += `<br><strong>Instructions:</strong><br>`;
+                        Object.entries(data.instructions).forEach(([key, value]) => {
+                            if (value) resultMessage += `• ${value}<br>`;
+                        });
+                    }
+
+                    showResult(resultMessage, true);
+                } else {
+                    showResult(`❌ Test failed: ${data.message}`, false);
+                }
+            } catch (error) {
+                console.error('Test error:', error);
+                showResult(`❌ Error: ${error.message}`, false);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send Test WhatsApp Message';
+            }
+        });
+
+        // Check configuration
+        configBtn.addEventListener('click', async () => {
+            configBtn.disabled = true;
+            configBtn.textContent = 'Checking...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/test/whatsapp-config`);
+                const data = await response.json();
+
+                if (data.success) {
+                    let configHtml = '<strong>📋 Configuration Status:</strong><br><br>';
+                    
+                    // Twilio config
+                    configHtml += `<strong>Twilio WhatsApp:</strong><br>`;
+                    configHtml += `• Configured: ${data.config.twilio.configured ? '✅ Yes' : '❌ No'}<br>`;
+                    configHtml += `• Account SID: ${data.config.twilio.accountSid}<br>`;
+                    configHtml += `• Auth Token: ${data.config.twilio.authToken}<br>`;
+                    configHtml += `• WhatsApp Number: ${data.config.twilio.whatsappNumber}<br><br>`;
+                    
+                    // MSG91 config
+                    configHtml += `<strong>MSG91 WhatsApp:</strong><br>`;
+                    configHtml += `• Configured: ${data.config.msg91.configured ? '✅ Yes' : '❌ No'}<br>`;
+                    configHtml += `• API Key: ${data.config.msg91.apiKey}<br><br>`;
+                    
+                    // Meta config
+                    configHtml += `<strong>Meta WhatsApp Business:</strong><br>`;
+                    configHtml += `• Configured: ${data.config.meta.configured ? '✅ Yes' : '❌ No'}<br>`;
+                    configHtml += `• Access Token: ${data.config.meta.token}<br>`;
+                    configHtml += `• Phone ID: ${data.config.meta.phoneId}<br>`;
+
+                    configInfoDiv.innerHTML = configHtml;
+                    configInfoDiv.style.display = 'block';
+                } else {
+                    showResult(`❌ Config check failed: ${data.message}`, false);
+                }
+            } catch (error) {
+                console.error('Config check error:', error);
+                showResult(`❌ Error checking config: ${error.message}`, false);
+            } finally {
+                configBtn.disabled = false;
+                configBtn.textContent = 'Check Configuration';
+            }
+        });
+
+        // Auto-check configuration on page load
+        window.addEventListener('load', () => {
+            configBtn.click();
+        });
+
+        // Test dummy booking notifications
+        dummyBookingBtn.addEventListener('click', async () => {
+            const mobile = document.getElementById('mobile').value || '+919172706306';
+            
+            dummyBookingBtn.disabled = true;
+            dummyBookingBtn.textContent = 'Testing Booking Notifications...';
+
+            try {
+                const response = await fetch(`${API_URL}/api/test/dummy-booking`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userName: 'Test Customer',
+                        userEmail: 'test@example.com',
+                        userMobile: mobile,
+                        bandName: 'Test Band'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    let resultMessage = `🎉 Booking notification test completed!<br><br>`;
+                    
+                    resultMessage += `<strong>📋 Booking Details:</strong><br>`;
+                    resultMessage += `• Customer: ${data.bookingDetails.customer}<br>`;
+                    resultMessage += `• Mobile: ${data.bookingDetails.mobile}<br>`;
+                    resultMessage += `• Date: ${data.bookingDetails.date}<br>`;
+                    resultMessage += `• Time: ${data.bookingDetails.time}<br>`;
+                    resultMessage += `• Amount: ₹${data.bookingDetails.amount}<br><br>`;
+                    
+                    resultMessage += `<strong>📱 WhatsApp Notifications:</strong><br>`;
+                    if (data.whatsappResult && Array.isArray(data.whatsappResult)) {
+                        data.whatsappResult.forEach(result => {
+                            const status = result.success ? '✅' : '❌';
+                            resultMessage += `• ${result.role} (${result.number}): ${status}<br>`;
+                        });
+                    } else {
+                        resultMessage += `• Result: ${data.whatsappResult.success ? '✅ Success' : '❌ Failed'}<br>`;
+                    }
+
+                    if (data.instructions) {
+                        resultMessage += `<br><strong>🔍 Next Steps:</strong><br>`;
+                        data.instructions.forEach(instruction => {
+                            resultMessage += `• ${instruction}<br>`;
+                        });
+                    }
+
+                    showResult(resultMessage, true);
+                } else {
+                    showResult(`❌ Booking notification test failed: ${data.message}`, false);
+                }
+            } catch (error) {
+                console.error('Booking test error:', error);
+                showResult(`❌ Error testing booking notifications: ${error.message}`, false);
+            } finally {
+                dummyBookingBtn.disabled = false;
+                dummyBookingBtn.textContent = '🧪 Test Booking Notifications';
+            }
+        });
+    </script>
+</body>
+</html>

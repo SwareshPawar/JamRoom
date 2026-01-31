@@ -21,6 +21,8 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/bookings', require('./routes/booking.routes'));
 app.use('/api/slots', require('./routes/slot.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
+app.use('/api/profile', require('./routes/profile.routes'));
+app.use('/api/test', require('./routes/test.routes'));
 
 // Root route
 app.get('/', (req, res) => {

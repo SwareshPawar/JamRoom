@@ -91,6 +91,10 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  userMobile: {
+    type: String,
+    trim: true
+  },
   bandName: {
     type: String,
     trim: true
