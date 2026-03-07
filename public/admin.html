@@ -978,20 +978,15 @@
                 <span class="close" onclick="closeModal('createBookingModal')">&times;</span>
             </div>
             <form id="createBookingForm" onsubmit="submitCreateBooking(event)">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group">
-                        <label for="createUserName">Customer Name*</label>
-                        <input type="text" id="createUserName" name="userName" required placeholder="Enter customer name">
-                    </div>
-                    <div class="form-group">
-                        <label for="createUserEmail">Email*</label>
-                        <input type="email" id="createUserEmail" name="userEmail" required placeholder="customer@example.com">
-                    </div>
-                </div>
-                
                 <div class="form-group">
-                    <label for="createUserMobile">Mobile Number</label>
-                    <input type="tel" id="createUserMobile" name="userMobile" placeholder="+91 XXXXX XXXXX" pattern="[+]?[0-9]{10,13}">
+                    <label for="createUserSearch">Select Registered User*</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="createUserSearch" placeholder="Search by name, email, or mobile" autocomplete="off" style="flex: 1;">
+                        <button type="button" class="btn btn-secondary" onclick="openRegisterUserModal()">+ Add User</button>
+                    </div>
+                    <input type="hidden" id="createUserId" name="userId" required>
+                    <small id="createUserSelected" style="display: block; color: #6c757d; margin-top: 6px;">No user selected</small>
+                    <div id="createUserTypeahead" style="margin-top: 8px; border: 1px solid #ddd; border-radius: 6px; max-height: 180px; overflow-y: auto; display: none;"></div>
                 </div>
                 
                 <div class="form-group">
@@ -1064,27 +1059,44 @@
                     <textarea id="createNotes" name="notes" rows="3" placeholder="Any additional notes..."></textarea>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group">
-                        <label for="createPaymentStatus">Payment Status*</label>
-                        <select id="createPaymentStatus" name="paymentStatus" required>
-                            <option value="PENDING">Pending</option>
-                            <option value="PARTIAL">Partial Paid</option>
-                            <option value="PAID">Paid</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="createBookingStatus">Booking Status*</label>
-                        <select id="createBookingStatus" name="bookingStatus" required>
-                            <option value="PENDING">Pending</option>
-                            <option value="CONFIRMED">Confirmed</option>
-                        </select>
-                    </div>
+                <div style="padding: 10px; background: #e8f5e8; border-left: 4px solid #28a745; border-radius: 4px; margin-top: 10px;">
+                    <strong>Admin booking policy:</strong> New bookings are saved as <strong>CONFIRMED</strong> and <strong>PAID</strong>.
                 </div>
                 
                 <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                     <button type="button" onclick="closeModal('createBookingModal')" class="btn btn-secondary">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Booking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Register User Modal (for admin booking flow) -->
+    <div id="registerUserModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Register New User</h2>
+                <span class="close" onclick="closeModal('registerUserModal')">&times;</span>
+            </div>
+            <form id="registerCreateUserForm">
+                <div class="form-group">
+                    <label for="registerUserName">Name*</label>
+                    <input type="text" id="registerUserName" required placeholder="Enter full name">
+                </div>
+                <div class="form-group">
+                    <label for="registerUserEmail">Email*</label>
+                    <input type="email" id="registerUserEmail" required placeholder="user@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="registerUserMobile">Mobile (Optional)</label>
+                    <input type="tel" id="registerUserMobile" placeholder="+91XXXXXXXXXX">
+                </div>
+                <div style="padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 15px;">
+                    Default password will be set to <strong>Qwerty123</strong>.
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('registerUserModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User</button>
                 </div>
             </form>
         </div>
@@ -2561,33 +2573,132 @@ Notes: ${booking.notes || 'N/A'}`);
         }
 
         // Booking creation functions
-        async function showCreateBookingModal() {
-            const modal = document.getElementById('createBookingModal');
-            modal.style.display = 'block';
-            
-            // Set default date to today
+        let adminCreateUsers = [];
+        let selectedCreateUser = null;
+        let createBookingSettings = null;
+
+        const escapeHtml = (unsafe) => {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        };
+
+        const getRentalInputId = (rentalId) => `quantity_${String(rentalId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+        const resetCreateBookingForm = () => {
+            const form = document.getElementById('createBookingForm');
+            form.reset();
+
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('createDate').value = today;
-            
-            // Clear form but keep date
-            document.getElementById('createBookingForm').reset();
-            document.getElementById('createDate').value = today; // Keep date
-            
-            // Load rental options
-            await loadCreateBookingRentals();
+
+            selectedCreateUser = null;
+            document.getElementById('createUserId').value = '';
+            document.getElementById('createUserSearch').value = '';
+            document.getElementById('createUserSelected').textContent = 'No user selected';
+            document.getElementById('createUserTypeahead').style.display = 'none';
+        };
+
+        async function showCreateBookingModal() {
+            resetCreateBookingForm();
+            document.getElementById('createBookingModal').classList.add('show');
+
+            await Promise.all([
+                loadCreateBookingUsers(),
+                loadCreateBookingRentals()
+            ]);
+        }
+
+        function hideCreateBookingModal() {
+            closeModal('createBookingModal');
+            resetCreateBookingForm();
+        }
+
+        async function loadCreateBookingUsers(search = '') {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/users?q=${encodeURIComponent(search)}&limit=300`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!res.ok) {
+                    throw new Error('Failed to load users');
+                }
+
+                const result = await res.json();
+                adminCreateUsers = Array.isArray(result.users) ? result.users : [];
+            } catch (error) {
+                console.error('Error loading admin users:', error);
+                adminCreateUsers = [];
+            }
+        }
+
+        function renderCreateUserTypeahead(query = '') {
+            const dropdown = document.getElementById('createUserTypeahead');
+            const normalizedQuery = query.trim().toLowerCase();
+
+            if (!normalizedQuery) {
+                dropdown.style.display = 'none';
+                dropdown.innerHTML = '';
+                return;
+            }
+
+            const filteredUsers = adminCreateUsers.filter((user) => {
+                const name = (user.name || '').toLowerCase();
+                const email = (user.email || '').toLowerCase();
+                const mobile = (user.mobile || '').toLowerCase();
+                return name.includes(normalizedQuery) || email.includes(normalizedQuery) || mobile.includes(normalizedQuery);
+            }).slice(0, 25);
+
+            if (filteredUsers.length === 0) {
+                dropdown.innerHTML = '<div style="padding: 10px; color: #6c757d;">No user found. Click + Add User.</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            dropdown.innerHTML = filteredUsers.map((user) => `
+                <button type="button" onclick="selectCreateBookingUser('${user._id}')" style="width: 100%; text-align: left; padding: 10px; border: 0; border-bottom: 1px solid #f0f0f0; background: white; cursor: pointer;">
+                    <div style="font-weight: 600; color: #2c3e50;">${escapeHtml(user.name)}</div>
+                    <div style="font-size: 12px; color: #666;">${escapeHtml(user.email)}${user.mobile ? ` | ${escapeHtml(user.mobile)}` : ''}</div>
+                </button>
+            `).join('');
+            dropdown.style.display = 'block';
+        }
+
+        function selectCreateBookingUser(userId) {
+            const user = adminCreateUsers.find((u) => u._id === userId);
+            if (!user) return;
+
+            selectedCreateUser = user;
+            document.getElementById('createUserId').value = user._id;
+            document.getElementById('createUserSearch').value = `${user.name} (${user.email})`;
+            document.getElementById('createUserSelected').textContent = `Selected: ${user.name} | ${user.email}${user.mobile ? ` | ${user.mobile}` : ''}`;
+            document.getElementById('createUserTypeahead').style.display = 'none';
+        }
+
+        function openRegisterUserModal() {
+            document.getElementById('registerCreateUserForm').reset();
+            document.getElementById('registerUserModal').classList.add('show');
         }
 
         async function loadCreateBookingRentals() {
             try {
-                const response = await fetch('/api/admin/settings', {
+                const response = await fetch(`${API_URL}/api/admin/settings`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
                 });
                 const result = await response.json();
-                
-                if (result.success && result.settings.rentalTypes) {
-                    displayCreateBookingRentals(result.settings.rentalTypes);
+
+                if (result.success && result.settings) {
+                    createBookingSettings = result.settings;
+                    displayCreateBookingRentals(result.settings.rentalTypes || []);
                 } else {
                     document.getElementById('createBookingRentals').innerHTML = '<div style="color: red;">Error loading rental options</div>';
                 }
@@ -2599,168 +2710,203 @@ Notes: ${booking.notes || 'N/A'}`);
 
         function displayCreateBookingRentals(rentalTypes) {
             const container = document.getElementById('createBookingRentals');
+
+            if (!Array.isArray(rentalTypes) || rentalTypes.length === 0) {
+                container.innerHTML = '<div style="color: #6c757d; text-align: center;">No rental options configured</div>';
+                return;
+            }
+
             let html = '';
-            
-            rentalTypes.forEach((type, typeIndex) => {
-                // Add main category header
-                html += `<div style="font-weight: bold; color: #333; margin: 15px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">${type.name}</div>`;
-                
-                // Add base item if it has a base price
+
+            rentalTypes.forEach((type) => {
+                html += `<div style="font-weight: bold; color: #333; margin: 15px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">${escapeHtml(type.name)}</div>`;
+
                 if (type.basePrice && type.basePrice > 0) {
                     const baseId = `${type.name}_base`;
+                    const qtyInputId = getRentalInputId(baseId);
+                    const isJamRoomBase = type.name === 'JamRoom';
+                    const encodedBaseData = encodeURIComponent(JSON.stringify({
+                        id: baseId,
+                        name: `${type.name} (Base)`,
+                        price: type.basePrice,
+                        perdayPrice: 0,
+                        rentalType: 'inhouse',
+                        description: type.description || '',
+                        isRequired: true,
+                        isBase: true
+                    }));
+
                     html += `
                         <div style="display: flex; align-items: center; margin: 8px 0; padding: 8px; background: #f0f8ff; border-radius: 4px; border-left: 4px solid #2196F3;">
-                            <input type="checkbox" id="rental_${baseId}" name="rental" value='${JSON.stringify({
-                                id: baseId,
-                                name: `${type.name} (Base)`,
-                                price: type.basePrice,
-                                perdayPrice: 0,
-                                rentalType: 'inhouse',
-                                description: type.description,
-                                isRequired: true
-                            })}' checked>
-                            <label for="rental_${baseId}" style="flex: 1; margin-left: 10px; font-weight: normal;">
-                                🏠 ${type.name} (Base) - ₹${type.basePrice}/hr <span style="color: #666;">(Required)</span>
+                            <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedBaseData}" checked>
+                            <label for="rental_${qtyInputId}" style="flex: 1; margin-left: 10px; font-weight: normal;">
+                                🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}/hr <span style="color: #666;">(Required)</span>
                             </label>
                             <div style="display: flex; align-items: center; gap: 5px;">
-                                <label for="quantity_${baseId}" style="font-size: 12px;">Qty:</label>
-                                <input type="number" id="quantity_${baseId}" min="1" max="10" value="1" style="width: 50px; padding: 2px;">
+                                <label for="${qtyInputId}" style="font-size: 12px;">Qty:</label>
+                                <input type="number" id="${qtyInputId}" min="1" max="10" value="1" ${isJamRoomBase ? 'disabled' : ''} style="width: 50px; padding: 2px;">
                             </div>
                         </div>
                     `;
                 }
-                
-                // Add sub-items
+
                 if (type.subItems && type.subItems.length > 0) {
-                    type.subItems.forEach((subItem, subIndex) => {
+                    type.subItems.forEach((subItem) => {
                         const itemId = `${type.name}__${subItem.name}`;
+                        const qtyInputId = getRentalInputId(itemId);
                         const isPerday = subItem.rentalType === 'perday';
                         const displayPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
                         const priceUnit = isPerday ? '/day' : '/hr';
                         const isFree = displayPrice === 0;
-                        
+                        const showQuantityControls = isPerday || isFree || (subItem.name || '').includes('IEM');
+
+                        const encodedRentalData = encodeURIComponent(JSON.stringify({
+                            id: itemId,
+                            name: subItem.name,
+                            price: subItem.price || 0,
+                            perdayPrice: subItem.perdayPrice || 0,
+                            rentalType: subItem.rentalType || 'inhouse',
+                            description: subItem.description || '',
+                            isRequired: false,
+                            isBase: false
+                        }));
+
                         const bgColor = isFree ? '#f0fff0' : (isPerday ? '#fff5f5' : '#fff');
                         const icon = isFree ? '🆓' : (isPerday ? '📅' : '🔗');
                         const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : ' (In-house)');
                         const priceDisplay = isFree ? 'FREE' : `₹${displayPrice}${priceUnit}`;
-                        
+
                         html += `
                             <div style="display: flex; align-items: center; margin: 8px 0; padding: 8px; background: ${bgColor}; border-radius: 4px; margin-left: 20px;">
-                                <input type="checkbox" id="rental_${itemId}" name="rental" value='${JSON.stringify({
-                                    id: itemId,
-                                    name: subItem.name,
-                                    price: subItem.price || 0,
-                                    perdayPrice: subItem.perdayPrice || 0,
-                                    rentalType: subItem.rentalType || 'inhouse',
-                                    description: subItem.description
-                                })}'>
-                                <label for="rental_${itemId}" style="flex: 1; margin-left: 10px; font-weight: normal;">
-                                    ${icon} ${subItem.name}${typeLabel} - ${priceDisplay}
+                                <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedRentalData}">
+                                <label for="rental_${qtyInputId}" style="flex: 1; margin-left: 10px; font-weight: normal;">
+                                    ${icon} ${escapeHtml(subItem.name)}${typeLabel} - ${priceDisplay}
                                     ${isPerday ? ' <span style="color: #666;">(flat rate)</span>' : ''}
+                                    ${!isPerday && !isFree ? ' <span style="color: #666;">(tied to session duration)</span>' : ''}
                                 </label>
                                 <div style="display: flex; align-items: center; gap: 5px;">
-                                    <label for="quantity_${itemId}" style="font-size: 12px;">Qty:</label>
-                                    <input type="number" id="quantity_${itemId}" min="1" max="10" value="1" style="width: 50px; padding: 2px;">
+                                    ${showQuantityControls
+                                        ? `<label for="${qtyInputId}" style="font-size: 12px;">Qty:</label><input type="number" id="${qtyInputId}" min="1" max="10" value="1" style="width: 50px; padding: 2px;">`
+                                        : `<span style="font-size: 12px; color: #666;">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
+                                    }
                                 </div>
                             </div>
                         `;
                     });
                 }
             });
-            
-            container.innerHTML = html;
-        }
 
-        function hideCreateBookingModal() {
-            const modal = document.getElementById('createBookingModal');
-            modal.style.display = 'none';
+            container.innerHTML = html;
         }
 
         async function submitCreateBooking(event) {
             event.preventDefault();
-            
+
             const form = event.target;
             const formData = new FormData(form);
-            
+            const userId = document.getElementById('createUserId').value;
+
+            if (!userId) {
+                showAlert('', 'Please select a registered user before creating booking.', 'warning');
+                return;
+            }
+
             const startTime = formData.get('startTime');
             const endTime = formData.get('endTime');
-            const duration = parseInt(formData.get('duration'));
-            
-            // Calculate duration from times if not provided or validate
+
             const [startHour, startMin] = startTime.split(':').map(Number);
             const [endHour, endMin] = endTime.split(':').map(Number);
             const calculatedDuration = (endHour * 60 + endMin - startHour * 60 - startMin) / 60;
-            
+
             if (calculatedDuration <= 0) {
-                alert('End time must be after start time');
+                showAlert('', 'End time must be after start time.', 'warning');
                 return;
             }
 
-            // Get selected rentals from the form
             const selectedRentals = [];
-            const rentalInputs = document.querySelectorAll('input[name="rental"]:checked');
-            
+            const rentalInputs = document.querySelectorAll('#createBookingRentals input[name="rental"]:checked');
+
             if (rentalInputs.length === 0) {
-                showAlert('', 'Please select at least one rental item', 'warning');
+                showAlert('', 'Please select at least one rental item.', 'warning');
                 return;
             }
 
-            rentalInputs.forEach(input => {
-                const rentalData = JSON.parse(input.value);
-                const quantity = parseInt(document.getElementById(`quantity_${rentalData.id}`).value) || 1;
-                
+            rentalInputs.forEach((input) => {
+                const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental));
+                const quantityElement = document.getElementById(getRentalInputId(rentalData.id));
+                const rawQuantity = parseInt(quantityElement?.value, 10) || 1;
+                const isPerday = rentalData.rentalType === 'perday';
+                const isFree = (isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0)) === 0;
+                const isIem = (rentalData.name || '').includes('IEM');
+                const isBase = rentalData.isRequired || String(rentalData.id).includes('_base');
+
+                let effectiveQuantity = rawQuantity;
+                if (!isPerday && !isFree && !isIem && !isBase) {
+                    effectiveQuantity = 1;
+                }
+
+                const unitPrice = isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0);
+
                 selectedRentals.push({
                     name: rentalData.name,
-                    price: rentalData.rentalType === 'perday' ? (rentalData.perdayPrice || 0) : (rentalData.price || 0),
+                    price: unitPrice,
                     perdayPrice: rentalData.perdayPrice || 0,
-                    quantity: quantity,
+                    quantity: effectiveQuantity,
                     rentalType: rentalData.rentalType || 'inhouse',
-                    description: rentalData.description || ''
+                    description: rentalData.description || '',
+                    isRequired: !!rentalData.isRequired,
+                    fullId: rentalData.id
                 });
             });
 
-            // Calculate subtotal with proper per-day pricing
             let calculatedSubtotal = 0;
-            for (const rental of selectedRentals) {
+            selectedRentals.forEach((rental) => {
                 let itemTotal;
+
                 if (rental.rentalType === 'perday') {
-                    // Per-day rentals: use perdayPrice, no duration factor
-                    const perdayPrice = rental.perdayPrice || rental.price;
-                    itemTotal = perdayPrice * rental.quantity;
-                } else {
-                    // Hourly rentals: use price with duration factor
+                    itemTotal = rental.price * rental.quantity;
+                } else if (rental.isRequired || String(rental.fullId).includes('_base')) {
                     itemTotal = rental.price * rental.quantity * calculatedDuration;
+                } else if (rental.price === 0) {
+                    itemTotal = 0;
+                } else if ((rental.name || '').includes('IEM')) {
+                    itemTotal = rental.price * rental.quantity * calculatedDuration;
+                } else {
+                    itemTotal = rental.price * 1 * calculatedDuration;
                 }
+
                 calculatedSubtotal += itemTotal;
-            }
-            
-            const gstRate = 0.18;
-            const taxAmount = Math.round(calculatedSubtotal * gstRate);
+            });
+
+            const gstEnabled = createBookingSettings?.gstConfig?.enabled || false;
+            const gstRate = createBookingSettings?.gstConfig?.rate || 0.18;
+            const taxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
             const totalAmount = calculatedSubtotal + taxAmount;
 
             const bookingData = {
-                userName: formData.get('userName'),
-                userEmail: formData.get('userEmail'),
-                userMobile: formData.get('userMobile'),
+                userId,
                 date: formData.get('date'),
-                startTime: startTime,
-                endTime: endTime,
+                startTime,
+                endTime,
                 duration: calculatedDuration,
-                rentals: selectedRentals,
+                rentals: selectedRentals.map((r) => ({
+                    name: r.name,
+                    price: r.price,
+                    perdayPrice: r.perdayPrice,
+                    quantity: r.quantity,
+                    rentalType: r.rentalType,
+                    description: r.description
+                })),
                 subtotal: calculatedSubtotal,
-                taxAmount: taxAmount,
-                totalAmount: totalAmount,
+                taxAmount,
+                totalAmount,
                 bandName: formData.get('bandName'),
-                notes: formData.get('notes'),
-                paymentStatus: formData.get('paymentStatus'),
-                bookingStatus: formData.get('bookingStatus')
+                notes: formData.get('notes')
             };
-
-            console.log('📤 Submitting booking data:', bookingData);
 
             try {
                 showLoading('Creating booking...');
-                const response = await fetch('/api/admin/bookings', {
+                const response = await fetch(`${API_URL}/api/admin/bookings`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -2770,37 +2916,91 @@ Notes: ${booking.notes || 'N/A'}`);
                 });
 
                 const result = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(result.message || 'Failed to create booking');
                 }
 
-                // Success
-                console.log('✅ Booking created:', result);
-                showAlert('', `Booking created successfully for ${bookingData.userName}!\nTotal: ₹${totalAmount}`, 'success');
+                const bookedFor = selectedCreateUser?.name || 'selected user';
+                showAlert('', `Booking created successfully for ${bookedFor}.\nTotal: ₹${totalAmount}`, 'success');
                 hideCreateBookingModal();
-                
-                // Refresh bookings tab if it's currently active
-                const bookingsTab = document.querySelector('[data-tab="bookings"]');
-                if (bookingsTab && bookingsTab.classList.contains('active')) {
-                    await loadBookings();
-                }
-                
+                await loadStats();
+                await loadBookings();
             } catch (error) {
                 console.error('❌ Error creating booking:', error);
                 showAlert('', `Error creating booking: ${error.message}`, 'danger');
             } finally {
-                showLoading(false);
+                hideLoading();
             }
         }
 
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('createBookingModal');
-            if (event.target === modal) {
+        document.getElementById('createUserSearch').addEventListener('input', (event) => {
+            document.getElementById('createUserId').value = '';
+            selectedCreateUser = null;
+            document.getElementById('createUserSelected').textContent = 'No user selected';
+            renderCreateUserTypeahead(event.target.value);
+        });
+
+        document.getElementById('createUserSearch').addEventListener('focus', (event) => {
+            renderCreateUserTypeahead(event.target.value);
+        });
+
+        document.getElementById('createUserSearch').addEventListener('blur', () => {
+            setTimeout(() => {
+                document.getElementById('createUserTypeahead').style.display = 'none';
+            }, 200);
+        });
+
+        document.getElementById('registerCreateUserForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const payload = {
+                name: document.getElementById('registerUserName').value.trim(),
+                email: document.getElementById('registerUserEmail').value.trim(),
+                mobile: document.getElementById('registerUserMobile').value.trim()
+            };
+
+            try {
+                showLoading('Creating user...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Failed to create user');
+                }
+
+                adminCreateUsers.unshift(data.user);
+                selectCreateBookingUser(data.user._id);
+                closeModal('registerUserModal');
+                showAlert('', `User created successfully. Temporary password: ${data.temporaryPassword}`, 'success');
+            } catch (error) {
+                showAlert('', `Error creating user: ${error.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Close booking-related modals when clicking outside modal content
+        window.addEventListener('click', (event) => {
+            const createModal = document.getElementById('createBookingModal');
+            const registerModal = document.getElementById('registerUserModal');
+
+            if (event.target === createModal) {
                 hideCreateBookingModal();
             }
-        }
+
+            if (event.target === registerModal) {
+                closeModal('registerUserModal');
+            }
+        });
 
         // Initialize
         checkAuth();

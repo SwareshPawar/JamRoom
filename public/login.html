@@ -242,6 +242,14 @@
 
                 const data = await response.json();
 
+                if (data.requiresPasswordReset && data.resetToken) {
+                    showAlert('Password reset required. Redirecting to secure reset...', 'success');
+                    setTimeout(() => {
+                        window.location.href = `/reset-password.html?token=${encodeURIComponent(data.resetToken)}&force=1`;
+                    }, 1200);
+                    return;
+                }
+
                 if (data.success) {
                     // Store token and user info
                     localStorage.setItem('token', data.token);

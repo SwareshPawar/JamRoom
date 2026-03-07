@@ -4,6 +4,42 @@ Use this checklist to verify that everything is working correctly.
 
 ---
 
+## 🧪 Admin Booking Improvements Smoke Test (March 7, 2026)
+
+Scope tested against local API:
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+- `POST /api/admin/bookings` strict `userId` requirement
+- Enforced admin create status behavior (`CONFIRMED` + `PAID`)
+- Overlap conflict rejection
+
+Results:
+- [x] Admin login works (`admin@jamroom.com`)
+- [x] Admin users list API returns results
+- [x] Admin can create user inline (temp password `Qwerty123` from API response)
+- [x] Duplicate admin-created user is rejected (`400`)
+- [x] Admin booking create without `userId` is rejected (`400`)
+- [x] Admin booking create stores `bookingStatus=CONFIRMED` and `paymentStatus=PAID`
+- [x] Overlapping booking is rejected (`400`)
+
+Notes:
+- First forced-status test attempt failed due an already-occupied slot in the chosen time range.
+- Re-ran with unique user/date/time and confirmed forced status behavior passes.
+- Script used: `admin_booking_smoke_test.ps1`
+
+Pending manual UI verification:
+- [x] Typeahead user picker behavior in Create Booking modal
+- [x] Inline `+ Add User` modal UX from admin page
+- [x] Modal reset behavior after successful booking create
+- [x] Visual parity checks for per-day/in-house rental interactions in admin modal
+
+Live UI verification notes:
+- Created user from admin modal and auto-selected in booking form.
+- Submitted booking with mixed in-house/per-day selections and verified booking row showed `CONFIRMED` with expected rental lines.
+- Confirmed post-create table refresh and stats update happened without page reload.
+
+---
+
 ## � **Enhanced Rental System Testing (January 2026)**
 
 ### 🎸 **Rental Category Testing**

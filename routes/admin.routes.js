@@ -10,13 +10,15 @@ const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
 const { generateBill, generateBillForDownload, generateBillFilename, generateBillForDownloadWithFilename } = require('../utils/billGenerator');
 const { 
-  sendBookingRequestNotifications, 
   sendBookingConfirmationNotifications, 
   sendBookingConfirmationWhatsApp,
   sendPaymentUpdateNotifications,
   sendCancellationNotifications,
   sendWhatsApp
 } = require('../utils/whatsapp');
+
+const DEFAULT_ADMIN_CREATED_USER_PASSWORD = 'Qwerty123';
+const DEFAULT_APP_LOGIN_URL = 'https://jam-room-mu.vercel.app/';
 
 // @route   GET /api/admin/debug-pdf
 // @desc    Debug PDF generation environment (for production troubleshooting)
@@ -955,6 +957,103 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
   }
 });
 
+// @route   GET /api/admin/users
+// @desc    Get users for admin booking selection
+// @access  Private/Admin
+router.get('/users', protect, isAdmin, async (req, res) => {
+  try {
+    const { q = '', limit = 100 } = req.query;
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+
+    const query = {};
+    if (q && q.trim()) {
+      const regex = new RegExp(q.trim(), 'i');
+      query.$or = [
+        { name: regex },
+        { email: regex },
+        { mobile: regex }
+      ];
+    }
+
+    const users = await User.find(query)
+      .select('name email mobile role createdAt')
+      .sort({ createdAt: -1 })
+      .limit(safeLimit);
+
+    res.json({
+      success: true,
+      count: users.length,
+      users
+    });
+  } catch (error) {
+    console.error('Get admin users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching users'
+    });
+  }
+});
+
+// @route   POST /api/admin/users
+// @desc    Create a user from admin panel for immediate booking
+// @access  Private/Admin
+router.post('/users', protect, isAdmin, async (req, res) => {
+  try {
+    const { name, email, mobile } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide name and email'
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is already registered'
+      });
+    }
+
+    const userPayload = {
+      name: name.trim(),
+      email: normalizedEmail,
+      password: DEFAULT_ADMIN_CREATED_USER_PASSWORD,
+      role: 'user',
+      forcePasswordReset: true,
+      tempPasswordSetAt: new Date()
+    };
+
+    if (mobile && mobile.trim()) {
+      userPayload.mobile = mobile.trim();
+    }
+
+    const user = await User.create(userPayload);
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile || '',
+        role: user.role,
+        createdAt: user.createdAt
+      },
+      temporaryPassword: DEFAULT_ADMIN_CREATED_USER_PASSWORD
+    });
+  } catch (error) {
+    console.error('Create admin user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error creating user'
+    });
+  }
+});
+
 // @route   GET /api/admin/settings
 // @desc    Get admin settings
 // @access  Private/Admin
@@ -1414,41 +1513,54 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
 });
 
 // @route   POST /api/admin/bookings
-// @desc    Create a new booking as admin (for walk-in customers or phone bookings)
+// @desc    Create a new booking as admin for a registered user
 // @access  Private/Admin
 router.post('/bookings', protect, isAdmin, async (req, res) => {
   try {
     console.log('📝 Admin booking creation request received:', req.body);
     
     const { 
-      userName, 
-      userEmail, 
-      userMobile,
+      userId,
       date, 
       startTime, 
       endTime, 
       duration, 
       rentals, 
       subtotal, 
-      taxAmount, 
-      totalAmount, 
       bandName, 
-      notes,
-      paymentStatus = 'PENDING',
-      bookingStatus = 'CONFIRMED' // Admin bookings are typically confirmed immediately
+      notes
     } = req.body;
 
+    const enforcedPaymentStatus = 'PAID';
+    const enforcedBookingStatus = 'CONFIRMED';
+
     console.log('🔍 Extracted fields:', {
-      userName, userEmail, userMobile, date, startTime, endTime, 
-      duration, rentals, subtotal, taxAmount, totalAmount, 
-      bandName, notes, paymentStatus, bookingStatus
+      userId,
+      date,
+      startTime,
+      endTime,
+      duration,
+      rentals,
+      subtotal,
+      bandName,
+      notes,
+      enforcedPaymentStatus,
+      enforcedBookingStatus
     });
 
     // Validation
-    if (!userName || !userEmail || !date || !startTime || !endTime || !duration || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
+    if (!userId || !date || !startTime || !endTime || !duration || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide userName, userEmail, date, startTime, endTime, duration, and at least one rental'
+        message: 'Please provide userId, date, startTime, endTime, duration, and at least one rental'
+      });
+    }
+
+    const selectedUser = await User.findById(userId).select('name email mobile role forcePasswordReset');
+    if (!selectedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Selected user not found'
       });
     }
 
@@ -1531,25 +1643,9 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     // Create rental type summary for backward compatibility
     const rentalTypeSummary = rentals.length === 1 ? rentals[0].name : `Multiple Items (${rentals.length})`;
 
-    // Try to find existing user or create user reference
-    let userId = null;
-    try {
-      const existingUser = await User.findOne({ email: userEmail });
-      if (existingUser) {
-        userId = existingUser._id;
-        // Update mobile if provided and not already set
-        if (userMobile && !existingUser.mobile) {
-          existingUser.mobile = userMobile;
-          await existingUser.save();
-        }
-      }
-    } catch (error) {
-      console.log('User lookup failed, proceeding without userId:', error.message);
-    }
-
     // Create booking
     const booking = await Booking.create({
-      userId: userId, // May be null for guest bookings
+      userId: selectedUser._id,
       date: bookingDate,
       startTime,
       endTime,
@@ -1559,13 +1655,13 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       subtotal: calculatedSubtotal,
       taxAmount: calculatedTaxAmount,
       price: calculatedTotalAmount, // Total amount including tax
-      userName,
-      userEmail,
-      userMobile,
+      userName: selectedUser.name,
+      userEmail: selectedUser.email,
+      userMobile: selectedUser.mobile,
       bandName,
       notes,
-      paymentStatus,
-      bookingStatus
+      paymentStatus: enforcedPaymentStatus,
+      bookingStatus: enforcedBookingStatus
     });
 
     // Format date for display
@@ -1607,15 +1703,30 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
 
     // Send confirmation email to customer
     try {
+      const appLoginUrl = DEFAULT_APP_LOGIN_URL;
+      const loginCredentialsSection = selectedUser.forcePasswordReset ? `
+          <h3>Login Details (Important)</h3>
+          <p>Your account was created by our admin team for this booking.</p>
+          <ul>
+            <li><strong>Login URL:</strong> <a href="${appLoginUrl}">${appLoginUrl}</a></li>
+            <li><strong>Email:</strong> ${selectedUser.email}</li>
+            <li><strong>Temporary Password:</strong> ${DEFAULT_ADMIN_CREATED_USER_PASSWORD}</li>
+          </ul>
+          <h3>Site Details</h3>
+          <p>You can manage future bookings and account activity here:</p>
+          <ul>
+            <li><strong>Website:</strong> <a href="${DEFAULT_APP_LOGIN_URL}">${DEFAULT_APP_LOGIN_URL}</a></li>
+          </ul>
+          <p><strong>Security Notice:</strong> You must reset your password on first login before continuing.</p>
+      ` : '';
+
       await sendEmail({
-        to: userEmail,
-        subject: bookingStatus === 'CONFIRMED' ? 'Booking Confirmed - JamRoom' : 'Booking Request Created - JamRoom',
+        to: selectedUser.email,
+        subject: 'Booking Confirmed - JamRoom',
         html: `
-          <h2>${bookingStatus === 'CONFIRMED' ? 'Booking Confirmed' : 'Booking Request Created'}</h2>
-          <p>Hi ${userName},</p>
-          <p>${bookingStatus === 'CONFIRMED' ? 
-            'Your booking has been confirmed by our admin.' : 
-            'Your booking request has been created by our admin and is pending final confirmation.'}</p>
+          <h2>Booking Confirmed</h2>
+          <p>Hi ${selectedUser.name},</p>
+          <p>Your booking has been confirmed by our admin.</p>
           <h3>Booking Details:</h3>
           <ul>
             <li><strong>Date:</strong> ${displayDate}</li>
@@ -1631,14 +1742,14 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
             <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
             ${gstEnabled ? `<li><strong>${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%):</strong> ₹${calculatedTaxAmount}</li>` : ''}
             <li><strong>Total Amount:</strong> ₹${calculatedTotalAmount}</li>
-            <li><strong>Status:</strong> ${bookingStatus}</li>
-            <li><strong>Payment Status:</strong> ${paymentStatus}</li>
+            <li><strong>Status:</strong> ${enforcedBookingStatus}</li>
+            <li><strong>Payment Status:</strong> ${enforcedPaymentStatus}</li>
           </ul>
           <h3>Payment Details:</h3>
           <p><strong>UPI ID:</strong> ${settings.upiId}</p>
           <p><strong>Name:</strong> ${settings.upiName}</p>
           <p><strong>Amount:</strong> ₹${calculatedTotalAmount}</p>
-          ${paymentStatus === 'PENDING' ? '<p>Please complete the payment to finalize your booking.</p>' : ''}
+          ${loginCredentialsSection}
         `
       });
     } catch (emailError) {
@@ -1646,17 +1757,17 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     }
 
     // Send WhatsApp confirmation to customer if mobile provided
-    if (userMobile) {
+    if (selectedUser.mobile) {
       try {
-        await sendBookingConfirmationWhatsApp(userMobile, {
+        await sendBookingConfirmationWhatsApp(selectedUser.mobile, {
           bookingId: booking._id,
           date: displayDate,
           startTime,
           endTime,
           totalAmount: calculatedTotalAmount,
           rentals: rentalsWhatsAppSummary,
-          status: bookingStatus,
-          paymentStatus
+          status: enforcedBookingStatus,
+          paymentStatus: enforcedPaymentStatus
         });
       } catch (whatsappError) {
         console.log('Customer WhatsApp failed:', whatsappError.message);
@@ -1665,32 +1776,18 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
 
     // Send WhatsApp notifications to all configured recipients
     try {
-      if (bookingStatus === 'CONFIRMED') {
-        await sendBookingConfirmationNotifications({
-          userName,
-          userEmail,
-          userMobile,
-          date: displayDate,
-          startTime,
-          endTime,
-          totalAmount: calculatedTotalAmount,
-          bookingId: booking._id,
-          bandName,
-          paymentStatus
-        }, settings.whatsappNotifications);
-      } else {
-        await sendBookingRequestNotifications({
-          userName,
-          userEmail,
-          userMobile,
-          date: displayDate,
-          startTime,
-          endTime,
-          totalAmount: calculatedTotalAmount,
-          bandName,
-          status: `Admin Created - ${bookingStatus}`
-        }, settings.whatsappNotifications);
-      }
+      await sendBookingConfirmationNotifications({
+        userName: selectedUser.name,
+        userEmail: selectedUser.email,
+        userMobile: selectedUser.mobile,
+        date: displayDate,
+        startTime,
+        endTime,
+        totalAmount: calculatedTotalAmount,
+        bookingId: booking._id,
+        bandName,
+        paymentStatus: enforcedPaymentStatus
+      }, settings.whatsappNotifications);
     } catch (whatsappError) {
       console.log('WhatsApp notifications failed:', whatsappError.message);
     }

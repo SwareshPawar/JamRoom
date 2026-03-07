@@ -119,6 +119,22 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Force password reset for admin-created temporary-password users.
+    if (user.forcePasswordReset) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      user.resetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+      user.resetTokenExpiry = Date.now() + 30 * 60 * 1000; // 30 minutes
+      await user.save();
+
+      return res.status(403).json({
+        success: false,
+        requiresPasswordReset: true,
+        message: 'Password reset required before first login',
+        resetToken,
+        resetPath: `/reset-password.html?token=${resetToken}&force=1`
+      });
+    }
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -245,6 +261,8 @@ router.post('/reset-password', async (req, res) => {
 
     // Set new password
     user.password = password;
+    user.forcePasswordReset = false;
+    user.tempPasswordSetAt = undefined;
     user.resetToken = undefined;
     user.resetTokenExpiry = undefined;
     await user.save();
