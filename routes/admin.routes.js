@@ -1701,6 +1701,18 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       }
     }).join('\n');
 
+    // Generate calendar invite for customer/admin email workflows.
+    const calendarInvite = generateCalendarInvite({
+      title: `${settings.studioName || 'Swar JamRoom'} Booking - ${rentalTypeSummary}`,
+      description: `Booking confirmed for ${selectedUser.name}${bandName ? ` (${bandName})` : ''}`,
+      location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
+      startDate: bookingDate,
+      startTime,
+      endTime,
+      attendees: [selectedUser.email, ...(settings.adminEmails || [])],
+      studioName: settings.studioName || 'Swar JamRoom'
+    });
+
     // Send confirmation email to customer
     try {
       const appLoginUrl = DEFAULT_APP_LOGIN_URL;
@@ -1749,8 +1761,13 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
           <p><strong>UPI ID:</strong> ${settings.upiId}</p>
           <p><strong>Name:</strong> ${settings.upiName}</p>
           <p><strong>Amount:</strong> ₹${calculatedTotalAmount}</p>
+          <p>A calendar invite is attached to this email.</p>
           ${loginCredentialsSection}
-        `
+        `,
+        attachments: [{
+          filename: 'booking.ics',
+          content: calendarInvite
+        }]
       });
     } catch (emailError) {
       console.log('Customer confirmation email failed:', emailError.message);
