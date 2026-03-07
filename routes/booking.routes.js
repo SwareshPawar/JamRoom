@@ -13,6 +13,36 @@ const {
   sendCustomerBookingRequestWhatsApp 
 } = require('../utils/whatsapp');
 
+const formatTime12Hour = (time24) => {
+  if (!time24) return time24;
+
+  const timeStr = String(time24).trim();
+  if (/\b(AM|PM)\b/i.test(timeStr)) {
+    return timeStr.toUpperCase();
+  }
+
+  const timeParts = timeStr.split(':');
+  if (timeParts.length < 2) {
+    return timeStr;
+  }
+
+  let hours = parseInt(timeParts[0], 10);
+  const minutes = String(parseInt(timeParts[1], 10) || 0).padStart(2, '0');
+
+  if (Number.isNaN(hours)) {
+    return timeStr;
+  }
+
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+
+  return `${hours}:${minutes} ${ampm}`;
+};
+
+const formatTimeRange12Hour = (startTime, endTime) => {
+  return `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
+};
+
 /**
  * Helper function to check time conflicts
  */
@@ -183,7 +213,7 @@ router.post('/', protect, async (req, res) => {
           <h3>Booking Details:</h3>
           <ul>
             <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
+            <li><strong>Time:</strong> ${formatTimeRange12Hour(startTime, endTime)}</li>
             <li><strong>Duration:</strong> ${duration} hour(s)</li>
           </ul>
           <h3>Rentals:</h3>
@@ -241,7 +271,7 @@ router.post('/', protect, async (req, res) => {
               <li><strong>User:</strong> ${req.user.name} (${req.user.email})</li>
               ${req.user.mobile ? `<li><strong>Mobile:</strong> ${req.user.mobile}</li>` : ''}
               <li><strong>Date:</strong> ${displayDate}</li>
-              <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
+              <li><strong>Time:</strong> ${formatTimeRange12Hour(startTime, endTime)}</li>
               <li><strong>Duration:</strong> ${duration} hour(s)</li>
             </ul>
             <h3>Rentals:</h3>
@@ -493,7 +523,7 @@ router.put('/:id/cancel', protect, async (req, res) => {
           <h3>Cancelled Booking Details:</h3>
           <ul>
             <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
+            <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
             <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
           </ul>
           <p>If you paid for this booking, please contact us for a refund.</p>

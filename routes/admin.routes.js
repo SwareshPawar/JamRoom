@@ -19,6 +19,213 @@ const {
 
 const DEFAULT_ADMIN_CREATED_USER_PASSWORD = 'Qwerty123';
 const DEFAULT_APP_LOGIN_URL = 'https://jam-room-mu.vercel.app/';
+const ADMIN_DELETE_OWNER_EMAIL = 'swareshpawar@gmail.com';
+const ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS = [
+  'priyankasoren69075@gmail.com',
+  'vinitapawar2912@gmail.com',
+  'swareshpawar@gmail.com'
+];
+
+const formatTime12Hour = (time24) => {
+  if (!time24) return time24;
+
+  const timeStr = String(time24).trim();
+  if (/\b(AM|PM)\b/i.test(timeStr)) {
+    return timeStr.toUpperCase();
+  }
+
+  const timeParts = timeStr.split(':');
+  if (timeParts.length < 2) {
+    return timeStr;
+  }
+
+  let hours = parseInt(timeParts[0], 10);
+  const minutes = String(parseInt(timeParts[1], 10) || 0).padStart(2, '0');
+
+  if (Number.isNaN(hours)) {
+    return timeStr;
+  }
+
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+
+  return `${hours}:${minutes} ${ampm}`;
+};
+
+const formatTimeRange12Hour = (startTime, endTime) => {
+  return `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
+};
+
+const normalizeEmail = (email) => {
+  return String(email || '').trim().toLowerCase();
+};
+
+const normalizeMobileLast10 = (mobile) => {
+  const digits = String(mobile || '').replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : '';
+};
+
+const resolveAdminNotificationEmails = async (settings = null) => {
+  const recipients = new Set();
+
+  // Always include key recipients for booking confirmations.
+  ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS.forEach((email) => {
+    const normalized = normalizeEmail(email);
+    if (normalized) recipients.add(normalized);
+  });
+
+  // Admin recipients from settings.
+  (settings?.adminEmails || []).forEach((email) => {
+    const normalized = normalizeEmail(email);
+    if (normalized) recipients.add(normalized);
+  });
+
+  // Admin recipients from user accounts (covers newly granted admins).
+  const adminUsers = await User.find({ role: 'admin' }).select('email');
+  adminUsers.forEach((adminUser) => {
+    const normalized = normalizeEmail(adminUser.email);
+    if (normalized) recipients.add(normalized);
+  });
+
+  // Include engineer/staff contacts configured in WhatsApp settings by resolving
+  // their mobile numbers to registered user accounts with emails.
+  const whatsappSettings = settings?.whatsappNotifications || {};
+  const roleContactLast10Numbers = new Set();
+
+  if (whatsappSettings.businessNotifications?.bookingConfirmations && whatsappSettings.businessNumber) {
+    const normalizedBusinessMobile = normalizeMobileLast10(whatsappSettings.businessNumber);
+    if (normalizedBusinessMobile) {
+      roleContactLast10Numbers.add(normalizedBusinessMobile);
+    }
+  }
+
+  if (Array.isArray(whatsappSettings.notificationNumbers)) {
+    whatsappSettings.notificationNumbers.forEach((contact) => {
+      if (contact?.notifications?.bookingConfirmations && contact?.number) {
+        const normalizedMobile = normalizeMobileLast10(contact.number);
+        if (normalizedMobile) {
+          roleContactLast10Numbers.add(normalizedMobile);
+        }
+      }
+    });
+  }
+
+  if (roleContactLast10Numbers.size > 0) {
+    const usersWithMobile = await User.find({
+      mobile: { $exists: true, $ne: null }
+    }).select('email mobile');
+
+    usersWithMobile.forEach((user) => {
+      const userMobileLast10 = normalizeMobileLast10(user.mobile);
+      if (userMobileLast10 && roleContactLast10Numbers.has(userMobileLast10)) {
+        const normalized = normalizeEmail(user.email);
+        if (normalized) recipients.add(normalized);
+      }
+    });
+  }
+
+  // Owner fallback so owner always receives confirmed-booking email alerts.
+  const ownerEmail = normalizeEmail(ADMIN_DELETE_OWNER_EMAIL);
+  if (ownerEmail) {
+    recipients.add(ownerEmail);
+  }
+
+  return Array.from(recipients);
+};
+
+const formatBookingDisplayDate = (date) => {
+  const bookingDate = new Date(date);
+  return bookingDate.toLocaleDateString('en-IN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+const sendUnifiedBookingConfirmationEmails = async ({
+  settings,
+  booking,
+  confirmedByName,
+  calendarInvite,
+  customerExtraHtml = ''
+}) => {
+  const displayDate = formatBookingDisplayDate(booking.date);
+  const studioName = settings.studioName || 'Swar JamRoom';
+  const studioLabel = settings.studioName || 'Swar JamRoom Studio';
+
+  // Send confirmation email to customer.
+  try {
+    await sendEmail({
+      to: booking.userEmail,
+      subject: `Booking Confirmed - ${studioName}`,
+      html: `
+        <h2>🎉 Booking Confirmed!</h2>
+        <p>Hi ${booking.userName},</p>
+        <p>Great news! Your booking has been confirmed.</p>
+        <h3>Booking Details:</h3>
+        <ul>
+          <li><strong>Date:</strong> ${displayDate}</li>
+          <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
+          <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
+          <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
+          <li><strong>Price:</strong> ₹${booking.price}</li>
+          ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
+        </ul>
+        <p>A calendar invite is attached to this email.</p>
+        <p>Looking forward to seeing you at ${studioLabel}!</p>
+        ${customerExtraHtml}
+      `,
+      attachments: [{
+        filename: 'booking.ics',
+        content: calendarInvite
+      }]
+    });
+  } catch (emailError) {
+    console.log('Customer confirmation email failed:', emailError.message);
+  }
+
+  // Send notification to all admins/staff recipients.
+  try {
+    const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
+
+    for (const adminEmail of adminNotificationEmails) {
+      if (normalizeEmail(adminEmail) === normalizeEmail(booking.userEmail)) {
+        continue;
+      }
+
+      try {
+        await sendEmail({
+          to: adminEmail,
+          subject: `Booking Approved - ${studioLabel}`,
+          html: `
+            <h2>Booking Approved</h2>
+            <p>A booking has been approved by ${confirmedByName}.</p>
+            <h3>Booking Details:</h3>
+            <ul>
+              <li><strong>User:</strong> ${booking.userName} (${booking.userEmail})</li>
+              ${booking.userMobile ? `<li><strong>Mobile:</strong> ${booking.userMobile}</li>` : ''}
+              <li><strong>Date:</strong> ${displayDate}</li>
+              <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
+              <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
+              <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
+              <li><strong>Price:</strong> ₹${booking.price}</li>
+              ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
+            </ul>
+          `,
+          attachments: [{
+            filename: 'booking.ics',
+            content: calendarInvite
+          }]
+        });
+      } catch (recipientEmailError) {
+        console.log(`Admin/staff notification email failed for ${adminEmail}:`, recipientEmailError.message);
+      }
+    }
+  } catch (emailError) {
+    console.log('Admin notification email failed:', emailError.message);
+  }
+};
 
 // @route   GET /api/admin/debug-pdf
 // @desc    Debug PDF generation environment (for production troubleshooting)
@@ -389,6 +596,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
     });
 
     const settings = await AdminSettings.getSettings();
+    const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
     console.log('DEBUG: Settings for calendar invite:', {
       studioName: settings.studioName,
       studioAddress: settings.studioAddress
@@ -409,7 +617,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
             html: `
               <h2>Booking Request Update</h2>
               <p>Hi ${pendingBooking.userName},</p>
-              <p>Unfortunately, your booking request for ${pendingBooking.date.toLocaleDateString('en-IN')} from ${pendingBooking.startTime} to ${pendingBooking.endTime} has been automatically rejected due to a scheduling conflict with another confirmed booking.</p>
+              <p>Unfortunately, your booking request for ${pendingBooking.date.toLocaleDateString('en-IN')} from ${formatTime12Hour(pendingBooking.startTime)} to ${formatTime12Hour(pendingBooking.endTime)} has been automatically rejected due to a scheduling conflict with another confirmed booking.</p>
               <p>Please feel free to make a new booking request for a different time slot.</p>
               <p>Thank you for your understanding.</p>
             `
@@ -420,12 +628,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       }
     }
 
-    const displayDate = booking.date.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const displayDate = formatBookingDisplayDate(booking.date);
 
     // Generate calendar invite
     const calendarInvite = generateCalendarInvite({
@@ -435,68 +638,16 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       startDate: booking.date,
       startTime: booking.startTime,
       endTime: booking.endTime,
-      attendees: [booking.userEmail, ...settings.adminEmails],
+      attendees: [booking.userEmail, ...adminNotificationEmails],
       studioName: settings.studioName || 'Swar JamRoom'
     });
 
-    // Send confirmation email to user with calendar invite
-    try {
-      await sendEmail({
-        to: booking.userEmail,
-        subject: `Booking Confirmed - ${settings.studioName || 'Swar JamRoom'}`,
-        html: `
-          <h2>🎉 Booking Confirmed!</h2>
-          <p>Hi ${booking.userName},</p>
-          <p>Great news! Your booking has been confirmed.</p>
-          <h3>Booking Details:</h3>
-          <ul>
-            <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
-            <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
-            <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
-            <li><strong>Price:</strong> ₹${booking.price}</li>
-            ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
-          </ul>
-          <p>A calendar invite is attached to this email.</p>
-          <p>Looking forward to seeing you at ${settings.studioName || 'Swar JamRoom Studio'}!</p>
-        `,
-        attachments: [{
-          filename: 'booking.ics',
-          content: calendarInvite
-        }]
-      });
-    } catch (emailError) {
-      console.log('Confirmation email failed:', emailError.message);
-    }
-
-    // Send notification to all admins
-    try {
-      for (const adminEmail of settings.adminEmails) {
-        await sendEmail({
-          to: adminEmail,
-          subject: `Booking Approved - ${settings.studioName || 'Swar JamRoom Studio'}`,
-          html: `
-            <h2>Booking Approved</h2>
-            <p>A booking has been approved by ${req.user.name}.</p>
-            <h3>Booking Details:</h3>
-            <ul>
-              <li><strong>User:</strong> ${booking.userName} (${booking.userEmail})</li>
-              <li><strong>Date:</strong> ${displayDate}</li>
-              <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
-              <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
-              <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
-              <li><strong>Price:</strong> ₹${booking.price}</li>
-            </ul>
-          `,
-          attachments: [{
-            filename: 'booking.ics',
-            content: calendarInvite
-          }]
-        });
-      }
-    } catch (emailError) {
-      console.log('Admin notification email failed:', emailError.message);
-    }
+    await sendUnifiedBookingConfirmationEmails({
+      settings,
+      booking,
+      confirmedByName: req.user.name,
+      calendarInvite
+    });
 
     // Send WhatsApp confirmation to customer if mobile provided
     if (booking.userMobile) {
@@ -550,30 +701,6 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
   try {
-    // Helper function to convert 24-hour time to 12-hour format
-    function formatTime12Hour(time24) {
-      if (!time24) return time24;
-      
-      let timeStr = time24.toString();
-      if (timeStr.includes('AM') || timeStr.includes('PM')) {
-        return timeStr;
-      }
-      
-      const timeParts = timeStr.split(':');
-      if (timeParts.length < 2) return time24;
-      
-      let hours = parseInt(timeParts[0]);
-      const minutes = timeParts[1];
-      
-      if (isNaN(hours)) return time24;
-      
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      
-      return `${hours}:${minutes} ${ampm}`;
-    }
-    
     const booking = await Booking.findById(req.params.id)
       .populate('userId');
 
@@ -603,6 +730,7 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
 
     // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
+    const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
 
     // Generate PDF bill and filename
     let pdfBuffer = null;
@@ -681,7 +809,7 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Time:</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)}</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${formatTimeRange12Hour(booking.startTime, booking.endTime)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Service:</td>
@@ -858,7 +986,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
           <h3>Booking Details:</h3>
           <ul>
             <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
+            <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
             <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
           </ul>
           ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
@@ -1032,6 +1160,31 @@ router.post('/users', protect, isAdmin, async (req, res) => {
 
     const user = await User.create(userPayload);
 
+    let inviteEmailSent = false;
+    try {
+      const settings = await AdminSettings.getSettings();
+      await sendEmail({
+        to: user.email,
+        subject: `Your ${settings.studioName || 'JamRoom'} Account Invite`,
+        html: `
+          <h2>Welcome to ${settings.studioName || 'JamRoom'}</h2>
+          <p>Hi ${user.name},</p>
+          <p>An admin created your account so you can access JamRoom services.</p>
+          <h3>Login Details</h3>
+          <ul>
+            <li><strong>Login URL:</strong> <a href="${DEFAULT_APP_LOGIN_URL}">${DEFAULT_APP_LOGIN_URL}</a></li>
+            <li><strong>Email:</strong> ${user.email}</li>
+            <li><strong>Temporary Password:</strong> ${DEFAULT_ADMIN_CREATED_USER_PASSWORD}</li>
+          </ul>
+          <p><strong>Security Notice:</strong> You must reset your password on first login before continuing.</p>
+          <p>This is an account invite email only. No booking has been created from this action.</p>
+        `
+      });
+      inviteEmailSent = true;
+    } catch (inviteEmailError) {
+      console.log('Admin user invite email failed:', inviteEmailError.message);
+    }
+
     res.status(201).json({
       success: true,
       message: 'User created successfully',
@@ -1043,13 +1196,127 @@ router.post('/users', protect, isAdmin, async (req, res) => {
         role: user.role,
         createdAt: user.createdAt
       },
-      temporaryPassword: DEFAULT_ADMIN_CREATED_USER_PASSWORD
+      temporaryPassword: DEFAULT_ADMIN_CREATED_USER_PASSWORD,
+      inviteEmailSent,
+      inviteMessage: inviteEmailSent
+        ? 'Account invite email sent successfully'
+        : 'User created, but invite email could not be sent'
     });
   } catch (error) {
     console.error('Create admin user error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error creating user'
+    });
+  }
+});
+
+// @route   POST /api/admin/users/:id/reset-default-password
+// @desc    Reset a user's password to the default admin-created password
+// @access  Private/Admin
+router.post('/users/:id/reset-default-password', protect, isAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('+password +resetToken +resetTokenExpiry');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot reset your own password from this action'
+      });
+    }
+
+    user.password = DEFAULT_ADMIN_CREATED_USER_PASSWORD;
+    user.forcePasswordReset = true;
+    user.tempPasswordSetAt = new Date();
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password reset to default successfully',
+      temporaryPassword: DEFAULT_ADMIN_CREATED_USER_PASSWORD,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Reset user password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error resetting user password'
+    });
+  }
+});
+
+// @route   DELETE /api/admin/users/:id
+// @desc    Delete a user and their associated bookings
+// @access  Private/Admin
+router.delete('/users/:id', protect, isAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('name email role');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account'
+      });
+    }
+
+    const requesterEmail = (req.user.email || '').trim().toLowerCase();
+    const canDeleteAdminUsers = requesterEmail === ADMIN_DELETE_OWNER_EMAIL;
+
+    if (user.role === 'admin' && !canDeleteAdminUsers) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only owner admin can delete admin users'
+      });
+    }
+
+    if (user.role === 'admin') {
+      const settings = await AdminSettings.getSettings();
+      if (Array.isArray(settings.adminEmails)) {
+        const targetEmail = (user.email || '').trim().toLowerCase();
+        settings.adminEmails = settings.adminEmails.filter((email) => (email || '').trim().toLowerCase() !== targetEmail);
+        await settings.save();
+      }
+    }
+
+    const deletedBookings = await Booking.deleteMany({ userId: user._id });
+    await User.deleteOne({ _id: user._id });
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully',
+      deletedBookings: deletedBookings.deletedCount || 0,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error deleting user'
     });
   }
 });
@@ -1148,7 +1415,7 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
           <h3>Deleted Booking Details:</h3>
           <ul>
             <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
+            <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
             <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
             <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
             <li><strong>Price:</strong> ₹${booking.price}</li>
@@ -1234,7 +1501,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
           <h3>Updated Booking Details:</h3>
           <ul>
             <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${booking.startTime} - ${booking.endTime}</li>
+            <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
             <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
             <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
             <li><strong>Price:</strong> ₹${booking.price}</li>
@@ -1528,8 +1795,11 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       rentals, 
       subtotal, 
       bandName, 
-      notes
+      notes,
+      overrideDateTime
     } = req.body;
+
+    const shouldOverrideDateTime = overrideDateTime === true || String(overrideDateTime).toLowerCase() === 'true';
 
     const enforcedPaymentStatus = 'PAID';
     const enforcedBookingStatus = 'CONFIRMED';
@@ -1544,6 +1814,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       subtotal,
       bandName,
       notes,
+      overrideDateTime: shouldOverrideDateTime,
       enforcedPaymentStatus,
       enforcedBookingStatus
     });
@@ -1586,12 +1857,6 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     const bookingDate = new Date(date);
     bookingDate.setHours(0, 0, 0, 0);
 
-    // Check for conflicts with existing bookings (only CONFIRMED bookings block slots)
-    const existingBookings = await Booking.find({
-      date: bookingDate,
-      bookingStatus: 'CONFIRMED'
-    });
-
     // Helper function to check time conflicts
     const checkTimeConflict = (start1, end1, start2, end2) => {
       const timeToMinutes = (time) => {
@@ -1605,27 +1870,37 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       return (start1Min < end2Min && end1Min > start2Min);
     };
 
-    for (const booking of existingBookings) {
-      if (checkTimeConflict(startTime, endTime, booking.startTime, booking.endTime)) {
-        return res.status(400).json({
-          success: false,
-          message: `Time conflict with existing booking (${booking.startTime} - ${booking.endTime})`
-        });
-      }
-    }
+    if (!shouldOverrideDateTime) {
+      // Check for conflicts with existing bookings (only CONFIRMED bookings block slots)
+      const existingBookings = await Booking.find({
+        date: bookingDate,
+        bookingStatus: 'CONFIRMED'
+      });
 
-    // Check for conflicts with blocked times
-    const blockedTimes = await BlockedTime.find({
-      date: bookingDate
-    });
-
-    for (const blocked of blockedTimes) {
-      if (checkTimeConflict(startTime, endTime, blocked.startTime, blocked.endTime)) {
-        return res.status(400).json({
-          success: false,
-          message: `This time slot is blocked by admin (${blocked.startTime} - ${blocked.endTime})`
-        });
+      for (const booking of existingBookings) {
+        if (checkTimeConflict(startTime, endTime, booking.startTime, booking.endTime)) {
+          return res.status(400).json({
+            success: false,
+            message: `Time conflict with existing booking (${booking.startTime} - ${booking.endTime})`
+          });
+        }
       }
+
+      // Check for conflicts with blocked times
+      const blockedTimes = await BlockedTime.find({
+        date: bookingDate
+      });
+
+      for (const blocked of blockedTimes) {
+        if (checkTimeConflict(startTime, endTime, blocked.startTime, blocked.endTime)) {
+          return res.status(400).json({
+            success: false,
+            message: `This time slot is blocked by admin (${blocked.startTime} - ${blocked.endTime})`
+          });
+        }
+      }
+    } else {
+      console.log('ℹ️ Admin booking override enabled: skipping conflict and blocked-time checks');
     }
 
     // Get admin settings for UPI details and GST configuration
@@ -1639,6 +1914,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     // Recalculate tax amount based on current admin settings
     const calculatedTaxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
     const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount;
+    const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
 
     // Create rental type summary for backward compatibility
     const rentalTypeSummary = rentals.length === 1 ? rentals[0].name : `Multiple Items (${rentals.length})`;
@@ -1659,33 +1935,15 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       userEmail: selectedUser.email,
       userMobile: selectedUser.mobile,
       bandName,
-      notes,
+      notes: shouldOverrideDateTime
+        ? `${notes ? `${notes}\n` : ''}[Admin Override] Date/time checks bypassed for historical booking entry.`
+        : notes,
       paymentStatus: enforcedPaymentStatus,
       bookingStatus: enforcedBookingStatus
     });
 
     // Format date for display
-    const displayDate = bookingDate.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Create rentals summary for email/WhatsApp with correct per-day pricing
-    const rentalsSummary = rentals.map(rental => {
-      let itemTotal;
-      if (rental.rentalType === 'perday') {
-        // Per-day rentals: use perdayPrice, no duration factor
-        const perdayPrice = rental.perdayPrice || rental.price;
-        itemTotal = perdayPrice * rental.quantity;
-        return `<li>${rental.name} × ${rental.quantity} (per day) - ₹${itemTotal}</li>`;
-      } else {
-        // Hourly rentals: use price with duration factor
-        itemTotal = rental.price * rental.quantity * duration;
-        return `<li>${rental.name} × ${rental.quantity} × ${duration}h - ₹${itemTotal}</li>`;
-      }
-    }).join('');
+    const displayDate = formatBookingDisplayDate(bookingDate);
 
     const rentalsWhatsAppSummary = rentals.map(rental => {
       let itemTotal;
@@ -1701,7 +1959,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       }
     }).join('\n');
 
-    // Generate calendar invite for customer/admin email workflows.
+    // Generate calendar invite so customer can directly save booking to calendar.
     const calendarInvite = generateCalendarInvite({
       title: `${settings.studioName || 'Swar JamRoom'} Booking - ${rentalTypeSummary}`,
       description: `Booking confirmed for ${selectedUser.name}${bandName ? ` (${bandName})` : ''}`,
@@ -1709,69 +1967,34 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       startDate: bookingDate,
       startTime,
       endTime,
-      attendees: [selectedUser.email, ...(settings.adminEmails || [])],
+      attendees: [selectedUser.email, ...adminNotificationEmails],
       studioName: settings.studioName || 'Swar JamRoom'
     });
 
-    // Send confirmation email to customer
-    try {
-      const appLoginUrl = DEFAULT_APP_LOGIN_URL;
-      const loginCredentialsSection = selectedUser.forcePasswordReset ? `
-          <h3>Login Details (Important)</h3>
-          <p>Your account was created by our admin team for this booking.</p>
-          <ul>
-            <li><strong>Login URL:</strong> <a href="${appLoginUrl}">${appLoginUrl}</a></li>
-            <li><strong>Email:</strong> ${selectedUser.email}</li>
-            <li><strong>Temporary Password:</strong> ${DEFAULT_ADMIN_CREATED_USER_PASSWORD}</li>
-          </ul>
-          <h3>Site Details</h3>
-          <p>You can manage future bookings and account activity here:</p>
-          <ul>
-            <li><strong>Website:</strong> <a href="${DEFAULT_APP_LOGIN_URL}">${DEFAULT_APP_LOGIN_URL}</a></li>
-          </ul>
-          <p><strong>Security Notice:</strong> You must reset your password on first login before continuing.</p>
-      ` : '';
+    const appLoginUrl = DEFAULT_APP_LOGIN_URL;
+    const loginCredentialsSection = selectedUser.forcePasswordReset ? `
+        <h3>Login Details (Important)</h3>
+        <p>Your account was created by our admin team for this booking.</p>
+        <ul>
+          <li><strong>Login URL:</strong> <a href="${appLoginUrl}">${appLoginUrl}</a></li>
+          <li><strong>Email:</strong> ${selectedUser.email}</li>
+          <li><strong>Temporary Password:</strong> ${DEFAULT_ADMIN_CREATED_USER_PASSWORD}</li>
+        </ul>
+        <h3>Site Details</h3>
+        <p>You can manage future bookings and account activity here:</p>
+        <ul>
+          <li><strong>Website:</strong> <a href="${DEFAULT_APP_LOGIN_URL}">${DEFAULT_APP_LOGIN_URL}</a></li>
+        </ul>
+        <p><strong>Security Notice:</strong> You must reset your password on first login before continuing.</p>
+    ` : '';
 
-      await sendEmail({
-        to: selectedUser.email,
-        subject: 'Booking Confirmed - JamRoom',
-        html: `
-          <h2>Booking Confirmed</h2>
-          <p>Hi ${selectedUser.name},</p>
-          <p>Your booking has been confirmed by our admin.</p>
-          <h3>Booking Details:</h3>
-          <ul>
-            <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${startTime} - ${endTime}</li>
-            <li><strong>Duration:</strong> ${duration} hour(s)</li>
-          </ul>
-          <h3>Rentals:</h3>
-          <ul>
-            ${rentalsSummary}
-          </ul>
-          <h3>Price Breakdown:</h3>
-          <ul>
-            <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
-            ${gstEnabled ? `<li><strong>${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%):</strong> ₹${calculatedTaxAmount}</li>` : ''}
-            <li><strong>Total Amount:</strong> ₹${calculatedTotalAmount}</li>
-            <li><strong>Status:</strong> ${enforcedBookingStatus}</li>
-            <li><strong>Payment Status:</strong> ${enforcedPaymentStatus}</li>
-          </ul>
-          <h3>Payment Details:</h3>
-          <p><strong>UPI ID:</strong> ${settings.upiId}</p>
-          <p><strong>Name:</strong> ${settings.upiName}</p>
-          <p><strong>Amount:</strong> ₹${calculatedTotalAmount}</p>
-          <p>A calendar invite is attached to this email.</p>
-          ${loginCredentialsSection}
-        `,
-        attachments: [{
-          filename: 'booking.ics',
-          content: calendarInvite
-        }]
-      });
-    } catch (emailError) {
-      console.log('Customer confirmation email failed:', emailError.message);
-    }
+    await sendUnifiedBookingConfirmationEmails({
+      settings,
+      booking,
+      confirmedByName: req.user.name,
+      calendarInvite,
+      customerExtraHtml: loginCredentialsSection
+    });
 
     // Send WhatsApp confirmation to customer if mobile provided
     if (selectedUser.mobile) {

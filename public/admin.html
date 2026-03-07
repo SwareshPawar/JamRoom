@@ -182,6 +182,160 @@
             .fc-daygrid-day-number {
                 font-size: 0.8em;
             }
+
+        }
+
+        .users-table-scroll {
+            max-height: 420px;
+            overflow-y: auto;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+        }
+
+        .users-table-scroll .table-container {
+            margin: 0;
+            border: 0;
+            border-radius: 0;
+        }
+
+        .admin-create-booking-modal .modal-content {
+            max-width: min(96vw, 980px);
+        }
+
+        .create-booking-time-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 15px;
+        }
+
+        .admin-reference-view {
+            background: #f8f9fa;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+
+        .admin-reference-view h3 {
+            margin-bottom: 4px;
+            font-size: 1em;
+            color: #2c3e50;
+        }
+
+        .admin-reference-view p {
+            margin: 0;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .admin-timeline {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding-right: 4px;
+        }
+
+        .admin-timeline-item {
+            padding: 9px 10px;
+            margin: 6px 0;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .admin-timeline-item.booked {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+
+        .admin-timeline-item.blocked {
+            background: #d6d6d6;
+            border-left: 4px solid #6c757d;
+        }
+
+        .admin-rentals-panel {
+            border: 1px solid #ddd;
+            padding: 12px;
+            border-radius: 8px;
+            max-height: 320px;
+            overflow-y: auto;
+            background: #fcfcfd;
+        }
+
+        .admin-rental-category {
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 14px 0 8px;
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 6px;
+        }
+
+        .admin-rental-category:first-child {
+            margin-top: 0;
+        }
+
+        .admin-rental-row {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: start;
+            margin: 8px 0;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #edf0f3;
+            background: #fff;
+        }
+
+        .admin-rental-row.base {
+            background: #f0f8ff;
+            border-left: 4px solid #2196f3;
+        }
+
+        .admin-rental-row.child {
+            margin-left: 16px;
+        }
+
+        .admin-rental-meta {
+            margin: 0;
+            font-weight: 500;
+            line-height: 1.35;
+        }
+
+        .admin-rental-subtext {
+            display: block;
+            color: #666;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .admin-rental-qty {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .admin-rental-qty input {
+            width: 64px;
+            padding: 5px 6px;
+        }
+
+        @media (max-width: 900px) {
+            .create-booking-time-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .admin-rental-row {
+                grid-template-columns: auto 1fr;
+            }
+
+            .admin-rental-qty {
+                grid-column: 2;
+                justify-content: flex-start;
+            }
+
+            .admin-rental-row.child {
+                margin-left: 6px;
+            }
         }
         
         .stat-card {
@@ -803,15 +957,55 @@
 
             <!-- Users Tab -->
             <div id="usersTab" class="tab-content">
-                <h2>Grant Admin Access</h2>
+                <h2>User Management</h2>
+                <p style="color: #6c757d; margin-bottom: 15px;">Create users and manage all registered users. You can reset a user password to default or delete user accounts.</p>
                 <div id="userAlert" class="alert"></div>
-                <form id="makeAdminForm">
-                    <div class="form-group">
-                        <label>User Email*</label>
-                        <input type="email" id="userEmail" required placeholder="user@example.com">
+
+                <div style="display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 20px; align-items: start; margin-bottom: 20px;">
+                    <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; border: 1px solid #e9ecef;">
+                        <h3 style="margin-bottom: 12px;">Create User</h3>
+                        <form id="usersTabCreateUserForm">
+                            <div class="form-group">
+                                <label for="usersTabUserName">Name*</label>
+                                <input type="text" id="usersTabUserName" required placeholder="Enter full name">
+                            </div>
+                            <div class="form-group">
+                                <label for="usersTabUserEmail">Email*</label>
+                                <input type="email" id="usersTabUserEmail" required placeholder="user@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="usersTabUserMobile">Mobile (Optional)</label>
+                                <input type="tel" id="usersTabUserMobile" placeholder="+91XXXXXXXXXX">
+                            </div>
+                            <div style="padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin-bottom: 12px; font-size: 13px;">
+                                Temporary password: <strong>Qwerty123</strong>. User must reset password on first login.
+                            </div>
+                            <button type="submit" class="btn btn-primary">Create User</button>
+                        </form>
                     </div>
-                    <button type="submit" class="btn btn-warning">Grant Admin Access</button>
-                </form>
+
+                    <div style="background: #ffffff; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <h3 style="margin: 0;">Registered Users</h3>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="usersSearchInput" placeholder="Search by name, email, mobile" style="min-width: 240px;">
+                                <button type="button" class="btn btn-secondary" onclick="loadUsersManagementList()">Refresh</button>
+                            </div>
+                        </div>
+                        <div id="usersManagementTable"></div>
+                    </div>
+                </div>
+
+                <div style="background: #fff7e6; padding: 16px; border-radius: 8px; border: 1px solid #ffe4b3;">
+                    <h3 style="margin-bottom: 10px;">Grant Admin Access</h3>
+                    <form id="makeAdminForm" style="display: flex; gap: 10px; align-items: end; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0; min-width: 260px; flex: 1;">
+                            <label>User Email*</label>
+                            <input type="email" id="userEmail" required placeholder="user@example.com">
+                        </div>
+                        <button type="submit" class="btn btn-warning">Grant Admin Access</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -971,11 +1165,11 @@
     </div>
 
     <!-- Create Booking Modal -->
-    <div id="createBookingModal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
+    <div id="createBookingModal" class="modal admin-create-booking-modal">
+        <div class="modal-content">
             <div class="modal-header">
                 <h2>Create New Booking</h2>
-                <span class="close" onclick="closeModal('createBookingModal')">&times;</span>
+                <span class="close" onclick="hideCreateBookingModal()">&times;</span>
             </div>
             <form id="createBookingForm" onsubmit="submitCreateBooking(event)">
                 <div class="form-group">
@@ -993,52 +1187,41 @@
                     <label for="createDate">Date*</label>
                     <input type="date" id="createDate" name="date" required>
                 </div>
+
+                <div class="form-group" style="margin-top: -6px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer;">
+                        <input type="checkbox" id="createDateTimeOverride" name="overrideDateTime" style="width: auto;">
+                        Override date/time checks (history mode)
+                    </label>
+                    <small style="display: block; color: #6c757d; margin-top: 4px;">
+                        Allows past date/time booking and bypasses availability conflicts for missed billing entries.
+                    </small>
+                </div>
+
+                <div class="admin-reference-view">
+                    <h3>Availability for Selected Date</h3>
+                    <p><small>Shows unavailable time slots</small></p>
+                    <div id="createReferenceTimeline" class="admin-timeline">
+                        <div class="loading">Select a date to view availability</div>
+                    </div>
+                </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                <div class="create-booking-time-grid">
                     <div class="form-group">
                         <label for="createStartTime">Start Time*</label>
-                        <select id="createStartTime" name="startTime" required>
-                            <option value="">Select time</option>
-                            <option value="09:00">9:00 AM</option>
-                            <option value="10:00">10:00 AM</option>
-                            <option value="11:00">11:00 AM</option>
-                            <option value="12:00">12:00 PM</option>
-                            <option value="13:00">1:00 PM</option>
-                            <option value="14:00">2:00 PM</option>
-                            <option value="15:00">3:00 PM</option>
-                            <option value="16:00">4:00 PM</option>
-                            <option value="17:00">5:00 PM</option>
-                            <option value="18:00">6:00 PM</option>
-                            <option value="19:00">7:00 PM</option>
-                            <option value="20:00">8:00 PM</option>
-                            <option value="21:00">9:00 PM</option>
-                            <option value="22:00">10:00 PM</option>
+                        <select id="createStartTime" name="startTime" required disabled>
+                            <option value="">Select date first</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="createEndTime">End Time*</label>
-                        <select id="createEndTime" name="endTime" required>
-                            <option value="">Select time</option>
-                            <option value="10:00">10:00 AM</option>
-                            <option value="11:00">11:00 AM</option>
-                            <option value="12:00">12:00 PM</option>
-                            <option value="13:00">1:00 PM</option>
-                            <option value="14:00">2:00 PM</option>
-                            <option value="15:00">3:00 PM</option>
-                            <option value="16:00">4:00 PM</option>
-                            <option value="17:00">5:00 PM</option>
-                            <option value="18:00">6:00 PM</option>
-                            <option value="19:00">7:00 PM</option>
-                            <option value="20:00">8:00 PM</option>
-                            <option value="21:00">9:00 PM</option>
-                            <option value="22:00">10:00 PM</option>
-                            <option value="23:00">11:00 PM</option>
-                            <option value="23:59">11:59 PM</option>
+                        <select id="createEndTime" name="endTime" required disabled>
+                            <option value="">Select start time first</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="createDuration">Duration (hours)*</label>
-                        <input type="number" id="createDuration" name="duration" min="1" max="12" step="0.5" required placeholder="2">
+                        <input type="number" id="createDuration" name="duration" min="1" max="12" step="0.5" readonly placeholder="Auto-calculated" style="background: #f8f9fa; color: #555;">
                     </div>
                 </div>
                 
@@ -1049,7 +1232,7 @@
 
                 <div class="form-group">
                     <label>Rental Items*</label>
-                    <div id="createBookingRentals" style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+                    <div id="createBookingRentals" class="admin-rentals-panel">
                         <div style="text-align: center; color: #666;">Loading rental options...</div>
                     </div>
                 </div>
@@ -1064,7 +1247,7 @@
                 </div>
                 
                 <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                    <button type="button" onclick="closeModal('createBookingModal')" class="btn btn-secondary">Cancel</button>
+                    <button type="button" onclick="hideCreateBookingModal()" class="btn btn-secondary">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Booking</button>
                 </div>
             </form>
@@ -1105,6 +1288,7 @@
     <script>
         const API_URL = window.location.origin;
         let currentUser = null;
+        let usersManagementData = [];
 
         // Utility functions
         const showAlert = (elementId, message, type = 'info') => {
@@ -1286,6 +1470,7 @@
             if (tab === 'revenue') loadRevenue();
             if (tab === 'blocked') loadBlockedTimes();
             if (tab === 'settings') loadSettings();
+            if (tab === 'users') loadUsersManagementList();
         };
 
         // Load statistics
@@ -1305,6 +1490,155 @@
                 document.getElementById('totalRevenue').textContent = `₹${data.stats.totalRevenue}`;
             } catch (error) {
                 console.error('Failed to load stats:', error);
+            }
+        };
+
+        const loadUsersManagementList = async () => {
+            const tableContainer = document.getElementById('usersManagementTable');
+            if (!tableContainer) return;
+
+            tableContainer.innerHTML = '<div style="color: #6c757d;">Loading users...</div>';
+            const query = (document.getElementById('usersSearchInput')?.value || '').trim();
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/users?q=${encodeURIComponent(query)}&limit=300`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!res.ok) {
+                    throw new Error('Failed to load users');
+                }
+
+                const result = await res.json();
+                usersManagementData = Array.isArray(result.users) ? result.users : [];
+                renderUsersManagementTable(usersManagementData);
+            } catch (error) {
+                tableContainer.innerHTML = `<div style="color: #dc3545;">${error.message}</div>`;
+            }
+        };
+
+        const renderUsersManagementTable = (users) => {
+            const tableContainer = document.getElementById('usersManagementTable');
+            if (!tableContainer) return;
+
+            if (!users.length) {
+                tableContainer.innerHTML = '<p style="color: #6c757d;">No users found.</p>';
+                return;
+            }
+
+            const rows = users.map((user) => {
+                const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-IN') : '-';
+                const role = user.role || 'user';
+                const roleColor = role === 'admin' ? '#dc3545' : '#198754';
+                const currentUserId = currentUser?.id || currentUser?._id;
+                const currentUserEmail = (currentUser?.email || '').trim().toLowerCase();
+                const isOwnerAdmin = currentUserEmail === 'swareshpawar@gmail.com';
+                const isCurrentUser = currentUserId && user._id === currentUserId;
+                const isAdminRow = role === 'admin';
+                const showDelete = !isCurrentUser && (!isAdminRow || isOwnerAdmin);
+                const showReset = !isCurrentUser;
+
+                return `
+                    <tr>
+                        <td>${escapeHtml(user.name || '-')}</td>
+                        <td>${escapeHtml(user.email || '-')}</td>
+                        <td>${escapeHtml(user.mobile || '-')}</td>
+                        <td>
+                            <span style="display:inline-block; padding: 2px 8px; border-radius: 12px; background:${roleColor}; color:white; font-size:12px; text-transform:uppercase;">
+                                ${escapeHtml(role)}
+                            </span>
+                        </td>
+                        <td>${escapeHtml(createdAt)}</td>
+                        <td>
+                            ${isCurrentUser ? '<span style="color:#6c757d; font-size:12px;">Current user</span>' : `
+                                ${showReset ? `<button class="btn btn-secondary btn-sm" onclick="resetUserPasswordToDefault('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Reset Password</button>` : ''}
+                                ${showDelete ? `<button class="btn btn-danger btn-sm" onclick="deleteRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Delete</button>` : '<span style="color:#6c757d; font-size:12px; margin-left:8px;">Admin delete restricted</span>'}
+                            `}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            tableContainer.innerHTML = `
+                <div class="users-table-scroll">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Mobile</th>
+                                    <th>Role</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        };
+
+        const resetUserPasswordToDefault = async (userId, name, email) => {
+            const confirmed = confirm(`Reset password to default for ${name} (${email})?`);
+            if (!confirmed) return;
+
+            try {
+                showLoading('Resetting password...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/users/${userId}/reset-default-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Failed to reset password');
+                }
+
+                showAlert('userAlert', `Password reset for ${name}.\nDefault password: ${data.temporaryPassword}\nUser must reset on first login.`, 'success');
+            } catch (error) {
+                showAlert('userAlert', error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        };
+
+        const deleteRegisteredUser = async (userId, name, email) => {
+            const confirmed = confirm(`Delete user ${name} (${email})?\nThis will also delete all bookings for this user.`);
+            if (!confirmed) return;
+
+            try {
+                showLoading('Deleting user...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Failed to delete user');
+                }
+
+                showAlert('userAlert', `Deleted ${name}. Removed bookings: ${data.deletedBookings || 0}`, 'success');
+                await loadUsersManagementList();
+                await loadStats();
+                await loadBookings();
+            } catch (error) {
+                showAlert('userAlert', error.message, 'error');
+            } finally {
+                hideLoading();
             }
         };
 
@@ -2234,6 +2568,58 @@ Notes: ${booking.notes || 'N/A'}`);
             gstDetails.style.display = this.checked ? 'block' : 'none';
         });
 
+        document.getElementById('usersSearchInput').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                loadUsersManagementList();
+            }
+        });
+
+        document.getElementById('usersTabCreateUserForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const payload = {
+                name: document.getElementById('usersTabUserName').value.trim(),
+                email: document.getElementById('usersTabUserEmail').value.trim(),
+                mobile: document.getElementById('usersTabUserMobile').value.trim()
+            };
+
+            try {
+                showLoading('Creating user...');
+
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Failed to create user');
+                }
+
+                if (Array.isArray(adminCreateUsers)) {
+                    adminCreateUsers.unshift(data.user);
+                }
+
+                const inviteStatus = data.inviteEmailSent === false
+                    ? '\nUser created, but invite email could not be sent.'
+                    : '';
+
+                showAlert('userAlert', `User created successfully. Temporary password: ${data.temporaryPassword}${inviteStatus}`, data.inviteEmailSent === false ? 'warning' : 'success');
+                document.getElementById('usersTabCreateUserForm').reset();
+                await loadUsersManagementList();
+            } catch (error) {
+                showAlert('userAlert', error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
         // Make admin
         document.getElementById('makeAdminForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -2259,6 +2645,7 @@ Notes: ${booking.notes || 'N/A'}`);
 
                 showAlert('userAlert', `Admin access granted to ${email}`, 'success');
                 document.getElementById('makeAdminForm').reset();
+                await loadUsersManagementList();
             } catch (error) {
                 showAlert('userAlert', error.message, 'error');
             }
@@ -2576,6 +2963,43 @@ Notes: ${booking.notes || 'N/A'}`);
         let adminCreateUsers = [];
         let selectedCreateUser = null;
         let createBookingSettings = null;
+        let createBookingAvailabilityData = null;
+
+        const createBookingStartSlots = [
+            { value: '09:00', label: '9:00 AM' },
+            { value: '10:00', label: '10:00 AM' },
+            { value: '11:00', label: '11:00 AM' },
+            { value: '12:00', label: '12:00 PM' },
+            { value: '13:00', label: '1:00 PM' },
+            { value: '14:00', label: '2:00 PM' },
+            { value: '15:00', label: '3:00 PM' },
+            { value: '16:00', label: '4:00 PM' },
+            { value: '17:00', label: '5:00 PM' },
+            { value: '18:00', label: '6:00 PM' },
+            { value: '19:00', label: '7:00 PM' },
+            { value: '20:00', label: '8:00 PM' },
+            { value: '21:00', label: '9:00 PM' },
+            { value: '22:00', label: '10:00 PM' },
+            { value: '23:00', label: '11:00 PM' }
+        ];
+
+        const createBookingEndSlots = [
+            { value: '10:00', label: '10:00 AM' },
+            { value: '11:00', label: '11:00 AM' },
+            { value: '12:00', label: '12:00 PM' },
+            { value: '13:00', label: '1:00 PM' },
+            { value: '14:00', label: '2:00 PM' },
+            { value: '15:00', label: '3:00 PM' },
+            { value: '16:00', label: '4:00 PM' },
+            { value: '17:00', label: '5:00 PM' },
+            { value: '18:00', label: '6:00 PM' },
+            { value: '19:00', label: '7:00 PM' },
+            { value: '20:00', label: '8:00 PM' },
+            { value: '21:00', label: '9:00 PM' },
+            { value: '22:00', label: '10:00 PM' },
+            { value: '23:00', label: '11:00 PM' },
+            { value: '00:00', label: '12:00 AM (Midnight)' }
+        ];
 
         const escapeHtml = (unsafe) => {
             if (unsafe === null || unsafe === undefined) return '';
@@ -2589,12 +3013,307 @@ Notes: ${booking.notes || 'N/A'}`);
 
         const getRentalInputId = (rentalId) => `quantity_${String(rentalId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
+        const isCreateDateTimeOverrideEnabled = () => {
+            return document.getElementById('createDateTimeOverride')?.checked === true;
+        };
+
+        const timeToMinutes = (time, treatMidnightAsNextDay = false) => {
+            const [hours, minutes] = String(time || '00:00').split(':').map(Number);
+            if (treatMidnightAsNextDay && hours === 0 && minutes === 0) {
+                return 24 * 60;
+            }
+            return hours * 60 + minutes;
+        };
+
+        const normalizeTimeRange = (startTime, endTime) => {
+            const startMinutes = timeToMinutes(startTime);
+            let endMinutes = timeToMinutes(endTime, true);
+            if (endMinutes <= startMinutes) {
+                endMinutes += 24 * 60;
+            }
+
+            return {
+                startMinutes,
+                endMinutes
+            };
+        };
+
+        const calculateCreateDurationHours = (startTime, endTime) => {
+            if (!startTime || !endTime) return 0;
+            const range = normalizeTimeRange(startTime, endTime);
+            return (range.endMinutes - range.startMinutes) / 60;
+        };
+
+        const getCreateUnavailableRanges = (availabilityData) => {
+            if (!availabilityData) return [];
+
+            const bookings = Array.isArray(availabilityData.bookings)
+                ? availabilityData.bookings
+                    .filter((booking) => {
+                        const status = String(booking.bookingStatus || '').toUpperCase();
+                        return status === 'CONFIRMED' || status === 'PENDING';
+                    })
+                    .map((booking) => ({
+                        start: booking.startTime,
+                        end: booking.endTime,
+                        type: 'booking',
+                        status: String(booking.bookingStatus || '').toUpperCase()
+                    }))
+                : [];
+
+            const blockedTimes = Array.isArray(availabilityData.blockedTimes)
+                ? availabilityData.blockedTimes.map((blocked) => ({
+                    start: blocked.startTime,
+                    end: blocked.endTime,
+                    type: 'blocked',
+                    status: 'BLOCKED'
+                }))
+                : [];
+
+            return [...bookings, ...blockedTimes].filter((range) => range.start && range.end);
+        };
+
+        const isCreateTimeRangeUnavailable = (startTime, endTime, unavailableRanges) => {
+            if (!startTime || !endTime) return true;
+
+            const selectedRange = normalizeTimeRange(startTime, endTime);
+
+            return unavailableRanges.some((range) => {
+                const rangeMinutes = normalizeTimeRange(range.start, range.end);
+
+                return !(
+                    selectedRange.endMinutes <= rangeMinutes.startMinutes ||
+                    selectedRange.startMinutes >= rangeMinutes.endMinutes
+                );
+            });
+        };
+
+        const isCreateStartSlotUnavailable = (startTime, unavailableRanges) => {
+            // Treat each start slot as 1 hour; if that base hour overlaps, slot should not be selectable.
+            const slotEnd = createBookingEndSlots.find((slot) => timeToMinutes(slot.value, true) > timeToMinutes(startTime));
+            if (!slotEnd) return true;
+            return isCreateTimeRangeUnavailable(startTime, slotEnd.value, unavailableRanges);
+        };
+
+        const updateCreateDurationDisplay = () => {
+            const durationInput = document.getElementById('createDuration');
+            const startTime = document.getElementById('createStartTime').value;
+            const endTime = document.getElementById('createEndTime').value;
+
+            if (!startTime || !endTime) {
+                durationInput.value = '';
+                return;
+            }
+
+            const duration = calculateCreateDurationHours(startTime, endTime);
+            durationInput.value = Number.isInteger(duration) ? String(duration) : duration.toFixed(1);
+        };
+
+        const renderCreateAvailabilityTimeline = (availabilityData) => {
+            const container = document.getElementById('createReferenceTimeline');
+            const ranges = getCreateUnavailableRanges(availabilityData);
+
+            if (ranges.length === 0) {
+                container.innerHTML = '<p style="color: #198754; margin: 0;">All time slots available for this date.</p>';
+                return;
+            }
+
+            const sortedRanges = ranges.slice().sort((a, b) => {
+                return timeToMinutes(a.start) - timeToMinutes(b.start);
+            });
+
+            const html = sortedRanges.map((range) => {
+                if (range.type === 'blocked') {
+                    return `
+                        <div class="admin-timeline-item blocked">
+                            <strong>${formatTime(range.start)} - ${formatTime(range.end)}</strong>
+                            <span style="color: #6c757d; font-weight: 500; margin-left: 10px;">Unavailable</span>
+                        </div>
+                    `;
+                }
+
+                const isPending = range.status === 'PENDING';
+                const statusLabel = isPending ? 'Pending' : 'Booked';
+                const statusColor = isPending ? '#fd7e14' : '#dc3545';
+
+                return `
+                    <div class="admin-timeline-item booked">
+                        <strong>${formatTime(range.start)} - ${formatTime(range.end)}</strong>
+                        <span style="color: ${statusColor}; font-weight: 500; margin-left: 10px;">${statusLabel}</span>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        };
+
+        const updateCreateDateInputConstraints = () => {
+            const dateInput = document.getElementById('createDate');
+            const today = new Date().toISOString().split('T')[0];
+
+            if (isCreateDateTimeOverrideEnabled()) {
+                dateInput.removeAttribute('min');
+                return;
+            }
+
+            dateInput.min = today;
+            if (dateInput.value && dateInput.value < today) {
+                dateInput.value = today;
+            }
+        };
+
+        const populateCreateStartTimes = (selectedDate, availabilityData) => {
+            const startTimeSelect = document.getElementById('createStartTime');
+            const endTimeSelect = document.getElementById('createEndTime');
+            const overrideDateTime = isCreateDateTimeOverrideEnabled();
+
+            endTimeSelect.innerHTML = '<option value="">Select start time first</option>';
+            endTimeSelect.disabled = true;
+            document.getElementById('createDuration').value = '';
+
+            if (!selectedDate) {
+                startTimeSelect.innerHTML = '<option value="">Select date first</option>';
+                startTimeSelect.disabled = true;
+                return;
+            }
+
+            const unavailableRanges = getCreateUnavailableRanges(availabilityData);
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+            startTimeSelect.innerHTML = '<option value="">Select time</option>';
+
+            let hasAvailableSlots = false;
+
+            createBookingStartSlots.forEach((slot) => {
+                if (!overrideDateTime && selectedDate === todayStr && timeToMinutes(slot.value) <= currentMinutes) {
+                    return;
+                }
+
+                if (!overrideDateTime && isCreateStartSlotUnavailable(slot.value, unavailableRanges)) {
+                    return;
+                }
+
+                const option = document.createElement('option');
+                option.value = slot.value;
+                option.textContent = slot.label;
+                startTimeSelect.appendChild(option);
+                hasAvailableSlots = true;
+            });
+
+            if (!hasAvailableSlots) {
+                startTimeSelect.innerHTML = '<option value="">No available time slots</option>';
+                startTimeSelect.disabled = true;
+                return;
+            }
+
+            startTimeSelect.disabled = false;
+        };
+
+        const populateCreateEndTimes = () => {
+            const startTime = document.getElementById('createStartTime').value;
+            const endTimeSelect = document.getElementById('createEndTime');
+            const overrideDateTime = isCreateDateTimeOverrideEnabled();
+
+            endTimeSelect.innerHTML = '<option value="">Select end time</option>';
+
+            if (!startTime) {
+                endTimeSelect.innerHTML = '<option value="">Select start time first</option>';
+                endTimeSelect.disabled = true;
+                document.getElementById('createDuration').value = '';
+                return;
+            }
+
+            const startMinutes = timeToMinutes(startTime);
+            const unavailableRanges = getCreateUnavailableRanges(createBookingAvailabilityData);
+            let hasEndOptions = false;
+
+            createBookingEndSlots.forEach((slot) => {
+                const endMinutes = timeToMinutes(slot.value, true);
+                if (endMinutes <= startMinutes) {
+                    return;
+                }
+
+                if (!overrideDateTime && isCreateTimeRangeUnavailable(startTime, slot.value, unavailableRanges)) {
+                    return;
+                }
+
+                const option = document.createElement('option');
+                option.value = slot.value;
+                option.textContent = slot.label;
+                endTimeSelect.appendChild(option);
+                hasEndOptions = true;
+            });
+
+            if (!hasEndOptions) {
+                endTimeSelect.innerHTML = '<option value="">No available end times</option>';
+                endTimeSelect.disabled = true;
+                document.getElementById('createDuration').value = '';
+                return;
+            }
+
+            endTimeSelect.disabled = false;
+        };
+
+        const loadCreateBookingAvailability = async (date) => {
+            const timelineContainer = document.getElementById('createReferenceTimeline');
+            const overrideDateTime = isCreateDateTimeOverrideEnabled();
+
+            if (!date) {
+                createBookingAvailabilityData = null;
+                timelineContainer.innerHTML = '<div class="loading">Select a date to view availability</div>';
+                populateCreateStartTimes('', null);
+                return;
+            }
+
+            if (overrideDateTime) {
+                createBookingAvailabilityData = null;
+                timelineContainer.innerHTML = '<p style="margin: 0; color: #856404;">Override is enabled. All time slots are selectable for this date.</p>';
+                populateCreateStartTimes(date, null);
+                return;
+            }
+
+            timelineContainer.innerHTML = '<div class="loading">Loading availability...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/bookings/availability/${date}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load availability');
+                }
+
+                const data = await response.json();
+                createBookingAvailabilityData = data;
+                renderCreateAvailabilityTimeline(data);
+                populateCreateStartTimes(date, data);
+            } catch (error) {
+                console.error('Error loading create-booking availability:', error);
+                createBookingAvailabilityData = null;
+                timelineContainer.innerHTML = '<p style="margin: 0; color: #b02a37;">Failed to load availability data</p>';
+                populateCreateStartTimes(date, null);
+            }
+        };
+
         const resetCreateBookingForm = () => {
             const form = document.getElementById('createBookingForm');
             form.reset();
 
+            const overrideCheckbox = document.getElementById('createDateTimeOverride');
+            overrideCheckbox.checked = false;
+
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('createDate').value = today;
+            const dateInput = document.getElementById('createDate');
+            dateInput.value = today;
+            updateCreateDateInputConstraints();
+
+            createBookingAvailabilityData = null;
+
+            document.getElementById('createReferenceTimeline').innerHTML = '<div class="loading">Select a date to view availability</div>';
+            document.getElementById('createStartTime').innerHTML = '<option value="">Select date first</option>';
+            document.getElementById('createStartTime').disabled = true;
+            document.getElementById('createEndTime').innerHTML = '<option value="">Select start time first</option>';
+            document.getElementById('createEndTime').disabled = true;
+            document.getElementById('createDuration').value = '';
 
             selectedCreateUser = null;
             document.getElementById('createUserId').value = '';
@@ -2607,9 +3326,12 @@ Notes: ${booking.notes || 'N/A'}`);
             resetCreateBookingForm();
             document.getElementById('createBookingModal').classList.add('show');
 
+            const selectedDate = document.getElementById('createDate').value;
+
             await Promise.all([
                 loadCreateBookingUsers(),
-                loadCreateBookingRentals()
+                loadCreateBookingRentals(),
+                loadCreateBookingAvailability(selectedDate)
             ]);
         }
 
@@ -2719,7 +3441,7 @@ Notes: ${booking.notes || 'N/A'}`);
             let html = '';
 
             rentalTypes.forEach((type) => {
-                html += `<div style="font-weight: bold; color: #333; margin: 15px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">${escapeHtml(type.name)}</div>`;
+                html += `<div class="admin-rental-category">${escapeHtml(type.name)}</div>`;
 
                 if (type.basePrice && type.basePrice > 0) {
                     const baseId = `${type.name}_base`;
@@ -2737,14 +3459,15 @@ Notes: ${booking.notes || 'N/A'}`);
                     }));
 
                     html += `
-                        <div style="display: flex; align-items: center; margin: 8px 0; padding: 8px; background: #f0f8ff; border-radius: 4px; border-left: 4px solid #2196F3;">
+                        <div class="admin-rental-row base">
                             <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedBaseData}" checked>
-                            <label for="rental_${qtyInputId}" style="flex: 1; margin-left: 10px; font-weight: normal;">
-                                🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}/hr <span style="color: #666;">(Required)</span>
+                            <label for="rental_${qtyInputId}" class="admin-rental-meta">
+                                🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}/hr
+                                <span class="admin-rental-subtext">Required base item</span>
                             </label>
-                            <div style="display: flex; align-items: center; gap: 5px;">
-                                <label for="${qtyInputId}" style="font-size: 12px;">Qty:</label>
-                                <input type="number" id="${qtyInputId}" min="1" max="10" value="1" ${isJamRoomBase ? 'disabled' : ''} style="width: 50px; padding: 2px;">
+                            <div class="admin-rental-qty">
+                                <label for="${qtyInputId}">Qty</label>
+                                <input type="number" id="${qtyInputId}" min="1" max="10" value="1" ${isJamRoomBase ? 'disabled' : ''}>
                             </div>
                         </div>
                     `;
@@ -2771,23 +3494,26 @@ Notes: ${booking.notes || 'N/A'}`);
                             isBase: false
                         }));
 
-                        const bgColor = isFree ? '#f0fff0' : (isPerday ? '#fff5f5' : '#fff');
                         const icon = isFree ? '🆓' : (isPerday ? '📅' : '🔗');
                         const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : ' (In-house)');
                         const priceDisplay = isFree ? 'FREE' : `₹${displayPrice}${priceUnit}`;
+                        const details = [
+                            isPerday ? 'Flat per-day pricing' : '',
+                            (!isPerday && !isFree) ? 'Tied to session duration' : '',
+                            isFree ? 'Free add-on' : ''
+                        ].filter(Boolean).join(' | ');
 
                         html += `
-                            <div style="display: flex; align-items: center; margin: 8px 0; padding: 8px; background: ${bgColor}; border-radius: 4px; margin-left: 20px;">
+                            <div class="admin-rental-row child">
                                 <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedRentalData}">
-                                <label for="rental_${qtyInputId}" style="flex: 1; margin-left: 10px; font-weight: normal;">
+                                <label for="rental_${qtyInputId}" class="admin-rental-meta">
                                     ${icon} ${escapeHtml(subItem.name)}${typeLabel} - ${priceDisplay}
-                                    ${isPerday ? ' <span style="color: #666;">(flat rate)</span>' : ''}
-                                    ${!isPerday && !isFree ? ' <span style="color: #666;">(tied to session duration)</span>' : ''}
+                                    <span class="admin-rental-subtext">${details}</span>
                                 </label>
-                                <div style="display: flex; align-items: center; gap: 5px;">
+                                <div class="admin-rental-qty">
                                     ${showQuantityControls
-                                        ? `<label for="${qtyInputId}" style="font-size: 12px;">Qty:</label><input type="number" id="${qtyInputId}" min="1" max="10" value="1" style="width: 50px; padding: 2px;">`
-                                        : `<span style="font-size: 12px; color: #666;">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
+                                        ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="10" value="1">`
+                                        : `<span class="admin-rental-subtext" style="margin-top: 0;">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
                                     }
                                 </div>
                             </div>
@@ -2814,12 +3540,22 @@ Notes: ${booking.notes || 'N/A'}`);
             const startTime = formData.get('startTime');
             const endTime = formData.get('endTime');
 
-            const [startHour, startMin] = startTime.split(':').map(Number);
-            const [endHour, endMin] = endTime.split(':').map(Number);
-            const calculatedDuration = (endHour * 60 + endMin - startHour * 60 - startMin) / 60;
+            if (!startTime || !endTime) {
+                showAlert('', 'Please choose both start and end time.', 'warning');
+                return;
+            }
+
+            const calculatedDuration = calculateCreateDurationHours(startTime, endTime);
+            const overrideDateTime = isCreateDateTimeOverrideEnabled();
 
             if (calculatedDuration <= 0) {
                 showAlert('', 'End time must be after start time.', 'warning');
+                return;
+            }
+
+            const unavailableRanges = getCreateUnavailableRanges(createBookingAvailabilityData);
+            if (!overrideDateTime && unavailableRanges.length > 0 && isCreateTimeRangeUnavailable(startTime, endTime, unavailableRanges)) {
+                showAlert('', 'Selected time range overlaps with an unavailable slot. Please choose another time.', 'warning');
                 return;
             }
 
@@ -2901,7 +3637,8 @@ Notes: ${booking.notes || 'N/A'}`);
                 taxAmount,
                 totalAmount,
                 bandName: formData.get('bandName'),
-                notes: formData.get('notes')
+                notes: formData.get('notes'),
+                overrideDateTime
             };
 
             try {
@@ -2949,6 +3686,27 @@ Notes: ${booking.notes || 'N/A'}`);
             setTimeout(() => {
                 document.getElementById('createUserTypeahead').style.display = 'none';
             }, 200);
+        });
+
+        document.getElementById('createDate').addEventListener('change', async (event) => {
+            await loadCreateBookingAvailability(event.target.value);
+        });
+
+        document.getElementById('createDateTimeOverride').addEventListener('change', async () => {
+            updateCreateDateInputConstraints();
+            const selectedDate = document.getElementById('createDate').value;
+            await loadCreateBookingAvailability(selectedDate);
+            populateCreateEndTimes();
+            updateCreateDurationDisplay();
+        });
+
+        document.getElementById('createStartTime').addEventListener('change', () => {
+            populateCreateEndTimes();
+            updateCreateDurationDisplay();
+        });
+
+        document.getElementById('createEndTime').addEventListener('change', () => {
+            updateCreateDurationDisplay();
         });
 
         document.getElementById('registerCreateUserForm').addEventListener('submit', async (event) => {

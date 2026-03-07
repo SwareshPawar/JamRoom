@@ -8,6 +8,9 @@ const AdminSettings = require('./models/AdminSettings');
 
 const app = express();
 
+// Default admin seeding is disabled unless explicitly enabled.
+const ENABLE_DEFAULT_ADMIN_SEED = String(process.env.ENABLE_DEFAULT_ADMIN_SEED || '').toLowerCase() === 'true';
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -54,22 +57,26 @@ const seedDatabase = async () => {
   try {
     console.log('Checking for seed data...');
 
-    // Check if admin user exists
-    const adminExists = await User.findOne({ email: 'admin@jamroom.com' });
-    
-    if (!adminExists) {
-      console.log('Creating default admin user...');
-      await User.create({
-        name: 'Admin',
-        email: 'admin@jamroom.com',
-        password: 'Admin@123', // Will be hashed automatically by pre-save hook
-        role: 'admin'
-      });
-      console.log('✅ Default admin user created');
-      console.log('📧 Email: admin@jamroom.com');
-      console.log('🔒 Password: Admin@123');
+    if (ENABLE_DEFAULT_ADMIN_SEED) {
+      // Optional local bootstrap path (disabled by default).
+      const adminExists = await User.findOne({ email: 'admin@jamroom.com' });
+
+      if (!adminExists) {
+        console.log('Creating default admin user...');
+        await User.create({
+          name: 'Admin',
+          email: 'admin@jamroom.com',
+          password: 'Admin@123', // Will be hashed automatically by pre-save hook
+          role: 'admin'
+        });
+        console.log('✅ Default admin user created');
+        console.log('📧 Email: admin@jamroom.com');
+        console.log('🔒 Password: Admin@123');
+      } else {
+        console.log('✅ Default admin user already exists');
+      }
     } else {
-      console.log('✅ Admin user already exists');
+      console.log('⏭️ Skipping default admin user seed (ENABLE_DEFAULT_ADMIN_SEED is not true)');
     }
 
     // Initialize admin settings
@@ -92,7 +99,7 @@ const seedDatabase = async () => {
         },
         upiId: process.env.UPI_ID || 'jamroom@paytm',
         upiName: process.env.UPI_NAME || 'JamRoom Studio',
-        adminEmails: ['admin@jamroom.com'],
+        adminEmails: [],
         businessHours: {
           startTime: '09:00',
           endTime: '22:00'
@@ -101,20 +108,17 @@ const seedDatabase = async () => {
       });
       console.log('✅ Default admin settings created');
     } else {
-      // Update admin emails to include default admin
-      if (!settings.adminEmails.includes('admin@jamroom.com')) {
-        settings.adminEmails.push('admin@jamroom.com');
-        await settings.save();
-      }
       console.log('✅ Admin settings verified');
     }
 
     console.log('\n🎉 Database seeded successfully!');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🔑 DEFAULT ADMIN CREDENTIALS:');
-    console.log('   Email: admin@jamroom.com');
-    console.log('   Password: Admin@123');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    if (ENABLE_DEFAULT_ADMIN_SEED) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔑 DEFAULT ADMIN CREDENTIALS:');
+      console.log('   Email: admin@jamroom.com');
+      console.log('   Password: Admin@123');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    }
 
   } catch (error) {
     console.error('❌ Error seeding database:', error.message);
