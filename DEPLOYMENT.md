@@ -68,6 +68,8 @@ mongodb+srv://jamroom_user:YourPassword@cluster0.xxxxx.mongodb.net/jamroom?retry
    BASE_URL = https://your-app-name.vercel.app
    UPI_ID = yourname@paytm
    UPI_NAME = JamRoom Studio
+   ENABLE_DEFAULT_ADMIN_SEED = false
+   ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS = owner@example.com,accounts@example.com
    ```
 
 6. **Deploy**
@@ -121,6 +123,8 @@ Follow MongoDB Atlas setup above.
    BASE_URL (use Render URL: https://jamroom-booking.onrender.com)
    UPI_ID
    UPI_NAME
+   ENABLE_DEFAULT_ADMIN_SEED
+   ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS
    ```
 
 6. **Create Web Service**
@@ -194,6 +198,8 @@ Edit email templates in:
 | `PORT` | Server port | `5000` |
 | `UPI_ID` | UPI ID for payments | `jamroom@paytm` |
 | `UPI_NAME` | UPI display name | `JamRoom Studio` |
+| `ENABLE_DEFAULT_ADMIN_SEED` | Seed default `admin@jamroom.com` on startup (`true`/`false`) | `false` |
+| `ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS` | Comma-separated always-notify confirmation recipients | `owner@example.com,accounts@example.com` |
 
 ---
 

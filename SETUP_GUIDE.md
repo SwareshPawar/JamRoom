@@ -71,6 +71,10 @@ EMAIL_PASS=your_gmail_app_password  # Not regular password!
 PORT=5000
 BASE_URL=http://localhost:5000
 NODE_ENV=development
+
+# 👤 Admin Startup / Notifications
+ENABLE_DEFAULT_ADMIN_SEED=false
+ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS=owner@example.com,accounts@example.com
 ```
 
 ### 📧 Gmail Setup Instructions
@@ -87,6 +91,10 @@ PORT=5000
 # UPI Payment Details (for India)
 UPI_ID=yourname@paytm
 UPI_NAME=JamRoom Studio
+
+# Admin startup + confirmation notifications
+ENABLE_DEFAULT_ADMIN_SEED=false
+ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS=owner@example.com,accounts@example.com
 ```
 
 ## Step 4: Setup Gmail for Email Notifications

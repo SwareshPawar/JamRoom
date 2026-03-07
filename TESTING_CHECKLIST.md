@@ -40,6 +40,34 @@ Live UI verification notes:
 
 ---
 
+## 🧪 Payment + Mobile Compatibility Smoke Test (March 2026)
+
+### UPI Flow Compatibility
+- [ ] `Open UPI App` launches using universal `upi://pay` link
+- [ ] `Share Payment Link` opens native share sheet (or falls back cleanly)
+- [ ] `Copy UPI Link` copies full UPI URI successfully
+- [ ] `Copy UPI ID` copies VPA successfully
+- [ ] No dependence on app-specific deep links (`phonepe://`, `tez://`, etc.)
+
+### UPI Layout Resilience (Mobile)
+- [ ] Long UPI IDs wrap fully inside card (no clipping)
+- [ ] QR frame remains inside the UPI card on narrow screens
+- [ ] UPI action buttons stack correctly on mobile
+
+### Mobile Shell Behavior
+- [ ] Phone redirect to `/booking-mobile.html` works when desktop override is not set
+- [ ] `booking-mobile.html` loads iframe `/booking.html?mobile=1&embedded=1`
+- [ ] `New Booking` and `My Bookings` sections start collapsed on mobile shell load
+- [ ] Bottom dock navigation expands and scrolls to target section correctly
+- [ ] PWA install prompt appears where supported
+
+### Admin Workflow Regression Checks
+- [ ] Send eBill supports customer + additional emails in one action
+- [ ] Invalid additional recipient email is rejected with validation message
+- [ ] Admin edit booking with item-level rentals recalculates totals server-side
+
+---
+
 ## � **Enhanced Rental System Testing (January 2026)**
 
 ### 🎸 **Rental Category Testing**

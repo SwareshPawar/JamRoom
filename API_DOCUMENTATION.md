@@ -10,6 +10,10 @@ Authorization: Bearer <your_jwt_token>
 
 > **🆕 Enhanced Rental System Update**: The rental system now supports hierarchical categories with in-house vs per-day pricing models. Booking endpoints accept enhanced rental data structures with `rentalType` and `perdayPrice` fields. See AdminSettings schema for complete structure.
 
+> **🆕 March 2026 API Updates**:
+> - `POST /api/admin/bookings/:id/send-ebill` supports multi-recipient invoice sending (`includeCustomer`, `additionalEmails`)
+> - `PUT /api/admin/bookings/:id/edit` supports item-level rental edits with server-side subtotal/tax/total recalculation
+
 ## 🧪 Testing & Development Tools
 
 ### Test Pages
@@ -499,6 +503,68 @@ Authorization: Bearer <admin_token>
 
 ---
 
+### Create Booking (Admin)
+**POST** `/api/admin/bookings`
+
+Create an admin booking for a registered user.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body:**
+```json
+{
+  "userId": "65abc123...",
+  "date": "2026-03-10",
+  "startTime": "14:00",
+  "endTime": "16:00",
+  "duration": 2,
+  "rentals": [
+    {
+      "name": "JamRoom (Base)",
+      "price": 300,
+      "quantity": 1,
+      "rentalType": "inhouse"
+    }
+  ],
+  "subtotal": 600,
+  "bandName": "Band Name",
+  "notes": "Optional admin note",
+  "overrideDateTime": false
+}
+```
+
+**Behavior:**
+- Admin create flow is registered-user-only (`userId` required)
+- Created booking is always enforced as:
+  - `bookingStatus = CONFIRMED`
+  - `paymentStatus = PAID`
+- When `overrideDateTime=true`, conflict/blocked-time validations are bypassed for historical entries and note is tagged with an admin override marker
+- Uses the same confirmation email/calendar flow as admin approve
+
+**Response:** `201 Created`
+```json
+{
+  "success": true,
+  "message": "Admin booking created successfully",
+  "booking": {
+    "_id": "65new...",
+    "userName": "Customer Name",
+    "bookingStatus": "CONFIRMED",
+    "paymentStatus": "PAID",
+    "price": 708
+  }
+}
+```
+
+**Common Error Responses:**
+- `400`: missing `userId`/required fields, conflicting slot (when override disabled)
+- `404`: selected user not found
+
+---
+
 ### Approve Booking (Admin)
 **PUT** `/api/admin/bookings/:id/approve`
 
@@ -560,6 +626,112 @@ Authorization: Bearer <admin_token>
 
 ---
 
+### Send eBill (Admin)
+**POST** `/api/admin/bookings/:id/send-ebill`
+
+Generate and send electronic bill email (with PDF when available) to selected recipients.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body:**
+```json
+{
+  "includeCustomer": true,
+  "additionalEmails": ["accounts@example.com", "manager@example.com"]
+}
+```
+
+**Request Notes:**
+- `includeCustomer` is optional, defaults to `true`
+- `additionalEmails` accepts either an array or comma/newline-separated string
+- Recipients are normalized and deduplicated before sending
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Electronic bill sent successfully with PDF attachment (2 recipients)",
+  "filename": "Invoice_BKG123_2026-03-07.pdf",
+  "customerEmail": "user@example.com",
+  "recipients": [
+    "user@example.com",
+    "accounts@example.com"
+  ]
+}
+```
+
+**Common Error Responses:**
+- `400`: booking not confirmed, invalid email(s), or no recipients resolved
+- `404`: booking not found
+
+---
+
+### Edit Booking (Admin)
+**PUT** `/api/admin/bookings/:id/edit`
+
+Edit booking date/time/notes and optionally update item-level rentals.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body (Item-Level Path):**
+```json
+{
+  "date": "2026-03-10",
+  "startTime": "14:00",
+  "endTime": "16:00",
+  "duration": 2,
+  "notes": "Updated by admin",
+  "rentals": [
+    {
+      "name": "JamRoom (Base)",
+      "price": 300,
+      "quantity": 1,
+      "rentalType": "inhouse",
+      "description": "Required base"
+    },
+    {
+      "name": "Keyboard (Per-day)",
+      "price": 800,
+      "quantity": 1,
+      "rentalType": "perday",
+      "description": "Independent day rental"
+    }
+  ]
+}
+```
+
+**Behavior:**
+- When `rentals` is provided, backend validates each rental item and recalculates `subtotal`, `taxAmount`, and `price` server-side
+- When `rentals` is not provided, legacy subtotal/tax/total/price fields remain supported for backward compatibility
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Booking updated successfully",
+  "booking": {
+    "_id": "65def...",
+    "bookingStatus": "CONFIRMED",
+    "rentalType": "Multiple Items (2)",
+    "subtotal": 1400,
+    "taxAmount": 252,
+    "price": 1652
+  }
+}
+```
+
+**Common Error Responses:**
+- `400`: invalid duration, rental name/price/quantity validation failure
+- `404`: booking not found
+
+---
+
 ### Get Statistics (Admin)
 **GET** `/api/admin/stats`
 
@@ -580,6 +752,105 @@ Authorization: Bearer <admin_token>
     "confirmedBookings": 38,
     "totalRevenue": 22500,
     "recentBookings": [...]
+  }
+}
+```
+
+---
+
+### Get Admin Users (Admin)
+**GET** `/api/admin/users?q=&limit=100`
+
+Get users for admin booking selection and inline user creation workflows.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Query Parameters:**
+- `q` (optional): Search by name/email/mobile
+- `limit` (optional): Result limit (1-500)
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "count": 2,
+  "users": [
+    {
+      "_id": "65abc...",
+      "name": "Test User",
+      "email": "test@example.com",
+      "mobile": "9876543210",
+      "role": "user",
+      "createdAt": "2026-03-07T09:30:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### Create Admin-Managed User (Admin)
+**POST** `/api/admin/users`
+
+Create a user directly from admin panel for immediate booking creation.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body:**
+```json
+{
+  "name": "New Customer",
+  "email": "customer@example.com",
+  "mobile": "9876543210"
+}
+```
+
+**Response:** `201 Created`
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "user": {
+    "_id": "65new...",
+    "name": "New Customer",
+    "email": "customer@example.com",
+    "mobile": "9876543210",
+    "role": "user"
+  },
+  "temporaryPassword": "Qwerty123",
+  "inviteEmailSent": true
+}
+```
+
+---
+
+### Reset User Default Password (Admin)
+**POST** `/api/admin/users/:id/reset-default-password`
+
+Reset a user's password back to the default admin-created temporary password.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Password reset to default successfully",
+  "temporaryPassword": "Qwerty123",
+  "user": {
+    "_id": "65abc...",
+    "name": "Test User",
+    "email": "test@example.com",
+    "role": "user"
   }
 }
 ```
@@ -817,6 +1088,11 @@ All endpoints return consistent error responses:
    - Admin: GET `/api/admin/bookings?status=PENDING`
    - Admin: PUT `/api/admin/bookings/:id/approve`
    - Emails sent with calendar invite
+
+  **Alternative Admin-Create Path**
+  - Admin: POST `/api/admin/bookings` with `userId`
+  - Booking is created directly as `CONFIRMED` + `PAID`
+  - Same confirmation email/calendar logic is triggered
 
 5. **Confirmation**
    - User receives confirmation email

@@ -14,6 +14,14 @@
 - **Email System**: Nodemailer with calendar invites
 - **Frontend**: Vanilla JS (No frameworks) - ES6+ with modern patterns
 
+### **March 2026 Implementation Standards**
+- **UPI Launch Pattern**: Prefer universal `upi://pay` + QR + share/copy fallback. Avoid provider-specific deep links (`phonepe://`, `tez://`, `gpay://`, `paytmmp://`) as primary flow.
+- **Admin Edit Pattern**: When editing bookings, send `rentals[]` and let backend recompute totals; do not trust client-calculated final totals.
+- **Mobile Shell Pattern**: Use `/booking-mobile.html` as phone-first shell with iframe to `/booking.html?mobile=1&embedded=1`.
+- **Section UX Pattern (Mobile)**: Booking shell should default key panels collapsed on load for compact navigation.
+- **Admin Create Status Policy**: Admin-created bookings must be enforced as `bookingStatus=CONFIRMED` and `paymentStatus=PAID`.
+- **Historical Override Policy**: Use `overrideDateTime=true` only for historical missed-bill entries where conflict/blocked checks should be intentionally bypassed.
+
 ---
 
 ## 🎨 **FRONTEND DEVELOPMENT PATTERNS**
@@ -133,6 +141,9 @@ function checkSlots() // Not descriptive enough
 /api/admin/bookings/:id/approve
 /api/admin/bookings/:id/reject
 /api/admin/bookings/:id/edit
+/api/admin/bookings/:id/send-ebill
+/api/admin/users
+/api/admin/users/:id/reset-default-password
 /api/admin/stats
 /api/admin/settings
 
@@ -292,10 +303,19 @@ index.html - Landing page
 login.html - User login
 register.html - User registration
 booking.html - User booking interface ⭐ Main user functionality
+booking-mobile.html - Phone-first booking app shell (iframe wrapper)
 admin.html - Admin dashboard ⭐ Main admin functionality
 reset-password.html - Password reset
 test.html - API testing suite
 test-rental-system.html - Rental system tests
+```
+
+#### **PWA/Mobile Assets**
+```
+manifest.webmanifest - Install metadata (name/icons/start_url)
+sw-booking.js - Service worker for mobile booking shell cache
+css/booking-mobile.css - Mobile shell styles
+icons/ - PWA launcher icons
 ```
 
 #### **JavaScript Patterns**
@@ -510,6 +530,8 @@ BASE_URL=        # Application base URL
 PORT=           # Server port (default: 5000)
 UPI_ID=         # UPI payment ID
 UPI_NAME=       # UPI account name
+ENABLE_DEFAULT_ADMIN_SEED=          # true/false toggle for default startup admin
+ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS= # Comma-separated confirmation recipients
 ```
 
 ---
@@ -685,11 +707,16 @@ const BOOKING_ENDPOINTS = {
 const ADMIN_ENDPOINTS = {
     STATS: '/api/admin/stats',
     BOOKINGS: '/api/admin/bookings',
+  CREATE_BOOKING: '/api/admin/bookings',
     SETTINGS_GET: '/api/admin/settings',
     SETTINGS_UPDATE: '/api/admin/settings',
     APPROVE_BOOKING: '/api/admin/bookings/:id/approve',
     REJECT_BOOKING: '/api/admin/bookings/:id/reject',
-    DELETE_BOOKING: '/api/admin/bookings/:id'
+  EDIT_BOOKING: '/api/admin/bookings/:id/edit',
+  SEND_EBILL: '/api/admin/bookings/:id/send-ebill',
+  DELETE_BOOKING: '/api/admin/bookings/:id',
+  USERS: '/api/admin/users',
+  RESET_DEFAULT_PASSWORD: '/api/admin/users/:id/reset-default-password'
 };
 ```
 
@@ -1113,10 +1140,14 @@ async function updateSettings(settingsData) {
 
 // ✅ ADMIN ENDPOINTS
 '/api/admin/bookings'              // GET - Get all bookings
+'/api/admin/bookings'              // POST - Create booking as admin
 '/api/admin/bookings/:id/approve'  // PUT - Approve booking
 '/api/admin/bookings/:id/reject'   // PUT - Reject booking  
 '/api/admin/bookings/:id/edit'     // PUT - Edit booking
+'/api/admin/bookings/:id/send-ebill' // POST - Send eBill to selected recipients
 '/api/admin/bookings/:id'          // DELETE - Delete booking
+'/api/admin/users'                 // GET/POST - User search/create from admin
+'/api/admin/users/:id/reset-default-password' // POST - Reset user temp password
 '/api/admin/stats'                 // GET - Get dashboard stats
 '/api/admin/settings'              // GET/PUT - Admin settings
 '/api/admin/make-admin'            // POST - Grant admin privileges
@@ -1873,4 +1904,4 @@ const setFormLoading = (formId, loading = true) => {
 
 **🎯 REMEMBER: Consistency is key to maintainable code. When in doubt, refer to this guide first!**
 
-*Last Updated: January 25, 2026*
+*Last Updated: March 7, 2026*

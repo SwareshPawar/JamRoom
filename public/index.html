@@ -144,6 +144,41 @@
                 padding: 12px 16px;
                 font-size: 0.9em;
             }
+
+            .upi-card {
+                padding: 14px !important;
+            }
+
+            .upi-card-grid {
+                grid-template-columns: 1fr !important;
+                gap: 14px !important;
+            }
+
+            .upi-id {
+                font-size: 15px !important;
+                letter-spacing: 0;
+                padding: 10px 8px !important;
+            }
+
+            .upi-card-actions {
+                display: grid !important;
+                grid-template-columns: 1fr !important;
+                gap: 8px !important;
+                width: 100% !important;
+            }
+
+            .upi-card-actions .copy-btn {
+                width: 100%;
+            }
+
+            .upi-qr-frame {
+                max-width: 160px;
+                padding: 10px;
+            }
+
+            .payment-methods {
+                grid-template-columns: 1fr !important;
+            }
         }
 
         .btn {
@@ -266,6 +301,65 @@
             border-radius: 8px;
             text-align: center;
             letter-spacing: 0.5px;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            line-height: 1.35;
+            max-width: 100%;
+        }
+
+        .upi-card {
+            background: #e7f3ff;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 2px solid #3498db;
+            width: 100%;
+            max-width: 100%;
+            overflow: visible;
+        }
+
+        .upi-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+            gap: 20px;
+            align-items: center;
+        }
+
+        .upi-card-grid > div {
+            min-width: 0;
+        }
+
+        .upi-card-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .upi-qr-col {
+            text-align: center;
+            min-width: 0;
+        }
+
+        .upi-qr-frame {
+            background: white;
+            padding: 12px;
+            border-radius: 10px;
+            border: 2px solid #ddd;
+            width: 100%;
+            max-width: 190px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        .upi-qr-image {
+            width: 100%;
+            max-width: 150px;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            display: block;
+            margin: 0 auto;
         }
 
         .copy-btn {
@@ -411,14 +505,14 @@
                         <div class="quick-payment" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
                             <h3 style="margin-bottom: 20px;">🚀 Quick Payment Options</h3>
                             <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
-                                <button id="payWithUPI" class="payment-btn primary" style="background: #28a745; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">📱 Any UPI App</button>
-                                <button id="payWithPhonePe" class="payment-btn secondary" style="background: #5f259f; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">📳 PhonePe</button>
-                                <button id="payWithGPay" class="payment-btn secondary" style="background: #4285f4; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">💳 Google Pay</button>
-                                <button id="payWithPaytm" class="payment-btn secondary" style="background: #00baf2; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">💰 Paytm</button>
+                                <button id="payWithUPI" class="payment-btn primary" style="background: #28a745; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">📱 Open UPI App</button>
+                                <button id="payWithPhonePe" class="payment-btn secondary" style="background: #5f259f; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">🔗 Share Payment Link</button>
+                                <button id="payWithGPay" class="payment-btn secondary" style="background: #4285f4; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">📋 Copy UPI Link</button>
+                                <button id="payWithPaytm" class="payment-btn secondary" style="background: #00baf2; border: none; padding: 12px 18px; border-radius: 8px; color: white; font-weight: 500; cursor: pointer; font-size: 13px;">🆔 Copy UPI ID</button>
                             </div>
                             <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px; text-align: center;">
-                                <p style="font-size: 13px; opacity: 0.9; margin: 0 0 8px 0;">⚡ <strong>Quick Tip:</strong> If app doesn't open automatically</p>
-                                <p style="font-size: 12px; opacity: 0.8; margin: 0;">Copy UPI ID • Open your UPI app • Paste ID • Enter amount • Pay</p>
+                                <p style="font-size: 13px; opacity: 0.9; margin: 0 0 8px 0;">⚡ <strong>Quick Tip:</strong> App-specific direct links are restricted in many browsers now</p>
+                                <p style="font-size: 12px; opacity: 0.8; margin: 0;">Use Open UPI App • or Share/Copy UPI link • or scan QR code</p>
                             </div>
                         </div>
                         
@@ -426,22 +520,22 @@
                             <h3 style="margin-bottom: 15px; color: #2c3e50;">📱 UPI Payment Details</h3>
                             <p style="margin-bottom: 20px; opacity: 0.9;">Fast, secure, and instant payment method</p>
                             
-                            <div class="upi-card" style="background: #e7f3ff; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 2px solid #3498db;">
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; align-items: center;">
+                            <div class="upi-card">
+                                <div class="upi-card-grid">
                                     <div>
                                         <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">UPI ID:</p>
                                         <div class="upi-id" id="upiId" style="font-size: 18px; font-weight: 600; color: #2c3e50; font-family: monospace; padding: 8px 0;">Loading...</div>
                                         <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Name: <span id="upiName" style="font-weight: 500;">Loading...</span></p>
-                                        <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                        <div class="upi-card-actions">
                                             <button class="copy-btn" onclick="copyUpiId()" style="background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 12px;">📋 Copy UPI ID</button>
                                             <button class="copy-btn" onclick="copyUpiName()" style="background: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 12px;">📝 Copy Name</button>
                                         </div>
                                     </div>
                                     
                                     <!-- QR Code Section -->
-                                    <div style="text-align: center;">
-                                        <div style="background: white; padding: 15px; border-radius: 10px; display: inline-block; border: 2px solid #ddd;">
-                                            <img id="upiQR" alt="UPI QR Code" style="width: 150px; height: 150px; display: block;">
+                                    <div class="upi-qr-col">
+                                        <div class="upi-qr-frame">
+                                            <img id="upiQR" class="upi-qr-image" alt="UPI QR Code">
                                         </div>
                                         <p style="font-size: 12px; color: #666; margin-top: 8px;">Scan with any UPI app</p>
                                     </div>
@@ -623,140 +717,114 @@
             }
         }
 
-        // Setup payment button handlers with updated deep link formats
+        // Copy a text value with secure clipboard fallback.
+        function copyTextWithFallback(value, successMessage) {
+            if (!value) return;
+
+            const onSuccess = () => showNotification(successMessage, 'success');
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(value).then(onSuccess).catch(() => {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = value;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    onSuccess();
+                });
+                return;
+            }
+
+            const textArea = document.createElement('textarea');
+            textArea.value = value;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            onSuccess();
+        }
+
+        async function sharePaymentLink(upiLink, upiId, upiName) {
+            const shareText = `Pay via UPI\nUPI ID: ${upiId}\nName: ${upiName}\nLink: ${upiLink}`;
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'UPI Payment Link',
+                        text: shareText
+                    });
+                    return;
+                } catch (error) {
+                    // If user cancels share sheet, silently return.
+                    if (error && error.name === 'AbortError') return;
+                }
+            }
+
+            copyTextWithFallback(upiLink, '✅ UPI payment link copied to clipboard!');
+        }
+
+        // Setup payment button handlers using universal UPI + share/copy fallbacks.
         function setupPaymentButtons() {
             const upiId = document.getElementById('upiId').textContent;
             const upiName = document.getElementById('upiName').textContent;
             
             if (upiId && upiId !== 'Loading...' && upiName && upiName !== 'Loading...') {
-                // Generic UPI payment with fallback
+                const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
+
                 const payWithUPI = document.getElementById('payWithUPI');
                 if (payWithUPI) {
-                    payWithUPI.onclick = function() {
-                        // Try multiple UPI formats for better compatibility
-                        const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        const intentLink = `intent://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR#Intent;scheme=upi;package=com.google.android.apps.nfc;end`;
-                        
-                        // Try to launch UPI app
-                        tryOpenUPIApp(upiLink, 'any UPI app');
-                    };
+                    payWithUPI.onclick = () => tryOpenUPIApp(upiLink, 'UPI app');
                 }
                 
-                // PhonePe payment with updated format
-                const payWithPhonePe = document.getElementById('payWithPhonePe');
-                if (payWithPhonePe) {
-                    payWithPhonePe.onclick = function() {
-                        // Updated PhonePe deep link format
-                        const phonePeLink = `phonepe://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        const phonePeWeb = `https://phon.pe/ru_upi?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        
-                        tryOpenUPIApp(phonePeLink, 'PhonePe', phonePeWeb);
-                    };
+                const shareBtn = document.getElementById('payWithPhonePe');
+                if (shareBtn) {
+                    shareBtn.onclick = () => sharePaymentLink(upiLink, upiId, upiName);
                 }
                 
-                // Google Pay payment with updated format
-                const payWithGPay = document.getElementById('payWithGPay');
-                if (payWithGPay) {
-                    payWithGPay.onclick = function() {
-                        // Updated Google Pay deep link formats
-                        const gPayLink = `gpay://upi/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        const gPayAlt = `tez://upi/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        const gPayWeb = `https://pay.google.com/gp/v/save/${encodeURIComponent(upiId)}`;
-                        
-                        // Try GPay first, then Tez format as fallback
-                        tryOpenUPIApp(gPayLink, 'Google Pay', gPayWeb, gPayAlt);
-                    };
+                const copyLinkBtn = document.getElementById('payWithGPay');
+                if (copyLinkBtn) {
+                    copyLinkBtn.onclick = () => copyTextWithFallback(upiLink, '✅ UPI payment link copied to clipboard!');
                 }
                 
-                // Paytm payment
-                const payWithPaytm = document.getElementById('payWithPaytm');
-                if (payWithPaytm) {
-                    payWithPaytm.onclick = function() {
-                        // Paytm deep link formats
-                        const paytmLink = `paytmmp://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        const paytmUPI = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&cu=INR`;
-                        
-                        tryOpenUPIApp(paytmLink, 'Paytm', null, paytmUPI);
-                    };
+                const copyUpiIdBtn = document.getElementById('payWithPaytm');
+                if (copyUpiIdBtn) {
+                    copyUpiIdBtn.onclick = () => copyTextWithFallback(upiId, '✅ UPI ID copied to clipboard!');
                 }
             }
         }
 
-        // Enhanced function to try opening UPI apps with fallbacks
-        function tryOpenUPIApp(deepLink, appName, webFallback = null, altDeepLink = null) {
+        // Launch universal UPI URI and fallback to manual instructions.
+        function tryOpenUPIApp(upiLink, appName) {
             let appOpened = false;
-            
-            // Create a hidden iframe to attempt deep link
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = deepLink;
-            document.body.appendChild(iframe);
-            
-            // Remove iframe after attempt
-            setTimeout(() => {
-                if (document.body.contains(iframe)) {
-                    document.body.removeChild(iframe);
-                }
-            }, 1000);
-            
-            // Set up detection for app launch failure
-            const startTime = Date.now();
-            
-            // Check if app opened (user left the page)
-            const checkAppLaunch = () => {
-                const timeDiff = Date.now() - startTime;
-                if (document.hidden || timeDiff > 2000) {
+            const onVisibility = () => {
+                if (document.hidden) {
                     appOpened = true;
-                    return;
                 }
             };
-            
-            // Listen for visibility change (app opened)
-            document.addEventListener('visibilitychange', checkAppLaunch, { once: true });
-            
-            // Fallback after 3 seconds if app didn't open
+
+            document.addEventListener('visibilitychange', onVisibility, { once: true });
+            window.location.href = upiLink;
+
             setTimeout(() => {
                 if (!appOpened) {
-                    // Try alternative deep link if provided
-                    if (altDeepLink) {
-                        const altIframe = document.createElement('iframe');
-                        altIframe.style.display = 'none';
-                        altIframe.src = altDeepLink;
-                        document.body.appendChild(altIframe);
-                        
-                        setTimeout(() => {
-                            if (document.body.contains(altIframe)) {
-                                document.body.removeChild(altIframe);
-                            }
-                        }, 1000);
-                        
-                        // Final fallback after trying alternative
-                        setTimeout(() => {
-                            if (!appOpened) {
-                                showAppNotFoundDialog(appName, webFallback);
-                            }
-                        }, 2000);
-                    } else {
-                        showAppNotFoundDialog(appName, webFallback);
-                    }
+                    showAppNotFoundDialog(appName);
                 }
-            }, 3000);
+            }, 1800);
         }
         
         // Show dialog when app is not found
-        function showAppNotFoundDialog(appName, webFallback) {
+        function showAppNotFoundDialog(appName) {
             const upiId = document.getElementById('upiId').textContent;
-            const upiName = document.getElementById('upiName').textContent;
             
             const message = `
                 <div style="text-align: left;">
-                    <p><strong>${appName} app not found or couldn't be opened.</strong></p>
+                    <p><strong>${appName} couldn't be opened from this browser.</strong></p>
                     <p>Here are alternative ways to pay:</p>
                     <ul style="margin: 10px 0; padding-left: 20px;">
                         <li><strong>Copy UPI ID:</strong> ${upiId}</li>
                         <li><strong>Open any UPI app manually</strong> (PhonePe, GPay, Paytm, etc.)</li>
                         <li><strong>Scan the QR code</strong> shown above</li>
-                        ${webFallback ? `<li><a href="${webFallback}" target="_blank" style="color: #007bff;">Try ${appName} web version</a></li>` : ''}
                     </ul>
                     <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
                         <button onclick="copyUpiId(); this.parentElement.parentElement.parentElement.parentElement.remove();" 

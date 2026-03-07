@@ -199,10 +199,16 @@
 - `GET /api/admin/revenue` - Get revenue analytics
 - `GET /api/admin/bookings/calendar` - Get calendar formatted bookings
 - `GET /api/admin/bookings` - Get all bookings (with filters)
+- `POST /api/admin/bookings` - Create confirmed/paid booking for registered user
 - `PUT /api/admin/bookings/:id/approve` - Approve booking
 - `PUT /api/admin/bookings/:id/reject` - Reject booking
+- `POST /api/admin/bookings/:id/send-ebill` - Send eBill to selected recipients
 - `DELETE /api/admin/bookings/:id` - Delete booking *(NEW)*
 - `PUT /api/admin/bookings/:id/edit` - Edit booking *(NEW)*
+- `GET /api/admin/users` - Fetch users for admin booking/create-user flows
+- `POST /api/admin/users` - Create user from admin panel
+- `POST /api/admin/users/:id/reset-default-password` - Reset user temporary password
+- `DELETE /api/admin/users/:id` - Delete user and related bookings
 - `GET /api/admin/stats` - Get dashboard statistics
 - `GET /api/admin/settings` - Get admin settings
 - `PUT /api/admin/settings` - Update admin settings
@@ -226,8 +232,12 @@
 2. **`/public/login.html`** - User login page
 3. **`/public/register.html`** - User registration page
 4. **`/public/booking.html`** - User booking interface
-5. **`/public/admin.html`** - Admin dashboard
-6. **`/public/reset-password.html`** - Password reset page
+5. **`/public/booking-mobile.html`** - Mobile app-shell wrapper for booking iframe
+6. **`/public/admin.html`** - Admin dashboard
+7. **`/public/reset-password.html`** - Password reset page
+8. **`/public/manifest.webmanifest`** - PWA install metadata
+9. **`/public/sw-booking.js`** - Booking shell service worker
+10. **`/public/css/booking-mobile.css`** - Mobile shell styles
 
 ### Key Frontend Variables & Functions
 
@@ -253,6 +263,11 @@ let settings = null;
 - currentUser: Current logged-in user object
 - settings: System settings (rental types, prices)
 ```
+
+**Mobile Shell Query Flags:**
+- `?mobile=1` enables mobile-app mode styles/behavior
+- `?embedded=1` enables iframe-embedded mode (used by `/booking-mobile.html`)
+- `?desktop=1` forces desktop mode and bypasses phone auto-redirect
 
 #### Admin Page (`admin.html`)
 ```javascript
@@ -333,6 +348,10 @@ EMAIL_PASS=your_app_password
 PORT=5000
 NODE_ENV=production
 BASE_URL=https://jam-room-mu.vercel.app
+
+# Admin booking workflow toggles
+ENABLE_DEFAULT_ADMIN_SEED=false
+ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS=owner@example.com,accounts@example.com
 ```
 
 ### Default System Settings
@@ -385,7 +404,20 @@ rentalTypes: [
    - Send notification to admin emails
 ```
 
-### 3. Email & Calendar Flow
+### 3. Admin Create Booking Flow
+```
+1. Admin opens create booking modal
+2. Admin selects registered user (or creates user inline)
+3. Admin selects date/time/rentals and submits:
+  - Enforced status: bookingStatus = CONFIRMED
+  - Enforced payment: paymentStatus = PAID
+4. If override mode enabled (`overrideDateTime=true`):
+  - Conflict and blocked-time checks are bypassed
+  - Booking note is tagged with admin override marker
+5. Unified confirmation emails + calendar invite are sent
+```
+
+### 4. Email & Calendar Flow
 ```
 1. Booking approved → Generate calendar invite
 2. Calendar contains:
@@ -396,7 +428,7 @@ rentalTypes: [
 3. Email sent with .ics attachment
 ```
 
-### 4. Edit/Delete Booking Flow *(NEW)*
+### 5. Edit/Delete Booking Flow *(NEW)*
 ```
 Edit Flow:
 1. Admin clicks "Edit" → Open edit modal
@@ -459,8 +491,13 @@ JamRoom/
 │   ├── login.html              # Login page
 │   ├── register.html           # Registration
 │   ├── booking.html            # User booking
+│   ├── booking-mobile.html     # Phone-first booking shell
 │   ├── admin.html              # Admin panel
-│   └── reset-password.html     # Password reset
+│   ├── reset-password.html     # Password reset
+│   ├── manifest.webmanifest    # PWA manifest
+│   ├── sw-booking.js           # Service worker for booking shell
+│   ├── css/booking-mobile.css  # Mobile shell styling
+│   └── icons/                  # PWA app icons
 │
 └── 📁 backend/                 # Legacy/backup files
     ├── api.js                  # Basic API structure
@@ -509,6 +546,44 @@ EMAIL_REPLY_TO=support@jamroom.com
 ---
 
 ## 📝 Recent Changes & Modifications
+
+### Latest Changes (March 2026)
+
+#### 1. Multi-Recipient eBill Delivery
+**Added**:
+- `POST /api/admin/bookings/:id/send-ebill` supports customer + custom recipient delivery
+- Recipient validation, normalization, and deduplication
+- Response now includes final `recipients` list
+
+#### 2. Admin Item-Level Booking Edit
+**Updated**:
+- `PUT /api/admin/bookings/:id/edit` supports full `rentals[]` updates
+- Server-side subtotal/tax/total recalculation for edit safety
+- Backward-compatible path retained for legacy subtotal/tax/total payloads
+
+#### 3. Admin Booking Workflow Hardening
+**Updated**:
+- Admin create booking requires registered user selection (`userId`)
+- Inline user create/reset/delete flows added to support create-booking pipeline
+- Admin-created bookings are enforced as `CONFIRMED` + `PAID`
+- Historical override mode allows bypassing date/time conflict checks for missed-bill backfill entries
+- Confirmation recipients are merged from always-notify list, settings admin emails, and admin users
+
+#### 4. Phone-First Booking PWA Shell
+**Added**:
+- `/booking-mobile.html` app-shell with iframe embedding `/booking.html?mobile=1&embedded=1`
+- `/manifest.webmanifest`, `/sw-booking.js`, and app icons for installability
+- Mobile redirect in `/booking.html` with desktop override support
+
+#### 5. Rental UX Consistency and Defaults
+**Updated**:
+- Booking rental list now matches admin-style base/child row alignment and controls
+- Default base selection standardized: only `JamRoom (Base)` auto-selected
+
+#### 6. UPI Launch Compatibility Update
+**Updated**:
+- Replaced app-specific deep-link dependence (`phonepe://`, `tez://`, etc.) in user flows
+- Standardized to universal `upi://pay` with share/copy/QR fallback actions
 
 ### Latest Changes (January 2026)
 

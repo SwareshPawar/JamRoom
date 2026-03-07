@@ -10,6 +10,14 @@
 💰 **Dynamic Pricing**: Different pricing models for various rental types  
 📄 **PDF Invoices**: Download booking invoices in PDF format  
 
+## 🎉 Latest Enhancements (March 2026)
+
+📧 **Multi-Recipient eBill Sending**: Admin can send eBills to customer and additional custom recipients from the admin panel  
+🧾 **Admin Booking Edit Upgrade**: Edit booking type, add/remove rental items, and persist item-level rental updates with server-side total recalculation  
+📱 **Phone-First Booking Shell (PWA)**: Added `/booking-mobile.html` app shell, manifest, service worker, and mobile redirect flow for installable home-screen experience  
+🎛️ **Rental UI Consistency Pass**: Booking rentals now follow the same base/child row alignment and controls used in admin create/edit workflows  
+💳 **Modern UPI Compatibility Flow**: Replaced brittle app-specific deep links with universal `upi://pay` plus share/copy/QR fallbacks for better browser support  
+
 ## 🚀 Core Features
 
 ### 👤 User Features
@@ -22,16 +30,20 @@
 - ✅ Cancel Pending Bookings
 - ✅ **PDF Download**: Download booking invoices
 - ✅ UPI QR Code for Payments
+- ✅ Universal UPI payment launch + link share/copy fallbacks
 - ✅ Email Notifications & Calendar Invites (.ics)
+- ✅ Mobile app-like booking shell with add-to-home-screen support
 
 ### 🛠️ Admin Features
 - ✅ Dashboard with Statistics & Analytics
 - ✅ View All Bookings with Filters
 - ✅ Approve/Reject Booking Requests
 - ✅ **PDF Download**: Download invoices for any booking
+- ✅ **eBill Recipients Control**: Send invoice to customer and/or additional emails
 - ✅ Create Time Slots (Single & Bulk Creation)
 - ✅ Block/Unblock Time Slots
 - ✅ **Rental Management**: Configure prices, types, and categories
+- ✅ **Booking Edit (Item-Level)**: Update rentals, booking type, and totals for existing bookings
 - ✅ Grant Admin Privileges to Users
 - ✅ Manage UPI Payment Details
 - ✅ Admin Email Notifications
