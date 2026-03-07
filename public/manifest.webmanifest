@@ -1,24 +1,24 @@
 {
   "name": "JamRoom Booking",
-  "short_name": "JamRoom",
-  "description": "Quick mobile booking for JamRoom sessions.",
-  "start_url": "/booking-mobile.html",
+  "short_name": "JamRoom", 
+  "description": "Quick booking for JamRoom sessions.",
+  "start_url": "/booking.html",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#eef2ff",
   "theme_color": "#0f172a",
   "icons": [
     {
       "src": "/icons/jamroom-icon.svg",
-      "sizes": "192x192",
+      "sizes": "192x192", 
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
       "src": "/icons/jamroom-maskable.svg",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/svg+xml", 
       "purpose": "maskable"
     }
   ],
@@ -26,13 +26,13 @@
     {
       "name": "New Booking",
       "short_name": "New",
-      "url": "/booking-mobile.html#new",
+      "url": "/booking.html",
       "description": "Open straight to new booking form."
     },
     {
-      "name": "My Bookings",
+      "name": "My Bookings", 
       "short_name": "My Bookings",
-      "url": "/booking-mobile.html#my-bookings",
+      "url": "/booking.html#bookings",
       "description": "View recent and upcoming bookings."
     }
   ]

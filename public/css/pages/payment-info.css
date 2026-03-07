@@ -1,0 +1,92 @@
+.payment-layout {
+            max-width: 960px;
+            margin: 0 auto;
+            display: grid;
+            gap: 18px;
+        }
+
+        .panel {
+            background: #ffffff;
+            border: 1px solid #e4e8ef;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .panel h2,
+        .panel h3 {
+            margin-top: 0;
+        }
+
+        .status-banner {
+            border-left: 4px solid #2f80ed;
+            background: #f2f7ff;
+        }
+
+        .payment-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .payment-actions .btn {
+            min-width: 170px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px dashed #e4e8ef;
+            padding: 10px 0;
+        }
+
+        .detail-row code {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .qr-wrap {
+            text-align: center;
+        }
+
+        #upiQR {
+            width: 220px;
+            height: 220px;
+            border-radius: 10px;
+            border: 1px solid #e4e8ef;
+            background: #fafbfd;
+        }
+
+        .notes-list {
+            margin: 0;
+            padding-left: 18px;
+            line-height: 1.8;
+        }
+
+        .is-hidden {
+            display: none;
+        }
+
+        .qr-note {
+            margin-bottom: 0;
+            color: #667085;
+        }
+
+        @media (max-width: 768px) {
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .payment-actions .btn {
+                width: 100%;
+            }
+        }

@@ -4,211 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JamRoom - System Test Suite</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #fff;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        header {
-            background: rgba(255,255,255,0.1);
-            padding: 20px 30px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
-        }
-        header h1 {
-            font-size: 1.8em;
-            margin-bottom: 10px;
-        }
-        header p {
-            color: #aaa;
-        }
-        .test-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        @media (max-width: 900px) {
-            .test-grid { grid-template-columns: 1fr; }
-        }
-        .test-section {
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .test-section h2 {
-            color: #667eea;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-size: 1.2em;
-        }
-        .test-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            margin: 8px 0;
-            background: rgba(0,0,0,0.2);
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-        .test-item:hover {
-            background: rgba(0,0,0,0.3);
-        }
-        .test-name {
-            flex: 1;
-        }
-        .test-name small {
-            display: block;
-            color: #888;
-            font-size: 0.8em;
-            margin-top: 3px;
-        }
-        .test-status {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 600;
-            min-width: 80px;
-            text-align: center;
-        }
-        .status-pending { background: #ffc107; color: #000; }
-        .status-running { background: #17a2b8; color: #fff; animation: pulse 1s infinite; }
-        .status-passed { background: #28a745; color: #fff; }
-        .status-failed { background: #dc3545; color: #fff; }
-        .status-skipped { background: #6c757d; color: #fff; }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-        
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 600;
-            transition: all 0.3s;
-            margin: 5px;
-        }
-        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-warning { background: #ffc107; color: #000; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        
-        .controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .summary {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .summary-card {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        .summary-card h3 {
-            font-size: 2em;
-            margin-bottom: 5px;
-        }
-        .summary-card.total h3 { color: #667eea; }
-        .summary-card.passed h3 { color: #28a745; }
-        .summary-card.failed h3 { color: #dc3545; }
-        .summary-card.pending h3 { color: #ffc107; }
-        
-        .log-container {
-            background: #0d1117;
-            border-radius: 8px;
-            padding: 15px;
-            max-height: 400px;
-            overflow-y: auto;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.85em;
-            margin-top: 20px;
-        }
-        .log-entry {
-            padding: 5px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .log-entry.info { color: #58a6ff; }
-        .log-entry.success { color: #3fb950; }
-        .log-entry.error { color: #f85149; }
-        .log-entry.warn { color: #d29922; }
-        
-        .input-group {
-            margin: 10px 0;
-        }
-        .input-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #aaa;
-        }
-        .input-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 6px;
-            background: rgba(0,0,0,0.3);
-            color: #fff;
-        }
-        .input-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .full-width {
-            grid-column: 1 / -1;
-        }
-        
-        .test-details {
-            font-size: 0.8em;
-            color: #888;
-            margin-top: 5px;
-            padding: 8px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 4px;
-            display: none;
-        }
-        .test-item.expanded .test-details {
-            display: block;
-        }
-        
-        .response-viewer {
-            background: #0d1117;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 10px;
-            max-height: 200px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.8em;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-    </style>
+    
+    <link rel="stylesheet" href="/css/shared.css">
+    <link rel="stylesheet" href="/css/pages/test.css">
+
 </head>
 <body>
     <div class="container">
@@ -247,21 +46,22 @@
         </div>
 
         <!-- Login Credentials -->
-        <div class="test-section" style="margin-bottom: 20px;">
-            <h2>🔐 Test Credentials & Environment</h2>\n            <div style="padding: 15px; background: rgba(78, 205, 196, 0.2); border-radius: 8px; margin-bottom: 15px;">
-                <p style="margin: 0; font-size: 0.9em;">
+        <div class="test-section section-spacer">
+            <h2>🔐 Test Credentials & Environment</h2>
+            <div class="info-card info-card-success">
+                <p class="info-text">
                     <strong>✅ Pre-configured:</strong> Test user and admin accounts are set up for automated testing.
-                    <br><small style="color: #888;">Run <code>node createTestUsers.js</code> to reset test accounts if needed.</small>
+                    <br><small class="info-small">Run <code>node createTestUsers.js</code> to reset test accounts if needed.</small>
                 </p>
             </div>
-            <div style="padding: 15px; background: rgba(255, 193, 7, 0.2); border-radius: 8px;">
-                <p style="margin: 0; font-size: 0.9em;">
+            <div class="info-card info-card-warning">
+                <p class="info-text">
                     <strong>⚙️ Environment Setup:</strong> Missing .env file or configuration issues?
-                    <br><small style="color: #888;">Run <code>node createEnvFile.js</code> for interactive environment setup with secure defaults.</small>
+                    <br><small class="info-small">Run <code>node createEnvFile.js</code> for interactive environment setup with secure defaults.</small>
                 </p>
             </div>
-            <div style="margin-top: 10px;">
-                <span id="tokenStatus" style="font-size: 0.85em; color: #888;">No tokens acquired yet</span>
+            <div class="token-status-wrap">
+                <span id="tokenStatus" class="token-status">No tokens acquired yet</span>
             </div>
         </div>
 
@@ -535,7 +335,7 @@
         </div>
 
         <!-- Test Logs -->
-        <div class="test-section full-width" style="margin-top: 20px;">
+        <div class="test-section full-width top-spacer">
             <h2>📋 Test Logs</h2>
             <div class="log-container" id="logContainer">
                 <div class="log-entry info">[System] Test suite initialized. Click "Run All Tests" to begin.</div>
@@ -543,7 +343,7 @@
         </div>
 
         <!-- Response Viewer -->
-        <div class="test-section full-width" style="margin-top: 20px;">
+        <div class="test-section full-width top-spacer">
             <h2>📄 Last Response</h2>
             <div class="response-viewer" id="responseViewer">
                 No response yet. Run a test to see the response.
@@ -1689,3 +1489,4 @@
     </script>
 </body>
 </html>
+

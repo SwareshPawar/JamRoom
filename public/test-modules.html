@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module Test - JamRoom</title>
+    
+    <!-- Test if shared modules load correctly -->
+    <script src="/js/shared/utils.js"></script>
+    <script src="/js/shared/alerts.js"></script>
+    <script src="/js/shared/auth.js"></script>
+    <script src="/js/shared/tabs.js"></script>
+    <script src="/js/shared/payment.js"></script>
+    <script src="/js/shared/data.js"></script>
+    <link rel="stylesheet" href="/css/shared.css">
+    
+    
+    <link rel="stylesheet" href="/css/pages/test-modules.css">
+
+</head>
+<body>
+    <div class="app-container">
+        <h1>🧪 Shared Modules Test Page</h1>
+        
+        <div class="test-section">
+            <h3>CSS Variables Test</h3>
+            <button class="btn btn-primary">Primary Button</button>
+            <button class="btn btn-secondary">Secondary Button</button>
+            <button class="btn btn-success">Success Button</button>
+            <button class="btn btn-danger">Danger Button</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Tab System Test</h3>
+            <div class="tab-container">
+                <div class="tab-nav">
+                    <button class="tab-btn active" data-tab="tab1">Tab 1</button>
+                    <button class="tab-btn" data-tab="tab2">Tab 2</button>
+                    <button class="tab-btn" data-tab="tab3">Tab 3</button>
+                </div>
+                <div id="tab1" class="tab-pane active">
+                    <p>Content of Tab 1 - This tab should be visible by default.</p>
+                </div>
+                <div id="tab2" class="tab-pane">
+                    <p>Content of Tab 2 - This should be visible when Tab 2 is clicked.</p>
+                </div>
+                <div id="tab3" class="tab-pane">
+                    <p>Content of Tab 3 - This should be visible when Tab 3 is clicked.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>JavaScript Modules Test</h3>
+            <div id="test-results">
+                <p>Testing module availability...</p>
+            </div>
+            <button class="btn btn-primary" onclick="testModules()">Run Tests</button>
+            <button class="btn btn-secondary" onclick="testAlerts()">Test Alerts</button>
+            <button class="btn btn-info" onclick="testPayment()">Test Payment</button>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tab manager
+            if (window.TabManager) {
+                new TabManager('.tab-container');
+                console.log('✅ TabManager initialized');
+            }
+            
+            // Test module loading
+            testModules();
+        });
+        
+        function testModules() {
+            const results = document.getElementById('test-results');
+            let html = '<h4>Module Loading Test Results:</h4><ul>';
+            
+            // Test each module
+            const modules = [
+                { name: 'JamRoomUtils', available: !!window.JamRoomUtils },
+                { name: 'AlertManager', available: !!window.AlertManager },
+                { name: 'AuthManager', available: !!window.AuthManager },
+                { name: 'TabManager', available: !!window.TabManager },
+                { name: 'PaymentManager', available: !!window.PaymentManager },
+                { name: 'JamRoomAPI', available: !!window.JamRoomAPI },
+                { name: 'FormValidator', available: !!window.FormValidator },
+                { name: 'DataManager', available: !!window.DataManager }
+            ];
+            
+            modules.forEach(module => {
+                const status = module.available ? 
+                    '<span class="success">✅ Available</span>' : 
+                    '<span class="error">❌ Missing</span>';
+                html += `<li><strong>${module.name}:</strong> ${status}</li>`;
+            });
+            
+            html += '</ul>';
+            
+            // Test CSS variables
+            html += '<h4>CSS Variables Test:</h4><ul>';
+            const testElement = document.createElement('div');
+            document.body.appendChild(testElement);
+            
+            const primaryColor = getComputedStyle(testElement).getPropertyValue('--primary-color').trim();
+            const fontFamily = getComputedStyle(testElement).getPropertyValue('--font-family').trim();
+            
+            document.body.removeChild(testElement);
+            
+            html += `<li><strong>Primary Color:</strong> ${primaryColor || '❌ Not found'}</li>`;
+            html += `<li><strong>Font Family:</strong> ${fontFamily || '❌ Not found'}</li>`;
+            html += '</ul>';
+            
+            results.innerHTML = html;
+        }
+        
+        function testAlerts() {
+            if (window.alertManager) {
+                window.alertManager.success('Success alert test!');
+                setTimeout(() => window.alertManager.info('Info alert test!'), 1000);
+                setTimeout(() => window.alertManager.warning('Warning alert test!'), 2000);
+            } else {
+                alert('AlertManager not available');
+            }
+        }
+        
+        function testPayment() {
+            if (window.JamRoomUtils) {
+                const testUpiId = 'test@upi';
+                const testMessage = `Test UPI ID: ${testUpiId}`;
+                window.JamRoomUtils.copyToClipboard(testMessage).then(success => {
+                    if (success && window.alertManager) {
+                        window.alertManager.success('Payment utilities working! Test UPI ID copied to clipboard.');
+                    } else {
+                        alert('Payment test completed - check console for details');
+                    }
+                });
+            } else {
+                alert('Payment utilities not available');
+            }
+        }
+    </script>
+</body>
+</html>

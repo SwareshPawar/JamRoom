@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JamRoom - Payment Info</title>
+
+    <link rel="stylesheet" href="/css/shared.css">
+
+    <script src="/js/shared/utils.js"></script>
+    <script src="/js/shared/alerts.js"></script>
+    <script src="/js/shared/auth.js"></script>
+    <script src="/js/shared/payment.js"></script>
+    <script src="/js/shared/navigation.js"></script>
+
+    
+    <link rel="stylesheet" href="/css/pages/payment-info.css">
+
+</head>
+<body>
+    <div class="app-container">
+        <div id="navigationContainer"></div>
+
+        <main class="payment-layout">
+            <section class="panel">
+                <h1>Payment Information</h1>
+                <p>Complete payment after creating your booking request. This page gives you the UPI details and quick payment actions.</p>
+                <div class="payment-actions">
+                    <a class="btn btn-primary" href="/booking.html">Go To Booking</a>
+                    <a class="btn btn-secondary" href="/index.html">Back To Home</a>
+                </div>
+            </section>
+
+            <section id="bookingContext" class="panel status-banner is-hidden">
+                <h3>Booking Context</h3>
+                <p id="bookingContextText"></p>
+            </section>
+
+            <section class="panel">
+                <h2>Pay Using UPI</h2>
+                <p>Use any UPI app, copy the payment link, or scan the QR code.</p>
+                <div class="payment-actions">
+                    <button id="payWithUPI" class="btn btn-success">Open UPI App</button>
+                    <button id="payWithPhonePe" class="btn btn-secondary">Share Payment Link</button>
+                    <button id="payWithGPay" class="btn btn-secondary">Copy UPI Link</button>
+                    <button id="payWithPaytm" class="btn btn-secondary">Copy UPI ID</button>
+                </div>
+            </section>
+
+            <section class="panel details-grid">
+                <div>
+                    <h3>Payment Details</h3>
+                    <div class="detail-row">
+                        <span>UPI ID</span>
+                        <code id="upiId">Loading...</code>
+                        <button id="copyUpiIdBtn" class="btn btn-primary">Copy</button>
+                    </div>
+                    <div class="detail-row">
+                        <span>UPI Name</span>
+                        <code id="upiName">Loading...</code>
+                        <button id="copyUpiNameBtn" class="btn btn-primary">Copy</button>
+                    </div>
+                    <div class="detail-row">
+                        <span>Amount</span>
+                        <code id="upiAmount">Set after booking</code>
+                        <button id="copyAmountBtn" class="btn btn-primary">Copy</button>
+                    </div>
+                </div>
+                <div class="qr-wrap">
+                    <h3>Scan QR</h3>
+                    <img id="upiQR" alt="UPI QR Code">
+                    <p class="qr-note">Scan with any UPI app</p>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h3>Important Notes</h3>
+                <ul class="notes-list">
+                    <li>Add your booking ID in UPI remarks where possible.</li>
+                    <li>Take a payment screenshot for verification.</li>
+                    <li>Booking confirmation is completed by admin approval.</li>
+                    <li>If direct app open fails, use copy or QR options.</li>
+                </ul>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <p>&copy; 2026 JamRoom Studio. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+
+        let upiAmount = '';
+
+        function parseAmount(value) {
+            if (!value) return '';
+            const parsed = Number(value);
+            if (Number.isNaN(parsed) || parsed <= 0) return '';
+            return String(parsed);
+        }
+
+        function getQueryContext() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                bookingId: params.get('bookingId') || '',
+                amount: parseAmount(params.get('amount'))
+            };
+        }
+
+        function renderBookingContext(context) {
+            if (!context.bookingId && !context.amount) return;
+
+            const section = document.getElementById('bookingContext');
+            const text = document.getElementById('bookingContextText');
+
+            const parts = [];
+            if (context.bookingId) {
+                parts.push(`Booking ID: ${context.bookingId}`);
+            }
+            if (context.amount) {
+                parts.push(`Suggested amount: INR ${context.amount}`);
+            }
+
+            text.textContent = parts.join(' | ');
+            section.style.display = 'block';
+        }
+
+        function setupNavigation() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.NavigationManager.init(null);
+                window.NavigationManager.render('navigationContainer');
+                return;
+            }
+
+            fetch(`${window.location.origin}/api/auth/me`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }).then(async (response) => {
+                if (!response.ok) {
+                    return null;
+                }
+                const data = await response.json();
+                return data.user || null;
+            }).then((user) => {
+                window.NavigationManager.init(user || null);
+                if (user) {
+                    window.NavigationManager.updateAuth(user);
+                }
+                window.NavigationManager.render('navigationContainer');
+            }).catch(() => {
+                window.NavigationManager.init(null);
+                window.NavigationManager.render('navigationContainer');
+            });
+        }
+
+        function bindCopyButtons(manager) {
+            document.getElementById('copyUpiIdBtn').addEventListener('click', () => {
+                manager.copyToClipboard(manager.upiId, 'UPI ID copied.');
+            });
+
+            document.getElementById('copyUpiNameBtn').addEventListener('click', () => {
+                manager.copyToClipboard(manager.upiName, 'UPI name copied.');
+            });
+
+            document.getElementById('copyAmountBtn').addEventListener('click', () => {
+                if (!upiAmount) {
+                    window.showAlert('Amount is available after booking.', 'warning', 'No Amount');
+                    return;
+                }
+                manager.copyToClipboard(upiAmount, 'Amount copied.');
+            });
+        }
+
+        async function loadPaymentInfo() {
+            const context = getQueryContext();
+            renderBookingContext(context);
+            upiAmount = context.amount;
+
+            try {
+                const response = await fetch(`${API_URL}/api/bookings/payment-info`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (!data.success || !data.paymentInfo) {
+                    throw new Error('Payment info unavailable');
+                }
+
+                const upiId = data.paymentInfo.upiId || 'Not configured';
+                const upiName = data.paymentInfo.upiName || 'JamRoom Studio';
+
+                document.getElementById('upiId').textContent = upiId;
+                document.getElementById('upiName').textContent = upiName;
+                document.getElementById('upiAmount').textContent = upiAmount ? `INR ${upiAmount}` : 'Set after booking';
+
+                const manager = new PaymentManager({ upiId, upiName, amount: upiAmount });
+                window.paymentManager = manager;
+
+                manager.generateQRCode('upiQR', upiAmount);
+                manager.setupPaymentButtons({
+                    upiBtn: 'payWithUPI',
+                    phonePeBtn: 'payWithPhonePe',
+                    gPayBtn: 'payWithGPay',
+                    paytmBtn: 'payWithPaytm'
+                });
+                bindCopyButtons(manager);
+            } catch (error) {
+                console.error('Failed to load payment information:', error);
+                window.showError('Failed to load payment information. Please try again.');
+                document.getElementById('upiId').textContent = 'Unavailable';
+                document.getElementById('upiName').textContent = 'Unavailable';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupNavigation();
+            loadPaymentInfo();
+        });
+    </script>
+</body>
+</html>
+

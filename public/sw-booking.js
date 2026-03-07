@@ -1,9 +1,8 @@
-const CACHE_NAME = 'jamroom-mobile-v1';
+const CACHE_NAME = 'jamroom-v2';
 const STATIC_ASSETS = [
-  '/booking-mobile.html',
   '/booking.html',
-  '/login.html',
-  '/css/booking-mobile.css',
+  '/login.html', 
+  '/index.html',
   '/manifest.webmanifest',
   '/icons/jamroom-icon.svg',
   '/icons/jamroom-maskable.svg',
@@ -44,11 +43,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const isSameOrigin = url.origin === self.location.origin;
+  const isNavigation = request.mode === 'navigate' || request.destination === 'document' || url.pathname.endsWith('.html');
+  const isCoreAsset = url.pathname.startsWith('/js/') || url.pathname.startsWith('/css/');
+
+  // Network-first for documents and core assets to avoid stale app code.
+  if (isSameOrigin && (isNavigation || isCoreAsset)) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const networkPromise = fetch(request)
         .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && url.origin === self.location.origin) {
+          if (networkResponse && networkResponse.status === 200 && isSameOrigin) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
           }

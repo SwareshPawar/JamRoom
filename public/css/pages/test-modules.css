@@ -1,0 +1,14 @@
+body { 
+            padding: 20px; 
+            font-family: var(--font-family);
+            background: var(--background-color);
+            color: var(--text-color);
+        }
+        .test-section { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        .success { color: var(--success-color); }
+        .error { color: var(--error-color); }

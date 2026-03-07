@@ -1,0 +1,538 @@
+/* Booking-specific container override */
+        .app-container {
+            max-width: 1400px;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        /* Desktop: Hide collapse functionality */
+        .section-header {
+            cursor: default;
+        }
+        
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        /* Form styles now in shared.css */
+        
+        .time-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        /* Note: Alert styles now handled by shared AlertManager */
+        
+        .price-display {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #e9ecef;
+        }
+        
+        .price-breakdown {
+            text-align: left;
+        }
+        
+        .selected-rentals {
+            margin-bottom: 15px;
+        }
+        
+        .selected-rentals .rental-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 0.95em;
+        }
+        
+        .price-total .subtotal,
+        .price-total .tax,
+        .price-total .total {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+        }
+        
+        .price-total .total {
+            font-size: 1.1em;
+            padding-top: 10px;
+            border-top: 1px solid #e9ecef;
+            color: #667eea;
+        }
+        
+        .rentals-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            background: #fcfcfd;
+            max-height: 340px;
+            overflow-y: auto;
+        }
+        
+        .rental-category {
+            margin-top: 0;
+        }
+        
+        .rental-category:first-child {
+            margin-top: 0;
+        }
+        
+        .category-header {
+            background: #f3f6fb;
+            color: #2c3e50;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-top: 16px;
+            border: 1px solid #e5e9f2;
+            font-weight: 700;
+        }
+        
+        .category-header:first-child {
+            margin-top: 0;
+        }
+        
+        .category-header span {
+            font-size: 0.85em;
+            opacity: 0.8;
+            margin-left: 10px;
+            font-weight: 500;
+        }
+        
+        .rental-option {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            align-items: start;
+            gap: 10px;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid #edf0f3;
+            border-radius: 8px;
+            background: white;
+            transition: all 0.3s ease;
+        }
+        
+        .rental-option:hover {
+            border-color: #dbe4f0;
+            box-shadow: 0 1px 6px rgba(15, 23, 42, 0.06);
+        }
+        
+        .rental-option.selected {
+            border-color: #a8c2f0;
+            background: #f4f8ff;
+        }
+
+        .rental-option.base {
+            background: #f0f8ff;
+            border-left: 4px solid #2196f3;
+        }
+
+        .rental-option.child {
+            margin-left: 16px;
+        }
+        
+        .rental-meta {
+            margin: 0;
+            line-height: 1.35;
+        }
+        
+        .rental-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 3px;
+        }
+        
+        .rental-description {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+        
+        .rental-price {
+            font-weight: 500;
+            color: #4a5f8a;
+            font-size: 13px;
+        }
+        
+        .rental-qty {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .quantity-info {
+            font-size: 12px;
+            color: #666;
+            padding: 5px;
+        }
+
+        .quantity-info.centered {
+            text-align: center;
+        }
+        
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .quantity-btn {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #8aa4d1;
+            background: white;
+            color: #4a5f8a;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .quantity-btn:hover {
+            background: #4a5f8a;
+            color: white;
+        }
+        
+        .quantity-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .quantity-display {
+            min-width: 30px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .rental-checkbox {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #4a5f8a;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .rental-checkbox:checked {
+            background: #4a5f8a;
+        }
+        
+        .rental-checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 14px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        @media (max-width: 900px) {
+            .rental-option {
+                grid-template-columns: auto 1fr;
+            }
+
+            .rental-qty {
+                grid-column: 2;
+                justify-content: flex-start;
+            }
+
+            .rental-option.child {
+                margin-left: 6px;
+            }
+        }
+        
+        .upi-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        
+        .upi-section.show { display: block; }
+        
+        .payment-methods {
+            display: grid;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .payment-method {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .payment-method:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+        }
+        
+        .payment-btn {
+            width: 100%;
+            padding: 12px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .payment-btn.primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .payment-btn.primary:hover {
+            background: #5a67d8;
+        }
+        
+        .payment-btn.secondary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .payment-btn.secondary:hover {
+            background: #218838;
+        }
+        
+        .payment-btn.copy {
+            background: #6c757d;
+            color: white;
+            font-size: 0.9em;
+        }
+        
+        .payment-btn.copy:hover {
+            background: #5a6268;
+        }
+        
+        .payment-info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        
+        .payment-divider {
+            margin: 20px 0;
+            text-align: center;
+            position: relative;
+        }
+        
+        .payment-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #dee2e6;
+        }
+        
+        .payment-divider span {
+            background: #f8f9fa;
+            padding: 0 15px;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        
+        .qr-section {
+            margin-top: 15px;
+        }
+        
+        .qr-section img {
+            max-width: 200px;
+            margin: 10px auto;
+            display: block;
+        }
+        
+        .reference-view {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .timeline {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        .timeline-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+        
+        .timeline-item.booked {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .timeline-item.blocked {
+            background: #d6d6d6;
+            border-left: 4px solid #6c757d;
+        }
+        
+        .timeline-item.available {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        
+        .bookings-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .booking-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 5px solid #667eea;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        
+        .booking-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        
+        .booking-card h4 {
+            font-size: 1.25em;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            letter-spacing: -0.01em;
+        }
+        
+        .booking-card p {
+            margin-bottom: 8px;
+            color: #5a6c7d;
+            line-height: 1.6;
+        }
+        
+        .booking-card.pending { border-left-color: #ffc107; }
+        .booking-card.confirmed { border-left-color: #28a745; }
+        .booking-card.rejected { border-left-color: #dc3545; }
+        .booking-card.cancelled { border-left-color: #6c757d; }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-confirmed { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .status-cancelled { background: #e2e3e5; color: #383d41; }
+        
+        .loading-text {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .timeline-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #666;
+            padding: 16px;
+        }
+        
+        /* Enhanced Loading Indicators */
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            display: none;
+        }
+        
+        .loading-overlay.show {
+            display: flex;
+        }
+        
+        .loading-content {
+            text-align: center;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+        
+        .loading-content .loader {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Button Loading State */
+        .btn.loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        
+        .btn.loading::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
