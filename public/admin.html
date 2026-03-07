@@ -1095,6 +1095,42 @@
         </div>
     </div>
 
+    <div id="sendEBillModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Send eBill</h2>
+                <span class="close" onclick="closeModal('sendEBillModal')">&times;</span>
+            </div>
+
+            <input type="hidden" id="sendEBillBookingId">
+
+            <div class="form-group" style="margin-top: 10px;">
+                <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; margin-bottom: 8px;">
+                    <input type="checkbox" id="sendEBillIncludeCustomer" checked>
+                    Send to booking user email
+                </label>
+                <small style="color: #6c757d; display: block;">Keep enabled to send the PDF bill to the customer on record.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="sendEBillAdditionalEmails">Additional recipient emails (optional)</label>
+                <textarea
+                    id="sendEBillAdditionalEmails"
+                    rows="3"
+                    placeholder="email1@example.com, email2@example.com"
+                ></textarea>
+                <small style="color: #6c757d; display: block; margin-top: 5px;">
+                    Use comma, semicolon, space, or new line separated email addresses.
+                </small>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button onclick="submitSendEBill()" class="btn btn-primary" style="flex: 1;">Send eBill</button>
+                <button onclick="closeModal('sendEBillModal')" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Booking Modal -->
     <div id="editBookingModal" class="modal">
         <div class="modal-content">
@@ -1145,13 +1181,34 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="editRentalType">Rental Type*</label>
+                    <label for="editRentalType">Booking Type / Label*</label>
                     <input type="text" id="editRentalType" required>
                 </div>
                 <div class="form-group">
-                    <label for="editPrice">Price (₹)*</label>
-                    <input type="number" id="editPrice" required min="0">
+                    <label>Booking Items*</label>
+                    <div id="editBookingRentals" class="admin-rentals-panel">
+                        <div style="text-align: center; color: #666;">Loading rental options...</div>
+                    </div>
+                    <small style="display: block; color: #6c757d; margin-top: 6px;">
+                        Select the same booking items as create booking. Existing items are pre-selected.
+                    </small>
                 </div>
+
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div class="form-group">
+                        <label for="editSubtotal">Subtotal (₹)</label>
+                        <input type="number" id="editSubtotal" readonly style="background: #f8f9fa; color: #555;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editTaxAmount">Tax (₹)</label>
+                        <input type="number" id="editTaxAmount" readonly style="background: #f8f9fa; color: #555;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editPrice">Total (₹)</label>
+                        <input type="number" id="editPrice" readonly style="background: #f8f9fa; color: #555;">
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="editNotes">Notes</label>
                     <textarea id="editNotes" rows="3" placeholder="Additional notes..."></textarea>
@@ -1289,6 +1346,7 @@
         const API_URL = window.location.origin;
         let currentUser = null;
         let usersManagementData = [];
+        let adminSettingsData = null;
 
         // Utility functions
         const showAlert = (elementId, message, type = 'info') => {
@@ -1952,7 +2010,7 @@ Notes: ${booking.notes || 'N/A'}`);
                                     <button onclick="rejectBooking('${booking._id}')" class="btn btn-danger btn-sm">Reject</button>
                                 ` : ''}
                                 ${booking.bookingStatus === 'CONFIRMED' ? `
-                                    <button onclick="sendEBill('${booking._id}')" class="btn btn-primary btn-sm" title="Send eBill to Customer">📧 Send eBill</button>
+                                    <button onclick="sendEBill('${booking._id}')" class="btn btn-primary btn-sm" title="Send eBill to customer and/or custom recipients">📧 Send eBill</button>
                                     <button onclick="downloadPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download PDF Bill">📄 Download PDF</button>
                                 ` : ''}
                                 <button onclick="editBooking('${booking._id}', ${JSON.stringify(booking).replace(/"/g, '&quot;')})" class="btn btn-warning btn-sm">Edit</button>
@@ -2084,43 +2142,344 @@ Notes: ${booking.notes || 'N/A'}`);
 
         // Edit booking
         let currentEditingBookingId = null;
-        
-        const editBooking = (bookingId, bookingData) => {
+        let currentEditingBookingData = null;
+
+        const getEditRentalInputId = (rentalId) => `edit_${getRentalInputId(rentalId)}`;
+
+        const getRentalMatchKey = (name, rentalType = 'inhouse') => {
+            return `${String(name || '').trim().toLowerCase()}::${String(rentalType || 'inhouse').trim().toLowerCase()}`;
+        };
+
+        const buildExistingRentalMap = (booking) => {
+            const existingMap = new Map();
+            const existingRentals = Array.isArray(booking?.rentals) ? booking.rentals : [];
+
+            existingRentals.forEach((rental) => {
+                const key = getRentalMatchKey(rental?.name, rental?.rentalType || 'inhouse');
+                if (!existingMap.has(key)) {
+                    existingMap.set(key, rental);
+                }
+            });
+
+            return existingMap;
+        };
+
+        const renderEditBookingRentals = (rentalTypes, booking) => {
+            const container = document.getElementById('editBookingRentals');
+            const existingMap = buildExistingRentalMap(booking);
+            const usedExistingKeys = new Set();
+
+            if (!Array.isArray(rentalTypes) || rentalTypes.length === 0) {
+                container.innerHTML = '<div style="color: #6c757d; text-align: center;">No rental options configured</div>';
+                return;
+            }
+
+            let html = '';
+
+            rentalTypes.forEach((type) => {
+                html += `<div class="admin-rental-category">${escapeHtml(type.name)}</div>`;
+
+                if (type.basePrice && type.basePrice > 0) {
+                    const baseId = `${type.name}_base`;
+                    const qtyInputId = getEditRentalInputId(baseId);
+                    const isJamRoomBase = type.name === 'JamRoom';
+                    const baseKey = getRentalMatchKey(`${type.name} (Base)`, 'inhouse');
+                    const matchedBase = existingMap.get(baseKey);
+
+                    if (matchedBase) {
+                        usedExistingKeys.add(baseKey);
+                    }
+
+                    const basePrice = matchedBase ? Number(matchedBase.price || type.basePrice) : type.basePrice;
+                    const baseQuantity = Math.max(parseInt(matchedBase?.quantity, 10) || 1, 1);
+
+                    const encodedBaseData = encodeURIComponent(JSON.stringify({
+                        id: baseId,
+                        name: `${type.name} (Base)`,
+                        price: basePrice,
+                        perdayPrice: 0,
+                        rentalType: 'inhouse',
+                        description: matchedBase?.description || type.description || '',
+                        isRequired: true,
+                        isBase: true
+                    }));
+
+                    const shouldCheckBase = !!matchedBase || isJamRoomBase;
+
+                    html += `
+                        <div class="admin-rental-row base">
+                            <input type="checkbox" id="edit_rental_${qtyInputId}" name="editRental" data-rental="${encodedBaseData}" ${shouldCheckBase ? 'checked' : ''}>
+                            <label for="edit_rental_${qtyInputId}" class="admin-rental-meta">
+                                🏠 ${escapeHtml(type.name)} (Base) - ₹${basePrice}/hr
+                                <span class="admin-rental-subtext">Required base item</span>
+                            </label>
+                            <div class="admin-rental-qty">
+                                <label for="${qtyInputId}">Qty</label>
+                                <input type="number" id="${qtyInputId}" min="1" max="10" value="${baseQuantity}" ${isJamRoomBase ? 'disabled' : ''}>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (type.subItems && type.subItems.length > 0) {
+                    type.subItems.forEach((subItem) => {
+                        const itemId = `${type.name}__${subItem.name}`;
+                        const qtyInputId = getEditRentalInputId(itemId);
+                        const configuredRentalType = subItem.rentalType || 'inhouse';
+                        const matchKey = getRentalMatchKey(subItem.name, configuredRentalType);
+                        const matchedRental = existingMap.get(matchKey);
+
+                        if (matchedRental) {
+                            usedExistingKeys.add(matchKey);
+                        }
+
+                        const effectiveRentalType = matchedRental?.rentalType || configuredRentalType;
+                        const isPerday = effectiveRentalType === 'perday';
+                        const defaultPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
+                        const effectivePrice = matchedRental ? Number(matchedRental.price || defaultPrice) : defaultPrice;
+                        const priceUnit = isPerday ? '/day' : '/hr';
+                        const isFree = effectivePrice === 0;
+                        const showQuantityControls = isPerday || isFree || (subItem.name || '').includes('IEM');
+                        const quantityValue = Math.max(parseInt(matchedRental?.quantity, 10) || 1, 1);
+
+                        const encodedRentalData = encodeURIComponent(JSON.stringify({
+                            id: itemId,
+                            name: subItem.name,
+                            price: effectivePrice,
+                            perdayPrice: isPerday ? effectivePrice : (subItem.perdayPrice || 0),
+                            rentalType: effectiveRentalType,
+                            description: matchedRental?.description || subItem.description || '',
+                            isRequired: false,
+                            isBase: false,
+                            allowCustomQuantity: isPerday || isFree || (subItem.name || '').includes('IEM')
+                        }));
+
+                        const icon = isFree ? '🆓' : (isPerday ? '📅' : '🔗');
+                        const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : ' (In-house)');
+                        const priceDisplay = isFree ? 'FREE' : `₹${effectivePrice}${priceUnit}`;
+                        const details = [
+                            isPerday ? 'Flat per-day pricing' : '',
+                            (!isPerday && !isFree) ? 'Tied to session duration' : '',
+                            isFree ? 'Free add-on' : ''
+                        ].filter(Boolean).join(' | ');
+
+                        html += `
+                            <div class="admin-rental-row child">
+                                <input type="checkbox" id="edit_rental_${qtyInputId}" name="editRental" data-rental="${encodedRentalData}" ${matchedRental ? 'checked' : ''}>
+                                <label for="edit_rental_${qtyInputId}" class="admin-rental-meta">
+                                    ${icon} ${escapeHtml(subItem.name)}${typeLabel} - ${priceDisplay}
+                                    <span class="admin-rental-subtext">${details}</span>
+                                </label>
+                                <div class="admin-rental-qty">
+                                    ${showQuantityControls
+                                        ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="10" value="${quantityValue}">`
+                                        : `<span class="admin-rental-subtext" style="margin-top: 0;">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
+                                    }
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            });
+
+            const existingRentals = Array.isArray(booking?.rentals) ? booking.rentals : [];
+            const unmatchedRentals = existingRentals.filter((rental) => {
+                const key = getRentalMatchKey(rental?.name, rental?.rentalType || 'inhouse');
+                return !usedExistingKeys.has(key);
+            });
+
+            if (unmatchedRentals.length > 0) {
+                html += '<div class="admin-rental-category">Existing Custom Items</div>';
+
+                unmatchedRentals.forEach((rental, index) => {
+                    const itemId = `custom_existing_${index}`;
+                    const qtyInputId = getEditRentalInputId(itemId);
+                    const isPerday = String(rental?.rentalType || '').toLowerCase() === 'perday';
+                    const effectivePrice = Number(rental?.price || 0);
+                    const priceUnit = isPerday ? '/day' : '/hr';
+                    const quantityValue = Math.max(parseInt(rental?.quantity, 10) || 1, 1);
+
+                    const encodedRentalData = encodeURIComponent(JSON.stringify({
+                        id: itemId,
+                        name: rental?.name || 'Custom Item',
+                        price: effectivePrice,
+                        perdayPrice: isPerday ? effectivePrice : (Number(rental?.perdayPrice) || 0),
+                        rentalType: isPerday ? 'perday' : 'inhouse',
+                        description: rental?.description || '',
+                        isRequired: false,
+                        isBase: false,
+                        allowCustomQuantity: true
+                    }));
+
+                    html += `
+                        <div class="admin-rental-row child">
+                            <input type="checkbox" id="edit_rental_${qtyInputId}" name="editRental" data-rental="${encodedRentalData}" checked>
+                            <label for="edit_rental_${qtyInputId}" class="admin-rental-meta">
+                                🧩 ${escapeHtml(rental?.name || 'Custom Item')} - ₹${effectivePrice}${priceUnit}
+                                <span class="admin-rental-subtext">Previously saved item (not in current settings)</span>
+                            </label>
+                            <div class="admin-rental-qty">
+                                <label for="${qtyInputId}">Qty</label>
+                                <input type="number" id="${qtyInputId}" min="1" max="10" value="${quantityValue}">
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            container.innerHTML = html;
+        };
+
+        const collectSelectedEditRentals = ({ strict = false } = {}) => {
+            const selectedRentals = [];
+            const rentalInputs = document.querySelectorAll('#editBookingRentals input[name="editRental"]:checked');
+
+            if (strict && rentalInputs.length === 0) {
+                throw new Error('Please select at least one rental item.');
+            }
+
+            rentalInputs.forEach((input) => {
+                const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental));
+                const quantityElement = document.getElementById(getEditRentalInputId(rentalData.id));
+                const rawQuantity = parseInt(quantityElement?.value, 10) || 1;
+                const isPerday = rentalData.rentalType === 'perday';
+                const isFree = (isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0)) === 0;
+                const isIem = (rentalData.name || '').includes('IEM');
+                const isBase = rentalData.isRequired || String(rentalData.id).includes('_base');
+
+                let effectiveQuantity = rawQuantity;
+                if (!isPerday && !isFree && !isIem && !isBase && !rentalData.allowCustomQuantity) {
+                    effectiveQuantity = 1;
+                }
+
+                const unitPrice = isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0);
+
+                selectedRentals.push({
+                    name: rentalData.name,
+                    price: unitPrice,
+                    perdayPrice: rentalData.perdayPrice || 0,
+                    quantity: effectiveQuantity,
+                    rentalType: rentalData.rentalType || 'inhouse',
+                    description: rentalData.description || '',
+                    isRequired: !!rentalData.isRequired,
+                    fullId: rentalData.id
+                });
+            });
+
+            if (strict && selectedRentals.length === 0) {
+                throw new Error('Please select at least one rental item.');
+            }
+
+            return selectedRentals;
+        };
+
+        const getCurrentGstConfig = () => {
+            const source = createBookingSettings || adminSettingsData || {};
+            const enabled = source?.gstConfig?.enabled === true;
+            const rate = enabled ? (source?.gstConfig?.rate || 0.18) : 0;
+
+            return { enabled, rate };
+        };
+
+        const recalculateEditBookingTotals = () => {
+            const duration = parseFloat(document.getElementById('editDuration')?.value) || 0;
+            const items = collectSelectedEditRentals({ strict: false });
+
+            let subtotal = 0;
+            items.forEach((item) => {
+                let itemTotal;
+
+                if (item.rentalType === 'perday') {
+                    itemTotal = item.price * item.quantity;
+                } else if (item.isRequired || String(item.fullId).includes('_base')) {
+                    itemTotal = item.price * item.quantity * duration;
+                } else if (item.price === 0) {
+                    itemTotal = 0;
+                } else if ((item.name || '').includes('IEM')) {
+                    itemTotal = item.price * item.quantity * duration;
+                } else {
+                    itemTotal = item.price * 1 * duration;
+                }
+
+                subtotal += itemTotal;
+            });
+
+            const gstConfig = getCurrentGstConfig();
+            const taxAmount = gstConfig.enabled ? Math.round(subtotal * gstConfig.rate) : 0;
+            const totalAmount = subtotal + taxAmount;
+
+            document.getElementById('editSubtotal').value = subtotal.toFixed(2);
+            document.getElementById('editTaxAmount').value = taxAmount.toFixed(2);
+            document.getElementById('editPrice').value = totalAmount.toFixed(2);
+
+            return {
+                items,
+                subtotal,
+                taxAmount,
+                totalAmount
+            };
+        };
+
+        const loadEditBookingRentals = async (booking) => {
+            let settingsToUse = createBookingSettings;
+
+            if (!settingsToUse || !Array.isArray(settingsToUse.rentalTypes)) {
+                const response = await fetch(`${API_URL}/api/admin/settings`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load rental options for editing');
+                }
+
+                const result = await response.json();
+                if (!result.success || !result.settings) {
+                    throw new Error('Rental settings are unavailable');
+                }
+
+                settingsToUse = result.settings;
+                createBookingSettings = result.settings;
+                adminSettingsData = result.settings;
+            }
+
+            renderEditBookingRentals(settingsToUse.rentalTypes || [], booking);
+        };
+
+        const editBooking = async (bookingId, bookingData) => {
             try {
                 currentEditingBookingId = bookingId;
-                
+
                 // Parse booking data if it's a string
                 const booking = typeof bookingData === 'string' ? JSON.parse(bookingData.replace(/&quot;/g, '"')) : bookingData;
-                
+                currentEditingBookingData = booking;
+
                 // Format date for input (YYYY-MM-DD)
                 const bookingDate = new Date(booking.date);
                 const formattedDate = bookingDate.toISOString().split('T')[0];
-                
-                // Calculate end time from start time and duration
-                const calculateEndTime = (startTime, duration) => {
-                    const [hours, minutes] = startTime.split(':').map(Number);
-                    const totalMinutes = hours * 60 + minutes + (duration * 60);
-                    const endHours = Math.floor(totalMinutes / 60) % 24;
-                    const endMins = totalMinutes % 60;
-                    return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
-                };
-                
-                // Populate form fields
+
+                // Populate top-level form fields
                 document.getElementById('editDate').value = formattedDate;
                 document.getElementById('editStartTime').value = booking.startTime;
                 document.getElementById('editDuration').value = booking.duration;
-                document.getElementById('editRentalType').value = booking.rentalType;
-                document.getElementById('editPrice').value = booking.price;
+                document.getElementById('editRentalType').value = booking.rentalType || '';
                 document.getElementById('editNotes').value = booking.notes || '';
-                
+
+                document.getElementById('editBookingRentals').innerHTML = '<div style="text-align: center; color: #666;">Loading rental options...</div>';
+
+                await loadEditBookingRentals(booking);
+
+                recalculateEditBookingTotals();
+
                 // Show modal
-                document.getElementById('editBookingModal').style.display = 'block';
+                document.getElementById('editBookingModal').classList.add('show');
             } catch (error) {
                 console.error('Error opening edit modal:', error);
                 showAlert('bookingAlert', 'Error opening edit form', 'error');
             }
         };
-
+        
         // Delete booking
         const deleteBooking = (bookingId) => {
             showConfirmationModal(
@@ -2151,73 +2510,109 @@ Notes: ${booking.notes || 'N/A'}`);
             );
         };
 
-        // Send eBill to customer
-        const sendEBill = async (bookingId) => {
-            showConfirmationModal(
-                'Send eBill',
-                'This will generate and send an electronic bill to the customer via email. The bill will include all booking details, pricing, and payment information.',
-                'Send eBill',
-                async () => {
-                    try {
-                        showLoading('Generating and sending eBill...');
-                        
-                        const token = localStorage.getItem('token');
-                        const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/send-ebill`, {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
+        const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 
-                        if (!res.ok) {
-                            const error = await res.json();
-                            throw new Error(error.message || 'Failed to send eBill');
-                        }
+        const parseEmailListInput = (inputValue) => {
+            return String(inputValue || '')
+                .split(/[\s,;]+/)
+                .map(email => email.trim().toLowerCase())
+                .filter(Boolean);
+        };
 
-                        const result = await res.json();
-                        showAlert('bookingAlert', result.message || 'eBill sent successfully to customer!', 'success');
-                    } catch (error) {
-                        console.error('Send eBill error:', error);
-                        
-                        // Improve error messages for common Gmail issues
-                        let userMessage = error.message;
-                        
-                        if (error.message.includes('Daily user sending limit exceeded')) {
-                            userMessage = '📧 Gmail Daily Limit Reached!\n\n' +
-                                'You\'ve exceeded Gmail\'s daily sending limit. This typically resets within 24 hours.\n\n' +
-                                'Solutions:\n' +
-                                '• Wait 24 hours and try again\n' +
-                                '• Use a different Gmail account\n' +
-                                '• Consider upgrading to Google Workspace for higher limits\n\n' +
-                                'Learn more: https://support.google.com/a/answer/166852';
-                        } else if (error.message.includes('Authentication failed') || error.message.includes('invalid credentials')) {
-                            userMessage = '🔐 Gmail Authentication Issue!\n\n' +
-                                'Your Gmail credentials may be invalid or expired.\n\n' +
-                                'Solutions:\n' +
-                                '• Check EMAIL_USER and EMAIL_PASS in .env file\n' +
-                                '• Regenerate Gmail App Password\n' +
-                                '• Ensure 2-Factor Authentication is enabled\n\n' +
-                                'Setup Guide: https://support.google.com/mail/answer/185833';
-                        } else if (error.message.includes('Recipient address rejected') || error.message.includes('Invalid recipients')) {
-                            userMessage = '📮 Invalid Email Address!\n\n' +
-                                'The customer\'s email address appears to be invalid.\n\n' +
-                                'Solutions:\n' +
-                                '• Verify the email address in booking details\n' +
-                                '• Contact customer for correct email\n' +
-                                '• Edit booking with valid email address';
-                        } else if (error.message.includes('Network')) {
-                            userMessage = '🌐 Network Connection Issue!\n\n' +
-                                'Unable to connect to Gmail servers.\n\n' +
-                                'Solutions:\n' +
-                                '• Check your internet connection\n' +
-                                '• Try again in a few minutes\n' +
-                                '• Verify firewall settings';
-                        }
-                        
-                        showAlert('bookingAlert', userMessage, 'error');
-                    } finally {
-                        hideLoading();
-                    }
+        // Open eBill recipient modal
+        const sendEBill = (bookingId) => {
+            document.getElementById('sendEBillBookingId').value = bookingId;
+            document.getElementById('sendEBillIncludeCustomer').checked = true;
+            document.getElementById('sendEBillAdditionalEmails').value = '';
+            document.getElementById('sendEBillModal').classList.add('show');
+        };
+
+        // Submit eBill with selected recipients
+        const submitSendEBill = async () => {
+            const bookingId = document.getElementById('sendEBillBookingId').value;
+            const includeCustomer = document.getElementById('sendEBillIncludeCustomer').checked;
+            const additionalEmails = parseEmailListInput(document.getElementById('sendEBillAdditionalEmails').value);
+
+            const invalidEmails = additionalEmails.filter(email => !isValidEmail(email));
+            if (invalidEmails.length > 0) {
+                showAlert('bookingAlert', `Invalid email address(es): ${invalidEmails.join(', ')}`, 'error');
+                return;
+            }
+
+            if (!includeCustomer && additionalEmails.length === 0) {
+                showAlert('bookingAlert', 'Select customer email or provide at least one additional email address.', 'error');
+                return;
+            }
+
+            try {
+                closeModal('sendEBillModal');
+                showLoading('Generating and sending eBill...');
+
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/bookings/${bookingId}/send-ebill`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        includeCustomer,
+                        additionalEmails
+                    })
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.message || 'Failed to send eBill');
                 }
-            );
+
+                const result = await res.json();
+                const recipientsText = Array.isArray(result.recipients) && result.recipients.length > 0
+                    ? `\nRecipients: ${result.recipients.join(', ')}`
+                    : '';
+                showAlert('bookingAlert', `${result.message || 'eBill sent successfully!'}${recipientsText}`, 'success');
+            } catch (error) {
+                console.error('Send eBill error:', error);
+
+                // Improve error messages for common Gmail issues
+                let userMessage = error.message;
+
+                if (error.message.includes('Daily user sending limit exceeded')) {
+                    userMessage = '📧 Gmail Daily Limit Reached!\n\n' +
+                        'You\'ve exceeded Gmail\'s daily sending limit. This typically resets within 24 hours.\n\n' +
+                        'Solutions:\n' +
+                        '• Wait 24 hours and try again\n' +
+                        '• Use a different Gmail account\n' +
+                        '• Consider upgrading to Google Workspace for higher limits\n\n' +
+                        'Learn more: https://support.google.com/a/answer/166852';
+                } else if (error.message.includes('Authentication failed') || error.message.includes('invalid credentials')) {
+                    userMessage = '🔐 Gmail Authentication Issue!\n\n' +
+                        'Your Gmail credentials may be invalid or expired.\n\n' +
+                        'Solutions:\n' +
+                        '• Check EMAIL_USER and EMAIL_PASS in .env file\n' +
+                        '• Regenerate Gmail App Password\n' +
+                        '• Ensure 2-Factor Authentication is enabled\n\n' +
+                        'Setup Guide: https://support.google.com/mail/answer/185833';
+                } else if (error.message.includes('Recipient address rejected') || error.message.includes('Invalid recipients')) {
+                    userMessage = '📮 Invalid Email Address!\n\n' +
+                        'One or more recipient email addresses are invalid.\n\n' +
+                        'Solutions:\n' +
+                        '• Verify the entered email addresses\n' +
+                        '• Check booking customer email\n' +
+                        '• Retry with valid recipients';
+                } else if (error.message.includes('Network')) {
+                    userMessage = '🌐 Network Connection Issue!\n\n' +
+                        'Unable to connect to Gmail servers.\n\n' +
+                        'Solutions:\n' +
+                        '• Check your internet connection\n' +
+                        '• Try again in a few minutes\n' +
+                        '• Verify firewall settings';
+                }
+
+                showAlert('bookingAlert', userMessage, 'error');
+            } finally {
+                hideLoading();
+            }
         };
 
         // Download PDF bill
@@ -2355,6 +2750,11 @@ Notes: ${booking.notes || 'N/A'}`);
             }
         };
 
+        document.getElementById('editDuration').addEventListener('input', recalculateEditBookingTotals);
+        document.getElementById('editDuration').addEventListener('change', recalculateEditBookingTotals);
+        document.getElementById('editBookingRentals').addEventListener('input', recalculateEditBookingTotals);
+        document.getElementById('editBookingRentals').addEventListener('change', recalculateEditBookingTotals);
+
         // Edit booking form handler
         document.getElementById('editBookingForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -2367,19 +2767,42 @@ Notes: ${booking.notes || 'N/A'}`);
             try {
                 showLoading('Updating booking...');
 
+                const duration = parseFloat(document.getElementById('editDuration').value);
+                if (!Number.isFinite(duration) || duration <= 0) {
+                    throw new Error('Please provide a valid duration.');
+                }
+
+                const bookingTypeLabel = document.getElementById('editRentalType').value.trim();
+                if (!bookingTypeLabel) {
+                    throw new Error('Please provide booking type/label.');
+                }
+
+                const rentals = collectSelectedEditRentals({ strict: true });
+                const pricing = recalculateEditBookingTotals();
+
                 const formData = {
                     date: document.getElementById('editDate').value,
                     startTime: document.getElementById('editStartTime').value,
-                    duration: parseInt(document.getElementById('editDuration').value),
-                    rentalType: document.getElementById('editRentalType').value,
-                    price: parseFloat(document.getElementById('editPrice').value),
+                    duration,
+                    rentalType: bookingTypeLabel,
+                    rentals: rentals.map((rental) => ({
+                        name: rental.name,
+                        price: rental.price,
+                        perdayPrice: rental.perdayPrice,
+                        quantity: rental.quantity,
+                        rentalType: rental.rentalType,
+                        description: rental.description
+                    })),
+                    subtotal: pricing.subtotal,
+                    taxAmount: pricing.taxAmount,
+                    totalAmount: pricing.totalAmount,
                     notes: document.getElementById('editNotes').value
                 };
 
                 // Calculate end time
                 const calculateEndTime = (startTime, duration) => {
                     const [hours, minutes] = startTime.split(':').map(Number);
-                    const totalMinutes = hours * 60 + minutes + (duration * 60);
+                    const totalMinutes = hours * 60 + minutes + Math.round(duration * 60);
                     const endHours = Math.floor(totalMinutes / 60) % 24;
                     const endMins = totalMinutes % 60;
                     return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
@@ -2483,6 +2906,10 @@ Notes: ${booking.notes || 'N/A'}`);
 
                 const data = await res.json();
                 const settings = data.settings;
+                adminSettingsData = settings;
+                if (!createBookingSettings) {
+                    createBookingSettings = settings;
+                }
 
                 document.getElementById('studioName').value = settings.studioName || 'JamRoom Studio';
                 document.getElementById('studioAddress').value = settings.studioAddress || '';
@@ -3458,9 +3885,11 @@ Notes: ${booking.notes || 'N/A'}`);
                         isBase: true
                     }));
 
+                    const shouldCheckCreateBase = isJamRoomBase;
+
                     html += `
                         <div class="admin-rental-row base">
-                            <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedBaseData}" checked>
+                            <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedBaseData}" ${shouldCheckCreateBase ? 'checked' : ''}>
                             <label for="rental_${qtyInputId}" class="admin-rental-meta">
                                 🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}/hr
                                 <span class="admin-rental-subtext">Required base item</span>
@@ -3750,6 +4179,8 @@ Notes: ${booking.notes || 'N/A'}`);
         window.addEventListener('click', (event) => {
             const createModal = document.getElementById('createBookingModal');
             const registerModal = document.getElementById('registerUserModal');
+            const sendEBillModal = document.getElementById('sendEBillModal');
+            const editModal = document.getElementById('editBookingModal');
 
             if (event.target === createModal) {
                 hideCreateBookingModal();
@@ -3757,6 +4188,14 @@ Notes: ${booking.notes || 'N/A'}`);
 
             if (event.target === registerModal) {
                 closeModal('registerUserModal');
+            }
+
+            if (event.target === sendEBillModal) {
+                closeModal('sendEBillModal');
+            }
+
+            if (event.target === editModal) {
+                closeModal('editBookingModal');
             }
         });
 

@@ -60,6 +60,26 @@ const normalizeEmail = (email) => {
   return String(email || '').trim().toLowerCase();
 };
 
+const isValidEmail = (email) => {
+  const normalized = normalizeEmail(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+};
+
+const parseOptionalEmailList = (value) => {
+  if (Array.isArray(value)) {
+    return value.map(normalizeEmail).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(/[\s,;]+/)
+      .map(normalizeEmail)
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 const normalizeMobileLast10 = (mobile) => {
   const digits = String(mobile || '').replace(/\D/g, '');
   return digits.length >= 10 ? digits.slice(-10) : '';
@@ -697,7 +717,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
 });
 
 // @route   POST /api/admin/bookings/:id/send-ebill
-// @desc    Send electronic bill to customer
+// @desc    Send electronic bill to selected recipients
 // @access  Private/Admin
 router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
   try {
@@ -728,9 +748,19 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
       });
     }
 
+    const includeCustomer = req.body?.includeCustomer !== false;
+    const additionalEmails = parseOptionalEmailList(req.body?.additionalEmails);
+    const invalidAdditionalEmails = additionalEmails.filter((email) => !isValidEmail(email));
+
+    if (invalidAdditionalEmails.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid additional email address(es): ${invalidAdditionalEmails.join(', ')}`
+      });
+    }
+
     // Get admin settings for company info
     const settings = await AdminSettings.getSettings();
-    const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
 
     // Generate PDF bill and filename
     let pdfBuffer = null;
@@ -761,12 +791,42 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
       // Continue without PDF attachment but log the error
     }
 
-    // Get customer email
+    // Resolve recipient emails.
     const customerEmail = booking.userEmail || booking.userId?.email;
-    if (!customerEmail) {
+
+    if (includeCustomer && !customerEmail) {
       return res.status(400).json({
         success: false,
         message: 'No customer email available for this booking'
+      });
+    }
+
+    const recipientSet = new Set();
+
+    if (includeCustomer && customerEmail) {
+      const normalizedCustomerEmail = normalizeEmail(customerEmail);
+      if (!isValidEmail(normalizedCustomerEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid customer email address: ${customerEmail}`
+        });
+      }
+
+      recipientSet.add(normalizedCustomerEmail);
+    }
+
+    additionalEmails.forEach((email) => {
+      if (isValidEmail(email)) {
+        recipientSet.add(email);
+      }
+    });
+
+    const recipientEmails = Array.from(recipientSet);
+
+    if (recipientEmails.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please include customer email or provide at least one valid additional email address'
       });
     }
 
@@ -782,10 +842,8 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     const totalAmount = subtotal + taxAmount;
 
     // Send email with PDF attachment
-    const emailOptions = {
-      to: customerEmail,
-      subject: `Invoice for Your ${settings?.studioName || 'JamRoom'} Booking - ${displayDate}`,
-      html: `
+    const emailSubject = `Invoice for Your ${settings?.studioName || 'JamRoom'} Booking - ${displayDate}`;
+    const emailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">Invoice - ${settings?.studioName || 'JamRoom'} Booking</h1>
@@ -887,23 +945,31 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
             `}
           </div>
         </div>
-      `
-    };
-    
-    // Add PDF attachment only if successfully generated
+      `;
+
+    const attachments = [];
+
+    // Add PDF attachment only if successfully generated.
     if (pdfBuffer) {
-      emailOptions.attachments = [{
+      attachments.push({
         filename: filename,
         content: pdfBuffer,
         contentType: 'application/pdf'
-      }];
+      });
     }
-    
-    await sendEmail(emailOptions);
+
+    for (const recipientEmail of recipientEmails) {
+      await sendEmail({
+        to: recipientEmail,
+        subject: emailSubject,
+        html: emailHtml,
+        attachments
+      });
+    }
 
     // Log the eBill generation
     const pdfAttached = !!pdfBuffer;
-    console.log(`eBill sent for booking ${booking._id} to ${customerEmail} by admin ${req.user.name}. PDF attached: ${pdfAttached}`);
+    console.log(`eBill sent for booking ${booking._id} to ${recipientEmails.join(', ')} by admin ${req.user.name}. PDF attached: ${pdfAttached}`);
     
     // Provide different success messages based on PDF attachment success
     let successMessage;
@@ -919,9 +985,10 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
 
     res.json({
       success: true,
-      message: successMessage,
+      message: `${successMessage} (${recipientEmails.length} recipient${recipientEmails.length === 1 ? '' : 's'})`,
       filename: filename,
-      customerEmail: customerEmail
+      customerEmail: normalizeEmail(customerEmail),
+      recipients: recipientEmails
     });
 
   } catch (error) {
@@ -1449,7 +1516,19 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
   try {
-    const { date, startTime, endTime, duration, rentalType, notes, price } = req.body;
+    const {
+      date,
+      startTime,
+      endTime,
+      duration,
+      rentalType,
+      notes,
+      price,
+      rentals,
+      subtotal,
+      taxAmount,
+      totalAmount
+    } = req.body;
     
     const booking = await Booking.findById(req.params.id);
     
@@ -1460,28 +1539,147 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       });
     }
 
-    // Store old values for comparison
-    const oldValues = {
-      date: booking.date,
-      startTime: booking.startTime,
-      endTime: booking.endTime,
-      duration: booking.duration,
-      rentalType: booking.rentalType,
-      price: booking.price
-    };
+    const settings = await AdminSettings.getSettings();
+    const gstEnabled = settings?.gstConfig?.enabled || false;
+    const gstRate = gstEnabled ? (settings?.gstConfig?.rate || 0.18) : 0;
 
     // Update booking fields
     if (date) booking.date = new Date(date);
     if (startTime) booking.startTime = startTime;
     if (endTime) booking.endTime = endTime;
-    if (duration) booking.duration = duration;
-    if (rentalType) booking.rentalType = rentalType;
+    if (duration !== undefined && duration !== null) {
+      const parsedDuration = Number(duration);
+      if (!Number.isFinite(parsedDuration) || parsedDuration <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Duration must be a positive number'
+        });
+      }
+      booking.duration = parsedDuration;
+    }
+
+    const normalizedRentalType = String(rentalType || '').trim();
+    if (normalizedRentalType) booking.rentalType = normalizedRentalType;
+
     if (notes !== undefined) booking.notes = notes;
-    if (price) booking.price = price;
+
+    // Item-level booking edit path.
+    if (Array.isArray(rentals)) {
+      if (rentals.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide at least one rental item'
+        });
+      }
+
+      const sanitizedRentals = [];
+      for (const rental of rentals) {
+        const rentalName = String(rental?.name || '').trim();
+        const rentalPrice = Number(rental?.price);
+        const rentalQuantity = parseInt(rental?.quantity, 10);
+        const rentalTypeValue = String(rental?.rentalType || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'inhouse';
+        const rentalDescription = String(rental?.description || '').trim();
+
+        if (!rentalName) {
+          return res.status(400).json({
+            success: false,
+            message: 'Each rental item must have a name'
+          });
+        }
+
+        if (!Number.isFinite(rentalPrice) || rentalPrice < 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid price for rental item: ${rentalName}`
+          });
+        }
+
+        if (!Number.isInteger(rentalQuantity) || rentalQuantity < 1) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid quantity for rental item: ${rentalName}`
+          });
+        }
+
+        sanitizedRentals.push({
+          name: rentalName,
+          price: rentalPrice,
+          perdayPrice: rentalTypeValue === 'perday' ? rentalPrice : (Number(rental?.perdayPrice) || 0),
+          quantity: rentalQuantity,
+          rentalType: rentalTypeValue,
+          description: rentalDescription
+        });
+      }
+
+      let calculatedSubtotal = 0;
+      sanitizedRentals.forEach((rentalItem) => {
+        if (rentalItem.rentalType === 'perday') {
+          calculatedSubtotal += rentalItem.price * rentalItem.quantity;
+        } else {
+          calculatedSubtotal += rentalItem.price * rentalItem.quantity * booking.duration;
+        }
+      });
+
+      const calculatedTaxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
+      const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount;
+
+      booking.rentals = sanitizedRentals;
+      booking.subtotal = calculatedSubtotal;
+      booking.taxAmount = calculatedTaxAmount;
+      booking.price = calculatedTotalAmount;
+
+      if (!normalizedRentalType) {
+        booking.rentalType = sanitizedRentals.length === 1
+          ? sanitizedRentals[0].name
+          : `Multiple Items (${sanitizedRentals.length})`;
+      }
+    } else {
+      // Backward-compatible edit path.
+      if (subtotal !== undefined && subtotal !== null) {
+        const parsedSubtotal = Number(subtotal);
+        if (!Number.isFinite(parsedSubtotal) || parsedSubtotal < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Subtotal must be a non-negative number'
+          });
+        }
+        booking.subtotal = parsedSubtotal;
+      }
+
+      if (taxAmount !== undefined && taxAmount !== null) {
+        const parsedTaxAmount = Number(taxAmount);
+        if (!Number.isFinite(parsedTaxAmount) || parsedTaxAmount < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Tax amount must be a non-negative number'
+          });
+        }
+        booking.taxAmount = parsedTaxAmount;
+      }
+
+      if (totalAmount !== undefined && totalAmount !== null) {
+        const parsedTotalAmount = Number(totalAmount);
+        if (!Number.isFinite(parsedTotalAmount) || parsedTotalAmount < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Total amount must be a non-negative number'
+          });
+        }
+        booking.price = parsedTotalAmount;
+      } else if (price !== undefined && price !== null) {
+        const parsedPrice = Number(price);
+        if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Price must be a non-negative number'
+          });
+        }
+        booking.price = parsedPrice;
+      }
+    }
     
     await booking.save();
 
-    const settings = await AdminSettings.getSettings();
     const displayDate = booking.date.toLocaleDateString('en-IN', {
       weekday: 'long',
       year: 'numeric',

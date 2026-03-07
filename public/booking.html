@@ -1052,6 +1052,7 @@
         const populateRentalTypes = () => {
             const container = document.getElementById('rentalsList');
             container.innerHTML = '';
+            selectedRentals = new Map();
             
             console.log('populateRentalTypes called, settings:', settings);
             
@@ -1130,10 +1131,26 @@
                                         Fixed: 1 room
                                     </div>
                                 `}
-                                <input type="checkbox" class="rental-checkbox" onchange="toggleRental('${type.name}_base', ${type.basePrice}, '${(type.description || 'Base rental').replace(/'/g, "\\'")}', '${type.name}', true)">
+                                <input type="checkbox" class="rental-checkbox" ${isJamRoomBase ? 'checked' : ''} onchange="toggleRental('${type.name}_base', ${type.basePrice}, '${(type.description || 'Base rental').replace(/'/g, "\\'")}', '${type.name}', true)">
                             </div>
                         `;
                         categoryContent.appendChild(baseCategoryDiv);
+
+                        if (isJamRoomBase) {
+                            selectedRentals.set(`${type.name}_base`, {
+                                name: `${type.name} (Base)`,
+                                fullId: `${type.name}_base`,
+                                category: type.name,
+                                description: type.description || 'Base rental',
+                                basePrice: type.basePrice,
+                                price: type.basePrice,
+                                quantity: 1,
+                                isRequired: true,
+                                rentalType: 'inhouse',
+                                perdayPrice: 0
+                            });
+                            baseCategoryDiv.classList.add('selected');
+                        }
                         
                         // Add each sub-item as an optional add-on
                         type.subItems.forEach((subItem, subIndex) => {
@@ -1208,6 +1225,8 @@
             } else {
                 container.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 20px;">No rental options available. Please contact admin.</p>';
             }
+
+            updatePriceDisplay();
         };
 
         // Toggle rental selection
