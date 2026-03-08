@@ -1,21 +1,759 @@
 /**
  * Booking rental selection module.
+ * Supports separate booking flows for hourly (JamRoom + InHouse) and per-day rentals.
  */
+
+let currentBookingMode = 'hourly';
+let hourlySelectedRentals = new Map();
+let perdaySelectedRentals = new Map();
+let perdayUnavailableItems = new Set();
+let perdayBookedItemQuantities = new Map();
+let perdaySelectedRange = null;
+let perdayAvailabilityRequestSeq = 0;
+
+const rentalCatalog = {
+    hourly: new Map(),
+    perday: new Map()
+};
+
+const normalizeRentalType = (value) => String(value || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'inhouse';
+const normalizeRentalNameKey = (name) => String(name || '').trim().toLowerCase();
+
+const getMapForMode = (mode) => mode === 'perday' ? perdaySelectedRentals : hourlySelectedRentals;
+
+const setActiveSelectionMap = () => {
+    selectedRentals = getMapForMode(currentBookingMode);
+};
+
+const getTodayDateString = () => new Date().toISOString().split('T')[0];
+
+const combineDateAndTime = (dateValue, timeValue) => {
+    if (!dateValue || !timeValue) return null;
+
+    const [hours, minutes] = String(timeValue).split(':').map(Number);
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+
+    const date = new Date(`${dateValue}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return null;
+
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+};
+
+const calculatePerDayDurationInfo = ({ startDate, endDate, pickupTime, returnTime }) => {
+    const startDateTime = combineDateAndTime(startDate, pickupTime);
+    const endDateTime = combineDateAndTime(endDate, returnTime);
+
+    if (!startDateTime || !endDateTime) {
+        return {
+            days: 0,
+            totalHours: 0,
+            isValid: false,
+            error: 'Select per-day start/end date and pick-up/return time.'
+        };
+    }
+
+    const diffMs = endDateTime.getTime() - startDateTime.getTime();
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    if (diffMs < dayMs) {
+        return {
+            days: 0,
+            totalHours: 0,
+            isValid: false,
+            error: 'Return must be at least 24 hours after pick-up.'
+        };
+    }
+
+    if (diffMs % dayMs !== 0) {
+        return {
+            days: 0,
+            totalHours: Math.floor(diffMs / (1000 * 60 * 60)),
+            isValid: false,
+            error: 'Return must be in exact 24-hour blocks (24h, 48h, 72h...).'
+        };
+    }
+
+    const days = diffMs / dayMs;
+    return {
+        days,
+        totalHours: days * 24,
+        isValid: true,
+        error: ''
+    };
+};
+
+const ensurePerdayAvailabilityInfoEl = () => {
+    const container = document.getElementById('perdayRentalsList');
+    if (!container) return null;
+
+    let infoEl = document.getElementById('perdayAvailabilityInfo');
+    if (!infoEl) {
+        infoEl = document.createElement('small');
+        infoEl.id = 'perdayAvailabilityInfo';
+        infoEl.className = 'field-help';
+        container.parentElement?.appendChild(infoEl);
+    }
+
+    return infoEl;
+};
+
+const updatePerdayAvailabilityInfo = (message = '') => {
+    const infoEl = ensurePerdayAvailabilityInfoEl();
+    if (!infoEl) return;
+
+    infoEl.textContent = message;
+    infoEl.style.display = message ? 'block' : 'none';
+};
+
+const toTitleCase = (value) => String(value || '')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+const getPerdayItemDisplayName = (nameKey) => {
+    for (const item of rentalCatalog.perday.values()) {
+        if (normalizeRentalNameKey(item.name) === nameKey) {
+            return item.name;
+        }
+    }
+
+    return toTitleCase(nameKey);
+};
+
+const ensurePerdayBookedItemsPanelEl = () => {
+    const container = document.getElementById('perdayRentalsList');
+    if (!container) return null;
+
+    let panelEl = document.getElementById('perdayBookedItemsPanel');
+    if (!panelEl) {
+        panelEl = document.createElement('div');
+        panelEl.id = 'perdayBookedItemsPanel';
+        panelEl.className = 'perday-booked-panel';
+        container.parentElement?.appendChild(panelEl);
+    }
+
+    return panelEl;
+};
+
+const renderPerdayBookedItemsPanel = ({ hasValidRange = false } = {}) => {
+    const panelEl = ensurePerdayBookedItemsPanelEl();
+    if (!panelEl) return;
+
+    if (!hasValidRange || !perdaySelectedRange) {
+        panelEl.style.display = 'none';
+        panelEl.innerHTML = '';
+        return;
+    }
+
+    const { startDate, endDate, pickupTime, returnTime } = perdaySelectedRange;
+    const headerText = `Booked items in selected range: ${startDate} ${pickupTime} to ${endDate} ${returnTime}`;
+
+    if (perdayBookedItemQuantities.size === 0) {
+        panelEl.style.display = 'block';
+        panelEl.innerHTML = `
+            <div class="perday-booked-header">${headerText}</div>
+            <div class="perday-booked-empty">No per-day items are booked for this range.</div>
+        `;
+        return;
+    }
+
+    const listHtml = [...perdayBookedItemQuantities.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([nameKey, qty]) => `
+            <li class="perday-booked-item">
+                <span class="perday-booked-name">${getPerdayItemDisplayName(nameKey)}</span>
+                <span class="perday-booked-qty">Booked: ${qty}</span>
+            </li>
+        `)
+        .join('');
+
+    panelEl.style.display = 'block';
+    panelEl.innerHTML = `
+        <div class="perday-booked-header">${headerText}</div>
+        <ul class="perday-booked-list">${listHtml}</ul>
+    `;
+};
+
+const applyPerdayItemAvailability = () => {
+    const perdayContainer = document.getElementById('perdayRentalsList');
+    if (!perdayContainer) return;
+
+    let removedSelection = false;
+
+    perdayContainer
+        .querySelectorAll('.rental-option[data-rental-mode="perday"]')
+        .forEach((optionEl) => {
+            const rentalKey = optionEl.getAttribute('data-rental-id');
+            const item = rentalCatalog.perday.get(rentalKey);
+            const checkbox = optionEl.querySelector('.rental-checkbox');
+            if (!item || !checkbox) return;
+
+            const rentalNameKey = normalizeRentalNameKey(item.name);
+            const isUnavailable = perdayUnavailableItems.has(rentalNameKey);
+
+            checkbox.disabled = isUnavailable;
+            optionEl.classList.toggle('unavailable', isUnavailable);
+
+            if (isUnavailable) {
+                optionEl.title = 'Unavailable for selected pickup/return range';
+                if (checkbox.checked) {
+                    checkbox.checked = false;
+                }
+                if (perdaySelectedRentals.has(rentalKey)) {
+                    perdaySelectedRentals.delete(rentalKey);
+                    removedSelection = true;
+                }
+            } else {
+                optionEl.removeAttribute('title');
+            }
+        });
+
+    if (removedSelection && currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
+        updatePriceDisplay();
+    }
+
+    if (perdayUnavailableItems.size > 0) {
+        updatePerdayAvailabilityInfo('Some per-day items are unavailable for the selected date range.');
+    } else {
+        updatePerdayAvailabilityInfo('');
+    }
+
+    renderPerdayBookedItemsPanel({ hasValidRange: !!perdaySelectedRange });
+};
+
+const fetchPerdayItemAvailability = async () => {
+    const startDate = document.getElementById('perdayStartDate')?.value || '';
+    const endDate = document.getElementById('perdayEndDate')?.value || '';
+    const pickupTime = document.getElementById('perdayPickupTime')?.value || '';
+    const returnTime = document.getElementById('perdayReturnTime')?.value || '';
+
+    const durationInfo = calculatePerDayDurationInfo({
+        startDate,
+        endDate,
+        pickupTime,
+        returnTime
+    });
+
+    if (!startDate || !endDate || !pickupTime || !returnTime || !durationInfo.isValid) {
+        perdayUnavailableItems = new Set();
+        perdayBookedItemQuantities = new Map();
+        perdaySelectedRange = null;
+        applyPerdayItemAvailability();
+        return;
+    }
+
+    const requestId = ++perdayAvailabilityRequestSeq;
+
+    try {
+        const params = new URLSearchParams({
+            startDate,
+            endDate,
+            pickupTime,
+            returnTime
+        });
+
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/bookings/availability/perday-items?${params.toString()}`, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            }
+        });
+
+        const data = await response.json();
+        if (requestId !== perdayAvailabilityRequestSeq) return;
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Failed to fetch per-day item availability');
+        }
+
+        perdaySelectedRange = { startDate, endDate, pickupTime, returnTime };
+        perdayUnavailableItems = new Set((data.unavailableItems || []).map((name) => normalizeRentalNameKey(name)));
+        perdayBookedItemQuantities = new Map(
+            Object.entries(data.bookedItemQuantities || {}).map(([name, qty]) => [normalizeRentalNameKey(name), Number(qty) || 0])
+        );
+        applyPerdayItemAvailability();
+    } catch (error) {
+        console.error('Per-day item availability fetch error:', error);
+        perdayUnavailableItems = new Set();
+        perdayBookedItemQuantities = new Map();
+        perdaySelectedRange = null;
+        applyPerdayItemAvailability();
+    }
+};
+
+const refreshPerDayDaysInfo = () => {
+    const startDate = document.getElementById('perdayStartDate')?.value;
+    const endDate = document.getElementById('perdayEndDate')?.value;
+    const pickupTime = document.getElementById('perdayPickupTime')?.value;
+    const returnTime = document.getElementById('perdayReturnTime')?.value;
+    const infoEl = document.getElementById('perdayDaysInfo');
+    if (!infoEl) return;
+
+    const durationInfo = calculatePerDayDurationInfo({
+        startDate,
+        endDate,
+        pickupTime,
+        returnTime
+    });
+
+    infoEl.textContent = durationInfo.isValid
+        ? `${durationInfo.days} day(s) selected (${durationInfo.totalHours}h total).`
+        : durationInfo.error;
+};
+
+const syncPerDayReturnWithPickup = () => {
+    const pickupInput = document.getElementById('perdayPickupTime');
+    const returnInput = document.getElementById('perdayReturnTime');
+    if (!pickupInput || !returnInput) return;
+
+    returnInput.value = pickupInput.value || '';
+};
+
+const toggleBookingModeFields = (mode) => {
+    const isPerday = mode === 'perday';
+
+    const hourlyBlock = document.getElementById('hourlyBookingBlock');
+    const perdayBlock = document.getElementById('perdayBookingBlock');
+    if (hourlyBlock) hourlyBlock.style.display = isPerday ? 'none' : 'block';
+    if (perdayBlock) perdayBlock.style.display = isPerday ? 'block' : 'none';
+
+    const bookingDateInput = document.getElementById('bookingDate');
+    const startTimeInput = document.getElementById('startTime');
+    const endTimeInput = document.getElementById('endTime');
+    const perdayStart = document.getElementById('perdayStartDate');
+    const perdayEnd = document.getElementById('perdayEndDate');
+    const perdayPickup = document.getElementById('perdayPickupTime');
+    const perdayReturn = document.getElementById('perdayReturnTime');
+
+    if (bookingDateInput) bookingDateInput.disabled = isPerday;
+
+    if (startTimeInput) {
+        if (isPerday) {
+            startTimeInput.disabled = true;
+        } else {
+            startTimeInput.disabled = !bookingDateInput?.value;
+        }
+    }
+
+    if (endTimeInput) {
+        if (isPerday) {
+            endTimeInput.disabled = true;
+        } else {
+            endTimeInput.disabled = !startTimeInput?.value;
+        }
+    }
+
+    if (perdayStart) perdayStart.disabled = !isPerday;
+    if (perdayEnd) perdayEnd.disabled = !isPerday;
+    if (perdayPickup) perdayPickup.disabled = !isPerday;
+    if (perdayReturn) perdayReturn.disabled = true;
+
+    if (isPerday) {
+        syncPerDayReturnWithPickup();
+    }
+};
+
+const switchBookingMode = (mode) => {
+    currentBookingMode = mode === 'perday' ? 'perday' : 'hourly';
+    toggleBookingModeFields(currentBookingMode);
+    setActiveSelectionMap();
+    refreshPerDayDaysInfo();
+
+    if (currentBookingMode === 'hourly') {
+        const selectedDate = document.getElementById('bookingDate')?.value;
+        if (selectedDate && typeof loadAvailability === 'function') {
+            loadAvailability(selectedDate);
+        }
+
+        perdaySelectedRange = null;
+        renderPerdayBookedItemsPanel({ hasValidRange: false });
+    }
+
+    if (currentBookingMode === 'perday') {
+        fetchPerdayItemAvailability();
+    }
+
+    if (typeof updatePriceDisplay === 'function') {
+        updatePriceDisplay();
+    }
+};
+
+const bindBookingModeControls = () => {
+    const modeInputs = document.querySelectorAll('input[name="bookingMode"]');
+    if (!modeInputs || modeInputs.length === 0) {
+        switchBookingMode('hourly');
+        return;
+    }
+
+    modeInputs.forEach((input) => {
+        input.addEventListener('change', (event) => {
+            if (event.target.checked) {
+                switchBookingMode(event.target.value);
+            }
+        });
+    });
+
+    const selected = Array.from(modeInputs).find((input) => input.checked);
+    switchBookingMode(selected?.value || 'hourly');
+};
+
+const setPerDayInputConstraints = () => {
+    const startInput = document.getElementById('perdayStartDate');
+    const endInput = document.getElementById('perdayEndDate');
+    const pickupInput = document.getElementById('perdayPickupTime');
+    const returnInput = document.getElementById('perdayReturnTime');
+    if (!startInput || !endInput || !pickupInput || !returnInput) return;
+
+    const today = getTodayDateString();
+    startInput.min = today;
+    endInput.min = startInput.value || today;
+
+    if (endInput.value && startInput.value && endInput.value < startInput.value) {
+        endInput.value = startInput.value;
+    }
+
+    startInput.addEventListener('change', () => {
+        endInput.min = startInput.value || today;
+        if (endInput.value && startInput.value && endInput.value < startInput.value) {
+            endInput.value = startInput.value;
+        }
+
+        syncPerDayReturnWithPickup();
+
+        refreshPerDayDaysInfo();
+        if (currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
+            updatePriceDisplay();
+        }
+
+        if (currentBookingMode === 'perday') {
+            fetchPerdayItemAvailability();
+        }
+    });
+
+    endInput.addEventListener('change', () => {
+        refreshPerDayDaysInfo();
+        if (currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
+            updatePriceDisplay();
+        }
+
+        if (currentBookingMode === 'perday') {
+            fetchPerdayItemAvailability();
+        }
+    });
+
+    pickupInput.addEventListener('change', () => {
+        syncPerDayReturnWithPickup();
+
+        refreshPerDayDaysInfo();
+        if (currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
+            updatePriceDisplay();
+        }
+
+        if (currentBookingMode === 'perday') {
+            fetchPerdayItemAvailability();
+        }
+    });
+
+    syncPerDayReturnWithPickup();
+
+    refreshPerDayDaysInfo();
+    fetchPerdayItemAvailability();
+};
+
+const isQuantityControlEnabled = (item) => {
+    if (item.isRequired) return false;
+    if (item.rentalType === 'perday') return true;
+    if (item.price === 0) return true;
+    if ((item.name || '').includes('IEM')) return true;
+    return false;
+};
+
+const buildRentalOptionHTML = (item, mode) => {
+    const showQuantity = isQuantityControlEnabled(item);
+    const priceUnit = item.rentalType === 'perday' ? '/day' : '/hr';
+    const defaultChecked = item.isRequired ? 'checked' : '';
+    const defaultDisabled = item.isRequired ? 'disabled' : '';
+    const selectedClass = item.isRequired ? ' selected' : '';
+    const infoText = item.isRequired
+        ? 'Always required'
+        : (item.rentalType === 'perday' ? 'Charged per selected day' : 'Charged for jam duration');
+
+    return `
+        <div class="rental-option ${item.isRequired ? 'base' : 'child'}${selectedClass}" data-rental-id="${item.key}" data-rental-mode="${mode}">
+            <input type="checkbox" class="rental-checkbox" ${defaultChecked} ${defaultDisabled} onchange="toggleRental('${item.key}', '${mode}')">
+            <div class="rental-meta">
+                <div class="rental-name">${item.name}</div>
+                <div class="rental-description">${item.description || ''}</div>
+                <div class="rental-price">${item.price === 0 ? 'FREE' : `₹${item.price}${priceUnit}`}</div>
+            </div>
+            <div class="rental-qty">
+                ${showQuantity
+                    ? `<div class="quantity-controls">
+                           <button type="button" class="quantity-btn" onclick="updateQuantity('${item.key}', -1, '${mode}')">−</button>
+                           <span class="quantity-display">1</span>
+                           <button type="button" class="quantity-btn" onclick="updateQuantity('${item.key}', 1, '${mode}')">+</button>
+                       </div>`
+                    : `<div class="quantity-info centered">${infoText}</div>`}
+            </div>
+        </div>
+    `;
+};
+
+const renderRentalSection = (container, title, items, mode) => {
+    if (!container) return;
+
+    const section = document.createElement('div');
+    section.className = 'rental-category';
+
+    const header = document.createElement('div');
+    header.className = 'category-header';
+    header.innerHTML = `<strong>${title}</strong>`;
+    section.appendChild(header);
+
+    const content = document.createElement('div');
+    content.className = 'category-content';
+
+    if (!Array.isArray(items) || items.length === 0) {
+        content.innerHTML = '<p class="booking-empty-message booking-empty-padded">No items configured.</p>';
+    } else {
+        content.innerHTML = items.map((item) => buildRentalOptionHTML(item, mode)).join('');
+    }
+
+    section.appendChild(content);
+    container.appendChild(section);
+};
+
+const toNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const categorizeRentalItems = () => {
+    const jamroomItems = [];
+    const inhouseItems = [];
+    const perdayItems = [];
+
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+
+    rentalTypes.forEach((type) => {
+        const typeName = String(type?.name || '').trim();
+        if (!typeName) return;
+
+        if (typeName === 'JamRoom' && toNumber(type.basePrice, 0) > 0) {
+            jamroomItems.push({
+                key: 'JamRoom_base',
+                name: 'JamRoom (Base)',
+                category: 'JamRoom',
+                description: type.description || 'Base room booking',
+                price: toNumber(type.basePrice, 0),
+                rentalType: 'inhouse',
+                isRequired: true
+            });
+        }
+
+        if (Array.isArray(type.subItems) && type.subItems.length > 0) {
+            type.subItems.forEach((subItem) => {
+                const itemName = String(subItem?.name || '').trim();
+                if (!itemName) return;
+
+                const normalizedType = normalizeRentalType(subItem.rentalType);
+                const price = normalizedType === 'perday'
+                    ? toNumber(subItem.perdayPrice, 0)
+                    : toNumber(subItem.price, 0);
+
+                const item = {
+                    key: `${typeName}__${itemName}`,
+                    name: itemName,
+                    category: typeName,
+                    description: subItem.description || type.description || '',
+                    price,
+                    rentalType: normalizedType,
+                    isRequired: false
+                };
+
+                if (normalizedType === 'perday') {
+                    perdayItems.push(item);
+                } else if (typeName === 'JamRoom') {
+                    jamroomItems.push(item);
+                } else {
+                    inhouseItems.push(item);
+                }
+            });
+
+            return;
+        }
+
+        // For non-JamRoom categories without sub-items, treat base price as a single in-house item.
+        if (typeName !== 'JamRoom' && toNumber(type.basePrice, 0) > 0) {
+            inhouseItems.push({
+                key: `${typeName}__${typeName}`,
+                name: typeName,
+                category: typeName,
+                description: type.description || `${typeName} rental`,
+                price: toNumber(type.basePrice, 0),
+                rentalType: 'inhouse',
+                isRequired: false
+            });
+        }
+    });
+
+    return { jamroomItems, inhouseItems, perdayItems };
+};
+
+const initializeRequiredSelections = () => {
+    const jamroomBase = rentalCatalog.hourly.get('JamRoom_base');
+    if (!jamroomBase) return;
+
+    hourlySelectedRentals.set(jamroomBase.key, {
+        name: jamroomBase.name,
+        fullId: jamroomBase.key,
+        category: jamroomBase.category,
+        description: jamroomBase.description,
+        basePrice: jamroomBase.price,
+        price: jamroomBase.price,
+        quantity: 1,
+        isRequired: true,
+        rentalType: 'inhouse',
+        perdayPrice: 0
+    });
+};
+
+const populateRentalTypes = () => {
+    const hourlyContainer = document.getElementById('rentalsList');
+    const perdayContainer = document.getElementById('perdayRentalsList');
+
+    if (!hourlyContainer || !perdayContainer) return;
+
+    hourlyContainer.innerHTML = '';
+    perdayContainer.innerHTML = '';
+    hourlySelectedRentals = new Map();
+    perdaySelectedRentals = new Map();
+    rentalCatalog.hourly = new Map();
+    rentalCatalog.perday = new Map();
+
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+    if (rentalTypes.length === 0) {
+        hourlyContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No rental options available.</p>';
+        perdayContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No per-day options available.</p>';
+        setActiveSelectionMap();
+        if (typeof updatePriceDisplay === 'function') updatePriceDisplay();
+        return;
+    }
+
+    const { jamroomItems, inhouseItems, perdayItems } = categorizeRentalItems();
+
+    jamroomItems.forEach((item) => rentalCatalog.hourly.set(item.key, item));
+    inhouseItems.forEach((item) => rentalCatalog.hourly.set(item.key, item));
+    perdayItems.forEach((item) => rentalCatalog.perday.set(item.key, item));
+
+    renderRentalSection(hourlyContainer, 'JamRoom', jamroomItems, 'hourly');
+    renderRentalSection(hourlyContainer, 'InHouse Rentals', inhouseItems, 'hourly');
+    renderRentalSection(perdayContainer, 'Per Day Rentals', perdayItems, 'perday');
+
+    initializeRequiredSelections();
+    setActiveSelectionMap();
+    applyPerdayItemAvailability();
+
+    if (typeof updatePriceDisplay === 'function') {
+        updatePriceDisplay();
+    }
+};
+
+const toggleRental = (rentalKey, mode = 'hourly') => {
+    const selectedMap = getMapForMode(mode);
+    const item = rentalCatalog[mode]?.get(rentalKey);
+    const rentalDiv = document.querySelector(`[data-rental-id="${rentalKey}"][data-rental-mode="${mode}"]`);
+    const checkbox = rentalDiv?.querySelector('.rental-checkbox');
+
+    if (!item || !rentalDiv || !checkbox) return;
+
+    if (mode === 'perday' && checkbox.checked && perdayUnavailableItems.has(normalizeRentalNameKey(item.name))) {
+        checkbox.checked = false;
+        showAlert(`${item.name} is unavailable for the selected pickup/return range.`, 'error');
+        return;
+    }
+
+    if (checkbox.checked) {
+        selectedMap.set(rentalKey, {
+            name: item.name,
+            fullId: rentalKey,
+            category: item.category,
+            description: item.description,
+            basePrice: item.price,
+            price: item.price,
+            quantity: 1,
+            isRequired: !!item.isRequired,
+            rentalType: item.rentalType,
+            perdayPrice: item.rentalType === 'perday' ? item.price : 0
+        });
+        rentalDiv.classList.add('selected');
+    } else {
+        selectedMap.delete(rentalKey);
+        rentalDiv.classList.remove('selected');
+        const quantityDisplay = rentalDiv.querySelector('.quantity-display');
+        if (quantityDisplay) quantityDisplay.textContent = '1';
+    }
+
+    if (mode === currentBookingMode && typeof updatePriceDisplay === 'function') {
+        updatePriceDisplay();
+    }
+};
+
+const updateQuantity = (rentalKey, change, mode = 'hourly') => {
+    const selectedMap = getMapForMode(mode);
+    if (!selectedMap.has(rentalKey)) return;
+
+    const rental = selectedMap.get(rentalKey);
+    if (rental.isRequired) return;
+
+    if (mode === 'hourly' && rental.rentalType === 'inhouse' && rental.price > 0 && !rental.name.includes('IEM')) {
+        return;
+    }
+
+    const maxLimits = {
+        'JamRoom__Microphone': 4,
+        'JamRoom__Audio Jacks': 4
+    };
+
+    const maxLimit = maxLimits[rentalKey] || 99;
+    const newQuantity = Math.max(1, Math.min(maxLimit, rental.quantity + change));
+    rental.quantity = newQuantity;
+
+    const rentalDiv = document.querySelector(`[data-rental-id="${rentalKey}"][data-rental-mode="${mode}"]`);
+    const quantityDisplay = rentalDiv?.querySelector('.quantity-display');
+    if (quantityDisplay) quantityDisplay.textContent = String(newQuantity);
+
+    if (mode === currentBookingMode && typeof updatePriceDisplay === 'function') {
+        updatePriceDisplay();
+    }
+};
+
+const resetBookingRentalState = () => {
+    populateRentalTypes();
+
+    const modeInputs = document.querySelectorAll('input[name="bookingMode"]');
+    modeInputs.forEach((input) => {
+        input.checked = input.value === 'hourly';
+    });
+
+    switchBookingMode('hourly');
+};
 
 // Load settings using shared API
 const loadSettings = async () => {
     try {
-        console.log('Loading booking settings...');
-        // Booking page should use public booking settings, not admin-only settings.
         const res = await fetch(`${API_URL}/api/bookings/settings`);
         const data = await res.json();
 
         if (res.ok && data.success && data.settings) {
             settings = data.settings;
-            window.adminSettings = settings; // For GST calculations
+            window.adminSettings = settings;
 
-            console.log('Settings loaded:', settings);
-            console.log('Rental types count:', settings?.rentalTypes?.length);
+            bindBookingModeControls();
+            setPerDayInputConstraints();
             populateRentalTypes();
         } else {
             console.error('Failed to load settings:', data);
@@ -27,253 +765,30 @@ const loadSettings = async () => {
     }
 };
 
-// Populate rental types with multiple selection interface
-const populateRentalTypes = () => {
-    const container = document.getElementById('rentalsList');
-    container.innerHTML = '';
-    selectedRentals = new Map();
+const getBookingMode = () => currentBookingMode;
 
-    console.log('populateRentalTypes called, settings:', settings);
+const getPerDayBookingInfo = () => {
+    const startDate = document.getElementById('perdayStartDate')?.value || '';
+    const endDate = document.getElementById('perdayEndDate')?.value || '';
+    const pickupTime = document.getElementById('perdayPickupTime')?.value || '';
+    const returnTime = document.getElementById('perdayReturnTime')?.value || '';
+    const durationInfo = calculatePerDayDurationInfo({
+        startDate,
+        endDate,
+        pickupTime,
+        returnTime
+    });
 
-    if (settings && settings.rentalTypes) {
-        console.log('Found rental types:', settings.rentalTypes);
-        settings.rentalTypes.forEach((type, index) => {
-            console.log(`Processing rental type ${index}:`, type);
-            console.log('Has subItems:', type.subItems, 'Length:', type.subItems?.length);
-
-            const hasSubItems = type.subItems && type.subItems.length > 0;
-
-            // Create collapsible category section
-            const categorySection = document.createElement('div');
-            categorySection.className = 'rental-category';
-            categorySection.style.cssText = 'margin-bottom: 20px; border: 2px solid #e1e8ed; border-radius: 12px; background: #f8f9fa;';
-
-            // Category header (clickable to toggle)
-            const categoryHeader = document.createElement('div');
-            categoryHeader.className = 'category-header';
-            categoryHeader.style.cssText = 'padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px 10px 0 0; font-weight: 600;';
-            categoryHeader.innerHTML = `
-                <span>${type.name}</span>
-                <span class="toggle-icon" style="font-size: 18px; font-weight: bold;">−</span>
-            `;
-
-            // Category content (collapsible)
-            const categoryContent = document.createElement('div');
-            categoryContent.className = 'category-content';
-            categoryContent.style.cssText = 'padding: 15px; display: block;';
-
-            categorySection.appendChild(categoryHeader);
-            categorySection.appendChild(categoryContent);
-            container.appendChild(categorySection);
-
-            // Add click handler for toggle
-            categoryHeader.addEventListener('click', () => {
-                const content = categoryContent;
-                const icon = categoryHeader.querySelector('.toggle-icon');
-                if (content.style.display === 'none') {
-                    content.style.display = 'block';
-                    icon.textContent = '−';
-                } else {
-                    content.style.display = 'none';
-                    icon.textContent = '+';
-                }
-            });
-
-            if (hasSubItems) {
-                // Add base category option (always charges base price)
-                const baseCategoryDiv = document.createElement('div');
-                baseCategoryDiv.className = 'rental-option base';
-                baseCategoryDiv.dataset.rentalId = `${type.name}_base`;
-
-                // Special handling for JamRoom base - no quantity controls
-                const isJamRoomBase = type.name === 'JamRoom';
-
-                baseCategoryDiv.innerHTML = `
-                    <input type="checkbox" class="rental-checkbox" ${isJamRoomBase ? 'checked' : ''} onchange="toggleRental('${type.name}_base', ${type.basePrice}, '${(type.description || 'Base rental').replace(/'/g, "\\'")}', '${type.name}', true)">
-                    <div class="rental-meta">
-                        <div class="rental-name">${type.name} (Base)</div>
-                        <div class="rental-description">${type.description || 'Base rental'} - ${isJamRoomBase ? 'Always 1 room' : 'Required category'}</div>
-                        <div class="rental-price">₹${type.basePrice}/hr</div>
-                    </div>
-                    <div class="rental-qty">
-                        ${!isJamRoomBase ? `
-                            <div class="quantity-controls">
-                                <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}_base', -1)">−</button>
-                                <span class="quantity-display">1</span>
-                                <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}_base', 1)">+</button>
-                            </div>
-                        ` : `
-                            <div class="quantity-info centered">
-                                Fixed: 1 room
-                            </div>
-                        `}
-                    </div>
-                `;
-                categoryContent.appendChild(baseCategoryDiv);
-
-                if (isJamRoomBase) {
-                    selectedRentals.set(`${type.name}_base`, {
-                        name: `${type.name} (Base)`,
-                        fullId: `${type.name}_base`,
-                        category: type.name,
-                        description: type.description || 'Base rental',
-                        basePrice: type.basePrice,
-                        price: type.basePrice,
-                        quantity: 1,
-                        isRequired: true,
-                        rentalType: 'inhouse',
-                        perdayPrice: 0
-                    });
-                    baseCategoryDiv.classList.add('selected');
-                }
-
-                // Add each sub-item as an optional add-on
-                type.subItems.forEach((subItem) => {
-                    console.log(`Adding sub-item: ${subItem.name} - ₹${subItem.price}`);
-                    const itemId = `${type.name}__${subItem.name}`;
-                    const rentalDiv = document.createElement('div');
-                    rentalDiv.className = 'rental-option child';
-                    rentalDiv.dataset.rentalId = itemId;
-
-                    const isPerday = subItem.rentalType === 'perday';
-                    const displayPrice = isPerday ? subItem.perdayPrice || 0 : subItem.price || 0;
-                    const priceUnit = isPerday ? '/day' : '/hr';
-
-                    // Only show quantity controls for per-day rentals, free add-ons (price = 0), and IEM
-                    // In-house rentals (except IEM) are tied to jamroom duration and shouldn't have separate quantity controls
-                    const showQuantityControls = isPerday || displayPrice === 0 || subItem.name.includes('IEM');
-
-                    rentalDiv.innerHTML = `
-                        <input type="checkbox" class="rental-checkbox" onchange="toggleRental('${itemId}', ${displayPrice}, '${(subItem.description || type.description || '').replace(/'/g, "\\'")}', '${type.name}', false, '${subItem.rentalType || 'inhouse'}')">
-                        <div class="rental-meta">
-                            <div class="rental-name">${subItem.name}${isPerday ? ' (Per-day)' : displayPrice === 0 ? ' (Free add-on)' : ''}</div>
-                            <div class="rental-description">${subItem.description || type.description || ''} ${displayPrice === 0 ? '(Free add-on)' : isPerday ? '(Independent pricing)' : '(Tied to jamroom duration)'}</div>
-                            <div class="rental-price">${displayPrice === 0 ? 'FREE' : '₹' + displayPrice + priceUnit}</div>
-                        </div>
-                        <div class="rental-qty">
-                            ${showQuantityControls ? `
-                                <div class="quantity-controls">
-                                    <button type="button" class="quantity-btn" onclick="updateQuantity('${itemId}', -1)">−</button>
-                                    <span class="quantity-display">1</span>
-                                    <button type="button" class="quantity-btn" onclick="updateQuantity('${itemId}', 1)">+</button>
-                                </div>
-                            ` : `
-                                <div class="quantity-info">
-                                    Tied to JamRoom duration
-                                </div>
-                            `}
-                        </div>
-                    `;
-
-                    categoryContent.appendChild(rentalDiv);
-                });
-            } else {
-                console.log(`Creating regular rental option for: ${type.name}`);
-                // Regular rental type without sub-items
-                const rentalDiv = document.createElement('div');
-                rentalDiv.className = 'rental-option regular';
-                rentalDiv.dataset.rentalId = type.name;
-                rentalDiv.style.marginTop = '12px';
-
-                rentalDiv.innerHTML = `
-                    <input type="checkbox" class="rental-checkbox" onchange="toggleRental('${type.name}', ${type.basePrice}, '${(type.description || '').replace(/'/g, "\\'")}', null, false)">
-                    <div class="rental-meta">
-                        <div class="rental-name">${type.name}</div>
-                        <div class="rental-description">${type.description || 'No description available'}</div>
-                        <div class="rental-price">₹${type.basePrice}/hr</div>
-                    </div>
-                    <div class="rental-qty">
-                        <div class="quantity-controls">
-                            <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}', -1)">−</button>
-                            <span class="quantity-display">1</span>
-                            <button type="button" class="quantity-btn" onclick="updateQuantity('${type.name}', 1)">+</button>
-                        </div>
-                    </div>
-                `;
-
-                container.appendChild(rentalDiv);
-            }
-        });
-    } else {
-        container.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 20px;">No rental options available. Please contact admin.</p>';
-    }
-
-    updatePriceDisplay();
-};
-
-// Toggle rental selection
-const toggleRental = (rentalName, basePrice, description, category = null, isRequired = false, rentalType = 'inhouse') => {
-    const rentalDiv = document.querySelector(`[data-rental-id="${rentalName}"]`);
-    const checkbox = rentalDiv.querySelector('.rental-checkbox');
-
-    // Extract display name (remove category prefix if present)
-    const displayName = rentalName.includes('__') ? rentalName.split('__')[1] :
-        rentalName.includes('_base') ? rentalName.replace('_base', ' (Base)') : rentalName;
-
-    if (checkbox.checked) {
-        selectedRentals.set(rentalName, {
-            name: displayName,
-            fullId: rentalName,
-            category: category,
-            description: description,
-            basePrice: basePrice,
-            price: basePrice, // This should be the correct price for both hourly and per-day
-            quantity: 1,
-            isRequired: isRequired,
-            rentalType: rentalType, // Add rental type to track pricing model
-            perdayPrice: basePrice // Store the per-day price for per-day items
-        });
-        console.log(`Added rental: ${rentalName}, price: ${basePrice}, rentalType: ${rentalType}`);
-        rentalDiv.classList.add('selected');
-    } else {
-        selectedRentals.delete(rentalName);
-        rentalDiv.classList.remove('selected');
-        // Reset quantity to 1 (only if quantity display exists)
-        const quantityDisplay = rentalDiv.querySelector('.quantity-display');
-        if (quantityDisplay) {
-            quantityDisplay.textContent = '1';
-        }
-    }
-
-    updatePriceDisplay();
-};
-
-// Update quantity for a rental
-const updateQuantity = (rentalName, change) => {
-    if (!selectedRentals.has(rentalName)) return;
-
-    const rental = selectedRentals.get(rentalName);
-
-    // Skip quantity updates for JamRoom base (always 1) and paid in-house items
-    // Allow free items (price = 0), per-day rentals, and IEM to have quantity controls
-    if (rentalName === 'JamRoom_base') {
-        return; // JamRoom base always stays at 1
-    }
-
-    // Allow quantity changes for free items (price = 0), per-day rentals, or IEM
-    if (rental.rentalType === 'inhouse' && rental.price > 0 && !rentalName.includes('_base') && !rentalName.includes('IEM')) {
-        return; // Paid in-house instruments (except IEM) don't have adjustable quantities
-    }
-
-    // Define maximum limits for specific items
-    const maxLimits = {
-        'JamRoom__Microphone': 4,
-        'JamRoom__Audio Jacks': 4
+    return {
+        startDate,
+        endDate,
+        pickupTime,
+        returnTime,
+        days: durationInfo.days,
+        totalHours: durationInfo.totalHours,
+        isValid: durationInfo.isValid,
+        validationMessage: durationInfo.error
     };
-
-    const maxLimit = maxLimits[rentalName] || 99; // Default max of 99 if no specific limit
-    const newQuantity = Math.max(1, Math.min(maxLimit, rental.quantity + change));
-
-    rental.quantity = newQuantity;
-
-    // Update display (only if quantity display exists)
-    const rentalDiv = document.querySelector(`[data-rental-id="${rentalName}"]`);
-    const quantityDisplay = rentalDiv?.querySelector('.quantity-display');
-    if (quantityDisplay) {
-        quantityDisplay.textContent = newQuantity;
-    }
-
-    updatePriceDisplay();
 };
 
 // Expose for inline handlers and cross-file usage.
@@ -281,3 +796,7 @@ window.loadSettings = loadSettings;
 window.populateRentalTypes = populateRentalTypes;
 window.toggleRental = toggleRental;
 window.updateQuantity = updateQuantity;
+window.getBookingMode = getBookingMode;
+window.getPerDayBookingInfo = getPerDayBookingInfo;
+window.switchBookingMode = switchBookingMode;
+window.resetBookingRentalState = resetBookingRentalState;

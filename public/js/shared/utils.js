@@ -413,39 +413,12 @@ class JamRoomUtils {
         this.hideLoading(container); // Remove any existing loader
         
         const loader = this.createElement('div', {
-            className: 'loading-overlay',
-            style: `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(255, 255, 255, 0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 9999;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            `.replace(/\n\s*/g, '')
+            className: 'loading-overlay utils-loading-overlay'
         }, `
-            <div style="text-align: center;">
-                <div style="
-                    width: 40px;
-                    height: 40px;
-                    border: 3px solid #f3f3f3;
-                    border-top: 3px solid #3498db;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                    margin: 0 auto 15px;
-                "></div>
-                <div style="color: #555; font-size: 16px;">${message}</div>
+            <div class="utils-loading-content">
+                <div class="utils-loading-spinner"></div>
+                <div class="utils-loading-message">${message}</div>
             </div>
-            <style>
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            </style>
         `);
         
         container.appendChild(loader);
@@ -502,7 +475,7 @@ class JamRoomUtils {
         if (!container) return;
 
         container.innerHTML = `
-            <div class="loading" style="display:flex;align-items:center;gap:10px;justify-content:center;padding:20px;">
+            <div class="section-loading-inline">
                 <div class="loader"></div>
                 <span>${message}</span>
             </div>

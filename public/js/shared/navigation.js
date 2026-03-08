@@ -27,9 +27,26 @@ class NavigationManager {
         if (path === '/booking.html') return 'booking';
         if (path === '/admin.html') return 'admin';
         if (path === '/account.html') return 'account';
+        if (path === '/payment-info.html') return 'payment';
         if (path === '/login.html') return 'login';
         if (path === '/register.html') return 'register';
+        if (path === '/reset-password.html') return 'reset-password';
         return 'unknown';
+    }
+
+    isCurrentHref(href) {
+        const current = window.location.pathname === '/index.html' ? '/' : window.location.pathname;
+        const target = href === '/index.html' ? '/' : href;
+        return current === target;
+    }
+
+    escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**
@@ -69,59 +86,43 @@ class NavigationManager {
     getMainLinks() {
         const links = [];
 
-        // Home link (always available, but hidden on home page)
-        if (this.currentPage !== 'home') {
-            links.push({
-                href: '/',
-                text: '🏠 Home',
-                class: 'btn btn-secondary',
-                id: 'homeNavLink'
-            });
-        }
+        links.push({
+            href: '/',
+            text: '🏠 Home',
+            class: `nav-link ${this.isCurrentHref('/') ? 'active' : ''}`.trim(),
+            id: 'homeNavLink'
+        });
 
-        // Booking link (available for authenticated users, different text based on page)
+        links.push({
+            href: '/booking.html',
+            text: '📅 Book Now',
+            class: `nav-link ${this.isCurrentHref('/booking.html') ? 'active' : ''}`.trim(),
+            id: 'bookingNavLink'
+        });
+
+        links.push({
+            href: '/payment-info.html',
+            text: '💳 Payment Info',
+            class: `nav-link ${this.isCurrentHref('/payment-info.html') ? 'active' : ''}`.trim(),
+            id: 'paymentNavLink'
+        });
+
         if (this.isAuthenticated) {
-            if (this.currentPage !== 'booking') {
-                const text = this.currentPage === 'account' ? '📅 New Booking' : '📅 Book Now';
-                links.push({
-                    href: '/booking.html',
-                    text: text,
-                    class: this.currentPage === 'account' ? 'btn btn-primary' : 'btn btn-primary',
-                    id: 'bookingNavLink'
-                });
-            }
-        }
-
-        // Account link (available for authenticated users, hidden on account page)
-        if (this.isAuthenticated && this.currentPage !== 'account') {
             links.push({
                 href: '/account.html',
                 text: '👤 My Account',
-                class: 'btn btn-secondary',
+                class: `nav-link ${this.isCurrentHref('/account.html') ? 'active' : ''}`.trim(),
                 id: 'accountNavLink'
             });
         }
 
-        // Admin link (only for admin users, hidden on admin page)
-        if (this.isAuthenticated && this.user?.role === 'admin' && this.currentPage !== 'admin') {
+        if (this.isAuthenticated && this.user?.role === 'admin') {
             links.push({
                 href: '/admin.html',
                 text: '🎛️ Admin Panel',
-                class: 'btn btn-warning',
+                class: `nav-link ${this.isCurrentHref('/admin.html') ? 'active' : ''}`.trim(),
                 id: 'adminNavLink'
             });
-        }
-
-        // Additional admin-specific links (only on admin page)
-        if (this.currentPage === 'admin' && this.user?.role === 'admin') {
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                links.push({
-                    href: '/test.html',
-                    text: '🧪 Tests',
-                    class: 'btn btn-sm btn-warning',
-                    id: 'testNavLink'
-                });
-            }
         }
 
         return links;
@@ -130,50 +131,76 @@ class NavigationManager {
     /**
      * Generate user info section
      */
-    getUserInfo() {
-        const userInfo = [];
+    getHeaderActions() {
+        const actions = [];
 
         if (this.isAuthenticated) {
-            // User name display
-            const displayName = this.user.name || this.user.email || 'User';
-            const rolePrefix = this.user.role === 'admin' ? 'Admin: ' : '';
-            
-            userInfo.push({
-                type: 'text',
-                content: `${rolePrefix}${displayName}`,
-                id: 'userNameDisplay',
-                class: 'user-name'
-            });
-
-            // Logout button
-            userInfo.push({
+            actions.push({
                 type: 'button',
                 text: '🚪 Logout',
                 onclick: 'NavigationManager.logout()',
                 class: 'btn btn-danger',
                 id: 'navLogoutBtn'
             });
-        } else {
-            // Login/Register links (only on home page for guests)
-            if (this.currentPage === 'home') {
-                userInfo.push({
+
+            if (
+                this.user?.role === 'admin' &&
+                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ) {
+                actions.push({
                     type: 'link',
-                    href: '/login.html',
-                    text: 'Login',
-                    class: 'btn btn-primary',
-                    id: 'loginNavLink'
-                });
-                userInfo.push({
-                    type: 'link',
-                    href: '/register.html',
-                    text: 'Register',
-                    class: 'btn btn-secondary',
-                    id: 'registerNavLink'
+                    href: '/test.html',
+                    text: '🧪 Tests',
+                    class: 'btn btn-warning btn-sm',
+                    id: 'testNavLink'
                 });
             }
+        } else {
+            actions.push({
+                type: 'link',
+                href: '/login.html',
+                text: 'Login',
+                class: 'btn btn-primary',
+                id: 'loginNavLink'
+            });
+            actions.push({
+                type: 'link',
+                href: '/register.html',
+                text: 'Register',
+                class: 'btn btn-secondary',
+                id: 'registerNavLink'
+            });
         }
 
-        return userInfo;
+        actions.push({
+            type: 'button',
+            text: this.getThemeToggleText(),
+            onclick: 'NavigationManager.toggleTheme()',
+            class: 'btn btn-secondary btn-theme-toggle',
+            id: 'navThemeToggle',
+            attrs: 'data-theme-toggle="true"'
+        });
+
+        return actions;
+    }
+
+    getThemeToggleText() {
+        if (window.ThemeManager && typeof window.ThemeManager.getCurrentTheme === 'function') {
+            return window.ThemeManager.getCurrentTheme() === 'dark' ? 'Light Mode' : 'Dark Mode';
+        }
+        return 'Dark Mode';
+    }
+
+    refreshThemeToggleLabels() {
+        if (window.ThemeManager && typeof window.ThemeManager.updateToggleButtons === 'function') {
+            window.ThemeManager.updateToggleButtons();
+            return;
+        }
+
+        const text = this.getThemeToggleText();
+        document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+            button.textContent = text;
+        });
     }
 
     /**
@@ -181,88 +208,47 @@ class NavigationManager {
      */
     generateHTML() {
         const mainLinks = this.getMainLinks();
-        const userInfo = this.getUserInfo();
-
-        // Choose header style based on page
-        const headerClass = this.currentPage === 'admin' ? 'topbar' : 'app-header';
-        
-        // Page titles
-        const pageTitles = {
-            home: '🎸Swar JamRoom & Music Studio',
-            booking: '🎸 Book Your Jam Session',
-            admin: '🎛️ Admin Panel',
-            account: '📱 My Account'
-        };
-
-        const title = pageTitles[this.currentPage] || 'JamRoom';
-        const subtitle = this.currentPage === 'home' ? '<p>Premium Jam Room Rental & Music Production Space</p>' : '';
+        const headerActions = this.getHeaderActions();
+        const displayName = this.isAuthenticated
+            ? this.escapeHtml(this.user?.name || this.user?.email || 'User')
+            : '';
+        const greetingHtml = this.isAuthenticated
+            ? `<p class="app-greeting">Hi, ${displayName}</p>`
+            : '';
 
         // Generate main links HTML
         const mainLinksHTML = mainLinks.map(link => 
             `<a href="${link.href}" class="${link.class}" id="${link.id}">${link.text}</a>`
         ).join('\n                ');
 
-        // Generate user info HTML
-        const userInfoHTML = userInfo.map(item => {
+        // Generate header actions HTML
+        const headerActionsHTML = headerActions.map(item => {
             switch (item.type) {
-                case 'text':
-                    return `<span id="${item.id}" class="${item.class}">${item.content}</span>`;
                 case 'button':
-                    return `<button onclick="${item.onclick}" class="${item.class}" id="${item.id}">${item.text}</button>`;
+                    return `<button onclick="${item.onclick}" class="${item.class}" id="${item.id}" ${item.attrs || ''}>${item.text}</button>`;
                 case 'link':
-                    return `<a href="${item.href}" class="${item.class}" id="${item.id}">${item.text}</a>`;
+                    return `<a href="${item.href}" class="${item.class}" id="${item.id}" ${item.attrs || ''}>${item.text}</a>`;
                 default:
                     return '';
             }
         }).join('\n                ');
 
-        // Return appropriate structure based on page
-        if (this.currentPage === 'admin') {
-            return `
-            <div class="${headerClass}">
-                <h1>${title}</h1>
+        return `
+            <div class="app-header">
+                <div class="app-brand">
+                    <h1>🎸Swar JamRoom & Music Studio</h1>
+                    <p class="app-subtitle">Premium Jam Room Rental & Music Production Space</p>
+                    ${greetingHtml}
+                </div>
+                <div class="app-header-actions">
+                    ${headerActionsHTML}
+                </div>
+            </div>
+            <div class="main-nav" role="navigation" aria-label="Primary navigation">
                 <div class="nav-links">
-                    ${userInfoHTML}
                     ${mainLinksHTML}
                 </div>
             </div>`;
-        } else if (this.currentPage === 'account') {
-            return `
-            <div class="${headerClass}">
-                <h1>${title}</h1>
-                ${subtitle}
-                <div class="nav-links">
-                    ${mainLinksHTML}
-                    ${userInfoHTML}
-                </div>
-            </div>`;
-        } else if (this.currentPage === 'home') {
-            return `
-            <header class="${headerClass}">
-                <h1>${title}</h1>
-                ${subtitle}
-            </header>
-            <nav class="main-nav">
-                <div class="nav-links">
-                    <a href="/" class="nav-link ${this.currentPage === 'home' ? 'active' : ''}">Home</a>
-                    ${mainLinksHTML.replace(/btn btn-/g, 'nav-link ').replace(/class="nav-link primary"/g, 'class="nav-link"').replace(/class="nav-link secondary"/g, 'class="nav-link"').replace(/class="nav-link warning"/g, 'class="nav-link"')}
-                </div>
-                <div class="user-info">
-                    ${userInfoHTML}
-                </div>
-            </nav>`;
-        } else {
-            // booking.html and other pages
-            return `
-            <header class="${headerClass}">
-                <h1>${title}</h1>
-                ${subtitle}
-                <div class="user-info">
-                    ${userInfoHTML}
-                    ${mainLinksHTML}
-                </div>
-            </header>`;
-        }
     }
 
     /**
@@ -309,7 +295,18 @@ class NavigationManager {
             console.warn('🧭 NavigationManager: No navigation container found');
         }
 
+        this.refreshThemeToggleLabels();
+
         console.log(`🧭 NavigationManager: Rendered navigation for ${this.currentPage} page`);
+    }
+
+    static toggleTheme() {
+        if (window.ThemeManager && typeof window.ThemeManager.toggleTheme === 'function') {
+            window.ThemeManager.toggleTheme();
+            if (window.NavigationManager && typeof window.NavigationManager.refreshThemeToggleLabels === 'function') {
+                window.NavigationManager.refreshThemeToggleLabels();
+            }
+        }
     }
 
     /**
@@ -365,11 +362,17 @@ class NavigationManager {
      * Initialize responsive behavior
      */
     initResponsive() {
-        // Add mobile menu toggle if needed
-        const nav = document.querySelector('.main-nav, .topbar, .app-header');
-        if (nav && window.innerWidth <= 768) {
-            nav.classList.add('mobile-nav');
+        const nav = document.querySelector('.main-nav');
+        if (!nav) {
+            return;
         }
+
+        const syncMobileState = () => {
+            nav.classList.toggle('mobile-nav', window.innerWidth <= 768);
+        };
+
+        syncMobileState();
+        window.addEventListener('resize', syncMobileState);
     }
 }
 
@@ -381,6 +384,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize responsive behavior
     window.NavigationManager.initResponsive();
     window.NavigationManager.addEventListeners();
+
+    document.addEventListener('jamroom:theme-changed', () => {
+        if (window.NavigationManager && typeof window.NavigationManager.refreshThemeToggleLabels === 'function') {
+            window.NavigationManager.refreshThemeToggleLabels();
+        }
+    });
     
     console.log('🧭 NavigationManager: Ready for initialization');
 });

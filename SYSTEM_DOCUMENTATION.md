@@ -549,6 +549,11 @@ EMAIL_REPLY_TO=support@jamroom.com
 
 ### Latest Changes (March 2026)
 
+#### 0. UI Tracking Single Source Clarification
+**Updated**:
+- UI unification phase status/checklist tracking is maintained in `DESIGN_UNIFICATION_TRACKER.md`.
+- `SYSTEM_DOCUMENTATION.md` remains canonical for architecture, APIs, models, and system behavior.
+
 #### 1. Multi-Recipient eBill Delivery
 **Added**:
 - `POST /api/admin/bookings/:id/send-ebill` supports customer + custom recipient delivery
@@ -584,6 +589,23 @@ EMAIL_REPLY_TO=support@jamroom.com
 **Updated**:
 - Replaced app-specific deep-link dependence (`phonepe://`, `tez://`, etc.) in user flows
 - Standardized to universal `upi://pay` with share/copy/QR fallback actions
+
+#### 7. Shared Navigation And Header Consistency
+**Updated**:
+- Unified shared `app-header` and `main-nav` behavior through `public/js/shared/navigation.js`.
+- Standardized navigation ordering and active-link treatment across core pages.
+- Moved header actions (theme/logout/tests) into right-side header action area.
+- Added authenticated greeting line below brand/subtitle.
+
+#### 8. Booking Width And Mobile Payment UI Hardening
+**Updated**:
+- Removed booking-specific container width override so booking page matches shared shell width.
+- Added mobile-safe constraints for payment toast/dialog components in shared CSS.
+- Verified key pages `public/admin.html`, `public/account.html`, and `public/booking.html` have `style=` count `0`.
+
+#### 9. Undo Recovery Validation
+**Updated**:
+- Re-applied and validated key UI changes after accidental undo (header action placement, greeting line, booking width consistency).
 
 ### Latest Changes (January 2026)
 
@@ -834,6 +856,7 @@ node createTestUsers.js      # Create test accounts
 - `SETUP_GUIDE.md` - Environment setup instructions
 - `TESTING_CHECKLIST.md` - Testing procedures
 - `DEPLOYMENT.md` - Deployment instructions
+- `DESIGN_UNIFICATION_TRACKER.md` - Canonical UI design-unification phase and progress tracker
 
 ### External Dependencies
 - **FullCalendar.js**: Calendar UI in admin panel
@@ -868,7 +891,10 @@ node createTestUsers.js      # Create test accounts
    - Solution implemented
    - Files modified
 
-**This document should be the single source of truth for the entire JamRoom Booking System.**
+**Single source ownership:**
+- `SYSTEM_DOCUMENTATION.md`: Architecture, APIs, models, and runtime behavior.
+- `DEVELOPER_REFERENCE.md`: Coding standards, naming conventions, and implementation patterns.
+- `DESIGN_UNIFICATION_TRACKER.md`: UI unification progress, phases, and checklist status.
 
 ---
 
@@ -959,4 +985,4 @@ This cleanup transformed the JamRoom application from a collection of redundant 
 
 ---
 
-*Document Version: 2.0 | Last Updated: January 25, 2026 (Includes System Cleanup Documentation)*
+*Document Version: 2.1 | Last Updated: March 8, 2026 (Includes UI tracking ownership and shared nav/header consistency updates)*

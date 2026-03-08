@@ -299,9 +299,9 @@ const loadAvailability = async (date) => {
     } catch (error) {
         console.error('Error loading availability:', error);
         if (error.name === 'AbortError') {
-            container.innerHTML = '<p style="color: #dc3545;">Loading availability timed out. Please try again.</p>';
+            container.innerHTML = '<p class="text-danger">Loading availability timed out. Please try again.</p>';
         } else {
-            container.innerHTML = '<p style="color: #dc3545;">Failed to load schedule. Please try again.</p>';
+            container.innerHTML = '<p class="text-danger">Failed to load schedule. Please try again.</p>';
         }
 
         // Clear availability data on error
@@ -321,7 +321,7 @@ const displayAvailability = (data) => {
     const container = document.getElementById('referenceTimeline');
 
     if (data.bookings.length === 0 && data.blockedTimes.length === 0) {
-        container.innerHTML = '<p style="color: #28a745;">✓ All time slots available for this date</p>';
+        container.innerHTML = '<p class="availability-all-clear">✓ All time slots available for this date</p>';
         return;
     }
 
@@ -329,13 +329,15 @@ const displayAvailability = (data) => {
 
     // Show bookings with simplified information for users
     data.bookings.forEach(booking => {
-        const statusColor = booking.bookingStatus === 'CONFIRMED' ? '#dc3545' : '#fd7e14';
+        const isConfirmed = booking.bookingStatus === 'CONFIRMED';
         const statusText = booking.bookingStatus === 'CONFIRMED' ? 'Booked' : 'Pending';
+        const statusClass = isConfirmed ? 'timeline-status-confirmed' : 'timeline-status-pending';
+        const itemStateClass = isConfirmed ? 'timeline-booking-confirmed' : 'timeline-booking-pending';
 
         html += `
-            <div class="timeline-item booked" style="border-left-color: ${statusColor};">
+            <div class="timeline-item booked ${itemStateClass}">
                 <strong>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</strong>
-                <span style="color: ${statusColor}; font-weight: 500; margin-left: 10px;">${statusText}</span>
+                <span class="timeline-status-label ${statusClass}">${statusText}</span>
             </div>
         `;
     });
@@ -345,7 +347,7 @@ const displayAvailability = (data) => {
         html += `
             <div class="timeline-item blocked">
                 <strong>${formatTime(blocked.startTime)} - ${formatTime(blocked.endTime)}</strong>
-                <span style="color: #6c757d; font-weight: 500; margin-left: 10px;">Unavailable</span>
+                <span class="timeline-status-label timeline-status-unavailable">Unavailable</span>
             </div>
         `;
     });

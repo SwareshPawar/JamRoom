@@ -17,42 +17,58 @@ const loadMyBookings = async () => {
 
         if (data.bookings.length === 0) {
             document.getElementById('bookingsList').innerHTML =
-                '<p style="text-align:center; color:#666;">No bookings yet</p>';
+                '<p class="booking-empty-message">No bookings yet</p>';
             return;
         }
 
         let html = '';
         data.bookings.forEach(booking => {
-            // Skip old bookings that don't have the new schema
-            if (!booking.startTime || !booking.endTime || !booking.duration) {
-                console.log('Skipping old booking:', booking._id);
-                return;
-            }
+            const isPerday = booking.bookingMode === 'perday';
+            const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
+            const perDayRange = (booking.perDayStartDate && booking.perDayEndDate)
+                ? `${formatDate(booking.perDayStartDate)} to ${formatDate(booking.perDayEndDate)}`
+                : formatDate(booking.date);
+            const perDayTimeRange = `${formatTime(booking.startTime)} to ${formatTime(booking.endTime)}`;
 
             const statusClass = booking.bookingStatus.toLowerCase();
-            const date = new Date(booking.date);
             const rentalsDisplay = booking.rentals && booking.rentals.length > 0
                 ? booking.rentals.filter(r => r && r.name && r.quantity !== undefined && r.price !== undefined)
-                    .map(r => `<li>${r.name} × ${r.quantity} - ₹${r.price * r.quantity * booking.duration}</li>`).join('')
+                    .map(r => {
+                        const rentalType = String(r.rentalType || 'inhouse').toLowerCase();
+                        const days = isPerday ? perDayDays : 1;
+                        const amount = (isPerday || rentalType === 'perday')
+                            ? (r.price * r.quantity * days)
+                            : (r.price * r.quantity * (booking.duration || 1));
+                        return `<li>${r.name} × ${r.quantity} - ₹${amount}</li>`;
+                    }).join('')
                 : `<li>${booking.rentalType || 'Unknown rental'}</li>`;
+
+            const bookingDateLine = isPerday
+                ? `<p><strong>📅 Per-day Range:</strong> ${perDayRange} (${perDayDays} day(s))</p>`
+                : `<p><strong>📅 Date:</strong> ${formatDate(booking.date)}</p>`;
+
+            const bookingTimeLine = isPerday
+                ? `<p><strong>🕐 Pick-up/Return:</strong> ${perDayTimeRange}</p>`
+                : `<p><strong>🕐 Time:</strong> ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)} (${booking.duration}h)</p>`;
+
             html += `
                 <div class="booking-card ${statusClass}">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <h4 style="font-size: 1.25em; font-weight: 700; color: #2c3e50; margin: 0; letter-spacing: -0.01em;">
+                    <div class="booking-card-header">
+                        <h4 class="booking-card-title">
                             ${booking.rentals && booking.rentals.length > 0 ? `${booking.rentals.filter(r => r && r.name).length} Rental(s)` : (booking.rentalType || 'Booking')}
                         </h4>
                         <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
                     </div>
                     <p><strong>📝 Items:</strong></p>
-                    <ul style="margin: 5px 0 10px 20px; color: #555;">${rentalsDisplay}</ul>
-                    <p><strong>📅 Date:</strong> ${formatDate(booking.date)}</p>
-                    <p><strong>🕐 Time:</strong> ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)} (${booking.duration}h)</p>
+                    <ul class="booking-rentals-list">${rentalsDisplay}</ul>
+                    ${bookingDateLine}
+                    ${bookingTimeLine}
                     <p><strong>💰 Total:</strong> ₹${booking.price}
                         ${booking.subtotal !== undefined && booking.taxAmount !== undefined
                         ? `<small>(Subtotal: ₹${booking.subtotal} + Tax: ₹${booking.taxAmount})</small>` : ''}
                     </p>
                     ${booking.bandName ? `<p><strong>🎵 Band:</strong> ${booking.bandName}</p>` : ''}
-                    <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div class="booking-actions-row">
                         ${booking.bookingStatus === 'PENDING'
                         ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger">Cancel Booking</button>`
                         : ''}
@@ -64,11 +80,11 @@ const loadMyBookings = async () => {
             `;
         });
 
-        document.getElementById('bookingsList').innerHTML = html || '<p style="text-align:center; color:#666;">No valid bookings found</p>';
+        document.getElementById('bookingsList').innerHTML = html || '<p class="booking-empty-message">No valid bookings found</p>';
     } catch (error) {
         console.error('Load bookings error:', error);
         document.getElementById('bookingsList').innerHTML =
-            '<p style="color: #dc3545;">Failed to load bookings: ' + error.message + '</p>';
+            '<p class="text-danger">Failed to load bookings: ' + error.message + '</p>';
     }
 };
 

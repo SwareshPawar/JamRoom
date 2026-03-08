@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book Your Jam Session - JamRoom</title>
     <meta name="theme-color" content="#0f172a">
+    <script src="/js/shared/theme.js"></script>
 
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/icons/jamroom-icon.svg">
@@ -45,6 +46,21 @@
 
                 <form id="bookingForm">
                     <div class="form-group">
+                        <label>Booking Type*</label>
+                        <div class="booking-mode-switch" id="bookingModeSwitch">
+                            <label class="booking-mode-option">
+                                <input type="radio" name="bookingMode" value="hourly" checked>
+                                <span>JamRoom + InHouse (Hourly)</span>
+                            </label>
+                            <label class="booking-mode-option">
+                                <input type="radio" name="bookingMode" value="perday">
+                                <span>Per Day Rentals</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="hourlyBookingBlock" class="booking-flow-block">
+                    <div class="form-group">
                         <label for="bookingDate">Select Date*</label>
                         <input type="date" id="bookingDate" required>
                     </div>
@@ -64,7 +80,7 @@
                             <select id="startTime" required disabled>
                                 <option value="">Select date first</option>
                             </select>
-                            <div id="startTimeLoading" class="loading-text" style="display: none; margin-top: 5px; font-size: 0.9em; color: #666;">Loading available times...</div>
+                            <div id="startTimeLoading" class="loading-text start-time-loading">Loading available times...</div>
                         </div>
 
                         <div class="form-group">
@@ -76,22 +92,85 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Select Rentals*</label>
+                        <label>JamRoom + InHouse Rentals*</label>
                         <div id="rentalsList" class="rentals-container">
                             <!-- Rental items will be populated here -->
                         </div>
                     </div>
+                    </div>
 
-                    <div id="priceDisplay" class="price-display" style="display:none;">
+                    <div id="perdayBookingBlock" class="booking-flow-block booking-hidden-initial">
+                        <div class="form-group">
+                            <label for="perdayStartDate">Pickup Date*</label>
+                            <input type="date" id="perdayStartDate" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label for="perdayPickupTime">Pick-up Time*</label>
+                            <select id="perdayPickupTime" disabled>
+                                <option value="" selected>Select pick-up time</option>
+                                <option value="08:00">8:00 AM</option>
+                                <option value="09:00">9:00 AM</option>
+                                <option value="10:00">10:00 AM</option>
+                                <option value="11:00">11:00 AM</option>
+                                <option value="12:00">12:00 PM</option>
+                                <option value="13:00">1:00 PM</option>
+                                <option value="14:00">2:00 PM</option>
+                                <option value="15:00">3:00 PM</option>
+                                <option value="16:00">4:00 PM</option>
+                                <option value="17:00">5:00 PM</option>
+                                <option value="18:00">6:00 PM</option>
+                                <option value="19:00">7:00 PM</option>
+                                <option value="20:00">8:00 PM</option>
+                                <option value="21:00">9:00 PM</option>
+                                <option value="22:00">10:00 PM</option>
+                                <option value="23:00">11:00 PM</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="perdayEndDate">Return Date*</label>
+                            <input type="date" id="perdayEndDate" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label for="perdayReturnTime">Return Time*</label>
+                            <select id="perdayReturnTime" disabled>
+                                <option value="" selected>Select return time</option>
+                                <option value="08:00">8:00 AM</option>
+                                <option value="09:00">9:00 AM</option>
+                                <option value="10:00">10:00 AM</option>
+                                <option value="11:00">11:00 AM</option>
+                                <option value="12:00">12:00 PM</option>
+                                <option value="13:00">1:00 PM</option>
+                                <option value="14:00">2:00 PM</option>
+                                <option value="15:00">3:00 PM</option>
+                                <option value="16:00">4:00 PM</option>
+                                <option value="17:00">5:00 PM</option>
+                                <option value="18:00">6:00 PM</option>
+                                <option value="19:00">7:00 PM</option>
+                                <option value="20:00">8:00 PM</option>
+                                <option value="21:00">9:00 PM</option>
+                                <option value="22:00">10:00 PM</option>
+                                <option value="23:00">11:00 PM</option>
+                            </select>
+                            <small id="perdayDaysInfo" class="field-help">Return time is auto-set to pick-up time. End date controls 24h/48h/72h windows.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Per Day Rentals*</label>
+                            <div id="perdayRentalsList" class="rentals-container">
+                                <!-- Per-day rental items will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="priceDisplay" class="price-display booking-hidden-initial">
                         <div class="price-breakdown">
                             <div id="selectedRentals" class="selected-rentals"></div>
-                            <hr style="margin: 15px 0; border: none; border-top: 1px solid #e9ecef;">
+                            <hr class="price-break-divider">
                             <div class="price-total">
                                 <div class="subtotal">
                                     <span>Subtotal:</span>
                                     <span id="subtotalAmount">₹0</span>
                                 </div>
-                                <div class="tax" id="taxSection" style="display: none;">
+                                <div class="tax booking-hidden-initial" id="taxSection">
                                     <span id="taxLabel">GST (18%):</span>
                                     <span id="taxAmount">₹0</span>
                                 </div>
@@ -113,7 +192,7 @@
                         <textarea id="notes" rows="3" placeholder="Any special requirements..."></textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">Book Now</button>
+                    <button type="submit" class="btn btn-primary booking-submit-btn">Book Now</button>
                 </form>
 
                 <div id="upiSection" class="upi-section">
@@ -127,7 +206,7 @@
                             <button id="payWithUPI" class="payment-btn primary">Open UPI App & Pay</button>
                             <button id="payWithPhonePe" class="payment-btn secondary">Share Payment Link</button>
                             <button id="payWithGPay" class="payment-btn secondary">Copy UPI Link</button>
-                            <small style="color: #666; display: block; margin-top: 8px;">Use universal UPI link, share link, or QR scan (app-specific deep links are limited now)</small>
+                            <small class="payment-note-text">Use universal UPI link, share link, or QR scan (app-specific deep links are limited now)</small>
                         </div>
                         
                         <!-- Copy UPI Details -->
@@ -153,12 +232,12 @@
                         
                         <div class="qr-section">
                             <img id="upiQR" alt="UPI QR Code">
-                            <small style="color: #666;">Scan with any UPI app</small>
+                            <small class="payment-note-text payment-note-tight">Scan with any UPI app</small>
                         </div>
                     </div>
                     
-                    <button onclick="document.getElementById('upiSection').classList.remove('show')" class="btn btn-secondary" style="margin-top: 20px;">Close</button>
-                    <a id="paymentGuideLink" href="/payment-info.html" class="btn btn-primary" style="margin-top: 20px; margin-left: 8px;">Open Payment Guide</a>
+                    <button onclick="document.getElementById('upiSection').classList.remove('show')" class="btn btn-secondary payment-close-btn">Close</button>
+                    <a id="paymentGuideLink" href="/payment-info.html" class="btn btn-primary payment-guide-btn">Open Payment Guide</a>
                 </div>
                 </div>
             </div>
@@ -170,7 +249,7 @@
                 </div>
                 <div class="section-content">
                     <div id="bookingsLoading" class="loading-text">Loading...</div>
-                    <div id="bookingsList" class="bookings-list" style="display:none;"></div>
+                    <div id="bookingsList" class="bookings-list booking-hidden-initial"></div>
                 </div>
             </div>
         </div>
@@ -189,6 +268,9 @@
         <script src="/js/booking/booking-bookings.js"></script>
         <script src="/js/booking/booking-pricing.js"></script>
         <script src="/js/booking/booking-rentals.js"></script>
+        <script src="/js/booking/booking-api.js"></script>
+        <script src="/js/booking/booking-payment.js"></script>
+        <script src="/js/booking/booking-form.js"></script>
         <script src="/js/booking/booking-main.js"></script>
 </body>
 </html>

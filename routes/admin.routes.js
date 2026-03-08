@@ -56,6 +56,11 @@ const formatTimeRange12Hour = (startTime, endTime) => {
   return `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
 };
 
+const buildHourlySlotModeFilter = () => ({
+  bookingMode: 'hourly',
+  rentals: { $not: { $elemMatch: { rentalType: 'perday' } } }
+});
+
 const normalizeEmail = (email) => {
   return String(email || '').trim().toLowerCase();
 };
@@ -609,11 +614,14 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
     };
 
     // Find and reject overlapping pending bookings
-    const overlappingBookings = await Booking.find({
-      _id: { $ne: booking._id },
-      date: booking.date,
-      bookingStatus: 'PENDING'
-    });
+    const overlappingBookings = booking.bookingMode === 'perday'
+      ? []
+      : await Booking.find({
+          _id: { $ne: booking._id },
+          date: booking.date,
+          bookingStatus: 'PENDING',
+          ...buildHourlySlotModeFilter()
+        });
 
     const settings = await AdminSettings.getSettings();
     const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
@@ -1821,7 +1829,8 @@ router.post('/block-time', protect, isAdmin, async (req, res) => {
     // Check for conflicts with existing bookings
     const conflictBookings = await Booking.find({
       date: blockDate,
-      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
+      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] },
+      ...buildHourlySlotModeFilter()
     });
 
     const timeToMinutes = (time) => {
@@ -2072,7 +2081,8 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       // Check for conflicts with existing bookings (only CONFIRMED bookings block slots)
       const existingBookings = await Booking.find({
         date: bookingDate,
-        bookingStatus: 'CONFIRMED'
+        bookingStatus: 'CONFIRMED',
+        ...buildHourlySlotModeFilter()
       });
 
       for (const booking of existingBookings) {

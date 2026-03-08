@@ -4,12 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - JamRoom</title>
+    <script src="/js/shared/theme.js"></script>
     
     <link rel="stylesheet" href="/css/shared.css">
+    <script src="/js/shared/navigation.js"></script>
     <link rel="stylesheet" href="/css/pages/register.css">
 
 </head>
 <body>
+    <div id="navigationContainer"></div>
+
     <div class="register-container">
         <div class="register-header">
             <h1>🎸 JamRoom Register</h1>
@@ -63,6 +67,11 @@
         const form = document.getElementById('registerForm');
         const alertDiv = document.getElementById('alert');
         const submitBtn = document.getElementById('submitBtn');
+
+        if (window.NavigationManager) {
+            window.NavigationManager.init(null);
+            window.NavigationManager.render('navigationContainer');
+        }
 
         function showAlert(message, type = 'error') {
             alertDiv.textContent = message;

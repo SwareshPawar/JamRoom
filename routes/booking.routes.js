@@ -69,18 +69,185 @@ const calculateEndTime = (startTime, duration) => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
+const parseDateTime = (dateValue, timeValue) => {
+  if (!dateValue || !timeValue) return null;
+
+  const [hours, minutes] = String(timeValue).split(':').map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+
+  const parsedDate = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) return null;
+
+  parsedDate.setHours(hours, minutes, 0, 0);
+  return parsedDate;
+};
+
+const applyTimeToDateObject = (dateValue, timeValue) => {
+  if (!dateValue || !timeValue) return null;
+
+  const [hours, minutes] = String(timeValue).split(':').map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+
+  const parsedDate = new Date(dateValue);
+  if (Number.isNaN(parsedDate.getTime())) return null;
+
+  parsedDate.setHours(hours, minutes, 0, 0);
+  return parsedDate;
+};
+
+const normalizeRentalName = (name) => String(name || '').trim().toLowerCase();
+
+const buildPerdayInventoryModeFilter = () => ({
+  $or: [
+    { bookingMode: 'perday' },
+    { rentals: { $elemMatch: { rentalType: 'perday' } } },
+    {
+      perDayStartDate: { $exists: true, $ne: null },
+      perDayEndDate: { $exists: true, $ne: null }
+    }
+  ]
+});
+
+const rangesOverlap = (startA, endA, startB, endB) => {
+  return startA < endB && endA > startB;
+};
+
+const getPerdayBookedItemQuantities = async ({
+  requestStartDate,
+  requestEndDate,
+  requestStartTime,
+  requestEndTime,
+  excludeBookingId = null
+}) => {
+  const requestStartDateTime = parseDateTime(requestStartDate, requestStartTime);
+  const requestEndDateTime = parseDateTime(requestEndDate, requestEndTime);
+
+  if (!requestStartDateTime || !requestEndDateTime) {
+    return new Map();
+  }
+
+  const query = {
+    bookingStatus: { $in: ['PENDING', 'CONFIRMED'] },
+    $and: [
+      buildPerdayInventoryModeFilter(),
+      {
+        $or: [
+          {
+            perDayStartDate: { $lte: new Date(`${requestEndDate}T23:59:59.999`) },
+            perDayEndDate: { $gte: new Date(`${requestStartDate}T00:00:00.000`) }
+          },
+          {
+            date: {
+              $gte: new Date(`${requestStartDate}T00:00:00.000`),
+              $lte: new Date(`${requestEndDate}T23:59:59.999`)
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  if (excludeBookingId) {
+    query._id = { $ne: excludeBookingId };
+  }
+
+  const candidateBookings = await Booking.find(query)
+    .select('bookingMode date perDayStartDate perDayEndDate startTime endTime rentals');
+
+  const bookedItems = new Map();
+
+  for (const booking of candidateBookings) {
+    const bookingStartDate = booking.perDayStartDate || booking.date;
+    const bookingEndDate = booking.perDayEndDate || booking.date;
+    const bookingStartTime = booking.startTime || '00:00';
+    const bookingEndTime = booking.endTime || bookingStartTime;
+
+    const bookingStartDateTime = applyTimeToDateObject(bookingStartDate, bookingStartTime);
+    const bookingEndDateTime = applyTimeToDateObject(bookingEndDate, bookingEndTime);
+
+    if (!bookingStartDateTime || !bookingEndDateTime) {
+      continue;
+    }
+
+    if (!rangesOverlap(requestStartDateTime, requestEndDateTime, bookingStartDateTime, bookingEndDateTime)) {
+      continue;
+    }
+
+    const rentals = Array.isArray(booking.rentals) ? booking.rentals : [];
+    rentals.forEach((rental) => {
+      const rentalType = String(rental?.rentalType || '').toLowerCase();
+      const isPerdayRental = booking.bookingMode === 'perday' || rentalType === 'perday';
+      if (!isPerdayRental) return;
+
+      const rentalNameKey = normalizeRentalName(rental?.name);
+      if (!rentalNameKey) return;
+
+      const qty = Math.max(1, Number(rental?.quantity || 1));
+      bookedItems.set(rentalNameKey, (bookedItems.get(rentalNameKey) || 0) + qty);
+    });
+  }
+
+  return bookedItems;
+};
+
+const buildHourlySlotModeFilter = () => ({
+  bookingMode: 'hourly',
+  rentals: { $not: { $elemMatch: { rentalType: 'perday' } } }
+});
+
 // @route   POST /api/bookings
 // @desc    Create a new booking with multiple rentals
 // @access  Private
 router.post('/', protect, async (req, res) => {
   try {
-    const { date, startTime, endTime, duration, rentals, subtotal, taxAmount, totalAmount, bandName, notes } = req.body;
+    const {
+      bookingMode = 'hourly',
+      date,
+      startTime,
+      endTime,
+      duration,
+      rentals,
+      subtotal,
+      taxAmount,
+      totalAmount,
+      bandName,
+      notes,
+      perDayStartDate,
+      perDayEndDate,
+      perDayPickupTime,
+      perDayReturnTime,
+      perDayDays
+    } = req.body;
 
-    if (!date || !startTime || !endTime || !duration || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
+    const normalizedMode = String(bookingMode).toLowerCase() === 'perday' ? 'perday' : 'hourly';
+    const effectiveStartTime = normalizedMode === 'perday'
+      ? String(perDayPickupTime || startTime || '')
+      : String(startTime || '');
+    const effectiveEndTime = normalizedMode === 'perday'
+      ? String(perDayReturnTime || endTime || '')
+      : String(endTime || '');
+
+    if (!rentals || !Array.isArray(rentals) || rentals.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide date, startTime, endTime, duration, and at least one rental'
+        message: 'Please provide at least one rental item'
       });
+    }
+
+    if (normalizedMode === 'hourly') {
+      if (!date || !effectiveStartTime || !effectiveEndTime || !duration) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide date, startTime, endTime and duration for hourly booking'
+        });
+      }
+    } else {
+      if (!perDayStartDate || !perDayEndDate || !effectiveStartTime || !effectiveEndTime) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide per-day start/end date and pick-up/return time'
+        });
+      }
     }
 
     // Validate rentals data
@@ -91,45 +258,140 @@ router.post('/', protect, async (req, res) => {
           message: 'Each rental must have name, price, and quantity'
         });
       }
+
+      const rentalTypeValue = String(rental.rentalType || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'inhouse';
+      if (normalizedMode === 'perday' && rentalTypeValue !== 'perday') {
+        return res.status(400).json({
+          success: false,
+          message: 'Per-day booking can include only per-day rental items'
+        });
+      }
+
+      if (normalizedMode === 'hourly' && rentalTypeValue !== 'inhouse') {
+        return res.status(400).json({
+          success: false,
+          message: 'Hourly booking can include only JamRoom/InHouse rental items'
+        });
+      }
     }
 
-    // Validate duration
-    if (duration < 1) {
+    const parsedDuration = Number(duration);
+    const durationForPricing = normalizedMode === 'hourly' ? parsedDuration : 1;
+
+    // Validate duration for hourly mode
+    if (normalizedMode === 'hourly' && parsedDuration < 1) {
       return res.status(400).json({
         success: false,
         message: 'Duration must be at least 1 hour'
       });
     }
 
-    // Convert date to start of day
-    const bookingDate = new Date(date);
+    // Convert date(s) to start of day
+    const bookingDate = new Date(normalizedMode === 'perday' ? perDayStartDate : date);
     bookingDate.setHours(0, 0, 0, 0);
 
-    // Check for conflicts with existing bookings (only CONFIRMED bookings block slots)
-    const existingBookings = await Booking.find({
-      date: bookingDate,
-      bookingStatus: 'CONFIRMED'
-    });
+    let perDayStart = null;
+    let perDayEnd = null;
+    let computedPerDayDays = 1;
+    let computedPerDayHours = 24;
 
-    for (const booking of existingBookings) {
-      if (checkTimeConflict(startTime, endTime, booking.startTime, booking.endTime)) {
+    if (normalizedMode === 'perday') {
+      const perDayStartDateTime = parseDateTime(perDayStartDate, effectiveStartTime);
+      const perDayEndDateTime = parseDateTime(perDayEndDate, effectiveEndTime);
+
+      perDayStart = new Date(perDayStartDate);
+      perDayEnd = new Date(perDayEndDate);
+
+      if (
+        !perDayStartDateTime ||
+        !perDayEndDateTime ||
+        Number.isNaN(perDayStart.getTime()) ||
+        Number.isNaN(perDayEnd.getTime())
+      ) {
         return res.status(400).json({
           success: false,
-          message: `Time conflict with existing booking (${booking.startTime} - ${booking.endTime})`
+          message: 'Invalid per-day date/time selection'
         });
+      }
+
+      perDayStart.setHours(0, 0, 0, 0);
+      perDayEnd.setHours(0, 0, 0, 0);
+
+      const diffMs = perDayEndDateTime.getTime() - perDayStartDateTime.getTime();
+      const dayMs = 24 * 60 * 60 * 1000;
+
+      if (diffMs < dayMs) {
+        return res.status(400).json({
+          success: false,
+          message: 'Per-day return must be at least 24 hours after pick-up'
+        });
+      }
+
+      if (diffMs % dayMs !== 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Per-day return must be in exact 24-hour blocks (24h, 48h, 72h...)'
+        });
+      }
+
+      computedPerDayDays = diffMs / dayMs;
+      computedPerDayHours = computedPerDayDays * 24;
+    }
+
+    if (normalizedMode === 'hourly') {
+      // Check for conflicts with existing bookings (only CONFIRMED bookings block slots)
+      const existingBookings = await Booking.find({
+        date: bookingDate,
+        bookingStatus: 'CONFIRMED',
+        ...buildHourlySlotModeFilter()
+      });
+
+      for (const booking of existingBookings) {
+        if (checkTimeConflict(effectiveStartTime, effectiveEndTime, booking.startTime, booking.endTime)) {
+          return res.status(400).json({
+            success: false,
+            message: `Time conflict with existing booking (${booking.startTime} - ${booking.endTime})`
+          });
+        }
+      }
+
+      // Check for conflicts with blocked times
+      const blockedTimes = await BlockedTime.find({
+        date: bookingDate
+      });
+
+      for (const blocked of blockedTimes) {
+        if (checkTimeConflict(effectiveStartTime, effectiveEndTime, blocked.startTime, blocked.endTime)) {
+          return res.status(400).json({
+            success: false,
+            message: `This time slot is blocked by admin (${blocked.startTime} - ${blocked.endTime})`
+          });
+        }
       }
     }
 
-    // Check for conflicts with blocked times
-    const blockedTimes = await BlockedTime.find({
-      date: bookingDate
-    });
+    if (normalizedMode === 'perday') {
+      const bookedItemQuantities = await getPerdayBookedItemQuantities({
+        requestStartDate: perDayStartDate,
+        requestEndDate: perDayEndDate,
+        requestStartTime: effectiveStartTime,
+        requestEndTime: effectiveEndTime
+      });
 
-    for (const blocked of blockedTimes) {
-      if (checkTimeConflict(startTime, endTime, blocked.startTime, blocked.endTime)) {
-        return res.status(400).json({
+      const conflictingItems = [];
+      rentals.forEach((rental) => {
+        const requestedNameKey = normalizeRentalName(rental?.name);
+        if (!requestedNameKey) return;
+
+        if ((bookedItemQuantities.get(requestedNameKey) || 0) > 0) {
+          conflictingItems.push(rental.name);
+        }
+      });
+
+      if (conflictingItems.length > 0) {
+        return res.status(409).json({
           success: false,
-          message: `This time slot is blocked by admin (${blocked.startTime} - ${blocked.endTime})`
+          message: `These per-day item(s) are unavailable for the selected dates: ${[...new Set(conflictingItems)].join(', ')}`
         });
       }
     }
@@ -138,7 +400,25 @@ router.post('/', protect, async (req, res) => {
     const settings = await AdminSettings.getSettings();
     
     // Validate and recalculate totals based on admin settings
-    const calculatedSubtotal = subtotal || 0;
+    let calculatedSubtotal = 0;
+    rentals.forEach((rental) => {
+      const rentalType = String(rental?.rentalType || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'inhouse';
+      const itemPrice = Number(rental?.price || 0);
+      const itemQuantity = Math.max(1, Number(rental?.quantity || 1));
+
+      if (normalizedMode === 'perday') {
+        calculatedSubtotal += itemPrice * itemQuantity * computedPerDayDays;
+      } else if (rentalType === 'perday') {
+        calculatedSubtotal += itemPrice * itemQuantity;
+      } else {
+        calculatedSubtotal += itemPrice * itemQuantity * durationForPricing;
+      }
+    });
+
+    if (Number.isFinite(Number(subtotal)) && Number(subtotal) > 0) {
+      calculatedSubtotal = Number(subtotal);
+    }
+
     const gstEnabled = settings.gstConfig?.enabled || false;
     const gstRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
     
@@ -160,10 +440,14 @@ router.post('/', protect, async (req, res) => {
     // Create booking with multiple rentals
     const booking = await Booking.create({
       userId: req.user._id,
+      bookingMode: normalizedMode,
       date: bookingDate,
-      startTime,
-      endTime,
-      duration,
+      startTime: effectiveStartTime,
+      endTime: effectiveEndTime,
+      duration: normalizedMode === 'perday' ? computedPerDayHours : parsedDuration,
+      perDayStartDate: normalizedMode === 'perday' ? perDayStart : undefined,
+      perDayEndDate: normalizedMode === 'perday' ? perDayEnd : undefined,
+      perDayDays: normalizedMode === 'perday' ? computedPerDayDays : 1,
       rentalType: rentalTypeSummary, // Legacy field
       rentals: rentals, // New multiple rentals array
       subtotal: calculatedSubtotal,
@@ -186,18 +470,23 @@ router.post('/', protect, async (req, res) => {
       day: 'numeric'
     });
 
+    const perDayDateLabel = normalizedMode === 'perday'
+      ? `${perDayStart.toLocaleDateString('en-IN')} ${formatTime12Hour(effectiveStartTime)} to ${perDayEnd.toLocaleDateString('en-IN')} ${formatTime12Hour(effectiveEndTime)} (${computedPerDayDays} day(s))`
+      : null;
+
     // Create rentals summary for email with correct per-day pricing
     const rentalsSummary = rentals.map(rental => {
       let itemTotal;
-      if (rental.rentalType === 'perday') {
-        // Per-day rentals: use perdayPrice, no duration factor
+      if (normalizedMode === 'perday' || rental.rentalType === 'perday') {
+        // Per-day rentals: use per-day price and selected day count.
         const perdayPrice = rental.perdayPrice || rental.price;
-        itemTotal = perdayPrice * rental.quantity;
-        return `<li>${rental.name} × ${rental.quantity} (per day) - ₹${itemTotal}</li>`;
+        const days = normalizedMode === 'perday' ? computedPerDayDays : 1;
+        itemTotal = perdayPrice * rental.quantity * days;
+        return `<li>${rental.name} × ${rental.quantity} × ${days} day(s) - ₹${itemTotal}</li>`;
       } else {
         // Hourly rentals: use price with duration factor
-        itemTotal = rental.price * rental.quantity * duration;
-        return `<li>${rental.name} × ${rental.quantity} × ${duration}h - ₹${itemTotal}</li>`;
+        itemTotal = rental.price * rental.quantity * durationForPricing;
+        return `<li>${rental.name} × ${rental.quantity} × ${durationForPricing}h - ₹${itemTotal}</li>`;
       }
     }).join('');
 
@@ -212,9 +501,12 @@ router.post('/', protect, async (req, res) => {
           <p>Your booking request has been received and is pending admin approval.</p>
           <h3>Booking Details:</h3>
           <ul>
-            <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${formatTimeRange12Hour(startTime, endTime)}</li>
-            <li><strong>Duration:</strong> ${duration} hour(s)</li>
+            ${normalizedMode === 'perday'
+              ? `<li><strong>Per-day Range:</strong> ${perDayDateLabel}</li>`
+              : `<li><strong>Date:</strong> ${displayDate}</li>
+                 <li><strong>Time:</strong> ${formatTimeRange12Hour(effectiveStartTime, effectiveEndTime)}</li>
+                 <li><strong>Duration:</strong> ${durationForPricing} hour(s)</li>`
+            }
           </ul>
           <h3>Rentals:</h3>
           <ul>
@@ -245,9 +537,9 @@ router.post('/', protect, async (req, res) => {
         await sendCustomerBookingRequestWhatsApp(req.user.mobile, {
           userName: req.user.name,
           date: displayDate,
-          startTime,
-          endTime,
-          duration,
+          startTime: effectiveStartTime,
+          endTime: effectiveEndTime,
+          duration: normalizedMode === 'perday' ? computedPerDayHours : duration,
           totalAmount: calculatedTotalAmount,
           upiId: settings.upiId,
           upiName: settings.upiName
@@ -270,9 +562,12 @@ router.post('/', protect, async (req, res) => {
             <ul>
               <li><strong>User:</strong> ${req.user.name} (${req.user.email})</li>
               ${req.user.mobile ? `<li><strong>Mobile:</strong> ${req.user.mobile}</li>` : ''}
-              <li><strong>Date:</strong> ${displayDate}</li>
-              <li><strong>Time:</strong> ${formatTimeRange12Hour(startTime, endTime)}</li>
-              <li><strong>Duration:</strong> ${duration} hour(s)</li>
+              ${normalizedMode === 'perday'
+                ? `<li><strong>Per-day Range:</strong> ${perDayDateLabel}</li>`
+                : `<li><strong>Date:</strong> ${displayDate}</li>
+                   <li><strong>Time:</strong> ${formatTimeRange12Hour(effectiveStartTime, effectiveEndTime)}</li>
+                   <li><strong>Duration:</strong> ${durationForPricing} hour(s)</li>`
+              }
             </ul>
             <h3>Rentals:</h3>
             <ul>
@@ -284,6 +579,9 @@ router.post('/', protect, async (req, res) => {
               ${gstEnabled ? `<li><strong>${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%):</strong> ₹${calculatedTaxAmount}</li>` : ''}
               <li><strong>Total:</strong> ₹${calculatedTotalAmount}</li>
             </ul>
+            ${normalizedMode === 'perday'
+              ? '<p><strong>Admin note:</strong> This per-day rental does not block JamRoom hourly slots automatically. Use Block Time in admin panel if blocking is needed.</p>'
+              : ''}
             ${bandName ? `<p><strong>Band Name:</strong> ${bandName}</p>` : ''}
             <p>Please review and approve/reject this booking in the admin panel.</p>
           `
@@ -299,9 +597,9 @@ router.post('/', protect, async (req, res) => {
         userName: req.user.name,
         userEmail: req.user.email,
         userMobile: req.user.mobile,
-        date: displayDate,
-        startTime,
-        endTime,
+        date: normalizedMode === 'perday' ? perDayDateLabel : displayDate,
+        startTime: effectiveStartTime,
+        endTime: effectiveEndTime,
         totalAmount: calculatedTotalAmount,
         bandName
       }, settings.whatsappNotifications);
@@ -331,6 +629,66 @@ router.post('/', protect, async (req, res) => {
 // @route   GET /api/bookings/availability
 // @desc    Check availability for a specific date (for reference)
 // @access  Public
+router.get('/availability/perday-items', async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      pickupTime,
+      returnTime
+    } = req.query;
+
+    if (!startDate || !endDate || !pickupTime || !returnTime) {
+      return res.json({
+        success: true,
+        unavailableItems: [],
+        bookedItemQuantities: {}
+      });
+    }
+
+    const startDateTime = parseDateTime(startDate, pickupTime);
+    const endDateTime = parseDateTime(endDate, returnTime);
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    if (!startDateTime || !endDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid per-day date/time selection'
+      });
+    }
+
+    const diffMs = endDateTime.getTime() - startDateTime.getTime();
+    if (diffMs < dayMs || diffMs % dayMs !== 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Per-day range must be in exact 24-hour blocks'
+      });
+    }
+
+    const bookedItemQuantities = await getPerdayBookedItemQuantities({
+      requestStartDate: startDate,
+      requestEndDate: endDate,
+      requestStartTime: pickupTime,
+      requestEndTime: returnTime
+    });
+
+    const bookedItemQuantitiesObj = Object.fromEntries(bookedItemQuantities.entries());
+    const unavailableItems = Object.keys(bookedItemQuantitiesObj);
+
+    return res.json({
+      success: true,
+      unavailableItems,
+      bookedItemQuantities: bookedItemQuantitiesObj
+    });
+  } catch (error) {
+    console.error('Get per-day item availability error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error fetching per-day item availability'
+    });
+  }
+});
+
 router.get('/availability/:date', async (req, res) => {
   try {
     const date = new Date(req.params.date);
@@ -339,8 +697,9 @@ router.get('/availability/:date', async (req, res) => {
     // Get all bookings for the date (show both PENDING and CONFIRMED for reference)
     const bookings = await Booking.find({
       date,
-      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
-    }).select('startTime endTime rentalType bookingStatus');
+      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] },
+      ...buildHourlySlotModeFilter()
+    }).select('startTime endTime rentalType bookingStatus bookingMode');
 
     // Only confirmed bookings block new bookings
     const confirmedBookings = bookings.filter(b => b.bookingStatus === 'CONFIRMED');
@@ -511,6 +870,11 @@ router.put('/:id/cancel', protect, async (req, res) => {
       day: 'numeric'
     });
 
+    const isPerday = booking.bookingMode === 'perday';
+    const perdayRangeText = (booking.perDayStartDate && booking.perDayEndDate)
+      ? `${new Date(booking.perDayStartDate).toLocaleDateString('en-IN')} ${formatTime12Hour(booking.startTime)} to ${new Date(booking.perDayEndDate).toLocaleDateString('en-IN')} ${formatTime12Hour(booking.endTime)} (${booking.perDayDays || 1} day(s))`
+      : displayDate;
+
     // Send cancellation email
     try {
       await sendEmail({
@@ -522,8 +886,11 @@ router.put('/:id/cancel', protect, async (req, res) => {
           <p>Your booking has been cancelled.</p>
           <h3>Cancelled Booking Details:</h3>
           <ul>
-            <li><strong>Date:</strong> ${displayDate}</li>
-            <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
+            ${isPerday
+              ? `<li><strong>Per-day Range:</strong> ${perdayRangeText}</li>`
+              : `<li><strong>Date:</strong> ${displayDate}</li>
+                 <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>`
+            }
             <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
           </ul>
           <p>If you paid for this booking, please contact us for a refund.</p>

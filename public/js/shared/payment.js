@@ -241,21 +241,21 @@ class PaymentManager {
      */
     showAppNotFoundDialog(appName) {
         const message = `
-            <div style="text-align: left;">
+            <div class="payment-dialog-content">
                 <p><strong>${appName} not found or couldn't be opened.</strong></p>
                 <p>Here are alternative ways to pay:</p>
-                <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.6;">
+                <ul class="payment-dialog-list">
                     <li><strong>Copy UPI ID:</strong> ${this.upiId}</li>
                     <li><strong>Open any UPI app manually</strong> (PhonePe, GPay, Paytm, etc.)</li>
                     <li><strong>Scan the QR code</strong> above</li>
                 </ul>
-                <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <div class="payment-dialog-actions">
                     <button onclick="window.paymentManager?.copyToClipboard('${this.upiId}', '📋 UPI ID copied!'); this.closest('[data-dialog]')?.remove();" 
-                            style="background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: inherit;">
+                            class="payment-dialog-btn payment-dialog-btn-success">
                         📋 Copy UPI ID
                     </button>
                     <button onclick="this.closest('[data-dialog]')?.remove();" 
-                            style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: inherit;">
+                            class="payment-dialog-btn payment-dialog-btn-secondary">
                         ✕ Close
                     </button>
                 </div>
@@ -271,30 +271,10 @@ class PaymentManager {
     showCustomDialog(title, message, type = 'info') {
         const overlay = document.createElement('div');
         overlay.setAttribute('data-dialog', 'true');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        `;
+        overlay.className = 'payment-dialog-overlay';
         
         const dialog = document.createElement('div');
-        dialog.style.cssText = `
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            max-width: 500px;
-            width: 100%;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            position: relative;
-        `;
+        dialog.className = 'payment-dialog-box';
         
         const iconMap = {
             'info': '💡',
@@ -304,11 +284,11 @@ class PaymentManager {
         };
         
         dialog.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-                <span style="font-size: 24px;">${iconMap[type] || '💡'}</span>
-                <h3 style="margin: 0; color: #2c3e50; font-family: inherit;">${title}</h3>
+            <div class="payment-dialog-header">
+                <span class="payment-dialog-icon">${iconMap[type] || '💡'}</span>
+                <h3 class="payment-dialog-title">${title}</h3>
             </div>
-            <div style="color: #555; line-height: 1.6; font-family: inherit;">
+            <div class="payment-dialog-body">
                 ${message}
             </div>
         `;
@@ -337,21 +317,8 @@ class PaymentManager {
     showNotification(message, type = 'success') {
         const notification = document.createElement('div');
         notification.innerHTML = message;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            z-index: 10000;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: opacity 0.3s ease;
-            background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-            max-width: 300px;
-            font-family: inherit;
-        `;
+        const normalizedType = type === 'success' || type === 'error' ? type : 'info';
+        notification.className = `payment-toast payment-toast-${normalizedType}`;
         
         document.body.appendChild(notification);
         

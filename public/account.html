@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Account - JamRoom</title>
+    <script src="/js/shared/theme.js"></script>
     
     <!-- Shared CSS -->
     <link rel="stylesheet" href="/css/shared.css">
@@ -103,41 +104,41 @@
                 <h2>Account Settings</h2>
                 
                 <!-- WhatsApp Notifications Section -->
-                <div class="whatsapp-section" style="margin-bottom: 40px;">
+                <div class="whatsapp-section">
                     <h3>📱 WhatsApp Notifications</h3>
                     <p>Get booking confirmations and updates via WhatsApp (optional)</p>
                     
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="whatsappEnabled" style="margin-right: 8px;">
+                            <input type="checkbox" id="whatsappEnabled" class="checkbox-inline-gap">
                             Enable WhatsApp notifications
                         </label>
                     </div>
                     
-                    <div id="whatsappSetup" style="display: none; margin-top: 20px; padding: 20px; background: #e7f3ff; border-radius: 8px;">
+                    <div id="whatsappSetup" class="whatsapp-setup">
                         <h4>📋 Setup Instructions</h4>
                         <div id="setupInstructions"></div>
                         
-                        <div style="margin-top: 15px;">
+                        <div class="whatsapp-setup-confirm">
                             <label>
-                                <input type="checkbox" id="sandboxJoined" style="margin-right: 8px;">
+                                <input type="checkbox" id="sandboxJoined" class="checkbox-inline-gap">
                                 I have completed the verification process
                             </label>
                         </div>
                         
-                        <button type="button" id="saveWhatsAppBtn" class="btn btn-primary" style="margin-top: 10px;">
+                        <button type="button" id="saveWhatsAppBtn" class="btn btn-primary whatsapp-save-btn">
                             Save WhatsApp Preferences
                         </button>
                     </div>
                     
-                    <div id="whatsappStatus" style="margin-top: 15px;"></div>
+                    <div id="whatsappStatus" class="whatsapp-status"></div>
                 </div>
                 
                 <div class="delete-section">
                     <h3>⚠️ Danger Zone</h3>
                     <p>Once you delete your account, there is no going back. Please be certain.</p>
                     
-                    <form id="deleteForm" style="margin-top: 15px;">
+                    <form id="deleteForm" class="delete-form">
                         <div class="form-group">
                             <label for="deletePassword">Enter your password to confirm deletion</label>
                             <input type="password" id="deletePassword" name="deletePassword" required>
@@ -475,13 +476,13 @@
                     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(whatsappLink)}`;
                     
                     document.getElementById('setupInstructions').innerHTML = `
-                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 15px 0;">
-                            <h4 style="color: #25d366; margin-bottom: 15px;">🚀 Quick Setup Options</h4>
+                        <div class="whatsapp-setup-card">
+                            <h4 class="whatsapp-setup-title">🚀 Quick Setup Options</h4>
                             
                             <!-- Option 1: Direct WhatsApp Link -->
                             <div class="setup-option">
-                                <h5 style="margin: 0 0 10px 0;">📱 Option 1: One-Click Setup</h5>
-                                <p style="margin: 5px 0;">Click the button below to open WhatsApp with the message ready:</p>
+                                <h5 class="whatsapp-option-title">📱 Option 1: One-Click Setup</h5>
+                                <p class="whatsapp-option-desc">Click the button below to open WhatsApp with the message ready:</p>
                                 <a href="${whatsappLink}" target="_blank" class="whatsapp-btn">
                                     📱 Open WhatsApp & Send Message
                                 </a>
@@ -489,23 +490,23 @@
                             
                             <!-- Option 2: QR Code -->
                             <div class="setup-option qr">
-                                <h5 style="margin: 0 0 10px 0;">📷 Option 2: Scan QR Code</h5>
-                                <p style="margin: 5px 0;">Scan this QR code with your phone's camera:</p>
+                                <h5 class="whatsapp-option-title">📷 Option 2: Scan QR Code</h5>
+                                <p class="whatsapp-option-desc">Scan this QR code with your phone's camera:</p>
                                 <div class="qr-container">
                                     <img src="${qrCodeUrl}" alt="WhatsApp Setup QR Code">
-                                    <br><small style="color: #666;">Scan with your phone camera</small>
+                                    <br><small class="qr-caption">Scan with your phone camera</small>
                                 </div>
                             </div>
                             
                             <!-- Option 3: Manual Setup -->
                             <div class="setup-option manual">
-                                <h5 style="margin: 0 0 10px 0;">✍️ Option 3: Manual Setup</h5>
-                                <p style="margin: 5px 0;">If the above options don't work, send manually:</p>
+                                <h5 class="whatsapp-option-title">✍️ Option 3: Manual Setup</h5>
+                                <p class="whatsapp-option-desc">If the above options don't work, send manually:</p>
                                 <div class="code-block">
                                     <strong>Message:</strong> ${instructions.sandboxCode}<br>
                                     <strong>To:</strong> ${instructions.twilioNumber}
                                 </div>
-                                <ol style="margin: 10px 0; padding-left: 20px; font-size: 14px;">
+                                <ol class="whatsapp-steps">
                                     <li>Open WhatsApp on your phone</li>
                                     <li>Start a new chat with: <strong>${instructions.twilioNumber}</strong></li>
                                     <li>Send the message: <strong>${instructions.sandboxCode}</strong></li>
@@ -515,9 +516,9 @@
                             </div>
                         </div>
                         
-                        <div style="background: #e7f3ff; padding: 15px; border-radius: 6px; margin-top: 15px;">
-                            <h5 style="color: #0066cc; margin: 0 0 8px 0;">📝 Important Notes:</h5>
-                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 14px;">
+                        <div class="whatsapp-notes">
+                            <h5 class="whatsapp-notes-title">📝 Important Notes:</h5>
+                            <ul class="whatsapp-notes-list">
                                 <li>Make sure you send from your registered mobile: <strong>${instructions.userMobile || 'your mobile number'}</strong></li>
                                 <li>You should receive a confirmation message from Twilio</li>
                                 <li>This is a one-time setup process</li>
@@ -537,12 +538,12 @@
 
             if (whatsapp.enabled) {
                 if (whatsapp.verified) {
-                    statusHTML = `<div style="color: #28a745; font-weight: bold;">✅ WhatsApp notifications are active!</div>`;
+                    statusHTML = '<div class="whatsapp-status-active">✅ WhatsApp notifications are active!</div>';
                 } else {
-                    statusHTML = `<div style="color: #ffc107; font-weight: bold;">⚠️ Verification required</div>`;
+                    statusHTML = '<div class="whatsapp-status-pending">⚠️ Verification required</div>';
                 }
             } else {
-                statusHTML = `<div style="color: #6c757d;">WhatsApp notifications are disabled</div>`;
+                statusHTML = '<div class="whatsapp-status-disabled">WhatsApp notifications are disabled</div>';
             }
 
             statusDiv.innerHTML = statusHTML;

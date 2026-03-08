@@ -1,6 +1,6 @@
 # JamRoom UI/UX Restructuring Plan
 
-Last Updated: March 8, 2026 (Pause point: Phase 4 in progress, CSS externalization pass completed)
+Last Updated: March 8, 2026 (Navigation/header consistency refresh completed; visual QA and final script extraction remain)
 
 ## 🎯 **Project Overview**
 **Goal:** Create a consistent, maintainable, and professional UI/UX across all JamRoom pages
@@ -208,11 +208,11 @@ public/js/booking/
 
 **Tasks:**
 - [x] Extract booking inline script into external file (`public/js/booking/booking-main.js`) as baseline step
-- [ ] Extract form validation logic
+- [x] Extract form validation logic (`public/js/booking/booking-form.js`)
 - [x] Extract rental selection system (`public/js/booking/booking-rentals.js`)
 - [x] Extract price calculation logic (`public/js/booking/booking-pricing.js`)
-- [ ] Extract API call functions
-- [ ] Extract payment integration
+- [x] Extract API call functions (`public/js/booking/booking-api.js`)
+- [x] Extract payment integration (`public/js/booking/booking-payment.js`)
 - [ ] Reduce inline script to <50 lines
 
 ### **4.2 Admin Panel Refactoring**
@@ -232,10 +232,10 @@ public/js/admin/
 ```
 
 **Tasks:**
-- [ ] Extract dashboard statistics logic
-- [ ] Extract booking management functions
-- [ ] Extract calendar integration
-- [ ] Extract revenue analytics
+- [x] Extract dashboard statistics logic (`public/js/admin/admin-dashboard.js`)
+- [x] Extract booking management functions (`public/js/admin/admin-bookings.js`, `admin-bookings-actions.js`, `admin-bookings-edit.js`)
+- [x] Extract calendar integration (`public/js/admin/admin-calendar.js`)
+- [x] Extract revenue analytics (`public/js/admin/admin-revenue.js`)
 - [ ] Extract user management
 - [ ] Extract settings management
 - [ ] Reduce inline script to <150 lines
@@ -362,6 +362,8 @@ public/css/
 - Shared design system (`public/css/shared.css`) and shared JS modules created
 - Core pages integrated with shared modules: `public/index.html`, `public/booking.html`, `public/admin.html`, `public/account.html`, `public/payment-info.html`
 - Navigation standardized with `public/js/shared/navigation.js`
+- Standardized app shell (`.app-header`, `.main-nav`) behavior across user pages and auth pages (`login/register/reset-password`)
+- Moved header actions (theme/logout/tests) to right-side action group and added greeting line below brand/subtitle for authenticated users
 - Payment info moved to booking flow and dedicated page (`public/payment-info.html`)
 - Booking availability loader behavior fixed (no stuck spinner/text state)
 - Auth/token compatibility fixes applied for shared auth manager
@@ -369,24 +371,37 @@ public/css/
 - Added page-specific stylesheets under `public/css/pages/` and linked all 12 migrated pages
 - Linked `/css/shared.css` on all pages using `/css/pages/*` (`12/12` coverage)
 - Replaced inline style attributes for `reset-password`, `index`, `payment-info`, `whatsapp-test`, `test-pdf-working`, and `test`
+- Removed booking-specific container width override to keep booking shell/nav width aligned with other pages
+- Added mobile-safe shared payment dialog/toast sizing rules to prevent overflow on narrow screens
+- Recovered accidental undo by reapplying and validating key UI changes (header actions, greeting position, booking width)
+- Verified `style=` cleanup status: `public/admin.html`, `public/account.html`, and `public/booking.html` now all report `0`
 
 ### **In Progress:** 🔄
 - Phase 4 modular extraction of large inline scripts (booking/admin/account)
 - Booking page baseline extraction started: inline JS moved to `public/js/booking/booking-main.js`
 - Booking submodule split started: auth/init, availability/timeline, and bookings/billing moved to dedicated files in `public/js/booking/`
 - Booking rental and pricing logic split into `booking-rentals.js` and `booking-pricing.js`
-- Remaining inline `style="..."` cleanup concentrated in: `public/admin.html`, `public/account.html`, `public/booking.html`
-- Admin Users layout containment verification ("Registered Users" block within section)
+- Booking create-request API and UPI payment UI handling split into `booking-api.js` and `booking-payment.js`
+- Booking form submit/validation and date-time UI handlers split into `booking-form.js`
+- Admin Phase 4 kicked off: dashboard stats loader moved to `public/js/admin/admin-dashboard.js` with compatibility wrapper in `admin.html`
+- Admin booking list and approve/reject flows moved to `public/js/admin/admin-bookings.js` with compatibility wrappers in `admin.html`
+- Admin booking actions moved to `public/js/admin/admin-bookings-actions.js` (delete, send eBill, download PDF) with compatibility wrappers in `admin.html`
+- Admin edit-booking modal flow moved to `public/js/admin/admin-bookings-edit.js` (rental rendering, totals recalculation, submit handling) with compatibility wrappers in `admin.html`
+- Admin calendar init/load logic moved to `public/js/admin/admin-calendar.js` with compatibility wrappers in `admin.html`
+- Admin revenue loading/charts/table/filter behavior moved to `public/js/admin/admin-revenue.js` with compatibility wrappers in `admin.html`
+- Full cross-page visual QA in both themes and on true mobile viewport/device
+- Final trimming of legacy compatibility wrappers after extraction settles
 
 ### **Blocked:** ⛔
 - None currently
 
 ### **Next Up:** ⏳
-- Extract booking page script into `public/js/booking/*`
-- Extract admin page script into `public/js/admin/*`
+- Continue admin extraction: move users management flow into `public/js/admin/admin-users.js`
+- Continue admin extraction: move settings/rental-config flow into `public/js/admin/admin-settings.js`
+- Continue admin extraction: move blocked-time flow into dedicated module
 - Extract account page script into `public/js/account/*`
-- Remove residual inline `style="..."` attributes from admin/account/booking and convert to class-based CSS
-- Verify admin Users section containment in browser after CSS cleanup
+- Run final end-to-end visual pass for nav/header consistency (desktop + mobile)
+- Run final auth/account/booking/admin regression checklist after undo recovery
 - Create `DESIGN_SYSTEM.md` and update README architecture notes
 
 ---

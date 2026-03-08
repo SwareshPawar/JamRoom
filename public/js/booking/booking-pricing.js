@@ -17,10 +17,19 @@ const updatePriceDisplay = () => {
         return;
     }
 
+    const bookingMode = window.getBookingMode ? window.getBookingMode() : 'hourly';
+
     // Get duration
-    const startTime = document.getElementById('startTime').value;
-    const endTime = document.getElementById('endTime').value;
+    const startTime = document.getElementById('startTime')?.value;
+    const endTime = document.getElementById('endTime')?.value;
     const duration = startTime && endTime ? calculateDuration(startTime, endTime) : 1;
+
+    const perDayInfo = window.getPerDayBookingInfo
+        ? window.getPerDayBookingInfo()
+        : { days: 0, isValid: false };
+    const perDayDays = bookingMode === 'perday'
+        ? (perDayInfo.isValid ? Math.max(1, Number(perDayInfo.days) || 0) : 0)
+        : Math.max(1, Number(perDayInfo.days) || 1);
 
     let subtotal = 0;
     let selectedRentalsHTML = '';
@@ -31,11 +40,11 @@ const updatePriceDisplay = () => {
         let durationText;
         let displayQuantity;
 
-        if (rental.rentalType === 'perday') {
-            // Per-day rentals: flat rate regardless of duration
-            itemTotal = rental.price * rental.quantity;
+        if (bookingMode === 'perday' || rental.rentalType === 'perday') {
+            // Per-day rentals: charged by selected day range.
+            itemTotal = rental.price * rental.quantity * perDayDays;
             displayQuantity = rental.quantity;
-            durationText = 'per day';
+            durationText = perDayDays > 0 ? `${perDayDays} day(s)` : 'Waiting for valid pickup/return';
         } else if (rental.isRequired || rental.fullId.includes('_base')) {
             // JamRoom base rentals
             itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;

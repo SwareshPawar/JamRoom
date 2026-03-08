@@ -176,6 +176,10 @@ class AlertManager {
                 color: #34495e;
                 margin: 0;
             }
+
+            .alert-spacer {
+                flex: 1;
+            }
             
             .alert-progress {
                 position: absolute;
@@ -253,7 +257,7 @@ class AlertManager {
             </div>
         ` : (alertOptions.showCloseButton ? `
             <div class="alert-header">
-                <div style="flex: 1;"></div>
+                <div class="alert-spacer"></div>
                 <button class="alert-close" onclick="window.alertManager.remove('${alertId}')">&times;</button>
             </div>
         ` : '');
@@ -261,8 +265,15 @@ class AlertManager {
         alertElement.innerHTML = `
             ${headerHtml}
             <div class="alert-message">${message}</div>
-            ${alertOptions.timeout > 0 ? `<div class="alert-progress" style="animation-duration: ${alertOptions.timeout}ms;"></div>` : ''}
+            ${alertOptions.timeout > 0 ? '<div class="alert-progress"></div>' : ''}
         `;
+
+        if (alertOptions.timeout > 0) {
+            const progressBar = alertElement.querySelector('.alert-progress');
+            if (progressBar) {
+                progressBar.style.animationDuration = `${alertOptions.timeout}ms`;
+            }
+        }
         
         this.container.appendChild(alertElement);
         

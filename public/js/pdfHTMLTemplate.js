@@ -59,7 +59,73 @@ const calculatePricing = (booking) => {
  */
 const generateUnifiedPDFHTML = (booking, settings) => {
     const bookingDate = new Date(booking.date);
+    const isPerday = booking.bookingMode === 'perday';
+    const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
+    const perDayStartLabel = booking.perDayStartDate ? new Date(booking.perDayStartDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');
+    const perDayEndLabel = booking.perDayEndDate ? new Date(booking.perDayEndDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');
+    const perDayTimeRangeLabel = `${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)}`;
     const { subtotal, taxAmount, totalAmount } = calculatePricing(booking);
+    const safeDuration = Math.max(1, Number(booking.duration) || 1);
+
+    const itemRows = (booking.rentals && booking.rentals.length > 0)
+        ? booking.rentals.map((rental) => {
+            const rentalType = String(rental.rentalType || 'inhouse').toLowerCase();
+            const itemIsPerday = isPerday || rentalType === 'perday';
+            const itemDays = itemIsPerday ? perDayDays : 1;
+            const itemDurationLabel = itemIsPerday ? `${itemDays} day(s)` : `${safeDuration} hr(s)`;
+            const itemRateLabel = itemIsPerday ? `₹${rental.price}/day` : `₹${rental.price}/hr`;
+            const itemAmount = itemIsPerday
+                ? (rental.price * rental.quantity * itemDays)
+                : (rental.price * rental.quantity * safeDuration);
+            const bookingMeta = itemIsPerday
+                ? `${perDayStartLabel} ${formatTime12Hour(booking.startTime)} to ${perDayEndLabel} ${formatTime12Hour(booking.endTime)}`
+                : `${bookingDate.toLocaleDateString('en-IN')} (${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)})`;
+
+            return `
+                <tr>
+                    <td>
+                        <strong>${rental.name}</strong>
+                        <br>
+                        <small style="color: #666;">
+                            ${rental.description || 'Studio rental service'}
+                            <br>Booking: ${bookingMeta}
+                        </small>
+                    </td>
+                    <td style="text-align: center;">${rental.quantity}</td>
+                    <td style="text-align: center;">${itemDurationLabel}</td>
+                    <td class="amount-cell">${itemRateLabel}</td>
+                    <td class="amount-cell">₹${itemAmount.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('')
+        : `
+            <tr>
+                <td>
+                    <strong>${booking.rentalType || 'JamRoom Booking'}</strong>
+                    <br>
+                    <small style="color: #666;">
+                        Studio booking for ${bookingDate.toLocaleDateString('en-IN')} 
+                        (${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)})
+                    </small>
+                    ${booking.notes ? `<br><small style="color: #888; font-style: italic;">Note: ${booking.notes}</small>` : ''}
+                </td>
+                <td style="text-align: center;">1</td>
+                <td style="text-align: center;">${safeDuration} hr(s)</td>
+                <td class="amount-cell">₹${(booking.price / safeDuration).toFixed(2)}/hr</td>
+                <td class="amount-cell">₹${booking.price.toFixed(2)}</td>
+            </tr>
+        `;
+
+    const notesRow = booking.notes && booking.rentals && booking.rentals.length > 0
+        ? `
+            <tr>
+                <td colspan="5" style="padding-top: 20px; border-top: 1px solid #eee;">
+                    <strong>Additional Notes:</strong><br>
+                    <span style="color: #666; font-style: italic;">${booking.notes}</span>
+                </td>
+            </tr>
+        `
+        : '';
     
     return `
 <!DOCTYPE html>
@@ -462,16 +528,16 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                     <div class="section-title">📅 Booking Details</div>
                     <div class="booking-details">
                         <div class="detail-row">
-                            <span class="detail-label">📅 Date:</span>
-                            <span class="detail-value">${bookingDate.toLocaleDateString('en-IN')}</span>
+                            <span class="detail-label">📅 ${isPerday ? 'Range:' : 'Date:'}</span>
+                            <span class="detail-value">${isPerday ? `${perDayStartLabel} to ${perDayEndLabel}` : bookingDate.toLocaleDateString('en-IN')}</span>
                         </div>
                         <div class="detail-row">
-                            <span class="detail-label">🕒 Time:</span>
-                            <span class="detail-value">${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)}</span>
+                            <span class="detail-label">🕒 ${isPerday ? 'Mode:' : 'Time:'}</span>
+                            <span class="detail-value">${isPerday ? perDayTimeRangeLabel : `${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)}`}</span>
                         </div>
                         <div class="detail-row">
-                            <span class="detail-label">⏱️ Duration:</span>
-                            <span class="detail-value">${booking.duration} hour(s)</span>
+                            <span class="detail-label">⏱️ ${isPerday ? 'Days:' : 'Duration:'}</span>
+                            <span class="detail-value">${isPerday ? `${perDayDays} day(s)` : `${safeDuration} hour(s)`}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">✅ Status:</span>
@@ -493,47 +559,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                 </tr>
             </thead>
             <tbody>
-                ${booking.rentals && booking.rentals.length > 0 ? 
-                    booking.rentals.map(rental => `
-                        <tr>
-                            <td>
-                                <strong>${rental.name}</strong>
-                                <br>
-                                <small style="color: #666;">
-                                    ${rental.description || 'Studio rental service'}
-                                    <br>Booking: ${bookingDate.toLocaleDateString('en-IN')} (${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)})
-                                </small>
-                            </td>
-                            <td style="text-align: center;">${rental.quantity}</td>
-                            <td style="text-align: center;">${booking.duration} hr(s)</td>
-                            <td class="amount-cell">₹${rental.price}/hr</td>
-                            <td class="amount-cell">₹${(rental.price * rental.quantity * booking.duration).toFixed(2)}</td>
-                        </tr>
-                    `).join('') : `
-                        <tr>
-                            <td>
-                                <strong>${booking.rentalType || 'JamRoom Booking'}</strong>
-                                <br>
-                                <small style="color: #666;">
-                                    Studio booking for ${bookingDate.toLocaleDateString('en-IN')} 
-                                    (${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)})
-                                </small>
-                                ${booking.notes ? `<br><small style="color: #888; font-style: italic;">Note: ${booking.notes}</small>` : ''}
-                            </td>
-                            <td style="text-align: center;">1</td>
-                            <td style="text-align: center;">${booking.duration} hr(s)</td>
-                            <td class="amount-cell">₹${(booking.price / booking.duration).toFixed(2)}/hr</td>
-                            <td class="amount-cell">₹${booking.price.toFixed(2)}</td>
-                        </tr>
-                    `}
-                ${booking.notes && booking.rentals && booking.rentals.length > 0 ? `
-                    <tr>
-                        <td colspan="5" style="padding-top: 20px; border-top: 1px solid #eee;">
-                            <strong>Additional Notes:</strong><br>
-                            <span style="color: #666; font-style: italic;">${booking.notes}</span>
-                        </td>
-                    </tr>
-                ` : ''}
+                ${itemRows}
+                ${notesRow}
             </tbody>
         </table>
         

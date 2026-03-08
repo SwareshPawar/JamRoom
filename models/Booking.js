@@ -6,24 +6,40 @@ const bookingSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'User ID is required']
   },
+  bookingMode: {
+    type: String,
+    enum: ['hourly', 'perday'],
+    default: 'hourly'
+  },
   date: {
     type: Date,
     required: [true, 'Date is required']
   },
   startTime: {
     type: String,
-    required: [true, 'Start time is required'],
+    required: [function() { return this.bookingMode !== 'perday'; }, 'Start time is required'],
     match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)']
   },
   endTime: {
     type: String,
-    required: [true, 'End time is required'],
+    required: [function() { return this.bookingMode !== 'perday'; }, 'End time is required'],
     match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)']
   },
   duration: {
     type: Number,
-    required: [true, 'Duration is required'],
+    required: [function() { return this.bookingMode !== 'perday'; }, 'Duration is required'],
     min: [1, 'Duration must be at least 1 hour']
+  },
+  perDayStartDate: {
+    type: Date
+  },
+  perDayEndDate: {
+    type: Date
+  },
+  perDayDays: {
+    type: Number,
+    min: 1,
+    default: 1
   },
   // Legacy single rental type (kept for backward compatibility)
   rentalType: {
@@ -119,6 +135,7 @@ bookingSchema.index({ date: 1, startTime: 1 });
 bookingSchema.index({ bookingStatus: 1 });
 bookingSchema.index({ paymentStatus: 1 });
 bookingSchema.index({ date: 1, bookingStatus: 1 });
+bookingSchema.index({ bookingMode: 1, perDayStartDate: 1, perDayEndDate: 1 });
 
 // Update updatedAt on save
 bookingSchema.pre('save', function(next) {

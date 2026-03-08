@@ -1,6 +1,6 @@
 # 🧑‍💻 Developer Reference Guide - JamRoom Booking System
 
-> **📌 PURPOSE**: This document serves as the **single source of truth** for naming conventions, architecture patterns, and development standards. **ALWAYS REFERENCE THIS BEFORE ADDING NEW FEATURES** to maintain consistency.
+> **📌 PURPOSE**: This document serves as the **single source of truth** for naming conventions, architecture patterns, and development standards. **ALWAYS REFERENCE THIS BEFORE ADDING NEW FEATURES** to maintain consistency. For UI phase/progress status, use `DESIGN_UNIFICATION_TRACKER.md` as the canonical tracker.
 
 ---
 
@@ -21,6 +21,9 @@
 - **Section UX Pattern (Mobile)**: Booking shell should default key panels collapsed on load for compact navigation.
 - **Admin Create Status Policy**: Admin-created bookings must be enforced as `bookingStatus=CONFIRMED` and `paymentStatus=PAID`.
 - **Historical Override Policy**: Use `overrideDateTime=true` only for historical missed-bill entries where conflict/blocked checks should be intentionally bypassed.
+- **Shared Navigation Pattern**: Render header/nav via `public/js/shared/navigation.js` into `#navigationContainer`; do not handcraft page-specific nav variants.
+- **Header Action Pattern**: Keep theme/logout/tests controls in `.app-header-actions`; keep primary route links in `.main-nav .nav-links`.
+- **Theme Pattern**: Use `public/js/shared/theme.js` and tokenized styles in `public/css/shared.css`; avoid page-local hardcoded theme colors.
 
 ---
 
@@ -1904,4 +1907,4 @@ const setFormLoading = (formId, loading = true) => {
 
 **🎯 REMEMBER: Consistency is key to maintainable code. When in doubt, refer to this guide first!**
 
-*Last Updated: March 7, 2026*
+*Last Updated: March 8, 2026*
