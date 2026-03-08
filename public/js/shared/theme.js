@@ -57,10 +57,7 @@
     };
 
     const shouldInjectFloatingToggle = () => {
-        const hasNavContainer = document.getElementById('navigationContainer');
-        const hasTopbar = document.querySelector('.topbar, .main-nav, .app-header');
-        const hasExistingToggle = document.querySelector('[data-theme-toggle]');
-        return !hasNavContainer && !hasTopbar && !hasExistingToggle;
+        return !document.querySelector('[data-theme-fab="true"]');
     };
 
     const injectFloatingToggle = () => {
@@ -72,6 +69,7 @@
         button.type = 'button';
         button.className = 'theme-toggle-fab';
         button.setAttribute('data-theme-toggle', 'true');
+        button.setAttribute('data-theme-fab', 'true');
         button.addEventListener('click', toggleTheme);
         document.body.appendChild(button);
         updateToggleButtons();

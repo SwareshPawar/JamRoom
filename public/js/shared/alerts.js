@@ -6,7 +6,7 @@
 class AlertManager {
     constructor(options = {}) {
         this.options = {
-            position: 'top-right', // top-right, top-left, top-center, bottom-right, etc.
+            position: 'center', // center, top-right, top-left, top-center, bottom-right, etc.
             timeout: 5000, // Auto close after 5 seconds, 0 for no timeout
             maxAlerts: 5, // Maximum number of alerts to show at once
             showCloseButton: true,
@@ -53,6 +53,13 @@ class AlertManager {
             .alert-container.alert-top-right {
                 top: 20px;
                 right: 20px;
+            }
+
+            .alert-container.alert-center {
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: min(92vw, 420px);
             }
             
             .alert-container.alert-top-left {
@@ -102,6 +109,15 @@ class AlertManager {
             .jamroom-alert.alert-removing {
                 animation: alertSlideOut 0.3s ease-in forwards;
             }
+
+            .alert-container.alert-center .jamroom-alert {
+                animation: alertZoomIn 0.2s ease-out;
+                margin-bottom: 0;
+            }
+
+            .alert-container.alert-center .jamroom-alert.alert-removing {
+                animation: alertZoomOut 0.2s ease-in forwards;
+            }
             
             @keyframes alertSlideIn {
                 from {
@@ -119,6 +135,24 @@ class AlertManager {
                     opacity: 0;
                     transform: translateX(100%);
                     margin-bottom: -100px;
+                }
+            }
+
+            @keyframes alertZoomIn {
+                from {
+                    opacity: 0;
+                    transform: scale(0.95);
+                }
+                to {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+            }
+
+            @keyframes alertZoomOut {
+                to {
+                    opacity: 0;
+                    transform: scale(0.95);
                 }
             }
             
@@ -217,6 +251,14 @@ class AlertManager {
                     right: 10px !important;
                     max-width: none;
                     transform: none !important;
+                }
+
+                .alert-container.alert-center {
+                    top: 50% !important;
+                    left: 10px !important;
+                    right: 10px !important;
+                    transform: translateY(-50%) !important;
+                    width: auto;
                 }
                 
                 .jamroom-alert {

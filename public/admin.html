@@ -543,18 +543,22 @@
                 </div>
 
                 <div class="form-group create-override-group">
-                    <label class="create-override-label">
-                        <input type="checkbox" id="createDateTimeOverride" name="overrideDateTime" class="checkbox-auto">
-                        Override date/time checks (history mode)
-                    </label>
-                    <small class="create-override-help">
-                        Allows past date/time booking and bypasses availability conflicts for missed billing entries.
-                    </small>
+                    <div class="admin-theme-info-card admin-theme-info-card-accent">
+                        <label class="create-override-label">
+                            <input type="checkbox" id="createDateTimeOverride" name="overrideDateTime" class="checkbox-auto">
+                            Override date/time checks (history mode)
+                        </label>
+                        <small class="create-override-help">
+                            Allows past date/time booking and bypasses availability conflicts for missed billing entries.
+                        </small>
+                    </div>
                 </div>
 
                 <div class="admin-reference-view">
-                    <h3>Availability for Selected Date</h3>
-                    <p><small>Shows unavailable time slots</small></p>
+                    <div class="admin-theme-info-card admin-theme-info-card-muted">
+                        <h3>Availability for Selected Date</h3>
+                        <p class="admin-theme-info-note">Shows unavailable time slots</p>
+                    </div>
                     <div id="createReferenceTimeline" class="admin-timeline">
                         <div class="loading">Select a date to view availability</div>
                     </div>
@@ -808,7 +812,9 @@
             const tableContainer = document.getElementById('usersManagementTable');
             if (!tableContainer) return;
 
-            tableContainer.innerHTML = '<div class="text-muted">Loading users...</div>';
+            tableContainer.innerHTML = window.JamRoomUtils?.getSectionLoaderMarkup
+                ? window.JamRoomUtils.getSectionLoaderMarkup('Loading users...')
+                : '<div class="text-muted">Loading users...</div>';
             const query = (document.getElementById('usersSearchInput')?.value || '').trim();
 
             try {
@@ -1898,7 +1904,7 @@
             const ranges = getCreateUnavailableRanges(availabilityData);
 
             if (ranges.length === 0) {
-                container.innerHTML = '<p class="text-success-no-margin">All time slots available for this date.</p>';
+                container.innerHTML = '<div class="admin-theme-status admin-theme-status-success">All time slots available for this date.</div>';
                 return;
             }
 
@@ -2046,19 +2052,19 @@
 
             if (!date) {
                 createBookingAvailabilityData = null;
-                timelineContainer.innerHTML = '<div class="loading">Select a date to view availability</div>';
+                timelineContainer.innerHTML = '<div class="admin-theme-status admin-theme-status-muted">Select a date to view availability</div>';
                 populateCreateStartTimes('', null);
                 return;
             }
 
             if (overrideDateTime) {
                 createBookingAvailabilityData = null;
-                timelineContainer.innerHTML = '<p class="text-warning-no-margin">Override is enabled. All time slots are selectable for this date.</p>';
+                timelineContainer.innerHTML = '<div class="admin-theme-status admin-theme-status-warning">Override is enabled. All time slots are selectable for this date.</div>';
                 populateCreateStartTimes(date, null);
                 return;
             }
 
-            timelineContainer.innerHTML = '<div class="loading">Loading availability...</div>';
+            timelineContainer.innerHTML = '<div class="admin-theme-status admin-theme-status-loading">Loading availability...</div>';
 
             try {
                 const response = await fetch(`${API_URL}/api/bookings/availability/${date}`);
@@ -2073,7 +2079,7 @@
             } catch (error) {
                 console.error('Error loading create-booking availability:', error);
                 createBookingAvailabilityData = null;
-                timelineContainer.innerHTML = '<p class="text-danger-no-margin">Failed to load availability data</p>';
+                timelineContainer.innerHTML = '<div class="admin-theme-status admin-theme-status-danger">Failed to load availability data</div>';
                 populateCreateStartTimes(date, null);
             }
         };
@@ -2092,7 +2098,7 @@
 
             createBookingAvailabilityData = null;
 
-            document.getElementById('createReferenceTimeline').innerHTML = '<div class="loading">Select a date to view availability</div>';
+            document.getElementById('createReferenceTimeline').innerHTML = '<div class="admin-theme-status admin-theme-status-muted">Select a date to view availability</div>';
             document.getElementById('createStartTime').innerHTML = '<option value="">Select date first</option>';
             document.getElementById('createStartTime').disabled = true;
             document.getElementById('createEndTime').innerHTML = '<option value="">Select start time first</option>';

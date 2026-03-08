@@ -217,6 +217,11 @@ body {
     flex-wrap: wrap;
 }
 
+.app-header-actions .btn,
+.app-header-actions a {
+    margin: 0;
+}
+
 .main-nav {
     background: var(--surface-2);
     border-bottom: 1px solid var(--border-color);
@@ -235,10 +240,18 @@ body {
     flex-wrap: wrap;
 }
 
+.main-nav .nav-links {
+    width: 100%;
+}
+
 .nav-link {
     color: var(--text-color);
     text-decoration: none;
     padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
     border-radius: var(--radius-md);
     transition: var(--transition-normal);
     font-weight: 600;
@@ -353,8 +366,8 @@ nav a:hover {
 
 .theme-toggle-fab {
     position: fixed;
-    right: 12px;
-    bottom: 12px;
+    right: 14px;
+    bottom: max(14px, env(safe-area-inset-bottom));
     z-index: 1002;
     border: 1px solid var(--border-color);
     background: var(--surface-elevated);
@@ -364,6 +377,10 @@ nav a:hover {
     font-weight: 600;
     cursor: pointer;
     box-shadow: var(--shadow-md);
+}
+
+.theme-toggle-fab:hover {
+    box-shadow: var(--shadow-lg);
 }
 
 /* ================================================================================================= */
@@ -851,6 +868,12 @@ textarea:disabled {
     display: block !important;
 }
 
+.modal.show {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
 .text-center {
     text-align: center;
 }
@@ -969,12 +992,91 @@ textarea:disabled {
     animation: spin 1s linear infinite;
 }
 
+.boot-loader-chip {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 12000;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--surface-elevated) 96%, transparent);
+    color: var(--text-color-light);
+    box-shadow: var(--shadow-sm);
+    font-size: 0.72rem;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
+}
+
+.boot-loader-chip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.boot-loader-spinner {
+    width: 10px;
+    height: 10px;
+    border: 2px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.nav-loading-shell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 8px;
+    color: var(--text-color-light);
+    font-size: 0.78rem;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-loading-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
 .section-loading-inline {
     display: flex;
     align-items: center;
     gap: 10px;
     justify-content: center;
     padding: 20px;
+}
+
+.section-loader-tiny {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+    color: var(--text-color-light);
+    font-size: 0.76rem;
+}
+
+.section-loader-tiny-spinner {
+    width: 10px;
+    height: 10px;
+    border: 2px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
 }
 
 .utils-loading-overlay {
@@ -1121,40 +1223,65 @@ textarea:disabled {
     }
 
     .app-header {
-        padding: 18px 14px;
+        padding: 8px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
     }
 
     .app-header h1 {
-        font-size: 1.2rem;
+        font-size: 1.02rem;
+        line-height: 1.2;
+    }
+
+    .app-brand {
+        gap: 3px;
     }
 
     .app-subtitle {
-        font-size: 0.86rem;
+        font-size: 0.75rem;
     }
 
     .app-greeting {
-        font-size: 0.82rem;
+        font-size: 0.72rem;
     }
 
     .app-header-actions {
         width: 100%;
-        justify-content: flex-start;
+        justify-content: stretch;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px;
+    }
+
+    .app-header-actions .btn,
+    .app-header-actions a {
+        width: 100%;
+        text-align: center;
+        padding: 5px 6px;
+        font-size: 0.74rem;
+        min-height: 30px;
     }
 
     .main-nav {
-        padding: 10px;
+        padding: 5px;
         align-items: stretch;
-        gap: 8px;
+        gap: 5px;
+        border-top: 1px solid color-mix(in srgb, var(--primary-color) 28%, transparent);
     }
 
     .main-nav .nav-links {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        gap: 5px;
     }
 
     .main-nav .nav-link {
         text-align: center;
+        padding: 5px 6px;
+        min-height: 30px;
+        font-size: 0.76rem;
+        line-height: 1.2;
     }
 
     .main-content {
@@ -1256,16 +1383,33 @@ textarea:disabled {
         right: 10px;
         max-width: none;
     }
+
+    .boot-loader-chip {
+        top: 6px;
+        right: 6px;
+        padding: 4px 7px;
+        font-size: 0.68rem;
+    }
+
+    .nav-loading-shell {
+        min-height: 34px;
+        padding: 5px;
+        font-size: 0.72rem;
+    }
 }
 
 @media (max-width: 480px) {
     .main-nav .nav-links {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .main-nav .nav-link {
+        font-size: 0.72rem;
+        min-height: 28px;
     }
 
     .app-header-actions {
-        flex-direction: column;
-        align-items: stretch;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .app-header-actions .btn,
@@ -1292,5 +1436,15 @@ textarea:disabled {
     
     .btn {
         padding: 10px 14px;
+    }
+}
+
+@media (max-width: 360px) {
+    .main-nav .nav-links {
+        grid-template-columns: 1fr;
+    }
+
+    .app-header-actions {
+        grid-template-columns: 1fr;
     }
 }

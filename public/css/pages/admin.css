@@ -570,6 +570,64 @@
     margin-top: 4px;
 }
 
+.admin-theme-info-card {
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 28%, transparent);
+    background: color-mix(in srgb, var(--primary-color) 12%, var(--surface-elevated));
+    padding: 10px;
+}
+
+.admin-theme-info-card-accent {
+    border-left: 4px solid var(--primary-color);
+}
+
+.admin-theme-info-card-muted {
+    border-left: 4px solid var(--info-color);
+    background: color-mix(in srgb, var(--info-color) 10%, var(--surface-elevated));
+    margin-bottom: 8px;
+}
+
+.admin-theme-info-card h3 {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+}
+
+.admin-theme-info-note {
+    margin: 0;
+    font-size: 0.84rem;
+    color: var(--text-color-light);
+}
+
+.admin-theme-status {
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 0.86rem;
+    line-height: 1.35;
+    border: 1px solid var(--border-color-light);
+}
+
+.admin-theme-status-success {
+    background: color-mix(in srgb, var(--success-color) 12%, var(--surface-elevated));
+    border-left: 4px solid var(--success-color);
+}
+
+.admin-theme-status-warning {
+    background: color-mix(in srgb, var(--warning-color) 12%, var(--surface-elevated));
+    border-left: 4px solid var(--warning-color);
+}
+
+.admin-theme-status-danger {
+    background: color-mix(in srgb, var(--danger-color) 12%, var(--surface-elevated));
+    border-left: 4px solid var(--danger-color);
+}
+
+.admin-theme-status-muted,
+.admin-theme-status-loading {
+    background: color-mix(in srgb, var(--secondary-color) 10%, var(--surface-elevated));
+    border-left: 4px solid var(--secondary-color);
+    color: var(--text-color-light);
+}
+
 .inline-success-note {
     padding: 10px;
     background: color-mix(in srgb, var(--success-color) 16%, transparent);
@@ -1002,9 +1060,11 @@ table {
         white-space: nowrap;
     }
 
-    /* Only hide Type column on medium screens, keep all other columns */
-    table th:nth-child(5),
-    table td:nth-child(5) {
+    /* Only hide booking/revenue Type column on medium screens */
+    #bookingsTable table th:nth-child(5),
+    #bookingsTable table td:nth-child(5),
+    #revenueTable table th:nth-child(5),
+    #revenueTable table td:nth-child(5) {
         display: none;
     }
 }
@@ -1019,17 +1079,30 @@ table {
         padding: 6px 4px;
     }
 
-    /* Hide Type and Price columns on very small screens, but keep Actions */
-    table th:nth-child(5),
-    table td:nth-child(5),
-    table th:nth-child(6),
-    table td:nth-child(6) {
+    /* Hide booking/revenue Type and Price columns on very small screens */
+    #bookingsTable table th:nth-child(5),
+    #bookingsTable table td:nth-child(5),
+    #bookingsTable table th:nth-child(6),
+    #bookingsTable table td:nth-child(6),
+    #revenueTable table th:nth-child(5),
+    #revenueTable table td:nth-child(5),
+    #revenueTable table th:nth-child(6),
+    #revenueTable table td:nth-child(6) {
         display: none;
     }
 
     .btn-sm {
         padding: 4px 6px;
         font-size: 0.75em;
+    }
+}
+
+@media (min-width: 769px) {
+    .users-table-scroll table th:nth-child(5),
+    .users-table-scroll table td:nth-child(5),
+    .users-table-scroll table th:nth-child(6),
+    .users-table-scroll table td:nth-child(6) {
+        display: table-cell;
     }
 }
 
@@ -1288,7 +1361,7 @@ textarea:focus {
 }
 
 .modal.show {
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
 }
@@ -1351,4 +1424,205 @@ textarea:focus {
     border-radius: 8px;
     margin-bottom: 10px;
     border-left: 4px solid var(--secondary-color);
+}
+
+/* Mobile consistency overrides */
+@media (max-width: 768px) {
+    .admin-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .revenue-filter-grid,
+    .revenue-charts-grid,
+    .settings-gst-grid,
+    .form-grid-2,
+    .form-grid-3,
+    .custom-range-grid,
+    .rental-type-header-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .custom-range-inputs {
+        grid-column: auto;
+    }
+
+    .admin-inline-form,
+    .typeahead-input-row,
+    .blocked-item-row,
+    .modal-actions-row,
+    .action-row-end {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .admin-inline-form-group {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .modal-actions-row .btn,
+    .action-row-end .btn,
+    .typeahead-input-row .btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 600px) {
+    .rental-subitem-row {
+        grid-template-columns: 1fr;
+    }
+
+    .rental-subitem-remove {
+        grid-column: 1;
+        justify-self: stretch;
+    }
+
+    .admin-rental-qty {
+        white-space: normal;
+    }
+}
+
+/* Ultra-compact mobile density mode */
+@media (max-width: 768px) {
+    .topbar {
+        padding: 5px;
+    }
+
+    .dashboard {
+        padding: 0 5px;
+        margin: 10px auto;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px;
+        margin-bottom: 5px;
+    }
+
+    .revenue-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px;
+        margin-bottom: 5px;
+    }
+
+    .revenue-charts-grid {
+        gap: 5px;
+        margin-bottom: 5px;
+    }
+
+    .section,
+    .stat-card,
+    .users-card,
+    .admin-theme-info-card,
+    .admin-theme-status,
+    .revenue-filters-card,
+    .settings-highlight-card,
+    .admin-grant-card,
+    .rental-type-card,
+    .admin-reference-view,
+    .admin-rentals-panel,
+    .blocked-item,
+    .modal-content,
+    .alert {
+        padding: 5px !important;
+        margin-bottom: 5px;
+    }
+
+    .section h2,
+    .settings-section-title,
+    .users-card-title,
+    .admin-grant-title {
+        margin-bottom: 5px;
+    }
+
+    .section h2 {
+        font-size: 0.95rem;
+    }
+
+    .tabs {
+        gap: 5px;
+        margin-bottom: 5px;
+    }
+
+    .tab {
+        padding: 5px 6px;
+        font-size: 0.74em;
+    }
+
+    .stat-card h3 {
+        margin-bottom: 2px;
+        font-size: 0.62rem;
+        line-height: 1.15;
+        text-align: center;
+    }
+
+    .stat-card .number {
+        font-size: 1.05rem;
+        line-height: 1.1;
+        text-align: center;
+    }
+
+    .form-group {
+        margin-bottom: 5px;
+    }
+
+    label {
+        margin-bottom: 3px;
+    }
+
+    input,
+    select,
+    textarea,
+    .rental-type-input,
+    .rental-subitem-input {
+        padding: 5px;
+    }
+
+    .users-layout,
+    .users-card-header,
+    .users-table-controls,
+    .admin-inline-form,
+    .typeahead-input-row,
+    .blocked-item-row,
+    .modal-actions-row,
+    .action-row-end,
+    .custom-range-grid,
+    .revenue-filter-grid,
+    .settings-gst-grid,
+    .form-grid-2,
+    .form-grid-3,
+    .rental-type-header-grid {
+        gap: 5px;
+    }
+
+    .users-layout {
+        margin-bottom: 5px;
+    }
+
+    .btn,
+    .btn-sm,
+    .payment-btn,
+    .payment-dialog-btn {
+        padding: 5px 6px;
+        margin: 0;
+        font-size: 0.72rem;
+    }
+
+    .table-container {
+        margin: 5px 0;
+    }
+
+    table th,
+    table td {
+        padding: 5px;
+    }
+}
+
+@media (max-width: 420px) {
+    .stats-grid,
+    .revenue-summary-grid {
+        grid-template-columns: 1fr;
+    }
 }

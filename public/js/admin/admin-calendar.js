@@ -80,18 +80,37 @@
         }
     };
 
-    const loadCalendar = async ({ apiUrl, showSectionLoading, showAlert }) => {
+    const loadCalendar = async ({ apiUrl, showAlert }) => {
         if (!state.calendar) {
             return;
         }
 
+        const calendarLoading = document.getElementById('calendarLoading');
+
+        const showCalendarLoading = () => {
+            if (!calendarLoading) {
+                return;
+            }
+
+            calendarLoading.classList.remove('admin-hidden');
+            calendarLoading.innerHTML = window.JamRoomUtils?.getSectionLoaderMarkup
+                ? window.JamRoomUtils.getSectionLoaderMarkup('Loading calendar events...')
+                : 'Loading calendar events...';
+        };
+
+        const hideCalendarLoading = () => {
+            if (!calendarLoading) {
+                return;
+            }
+
+            calendarLoading.classList.add('admin-hidden');
+            calendarLoading.innerHTML = '';
+        };
+
         try {
             const month = document.getElementById('calendarMonth')?.value;
             const year = document.getElementById('calendarYear')?.value;
-
-            if (typeof showSectionLoading === 'function') {
-                showSectionLoading('calendar', 'Loading calendar events...');
-            }
+            showCalendarLoading();
 
             const token = localStorage.getItem('token');
             const res = await fetch(`${apiUrl}/api/admin/bookings/calendar?month=${month}&year=${year}`, {
@@ -111,6 +130,8 @@
             if (typeof showAlert === 'function') {
                 showAlert('calendarAlert', 'Failed to load calendar data', 'error');
             }
+        } finally {
+            hideCalendarLoading();
         }
     };
 

@@ -4,6 +4,20 @@
 
 // Load user's bookings
 const loadMyBookings = async () => {
+    const loadingEl = document.getElementById('bookingsLoading');
+    const bookingsEl = document.getElementById('bookingsList');
+
+    if (loadingEl) {
+        loadingEl.style.display = 'none';
+    }
+
+    if (bookingsEl) {
+        bookingsEl.style.display = 'block';
+        bookingsEl.innerHTML = window.JamRoomUtils?.getSectionLoaderMarkup
+            ? window.JamRoomUtils.getSectionLoaderMarkup('Loading bookings...')
+            : '<div class="loading-text">Loading bookings...</div>';
+    }
+
     try {
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/api/bookings/my-bookings`, {
@@ -11,9 +25,6 @@ const loadMyBookings = async () => {
         });
 
         const data = await res.json();
-
-        document.getElementById('bookingsLoading').style.display = 'none';
-        document.getElementById('bookingsList').style.display = 'block';
 
         if (data.bookings.length === 0) {
             document.getElementById('bookingsList').innerHTML =
@@ -83,8 +94,15 @@ const loadMyBookings = async () => {
         document.getElementById('bookingsList').innerHTML = html || '<p class="booking-empty-message">No valid bookings found</p>';
     } catch (error) {
         console.error('Load bookings error:', error);
-        document.getElementById('bookingsList').innerHTML =
-            '<p class="text-danger">Failed to load bookings: ' + error.message + '</p>';
+
+        if (loadingEl) {
+            loadingEl.style.display = 'none';
+        }
+
+        if (bookingsEl) {
+            bookingsEl.style.display = 'block';
+            bookingsEl.innerHTML = '<p class="text-danger">Failed to load bookings: ' + error.message + '</p>';
+        }
     }
 };
 

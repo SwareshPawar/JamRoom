@@ -172,15 +172,6 @@ class NavigationManager {
             });
         }
 
-        actions.push({
-            type: 'button',
-            text: this.getThemeToggleText(),
-            onclick: 'NavigationManager.toggleTheme()',
-            class: 'btn btn-secondary btn-theme-toggle',
-            id: 'navThemeToggle',
-            attrs: 'data-theme-toggle="true"'
-        });
-
         return actions;
     }
 
@@ -201,6 +192,23 @@ class NavigationManager {
         document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
             button.textContent = text;
         });
+    }
+
+    generateLoadingHTML() {
+        return `
+            <div class="nav-loading-shell" role="status" aria-live="polite">
+                <span class="nav-loading-spinner" aria-hidden="true"></span>
+                <span>Loading menu...</span>
+            </div>`;
+    }
+
+    showLoadingPlaceholder(containerId = 'navigationContainer') {
+        const container = document.getElementById(containerId);
+        if (!container || container.childElementCount > 0) {
+            return;
+        }
+
+        container.innerHTML = this.generateLoadingHTML();
     }
 
     /**
@@ -237,7 +245,6 @@ class NavigationManager {
             <div class="app-header">
                 <div class="app-brand">
                     <h1>🎸Swar JamRoom & Music Studio</h1>
-                    <p class="app-subtitle">Premium Jam Room Rental & Music Production Space</p>
                     ${greetingHtml}
                 </div>
                 <div class="app-header-actions">
@@ -261,6 +268,8 @@ class NavigationManager {
             const container = document.getElementById(containerId);
             if (container) {
                 container.innerHTML = navHTML;
+                this.refreshThemeToggleLabels();
+                document.dispatchEvent(new CustomEvent('jamroom:navigation-rendered'));
                 console.log(`🧭 NavigationManager: Rendered navigation for ${this.currentPage} page`);
                 return;
             }
@@ -296,6 +305,8 @@ class NavigationManager {
         }
 
         this.refreshThemeToggleLabels();
+
+        document.dispatchEvent(new CustomEvent('jamroom:navigation-rendered'));
 
         console.log(`🧭 NavigationManager: Rendered navigation for ${this.currentPage} page`);
     }
@@ -381,6 +392,10 @@ window.NavigationManager = new NavigationManager();
 
 // Auto-initialization
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.NavigationManager && typeof window.NavigationManager.showLoadingPlaceholder === 'function') {
+        window.NavigationManager.showLoadingPlaceholder('navigationContainer');
+    }
+
     // Initialize responsive behavior
     window.NavigationManager.initResponsive();
     window.NavigationManager.addEventListeners();

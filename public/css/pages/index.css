@@ -25,41 +25,66 @@
         }
 
         /* Navigation styles are now in shared.css */
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 30px;
+        .instagram-showcase {
             margin-bottom: 50px;
         }
 
-        .feature-card {
-            padding: 35px 30px;
-            background: #ffffff;
-            border: 1px solid #e9ecef;
-            border-radius: 12px;
+        .instagram-title {
             text-align: center;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            border-color: var(--primary-color);
-        }
-
-        .feature-card h3 {
-            color: var(--primary-color);
-            margin-bottom: 18px;
             font-size: 1.6em;
-            font-weight: 600;
-            letter-spacing: -0.01em;
+            color: var(--text-color);
+            margin-bottom: 20px;
         }
 
-        .feature-card p {
-            color: var(--text-secondary);
-            line-height: 1.7;
-            font-size: 1.05em;
+        .instagram-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            align-items: start;
+        }
+
+        .instagram-embed-card {
+            position: relative;
+            min-height: 120px;
+        }
+
+        .instagram-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--text-color-light);
+            background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+            border: 1px solid var(--border-color-light);
+            border-radius: 12px;
+            z-index: 1;
+        }
+
+        .instagram-loader-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .instagram-embed-card.loaded .instagram-loader {
+            display: none;
+        }
+
+        .instagram-grid .instagram-media {
+            margin: 0 !important;
+            min-width: 100% !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border-radius: 12px;
+            border: 1px solid var(--border-color-light);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
         }
 
         /* Mobile responsive styles - most are now in shared.css */
@@ -72,13 +97,9 @@
                 font-size: 1em;
             }
             
-            .features {
+            .instagram-grid {
                 grid-template-columns: 1fr;
-                gap: 20px;
-            }
-            
-            .feature-card {
-                padding: 20px;
+                gap: 12px;
             }
         }
 

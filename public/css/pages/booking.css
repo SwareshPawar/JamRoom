@@ -4,6 +4,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 30px;
+            min-width: 0;
         }
         
         /* Desktop: Hide collapse functionality */
@@ -16,6 +17,7 @@
             padding: 30px;
             border-radius: 10px;
             box-shadow: var(--shadow-md);
+            min-width: 0;
         }
         
         /* Form styles now in shared.css */
@@ -55,6 +57,7 @@
             padding: 14px;
             margin-bottom: 14px;
             background: var(--surface-1);
+            min-width: 0;
         }
 
         .booking-hidden-initial {
@@ -183,6 +186,7 @@
             background: var(--surface-1);
             max-height: 340px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
         
         .rental-category {
@@ -225,6 +229,7 @@
             border-radius: 8px;
             background: var(--surface-elevated);
             transition: all 0.3s ease;
+            min-width: 0;
         }
         
         .rental-option:hover {
@@ -268,37 +273,44 @@
         .rental-meta {
             margin: 0;
             line-height: 1.35;
+            min-width: 0;
         }
         
         .rental-name {
             font-weight: 600;
             color: var(--text-color);
             margin-bottom: 3px;
+            overflow-wrap: anywhere;
         }
         
         .rental-description {
             font-size: 12px;
             color: var(--text-color-light);
             margin-bottom: 4px;
+            overflow-wrap: anywhere;
         }
         
         .rental-price {
             font-weight: 500;
             color: var(--primary-color-dark);
             font-size: 13px;
+            overflow-wrap: anywhere;
         }
         
         .rental-qty {
             display: flex;
             align-items: center;
             gap: 6px;
-            white-space: nowrap;
+            white-space: normal;
+            min-width: 0;
         }
 
         .quantity-info {
             font-size: 12px;
             color: var(--text-color-light);
             padding: 5px;
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
 
         .quantity-info.centered {
@@ -368,17 +380,27 @@
         }
 
         @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .section {
+                padding: 18px;
+            }
+
             .booking-mode-switch {
                 grid-template-columns: 1fr;
             }
 
             .rental-option {
-                grid-template-columns: auto 1fr;
+                grid-template-columns: auto minmax(0, 1fr);
             }
 
             .rental-qty {
                 grid-column: 2;
                 justify-content: flex-start;
+                width: 100%;
             }
 
             .rental-option.child {
@@ -685,6 +707,32 @@
             color: var(--text-color-light);
         }
 
+        .booking-theme-status {
+            border-radius: 8px;
+            padding: 9px 10px;
+            font-size: 0.86rem;
+            line-height: 1.35;
+            border: 1px solid var(--border-color-light);
+            margin: 4px 0;
+        }
+
+        .booking-theme-status-success {
+            background: color-mix(in srgb, var(--success-color) 12%, var(--surface-elevated));
+            border-left: 4px solid var(--success-color);
+        }
+
+        .booking-theme-status-danger {
+            background: color-mix(in srgb, var(--danger-color) 12%, var(--surface-elevated));
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .booking-theme-status-muted,
+        .booking-theme-status-loading {
+            background: color-mix(in srgb, var(--secondary-color) 10%, var(--surface-elevated));
+            border-left: 4px solid var(--secondary-color);
+            color: var(--text-color-light);
+        }
+
         .timeline-loading {
             display: flex;
             align-items: center;
@@ -759,4 +807,70 @@
             border-top: 2px solid currentColor;
             border-radius: 50%;
             animation: spin 1s linear infinite;
+        }
+
+        /* Ultra-compact mobile density mode */
+        @media (max-width: 768px) {
+            .main-content {
+                gap: 5px;
+            }
+
+            .section,
+            .booking-flow-block,
+            .booking-theme-status,
+            .rentals-container,
+            .price-display,
+            .reference-view,
+            .booking-card,
+            .payment-method,
+            .payment-info,
+            .upi-section {
+                padding: 5px !important;
+                margin-bottom: 5px;
+            }
+
+            .form-group,
+            .selected-rentals,
+            .payment-methods,
+            .booking-actions-row,
+            .time-container {
+                gap: 5px;
+                margin-bottom: 5px;
+            }
+
+            .form-group {
+                margin-bottom: 5px;
+            }
+
+            label {
+                margin-bottom: 3px;
+            }
+
+            input,
+            select,
+            textarea {
+                padding: 5px;
+            }
+
+            .category-header {
+                padding: 5px;
+                margin-top: 5px;
+            }
+
+            .rental-option {
+                padding: 5px;
+                margin: 5px 0;
+            }
+
+            .quantity-btn {
+                width: 24px;
+                height: 24px;
+            }
+
+            .btn,
+            .payment-btn {
+                padding: 5px 6px;
+                margin: 0;
+                font-size: 0.78rem;
+            }
         }

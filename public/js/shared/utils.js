@@ -474,10 +474,16 @@ class JamRoomUtils {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        container.innerHTML = `
-            <div class="section-loading-inline">
-                <div class="loader"></div>
-                <span>${message}</span>
+        container.innerHTML = this.getSectionLoaderMarkup(message);
+    }
+
+    static getSectionLoaderMarkup(message = 'Loading...') {
+        return `
+            <div class="section-loading-inline" role="status" aria-live="polite">
+                <div class="section-loader-tiny">
+                    <span class="section-loader-tiny-spinner" aria-hidden="true"></span>
+                    <span>${message}</span>
+                </div>
             </div>
         `;
     }
@@ -581,6 +587,78 @@ class JamRoomUtils {
         return filename.slice((filename.lastIndexOf('.') - 1 >>> 0) + 2);
     }
 }
+
+const JamRoomBootLoader = (() => {
+    const loaderId = 'jamroomBootLoader';
+    let hideTimer = null;
+
+    const ensureLoader = () => {
+        let loader = document.getElementById(loaderId);
+        if (loader) {
+            return loader;
+        }
+
+        loader = document.createElement('div');
+        loader.id = loaderId;
+        loader.className = 'boot-loader-chip';
+        loader.setAttribute('aria-live', 'polite');
+        loader.innerHTML = '<span class="boot-loader-spinner"></span><span id="jamroomBootLoaderText">Loading...</span>';
+        document.body.appendChild(loader);
+        return loader;
+    };
+
+    const show = (message = 'Loading...') => {
+        const run = () => {
+            const loader = ensureLoader();
+            const label = loader.querySelector('#jamroomBootLoaderText');
+            if (label) {
+                label.textContent = message;
+            }
+
+            if (hideTimer) {
+                clearTimeout(hideTimer);
+                hideTimer = null;
+            }
+
+            loader.classList.add('show');
+        };
+
+        if (document.body) {
+            run();
+        } else {
+            document.addEventListener('DOMContentLoaded', run, { once: true });
+        }
+    };
+
+    const hide = (delay = 120) => {
+        const loader = document.getElementById(loaderId);
+        if (!loader) {
+            return;
+        }
+
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+        }
+
+        hideTimer = setTimeout(() => {
+            loader.classList.remove('show');
+            hideTimer = null;
+        }, Math.max(0, delay));
+    };
+
+    return { show, hide };
+})();
+
+window.JamRoomBootLoader = JamRoomBootLoader;
+window.JamRoomBootLoader.show('Loading...');
+
+window.addEventListener('load', () => {
+    window.JamRoomBootLoader.hide(180);
+});
+
+document.addEventListener('jamroom:navigation-rendered', () => {
+    window.JamRoomBootLoader.hide(100);
+});
 
 // Make JamRoomUtils globally available
 window.JamRoomUtils = JamRoomUtils;

@@ -376,16 +376,71 @@ textarea:focus {
     color: var(--text-color-light);
 }
 
+.container,
+.tab-content,
+.tab-pane,
+.booking-card {
+    min-width: 0;
+}
+
 @media (max-width: 768px) {
+    .container {
+        padding: 0;
+    }
+
+    .tabs,
+    .tab-content,
+    .setup-option,
+    .whatsapp-setup,
+    .whatsapp-setup-card,
+    .booking-card,
+    .info-card,
+    .delete-section {
+        padding: 5px !important;
+        margin-bottom: 5px;
+    }
+
     .tabs {
         flex-direction: column;
     }
 
+    .tab-btn {
+        padding: 5px;
+    }
+
     .tab-content {
-        padding: 20px;
+        padding: 5px;
     }
 
     .profile-info {
         grid-template-columns: 1fr;
+        gap: 5px;
+    }
+
+    .form-group {
+        margin-bottom: 5px;
+    }
+
+    label {
+        margin-bottom: 3px;
+    }
+
+    input,
+    textarea {
+        padding: 5px;
+    }
+
+    .btn,
+    .whatsapp-btn {
+        padding: 5px 6px;
+        margin: 0;
+        font-size: 0.78rem;
+    }
+
+    .tab-content .btn,
+    .booking-card .btn,
+    .delete-section .btn {
+        width: 100%;
+        margin-right: 0;
     }
 }

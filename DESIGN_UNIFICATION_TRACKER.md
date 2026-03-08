@@ -1,6 +1,6 @@
 # JamRoom Design Unification Tracker
 
-Last Updated: March 8, 2026 (Navigation/header consistency pass completed; QA and final cleanup in progress)
+Last Updated: March 8, 2026 (Mobile density, modal centering, loader consistency, and admin helper-card polish applied; final QA remains)
 Owner: JamRoom Team
 Scope: Unify all user and admin pages to match home page visual language with consistent layout, colors, typography, and theme behavior.
 Canonical Source: This file is the single source of truth for UI unification phase status, checklist progress, and UI-specific tracking updates.
@@ -155,6 +155,8 @@ Tasks:
 - [ ] Regression test critical flows: auth, booking, payment, account, admin.
 - [x] Verify high-risk pages have no residual inline `style=` attributes (`admin/account/booking` now `0`).
 - [x] Verify booking mode toggles and totals behavior after style and module updates.
+- [x] Standardize modal centering behavior where global utility classes previously overrode flex modal layout.
+- [x] Add lightweight perceived-loading indicators for navigation shell, Instagram embed cards, and section-level async data blocks.
 - [ ] Final review and sign-off checklist.
 
 Exit Criteria:
@@ -182,6 +184,18 @@ Exit Criteria:
 | 2026-03-08 | Phase 6 | Added mobile constraints for shared payment dialog/toast components to prevent overflow on narrow screens. | Copilot |
 | 2026-03-08 | Phase 6 | Re-applied and re-validated key UI changes after accidental undo (header actions placement, greeting line, booking width fix). | Copilot |
 | 2026-03-08 | Phase 6 | Confirmed inline `style=` cleanup state remains at zero for `public/admin.html`, `public/account.html`, and `public/booking.html`. | Copilot |
+| 2026-03-08 | Phase 6 | Fixed mobile booking layout inconsistency by forcing `public/css/pages/booking.css` main content to single-column at <=900px so `My Bookings` is not pushed off-screen in hourly mode. | Copilot |
+| 2026-03-08 | Phase 6 | Hardened `public/js/booking/booking-bookings.js` error path so `My Bookings` section is still shown with an error message when API loading fails. | Copilot |
+| 2026-03-08 | Phase 6 | Applied admin mobile consistency overrides in `public/css/pages/admin.css` (grid collapse for revenue/settings/forms, stacked action rows, modal/button usability on small screens). | Copilot |
+| 2026-03-08 | Phase 6 | Applied account mobile consistency overrides in `public/css/pages/account.css` (overflow safety and full-width action buttons for tabs/booking cards/danger zone). | Copilot |
+| 2026-03-08 | Phase 6 | Added compact mobile density overrides (<=768px) to `public/css/pages/admin.css`, `public/css/pages/booking.css`, and `public/css/pages/account.css`, capping key container paddings at 5px and reducing stat-card typography for efficient screen usage. | Copilot |
+| 2026-03-08 | Phase 2 | Removed shared subtitle line from unified header brand block and kept action area streamlined (theme toggle remains floating FAB). | Copilot |
+| 2026-03-08 | Phase 3 | Replaced home `feature-card` grid with Instagram post embeds and responsive embed-card layout. | Copilot |
+| 2026-03-08 | Phase 6 | Added tiny global/load-state UX improvements: startup chip loader, navigation placeholder loader, and shared section loader markup/styles for admin/booking async data blocks. | Copilot |
+| 2026-03-08 | Phase 6 | Hardened Instagram loader completion detection to prevent stale `Still loading...` text after embed render. | Copilot |
+| 2026-03-08 | Phase 6 | Fixed modal alignment regression by forcing `.modal.show` to `display:flex !important` to avoid global `.show` utility conflicts. | Copilot |
+| 2026-03-08 | Phase 5 | Added themed helper/status cards in admin create-booking modal for override/availability guidance and state messages. | Copilot |
+| 2026-03-08 | Phase 6 | Scoped table-column hide rules to booking/revenue tables so Users `Created` and `Actions` columns remain visible on desktop. | Copilot |
 
 ## 6. Risks And Watchouts
 
@@ -190,6 +204,7 @@ Exit Criteria:
 - Service worker/browser cache can hide style changes during verification.
 - Large inline legacy styles in some pages can slow migration if not staged.
 - In-editor mobile emulation may not always reflect true device viewport behavior; real-device checks are still required before sign-off.
+- Instagram official embed scripts may log browser `Permissions policy violation: unload is not allowed` warnings; these are third-party iframe warnings and are non-blocking for app behavior.
 
 ## 7. Update Protocol
 
@@ -200,3 +215,29 @@ When updating this tracker after each implementation step:
 3. Mark task checkboxes.
 4. Add one line to `Progress Log`.
 5. Note blockers/risks if discovered.
+
+## 8. Mobile Consistency Fix List
+
+Status: `In Progress`
+
+Booking (`public/booking.html`, `public/css/pages/booking.css`, `public/js/booking/*`):
+- [x] Ensure `My Bookings` remains reachable/visible on mobile (single-column layout, no off-screen second column).
+- [x] Ensure `My Bookings` renders visible error state when API request fails.
+- [ ] Verify hourly/per-day mode toggles do not change page width or trigger horizontal scroll.
+- [ ] Verify booking card actions remain tap-friendly at <=480px.
+
+Account (`public/account.html`, `public/css/pages/account.css`):
+- [ ] Audit tab stack behavior at <=768px and <=480px (no clipped tab buttons).
+- [ ] Verify booking/history cards and WhatsApp setup blocks do not overflow horizontally.
+- [ ] Ensure danger-zone and form actions remain full-width/tap-friendly on small screens.
+
+Admin (`public/admin.html`, `public/css/pages/admin.css`, `public/js/admin/*`):
+- [ ] Verify tab strip wraps cleanly and remains usable at <=768px.
+- [ ] Verify users/rentals/settings composite grids collapse without off-screen overflow.
+- [ ] Verify all table zones keep intentional horizontal scroll only within table containers.
+- [ ] Verify modal forms (create/edit booking, user actions) are fully usable at <=480px.
+- Note: modal centering bug is fixed in CSS; final device usability QA is still pending.
+
+Cross-page shared shell (`public/css/shared.css`, `public/js/shared/navigation.js`):
+- [ ] Verify header, nav links, and bottom theme toggle do not overlap content at <=360px.
+- [ ] Verify consistent container/gutter rhythm across booking/account/admin on mobile.

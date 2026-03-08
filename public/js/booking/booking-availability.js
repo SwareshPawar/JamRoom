@@ -260,12 +260,12 @@ const populateTimeSlots = async () => {
 const loadAvailability = async (date) => {
     const container = document.getElementById('referenceTimeline');
     if (!date) {
-        container.innerHTML = '<div class="loading-text">Select a date to view availability</div>';
+        container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">Select a date to view availability</div>';
         window.currentAvailabilityData = null;
         return;
     }
 
-    container.innerHTML = '<div class="timeline-loading"><span class="loader"></span><span>Loading availability...</span></div>';
+    container.innerHTML = '<div class="booking-theme-status booking-theme-status-loading">Loading availability...</div>';
 
     let timeoutId;
     try {
@@ -299,9 +299,9 @@ const loadAvailability = async (date) => {
     } catch (error) {
         console.error('Error loading availability:', error);
         if (error.name === 'AbortError') {
-            container.innerHTML = '<p class="text-danger">Loading availability timed out. Please try again.</p>';
+            container.innerHTML = '<div class="booking-theme-status booking-theme-status-danger">Loading availability timed out. Please try again.</div>';
         } else {
-            container.innerHTML = '<p class="text-danger">Failed to load schedule. Please try again.</p>';
+            container.innerHTML = '<div class="booking-theme-status booking-theme-status-danger">Failed to load schedule. Please try again.</div>';
         }
 
         // Clear availability data on error
@@ -321,7 +321,7 @@ const displayAvailability = (data) => {
     const container = document.getElementById('referenceTimeline');
 
     if (data.bookings.length === 0 && data.blockedTimes.length === 0) {
-        container.innerHTML = '<p class="availability-all-clear">✓ All time slots available for this date</p>';
+        container.innerHTML = '<div class="booking-theme-status booking-theme-status-success">All time slots available for this date.</div>';
         return;
     }
 
@@ -352,7 +352,7 @@ const displayAvailability = (data) => {
         `;
     });
 
-    container.innerHTML = html || '<p>No schedule items</p>';
+    container.innerHTML = html || '<div class="booking-theme-status booking-theme-status-muted">No schedule items</div>';
 };
 
 // Expose for cross-file calls and compatibility.

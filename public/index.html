@@ -32,30 +32,29 @@
                 <p>Professional equipment, soundproof rooms, and flexible booking options</p>
             </div>
 
-            <section class="features">
-                <div class="feature-card">
-                    <h3>Professional Equipment</h3>
-                    <p>High-quality instruments, amplifiers, and sound systems available for rent.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>Soundproof Rooms</h3>
-                    <p>Fully isolated jam rooms for a clean, focused practice and recording session.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>Flexible Timing</h3>
-                    <p>Book slots based on your schedule with transparent availability.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>Affordable Rates</h3>
-                    <p>Clear pricing with options for solo artists and full bands.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>Easy Booking</h3>
-                    <p>Simple online flow with immediate confirmation and payment guidance.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>Recording Ready</h3>
-                    <p>Use pro-audio gear and room-ready setups for fast session start.</p>
+            <section class="instagram-showcase">
+                <h3 class="instagram-title">Studio Instagram Highlights</h3>
+                <div class="instagram-grid">
+                    <div class="instagram-embed-card">
+                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
+                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DH7-xoRNGUa/" data-instgrm-version="14"></blockquote>
+                    </div>
+                    <div class="instagram-embed-card">
+                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
+                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/C4AvvnIvTho/" data-instgrm-version="14"></blockquote>
+                    </div>
+                    <div class="instagram-embed-card">
+                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
+                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DCeQLCmOu7L/" data-instgrm-version="14"></blockquote>
+                    </div>
+                    <div class="instagram-embed-card">
+                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
+                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DNXomqytoXd/" data-instgrm-version="14"></blockquote>
+                    </div>
+                    <div class="instagram-embed-card">
+                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
+                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DUada26Cfwz/" data-instgrm-version="14"></blockquote>
+                    </div>
                 </div>
             </section>
 
@@ -101,6 +100,117 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
+            const setupInstagramLoaders = () => {
+                const embedCards = Array.from(document.querySelectorAll('.instagram-embed-card'));
+                if (!embedCards.length) {
+                    return;
+                }
+
+                const triggerInstagramRender = () => {
+                    if (window.instgrm && window.instgrm.Embeds && typeof window.instgrm.Embeds.process === 'function') {
+                        window.instgrm.Embeds.process();
+                        return true;
+                    }
+                    return false;
+                };
+
+                if (!triggerInstagramRender()) {
+                    const processTimer = setInterval(() => {
+                        if (triggerInstagramRender()) {
+                            clearInterval(processTimer);
+                        }
+                    }, 300);
+
+                    setTimeout(() => clearInterval(processTimer), 5000);
+                }
+
+                const isEmbedRendered = (card, embed) => {
+                    if (!embed) {
+                        return true;
+                    }
+
+                    const renderedByClass = embed.classList.contains('instagram-media-rendered');
+                    const renderedByFlag = embed.getAttribute('data-instgrm-processed') === 'true';
+                    const hasInstagramIframe = !!card.querySelector('iframe[src*="instagram.com"]');
+                    const renderedHeight = embed.getBoundingClientRect().height > 140;
+
+                    return renderedByClass || renderedByFlag || hasInstagramIframe || renderedHeight;
+                };
+
+                const markLoaded = (card) => {
+                    card.classList.add('loaded');
+                };
+
+                const syncLoadedState = () => {
+                    let pending = 0;
+
+                    embedCards.forEach((card) => {
+                        if (card.classList.contains('loaded')) {
+                            return;
+                        }
+
+                        const embed = card.querySelector('.instagram-media');
+                        if (isEmbedRendered(card, embed)) {
+                            markLoaded(card);
+                        } else {
+                            pending += 1;
+                        }
+                    });
+
+                    return pending;
+                };
+
+                embedCards.forEach((card) => {
+                    const embed = card.querySelector('.instagram-media');
+                    if (!embed) {
+                        markLoaded(card);
+                        return;
+                    }
+
+                    if (isEmbedRendered(card, embed)) {
+                        markLoaded(card);
+                        return;
+                    }
+
+                    const observer = new MutationObserver(() => {
+                        if (isEmbedRendered(card, embed)) {
+                            markLoaded(card);
+                            observer.disconnect();
+                        }
+                    });
+
+                    observer.observe(card, {
+                        attributes: true,
+                        attributeFilter: ['class', 'data-instgrm-processed'],
+                        childList: true,
+                        subtree: true
+                    });
+
+                    setTimeout(() => {
+                        if (!card.classList.contains('loaded')) {
+                            const loaderText = card.querySelector('.instagram-loader-text');
+                            if (loaderText) {
+                                loaderText.textContent = 'Still loading...';
+                            }
+                        }
+                    }, 4500);
+                });
+
+                const statusTimer = setInterval(() => {
+                    const pending = syncLoadedState();
+                    if (pending === 0) {
+                        clearInterval(statusTimer);
+                    }
+                }, 300);
+
+                setTimeout(() => {
+                    clearInterval(statusTimer);
+                    syncLoadedState();
+                }, 9000);
+            };
+
+            setupInstagramLoaders();
+
             try {
                 const user = await getCurrentUser();
                 window.NavigationManager.init(user || null);
@@ -115,6 +225,7 @@
             }
         });
     </script>
+    <script async src="https://www.instagram.com/embed.js"></script>
 </body>
 </html>
 
