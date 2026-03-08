@@ -72,10 +72,10 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         // Get booked and blocked time ranges
         const unavailableRanges = [];
 
-        // Add booked times to unavailable ranges
+        // Only confirmed bookings block new slot selection.
         if (availabilityData && availabilityData.bookings) {
             availabilityData.bookings.forEach(booking => {
-                if (booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'PENDING') {
+                if (booking.bookingStatus === 'CONFIRMED') {
                     unavailableRanges.push({
                         start: booking.startTime,
                         end: booking.endTime,
@@ -213,7 +213,7 @@ const populateEndTimeSlots = () => {
     // Get current availability data if available
     const unavailableRanges = window.currentAvailabilityData ?
         [...(window.currentAvailabilityData.bookings || []).filter(b =>
-            b.bookingStatus === 'CONFIRMED' || b.bookingStatus === 'PENDING'
+            b.bookingStatus === 'CONFIRMED'
         ).map(b => ({ start: b.startTime, end: b.endTime, type: 'booking' })),
         ...(window.currentAvailabilityData.blockedTimes || []).map(b =>
             ({ start: b.startTime, end: b.endTime, type: 'blocked' })

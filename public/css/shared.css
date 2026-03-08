@@ -1223,10 +1223,10 @@ textarea:disabled {
     }
 
     .app-header {
-        padding: 8px;
+        padding: 10px;
         flex-direction: column;
         align-items: stretch;
-        gap: 5px;
+        gap: 8px;
     }
 
     .app-header h1 {
@@ -1235,15 +1235,15 @@ textarea:disabled {
     }
 
     .app-brand {
-        gap: 3px;
+        gap: 5px;
     }
 
     .app-subtitle {
-        font-size: 0.75rem;
+        font-size: 0.82rem;
     }
 
     .app-greeting {
-        font-size: 0.72rem;
+        font-size: 0.8rem;
     }
 
     .app-header-actions {
@@ -1251,36 +1251,36 @@ textarea:disabled {
         justify-content: stretch;
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 5px;
+        gap: 8px;
     }
 
     .app-header-actions .btn,
     .app-header-actions a {
         width: 100%;
         text-align: center;
-        padding: 5px 6px;
-        font-size: 0.74rem;
-        min-height: 30px;
+        padding: 8px 10px;
+        font-size: 0.82rem;
+        min-height: 36px;
     }
 
     .main-nav {
-        padding: 5px;
+        padding: 8px;
         align-items: stretch;
-        gap: 5px;
+        gap: 8px;
         border-top: 1px solid color-mix(in srgb, var(--primary-color) 28%, transparent);
     }
 
     .main-nav .nav-links {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 5px;
+        gap: 8px;
     }
 
     .main-nav .nav-link {
         text-align: center;
-        padding: 5px 6px;
-        min-height: 30px;
-        font-size: 0.76rem;
+        padding: 8px 10px;
+        min-height: 36px;
+        font-size: 0.84rem;
         line-height: 1.2;
     }
 
@@ -1404,8 +1404,8 @@ textarea:disabled {
     }
 
     .main-nav .nav-link {
-        font-size: 0.72rem;
-        min-height: 28px;
+        font-size: 0.8rem;
+        min-height: 34px;
     }
 
     .app-header-actions {

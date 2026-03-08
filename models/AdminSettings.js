@@ -67,7 +67,7 @@ const adminSettingsSchema = new mongoose.Schema({
   },
   upiName: {
     type: String,
-    default: 'Swar JamRoom & Music Studio (SwarJRS)'
+    default: 'Swaresh Pawar'
   },
   adminEmails: [{
     type: String,
@@ -83,7 +83,7 @@ const adminSettingsSchema = new mongoose.Schema({
     // Business number (primary admin)
     businessNumber: {
       type: String,
-      default: '+919172706306'
+      default: '+919970011855'
     },
     // Additional notification numbers
     notificationNumbers: [{
@@ -146,7 +146,7 @@ const adminSettingsSchema = new mongoose.Schema({
   },
   studioPhone: {
     type: String,
-    default: '+91 9172706306'
+    default: '+919970011855'
   },
   businessHours: {
     startTime: {
@@ -202,7 +202,7 @@ adminSettingsSchema.statics.getSettings = async function() {
       adminEmails: ['admin@jamroom.com'],
       whatsappNotifications: {
         enabled: true,
-        businessNumber: '+919172706306',
+        businessNumber: '+919970011855',
         notificationNumbers: [
           {
             number: '+919970011855',
@@ -215,7 +215,7 @@ adminSettingsSchema.statics.getSettings = async function() {
             }
           },
           {
-            number: '+919876543210',
+            number: '+919970011855',
             role: 'Sound Engineer',
             notifications: {
               bookingRequests: true,
@@ -225,7 +225,7 @@ adminSettingsSchema.statics.getSettings = async function() {
             }
           },
           {
-            number: '+919876543211',
+            number: '+919970011855',
             role: 'Maintenance Person',
             notifications: {
               bookingRequests: true,

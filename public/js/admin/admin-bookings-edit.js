@@ -46,7 +46,7 @@
         rentalTypes.forEach((type) => {
             html += `<div class="admin-rental-category">${deps.escapeHtml(type.name)}</div>`;
 
-            if (type.basePrice && type.basePrice > 0) {
+            if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0) {
                 const baseId = `${type.name}_base`;
                 const qtyInputId = getEditRentalInputId(baseId, deps);
                 const isJamRoomBase = type.name === 'JamRoom';
@@ -67,18 +67,18 @@
                     perdayPrice: 0,
                     rentalType: 'inhouse',
                     description: matchedBase?.description || type.description || '',
-                    isRequired: true,
+                    isRequired: false,
                     isBase: true
                 }));
 
-                const shouldCheckBase = !!matchedBase || isJamRoomBase;
+                const shouldCheckBase = !!matchedBase;
 
                 html += `
                     <div class="admin-rental-row base">
                         <input type="checkbox" id="edit_rental_${qtyInputId}" name="editRental" data-rental="${encodedBaseData}" ${shouldCheckBase ? 'checked' : ''}>
                         <label for="edit_rental_${qtyInputId}" class="admin-rental-meta">
                             🏠 ${deps.escapeHtml(type.name)} (Base) - ₹${basePrice}/hr
-                            <span class="admin-rental-subtext">Required base item</span>
+                            <span class="admin-rental-subtext">Base item</span>
                         </label>
                         <div class="admin-rental-qty">
                             <label for="${qtyInputId}">Qty</label>
@@ -146,6 +146,42 @@
                         </div>
                     `;
                 });
+            } else if (type.name !== 'JamRoom' && type.basePrice && type.basePrice > 0) {
+                const itemId = `${type.name}__${type.name}`;
+                const qtyInputId = getEditRentalInputId(itemId, deps);
+                const matchKey = getRentalMatchKey(type.name, 'inhouse');
+                const matchedRental = existingMap.get(matchKey);
+
+                if (matchedRental) {
+                    usedExistingKeys.add(matchKey);
+                }
+
+                const effectivePrice = matchedRental ? Number(matchedRental.price || type.basePrice) : type.basePrice;
+                const encodedRentalData = encodeURIComponent(JSON.stringify({
+                    id: itemId,
+                    name: type.name,
+                    price: effectivePrice,
+                    perdayPrice: 0,
+                    rentalType: 'inhouse',
+                    description: matchedRental?.description || type.description || '',
+                    isRequired: false,
+                    isBase: false,
+                    allowCustomQuantity: false
+                }));
+
+                html += `
+                    <div class="admin-rental-row child">
+                        <input type="checkbox" id="edit_rental_${qtyInputId}" name="editRental" data-rental="${encodedRentalData}" ${matchedRental ? 'checked' : ''}>
+                        <label for="edit_rental_${qtyInputId}" class="admin-rental-meta">
+                            🔗 ${deps.escapeHtml(type.name)} - ₹${effectivePrice}/hr
+                            <span class="admin-rental-subtext">Category base price item</span>
+                        </label>
+                        <div class="admin-rental-qty">
+                            <span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span>
+                            <input type="hidden" id="${qtyInputId}" value="1">
+                        </div>
+                    </div>
+                `;
             }
         });
 

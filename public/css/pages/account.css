@@ -396,8 +396,8 @@ textarea:focus {
     .booking-card,
     .info-card,
     .delete-section {
-        padding: 5px !important;
-        margin-bottom: 5px;
+        padding: 8px !important;
+        margin-bottom: 8px;
     }
 
     .tabs {
@@ -405,36 +405,36 @@ textarea:focus {
     }
 
     .tab-btn {
-        padding: 5px;
+        padding: 8px;
     }
 
     .tab-content {
-        padding: 5px;
+        padding: 8px;
     }
 
     .profile-info {
         grid-template-columns: 1fr;
-        gap: 5px;
+        gap: 8px;
     }
 
     .form-group {
-        margin-bottom: 5px;
+        margin-bottom: 8px;
     }
 
     label {
-        margin-bottom: 3px;
+        margin-bottom: 5px;
     }
 
     input,
     textarea {
-        padding: 5px;
+        padding: 8px;
     }
 
     .btn,
     .whatsapp-btn {
-        padding: 5px 6px;
+        padding: 8px 10px;
         margin: 0;
-        font-size: 0.78rem;
+        font-size: 0.84rem;
     }
 
     .tab-content .btn,

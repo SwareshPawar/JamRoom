@@ -31,17 +31,10 @@ router.get('/', async (req, res) => {
           bookingStatus: 'CONFIRMED'
         });
 
-        // Also get pending bookings for reference
-        const pendingBookings = await Booking.find({
-          slotId: slot._id,
-          bookingStatus: 'PENDING'
-        }).countDocuments();
-
         return {
           ...slot.toObject(),
           isBooked: !!confirmedBooking,
-          bookingId: confirmedBooking?._id,
-          pendingBookings
+          bookingId: confirmedBooking?._id
         };
       })
     );

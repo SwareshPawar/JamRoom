@@ -43,6 +43,20 @@ const formatTimeRange12Hour = (startTime, endTime) => {
   return `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
 };
 
+const getDisplayUpiName = (settings) => {
+  const configuredName = String(settings?.upiName || '').trim();
+  const legacyPlaceholders = new Set([
+    'JamRoom Studio',
+    'Swar JamRoom & Music Studio (SwarJRS)'
+  ]);
+
+  if (!configuredName || legacyPlaceholders.has(configuredName)) {
+    return process.env.UPI_NAME || 'Swaresh Pawar';
+  }
+
+  return configuredName;
+};
+
 /**
  * Helper function to check time conflicts
  */
@@ -127,7 +141,7 @@ const getPerdayBookedItemQuantities = async ({
   }
 
   const query = {
-    bookingStatus: { $in: ['PENDING', 'CONFIRMED'] },
+    bookingStatus: 'CONFIRMED',
     $and: [
       buildPerdayInventoryModeFilter(),
       {
@@ -191,8 +205,28 @@ const getPerdayBookedItemQuantities = async ({
 };
 
 const buildHourlySlotModeFilter = () => ({
-  bookingMode: 'hourly',
-  rentals: { $not: { $elemMatch: { rentalType: 'perday' } } }
+  $and: [
+    {
+      $or: [
+        { bookingMode: 'hourly' },
+        { bookingMode: { $exists: false } },
+        { bookingMode: null }
+      ]
+    },
+    { rentals: { $not: { $elemMatch: { rentalType: 'perday' } } } },
+    {
+      $or: [
+        { perDayStartDate: { $exists: false } },
+        { perDayStartDate: null }
+      ]
+    },
+    {
+      $or: [
+        { perDayEndDate: { $exists: false } },
+        { perDayEndDate: null }
+      ]
+    }
+  ]
 });
 
 // @route   POST /api/bookings
@@ -398,6 +432,7 @@ router.post('/', protect, async (req, res) => {
 
     // Get admin settings for UPI details and GST configuration
     const settings = await AdminSettings.getSettings();
+    const resolvedUpiName = getDisplayUpiName(settings);
     
     // Validate and recalculate totals based on admin settings
     let calculatedSubtotal = 0;
@@ -521,7 +556,7 @@ router.post('/', protect, async (req, res) => {
           </ul>
           <h3>Payment Details:</h3>
           <p><strong>UPI ID:</strong> ${settings.upiId}</p>
-          <p><strong>Name:</strong> ${settings.upiName}</p>
+          <p><strong>Name:</strong> ${resolvedUpiName}</p>
           <p><strong>Amount:</strong> ₹${totalAmount || subtotal}</p>
           <p>Please complete the payment and wait for admin approval.</p>
           <p>You will receive a confirmation email once approved.</p>
@@ -542,7 +577,7 @@ router.post('/', protect, async (req, res) => {
           duration: normalizedMode === 'perday' ? computedPerDayHours : duration,
           totalAmount: calculatedTotalAmount,
           upiId: settings.upiId,
-          upiName: settings.upiName
+          upiName: resolvedUpiName
         });
         console.log('Customer booking WhatsApp sent to:', req.user.mobile);
       } catch (whatsappError) {
@@ -613,7 +648,7 @@ router.post('/', protect, async (req, res) => {
       booking,
       upiDetails: {
         upiId: settings.upiId,
-        upiName: settings.upiName,
+        upiName: resolvedUpiName,
         amount: calculatedTotalAmount
       }
     });
@@ -693,20 +728,20 @@ router.get('/availability/:date', async (req, res) => {
   try {
     const date = new Date(req.params.date);
     date.setHours(0, 0, 0, 0);
+    const dayStart = new Date(date);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
 
-    // Get all bookings for the date (show both PENDING and CONFIRMED for reference)
+    // Public availability: only confirmed bookings are visible and block slots.
     const bookings = await Booking.find({
-      date,
-      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] },
+      date: { $gte: dayStart, $lte: dayEnd },
+      bookingStatus: 'CONFIRMED',
       ...buildHourlySlotModeFilter()
     }).select('startTime endTime rentalType bookingStatus bookingMode');
 
-    // Only confirmed bookings block new bookings
-    const confirmedBookings = bookings.filter(b => b.bookingStatus === 'CONFIRMED');
-
     // Get all blocked times for the date
     const blockedTimes = await BlockedTime.find({
-      date
+      date: { $gte: dayStart, $lte: dayEnd }
     }).select('startTime endTime reason');
 
     res.json({
@@ -781,7 +816,7 @@ router.get('/payment-info', async (req, res) => {
       success: true,
       paymentInfo: {
         upiId: settings.upiId || 'Not configured',
-        upiName: settings.upiName || 'JamRoom Studio',
+        upiName: getDisplayUpiName(settings),
         // Don't expose other sensitive admin settings
       }
     });

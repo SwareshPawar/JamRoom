@@ -232,6 +232,92 @@
     text-align: center;
 }
 
+.booking-row-clickable {
+    cursor: pointer;
+}
+
+.booking-row-clickable:hover {
+    background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+}
+
+.booking-row-clickable:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+}
+
+.booking-table-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    align-items: center;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.booking-table-actions .btn {
+    white-space: nowrap;
+}
+
+.booking-expand-actions {
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.bookings-table-controls {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto auto auto;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.bookings-pagination-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 10px 0 0;
+}
+
+.bookings-page-meta {
+    color: var(--text-color-light);
+    font-size: 0.9rem;
+    min-width: 110px;
+    text-align: center;
+}
+
+.bookings-pagination-controls .btn[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.bookings-search-input,
+.bookings-sort-select,
+.bookings-limit-select {
+    width: 100%;
+}
+
+.bookings-table-meta {
+    color: var(--text-color-light);
+    font-size: 0.9rem;
+    text-align: right;
+}
+
+#bookingsTable .table-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#bookingsTable .table-container table {
+    min-width: 980px;
+    margin: 0;
+}
+
 .revenue-breakdown-row {
     display: flex;
     justify-content: space-between;
@@ -1153,6 +1239,183 @@ table td small {
     color: var(--text-color);
 }
 
+.bookings-expand-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.booking-expand-card {
+    border: 1px solid var(--border-color-light);
+    border-radius: 10px;
+    background: var(--surface-1);
+    box-shadow: var(--shadow-sm);
+}
+
+.booking-expand-summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.booking-expand-summary::-webkit-details-marker {
+    display: none;
+}
+
+.booking-expand-summary::after {
+    content: '+';
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-left: 6px;
+}
+
+.booking-expand-card[open] .booking-expand-summary::after {
+    content: '-';
+}
+
+.booking-expand-main,
+.booking-expand-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.booking-expand-title,
+.booking-expand-subtitle,
+.booking-expand-price {
+    margin: 0;
+}
+
+.booking-expand-title {
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.booking-expand-subtitle {
+    color: var(--text-color-light);
+    font-size: 0.9rem;
+}
+
+.booking-expand-price {
+    font-weight: 700;
+    color: var(--primary-color);
+    text-align: right;
+}
+
+.booking-expand-body {
+    border-top: 1px solid var(--border-color-light);
+    padding: 12px 14px 14px;
+}
+
+.booking-expand-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.booking-expand-panel {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-color-light);
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.booking-expand-panel h4 {
+    margin: 0 0 8px;
+    color: var(--text-color);
+}
+
+.booking-kv-grid {
+    display: grid;
+    gap: 6px;
+}
+
+.booking-kv-grid p,
+.booking-requirements p {
+    margin: 0;
+    color: var(--text-color-light);
+}
+
+.booking-meta-list {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+}
+
+.booking-meta-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--text-color-light);
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 6px;
+}
+
+.booking-meta-empty {
+    margin: 0;
+    color: var(--text-color-light);
+}
+
+.booking-requirements {
+    display: grid;
+    gap: 8px;
+}
+
+.booking-kv-grid-price {
+    margin-top: 8px;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 8px;
+}
+
+.booking-expand-actions {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    align-items: center;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+@media (max-width: 768px) {
+    .bookings-table-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .bookings-pagination-controls {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .bookings-table-meta {
+        text-align: left;
+    }
+
+    .booking-expand-summary {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .booking-expand-price {
+        text-align: left;
+    }
+
+    .booking-expand-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-meta-list li {
+        flex-direction: column;
+    }
+}
+
 .form-group {
     margin-bottom: 20px;
 }
@@ -1377,6 +1640,99 @@ textarea:focus {
     overflow-y: auto;
 }
 
+#bookingActionModal .modal-content {
+    max-width: 980px;
+}
+
+#modalBookingDetails .booking-modal-body {
+    border-top: none;
+    padding: 0;
+}
+
+#bookingActionModal .modal-content {
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface-elevated) 90%, var(--primary-color) 10%) 0%,
+        var(--surface-elevated) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--primary-color) 26%, var(--border-color-light));
+}
+
+#bookingActionModal .modal-header h2 {
+    color: var(--primary-color);
+}
+
+#modalBookingDetails .booking-expand-grid {
+    gap: 12px;
+}
+
+#modalBookingDetails .booking-expand-panel {
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+}
+
+#modalBookingDetails .booking-expand-panel h4 {
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+}
+
+#modalBookingDetails .booking-kv-grid p,
+#modalBookingDetails .booking-requirements p {
+    color: var(--text-color);
+}
+
+#modalBookingDetails .booking-kv-grid p strong,
+#modalBookingDetails .booking-requirements p strong {
+    color: var(--primary-color);
+}
+
+.booking-modal-theme-pricing {
+    border-left: 4px solid var(--success-color);
+    background: color-mix(in srgb, var(--success-color) 10%, var(--surface-elevated));
+}
+
+.booking-modal-theme-requirements {
+    border-left: 4px solid var(--warning-color);
+    background: color-mix(in srgb, var(--warning-color) 10%, var(--surface-elevated));
+}
+
+#modalBookingDetails .booking-meta-list li {
+    border-bottom-color: color-mix(in srgb, var(--primary-color) 28%, transparent);
+}
+
+@media (max-width: 768px) {
+    #bookingActionModal .modal-content {
+        width: 96vw;
+        max-width: none;
+        max-height: 92vh;
+        padding: 12px !important;
+    }
+
+    #bookingActionModal .modal-header {
+        margin-bottom: 12px;
+    }
+
+    #modalBookingDetails .booking-expand-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    #modalBookingDetails .booking-expand-panel {
+        padding: 10px;
+    }
+
+    #modalBookingDetails .booking-kv-grid {
+        gap: 8px;
+    }
+
+    #modalBookingDetails .booking-kv-grid p,
+    #modalBookingDetails .booking-requirements p,
+    #modalBookingDetails .booking-meta-list li {
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+}
+
 .modal-header {
     display: flex;
     justify-content: space-between;
@@ -1487,29 +1843,29 @@ textarea:focus {
 /* Ultra-compact mobile density mode */
 @media (max-width: 768px) {
     .topbar {
-        padding: 5px;
+        padding: 8px;
     }
 
     .dashboard {
-        padding: 0 5px;
-        margin: 10px auto;
+        padding: 0 8px;
+        margin: 12px auto;
     }
 
     .stats-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 5px;
-        margin-bottom: 5px;
+        gap: 8px;
+        margin-bottom: 8px;
     }
 
     .revenue-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 5px;
-        margin-bottom: 5px;
+        gap: 8px;
+        margin-bottom: 8px;
     }
 
     .revenue-charts-grid {
-        gap: 5px;
-        margin-bottom: 5px;
+        gap: 8px;
+        margin-bottom: 8px;
     }
 
     .section,
@@ -1526,15 +1882,15 @@ textarea:focus {
     .blocked-item,
     .modal-content,
     .alert {
-        padding: 5px !important;
-        margin-bottom: 5px;
+        padding: 8px !important;
+        margin-bottom: 8px;
     }
 
     .section h2,
     .settings-section-title,
     .users-card-title,
     .admin-grant-title {
-        margin-bottom: 5px;
+        margin-bottom: 8px;
     }
 
     .section h2 {
@@ -1542,34 +1898,34 @@ textarea:focus {
     }
 
     .tabs {
-        gap: 5px;
-        margin-bottom: 5px;
+        gap: 8px;
+        margin-bottom: 8px;
     }
 
     .tab {
-        padding: 5px 6px;
-        font-size: 0.74em;
+        padding: 8px 10px;
+        font-size: 0.8em;
     }
 
     .stat-card h3 {
-        margin-bottom: 2px;
-        font-size: 0.62rem;
+        margin-bottom: 4px;
+        font-size: 0.7rem;
         line-height: 1.15;
         text-align: center;
     }
 
     .stat-card .number {
-        font-size: 1.05rem;
+        font-size: 1.2rem;
         line-height: 1.1;
         text-align: center;
     }
 
     .form-group {
-        margin-bottom: 5px;
+        margin-bottom: 8px;
     }
 
     label {
-        margin-bottom: 3px;
+        margin-bottom: 5px;
     }
 
     input,
@@ -1577,7 +1933,7 @@ textarea:focus {
     textarea,
     .rental-type-input,
     .rental-subitem-input {
-        padding: 5px;
+        padding: 8px;
     }
 
     .users-layout,
@@ -1594,29 +1950,29 @@ textarea:focus {
     .form-grid-2,
     .form-grid-3,
     .rental-type-header-grid {
-        gap: 5px;
+        gap: 8px;
     }
 
     .users-layout {
-        margin-bottom: 5px;
+        margin-bottom: 8px;
     }
 
     .btn,
     .btn-sm,
     .payment-btn,
     .payment-dialog-btn {
-        padding: 5px 6px;
+        padding: 8px 10px;
         margin: 0;
-        font-size: 0.72rem;
+        font-size: 0.8rem;
     }
 
     .table-container {
-        margin: 5px 0;
+        margin: 8px 0;
     }
 
     table th,
     table td {
-        padding: 5px;
+        padding: 8px;
     }
 }
 

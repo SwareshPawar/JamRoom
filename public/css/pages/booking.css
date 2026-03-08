@@ -812,7 +812,7 @@
         /* Ultra-compact mobile density mode */
         @media (max-width: 768px) {
             .main-content {
-                gap: 5px;
+                gap: 8px;
             }
 
             .section,
@@ -825,8 +825,8 @@
             .payment-method,
             .payment-info,
             .upi-section {
-                padding: 5px !important;
-                margin-bottom: 5px;
+                padding: 8px !important;
+                margin-bottom: 8px;
             }
 
             .form-group,
@@ -834,43 +834,43 @@
             .payment-methods,
             .booking-actions-row,
             .time-container {
-                gap: 5px;
-                margin-bottom: 5px;
+                gap: 8px;
+                margin-bottom: 8px;
             }
 
             .form-group {
-                margin-bottom: 5px;
+                margin-bottom: 8px;
             }
 
             label {
-                margin-bottom: 3px;
+                margin-bottom: 5px;
             }
 
             input,
             select,
             textarea {
-                padding: 5px;
+                padding: 8px;
             }
 
             .category-header {
-                padding: 5px;
-                margin-top: 5px;
+                padding: 8px;
+                margin-top: 8px;
             }
 
             .rental-option {
-                padding: 5px;
-                margin: 5px 0;
+                padding: 8px;
+                margin: 8px 0;
             }
 
             .quantity-btn {
-                width: 24px;
-                height: 24px;
+                width: 28px;
+                height: 28px;
             }
 
             .btn,
             .payment-btn {
-                padding: 5px 6px;
+                padding: 8px 10px;
                 margin: 0;
-                font-size: 0.78rem;
+                font-size: 0.84rem;
             }
         }

@@ -98,7 +98,7 @@ const seedDatabase = async () => {
           soundSystemRate: 400
         },
         upiId: process.env.UPI_ID || 'jamroom@paytm',
-        upiName: process.env.UPI_NAME || 'JamRoom Studio',
+        upiName: process.env.UPI_NAME || 'Swaresh Pawar',
         adminEmails: [],
         businessHours: {
           startTime: '09:00',

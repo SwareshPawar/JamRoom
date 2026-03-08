@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Booking = require('../models/Booking');
 const BlockedTime = require('../models/BlockedTime');
@@ -57,9 +58,31 @@ const formatTimeRange12Hour = (startTime, endTime) => {
 };
 
 const buildHourlySlotModeFilter = () => ({
-  bookingMode: 'hourly',
-  rentals: { $not: { $elemMatch: { rentalType: 'perday' } } }
+  $and: [
+    {
+      $or: [
+        { bookingMode: 'hourly' },
+        { bookingMode: { $exists: false } },
+        { bookingMode: null }
+      ]
+    },
+    { rentals: { $not: { $elemMatch: { rentalType: 'perday' } } } },
+    {
+      $or: [
+        { perDayStartDate: { $exists: false } },
+        { perDayStartDate: null }
+      ]
+    },
+    {
+      $or: [
+        { perDayEndDate: { $exists: false } },
+        { perDayEndDate: null }
+      ]
+    }
+  ]
 });
+
+const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const normalizeEmail = (email) => {
   return String(email || '').trim().toLowerCase();
@@ -521,12 +544,53 @@ router.get('/bookings/calendar', protect, isAdmin, async (req, res) => {
   }
 });
 
+// @route   GET /api/admin/availability/:date
+// @desc    Get admin availability timeline (includes pending + confirmed for visibility)
+// @access  Private/Admin
+router.get('/availability/:date', protect, isAdmin, async (req, res) => {
+  try {
+    const date = new Date(req.params.date);
+    date.setHours(0, 0, 0, 0);
+    const dayStart = new Date(date);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const bookings = await Booking.find({
+      date: { $gte: dayStart, $lte: dayEnd },
+      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] },
+      ...buildHourlySlotModeFilter()
+    }).select('startTime endTime rentalType bookingStatus bookingMode');
+
+    const blockedTimes = await BlockedTime.find({
+      date: { $gte: dayStart, $lte: dayEnd }
+    }).select('startTime endTime reason');
+
+    res.json({
+      success: true,
+      date: date.toISOString().split('T')[0],
+      bookings,
+      blockedTimes
+    });
+  } catch (error) {
+    console.error('Get admin availability error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching admin availability'
+    });
+  }
+});
+
 // @route   GET /api/admin/bookings
 // @desc    Get all bookings
 // @access  Private/Admin
 router.get('/bookings', protect, isAdmin, async (req, res) => {
   try {
-    const { status, date, startDate, endDate } = req.query;
+    const { status, date, startDate, endDate, q, sortBy } = req.query;
+
+    const parsedPage = Number.parseInt(req.query.page, 10);
+    const parsedLimit = Number.parseInt(req.query.limit, 10);
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 5;
 
     let query = {};
 
@@ -546,14 +610,78 @@ router.get('/bookings', protect, isAdmin, async (req, res) => {
       query.date = { $gte: start, $lte: end };
     }
 
+    const searchTerm = String(q || '').trim();
+    if (searchTerm) {
+      const regex = new RegExp(escapeRegExp(searchTerm), 'i');
+      const matchedUsers = await User.find({
+        $or: [
+          { name: regex },
+          { email: regex }
+        ]
+      }).select('_id');
+      const matchedUserIds = matchedUsers.map((user) => user._id);
+
+      const searchClauses = [
+        { userName: regex },
+        { userEmail: regex },
+        { userMobile: regex },
+        { bookingStatus: regex },
+        { paymentStatus: regex },
+        { paymentReference: regex },
+        { bookingMode: regex },
+        { bandName: regex },
+        { notes: regex },
+        { rentalType: regex },
+        { 'rentals.name': regex }
+      ];
+
+      if (matchedUserIds.length > 0) {
+        searchClauses.push({ userId: { $in: matchedUserIds } });
+      }
+
+      if (mongoose.Types.ObjectId.isValid(searchTerm)) {
+        searchClauses.push({ _id: new mongoose.Types.ObjectId(searchTerm) });
+      }
+
+      query.$or = searchClauses;
+    }
+
+    const sortMap = {
+      created_desc: { createdAt: -1 },
+      created_asc: { createdAt: 1 },
+      date_desc: { date: -1, startTime: -1 },
+      date_asc: { date: 1, startTime: 1 },
+      price_desc: { price: -1 },
+      price_asc: { price: 1 },
+      status_asc: { bookingStatus: 1, createdAt: -1 }
+    };
+
+    const sort = sortMap[sortBy] || sortMap.created_desc;
+
+    const totalCount = await Booking.countDocuments(query);
+    const totalPages = totalCount > 0 ? Math.ceil(totalCount / limit) : 0;
+    const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+    const skip = (safePage - 1) * limit;
+
     const bookings = await Booking.find(query)
       .populate('userId', 'name email')
-      .sort({ date: -1, startTime: -1 });
+      .sort(sort)
+      .skip(skip)
+      .limit(limit);
 
     res.json({
       success: true,
-      count: bookings.length,
-      bookings
+      count: totalCount,
+      pageCount: bookings.length,
+      bookings,
+      pagination: {
+        page: safePage,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage: totalPages > 0 && safePage < totalPages,
+        hasPrevPage: safePage > 1
+      }
     });
   } catch (error) {
     console.error('Get all bookings error:', error);
@@ -1286,6 +1414,96 @@ router.post('/users', protect, isAdmin, async (req, res) => {
   }
 });
 
+// @route   PUT /api/admin/users/:id
+// @desc    Update registered user details from admin panel
+// @access  Private/Admin
+router.put('/users/:id', protect, isAdmin, async (req, res) => {
+  try {
+    const { name, email, mobile } = req.body || {};
+
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide name and email'
+      });
+    }
+
+    const user = await User.findById(req.params.id).select('name email mobile role createdAt');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email'
+      });
+    }
+
+    if (normalizedEmail !== normalizeEmail(user.email)) {
+      const duplicateUser = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } }).select('_id');
+      if (duplicateUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is already registered'
+        });
+      }
+    }
+
+    const previousEmail = normalizeEmail(user.email);
+
+    user.name = String(name).trim();
+    user.email = normalizedEmail;
+    user.mobile = mobile && String(mobile).trim() ? String(mobile).trim() : undefined;
+
+    await user.save();
+
+    if (user.role === 'admin' && previousEmail !== normalizedEmail) {
+      const settings = await AdminSettings.getSettings();
+      if (Array.isArray(settings.adminEmails) && settings.adminEmails.length > 0) {
+        settings.adminEmails = settings.adminEmails.map((adminEmail) => {
+          const normalizedAdminEmail = normalizeEmail(adminEmail);
+          return normalizedAdminEmail === previousEmail ? normalizedEmail : adminEmail;
+        });
+
+        await settings.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'User details updated successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile || '',
+        role: user.role,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Update admin user error:', error);
+
+    if (error && error.name === 'ValidationError') {
+      const firstValidationError = Object.values(error.errors || {})[0];
+      return res.status(400).json({
+        success: false,
+        message: firstValidationError?.message || 'Validation failed while updating user'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating user'
+    });
+  }
+});
+
 // @route   POST /api/admin/users/:id/reset-default-password
 // @desc    Reset a user's password to the default admin-created password
 // @access  Private/Admin
@@ -1826,10 +2044,10 @@ router.post('/block-time', protect, isAdmin, async (req, res) => {
     const blockDate = new Date(date);
     blockDate.setHours(0, 0, 0, 0);
 
-    // Check for conflicts with existing bookings
+    // Check for conflicts with existing bookings (only confirmed bookings block slots)
     const conflictBookings = await Booking.find({
       date: blockDate,
-      bookingStatus: { $in: ['PENDING', 'CONFIRMED'] },
+      bookingStatus: 'CONFIRMED',
       ...buildHourlySlotModeFilter()
     });
 

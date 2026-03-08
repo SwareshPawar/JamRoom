@@ -42,7 +42,7 @@
                 <p>Use any UPI app, copy the payment link, or scan the QR code.</p>
                 <div class="payment-actions">
                     <button id="payWithUPI" class="btn btn-success">Open UPI App</button>
-                    <button id="payWithPhonePe" class="btn btn-secondary">Share Payment Link</button>
+                    <button id="payWithPhonePe" class="btn btn-secondary">Open PhonePe</button>
                     <button id="payWithGPay" class="btn btn-secondary">Copy UPI Link</button>
                     <button id="payWithPaytm" class="btn btn-secondary">Copy UPI ID</button>
                 </div>
@@ -193,7 +193,7 @@
                 }
 
                 const upiId = data.paymentInfo.upiId || 'Not configured';
-                const upiName = data.paymentInfo.upiName || 'JamRoom Studio';
+                const upiName = data.paymentInfo.upiName || 'Swaresh Pawar';
 
                 document.getElementById('upiId').textContent = upiId;
                 document.getElementById('upiName').textContent = upiName;

@@ -531,10 +531,16 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const addGroupedItem = (groupsMap, categoryName, item) => {
+    if (!groupsMap.has(categoryName)) {
+        groupsMap.set(categoryName, []);
+    }
+    groupsMap.get(categoryName).push(item);
+};
+
 const categorizeRentalItems = () => {
-    const jamroomItems = [];
-    const inhouseItems = [];
-    const perdayItems = [];
+    const hourlyGroups = new Map();
+    const perdayGroups = new Map();
 
     const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
 
@@ -542,83 +548,65 @@ const categorizeRentalItems = () => {
         const typeName = String(type?.name || '').trim();
         if (!typeName) return;
 
+        const hasSubItems = Array.isArray(type.subItems) && type.subItems.length > 0;
+
+        // Base item is supported only for JamRoom category.
         if (typeName === 'JamRoom' && toNumber(type.basePrice, 0) > 0) {
-            jamroomItems.push({
-                key: 'JamRoom_base',
-                name: 'JamRoom (Base)',
-                category: 'JamRoom',
-                description: type.description || 'Base room booking',
-                price: toNumber(type.basePrice, 0),
-                rentalType: 'inhouse',
-                isRequired: true
-            });
-        }
-
-        if (Array.isArray(type.subItems) && type.subItems.length > 0) {
-            type.subItems.forEach((subItem) => {
-                const itemName = String(subItem?.name || '').trim();
-                if (!itemName) return;
-
-                const normalizedType = normalizeRentalType(subItem.rentalType);
-                const price = normalizedType === 'perday'
-                    ? toNumber(subItem.perdayPrice, 0)
-                    : toNumber(subItem.price, 0);
-
-                const item = {
-                    key: `${typeName}__${itemName}`,
-                    name: itemName,
-                    category: typeName,
-                    description: subItem.description || type.description || '',
-                    price,
-                    rentalType: normalizedType,
-                    isRequired: false
-                };
-
-                if (normalizedType === 'perday') {
-                    perdayItems.push(item);
-                } else if (typeName === 'JamRoom') {
-                    jamroomItems.push(item);
-                } else {
-                    inhouseItems.push(item);
-                }
-            });
-
-            return;
-        }
-
-        // For non-JamRoom categories without sub-items, treat base price as a single in-house item.
-        if (typeName !== 'JamRoom' && toNumber(type.basePrice, 0) > 0) {
-            inhouseItems.push({
-                key: `${typeName}__${typeName}`,
-                name: typeName,
+            addGroupedItem(hourlyGroups, typeName, {
+                key: `${typeName}_base`,
+                name: `${typeName} (Base)`,
                 category: typeName,
-                description: type.description || `${typeName} rental`,
+                description: type.description || 'Base room booking',
                 price: toNumber(type.basePrice, 0),
                 rentalType: 'inhouse',
                 isRequired: false
             });
         }
+
+        if (!hasSubItems) {
+            if (typeName !== 'JamRoom' && toNumber(type.basePrice, 0) > 0) {
+                addGroupedItem(hourlyGroups, typeName, {
+                    key: `${typeName}__${typeName}`,
+                    name: typeName,
+                    category: typeName,
+                    description: type.description || `${typeName} rental`,
+                    price: toNumber(type.basePrice, 0),
+                    rentalType: 'inhouse',
+                    isRequired: false
+                });
+            }
+
+            return;
+        }
+
+        type.subItems.forEach((subItem) => {
+            const itemName = String(subItem?.name || '').trim();
+            if (!itemName) return;
+
+            const normalizedType = normalizeRentalType(subItem.rentalType);
+            const price = normalizedType === 'perday'
+                ? toNumber(subItem.perdayPrice, 0)
+                : toNumber(subItem.price, 0);
+
+            const item = {
+                key: `${typeName}__${itemName}`,
+                name: itemName,
+                category: typeName,
+                description: subItem.description || type.description || '',
+                price,
+                rentalType: normalizedType,
+                isRequired: false
+            };
+
+            if (normalizedType === 'perday') {
+                addGroupedItem(perdayGroups, typeName, item);
+            } else {
+                addGroupedItem(hourlyGroups, typeName, item);
+            }
+        });
     });
 
-    return { jamroomItems, inhouseItems, perdayItems };
-};
-
-const initializeRequiredSelections = () => {
-    const jamroomBase = rentalCatalog.hourly.get('JamRoom_base');
-    if (!jamroomBase) return;
-
-    hourlySelectedRentals.set(jamroomBase.key, {
-        name: jamroomBase.name,
-        fullId: jamroomBase.key,
-        category: jamroomBase.category,
-        description: jamroomBase.description,
-        basePrice: jamroomBase.price,
-        price: jamroomBase.price,
-        quantity: 1,
-        isRequired: true,
-        rentalType: 'inhouse',
-        perdayPrice: 0
-    });
+    return { hourlyGroups, perdayGroups };
 };
 
 const populateRentalTypes = () => {
@@ -643,17 +631,34 @@ const populateRentalTypes = () => {
         return;
     }
 
-    const { jamroomItems, inhouseItems, perdayItems } = categorizeRentalItems();
+    const { hourlyGroups, perdayGroups } = categorizeRentalItems();
 
-    jamroomItems.forEach((item) => rentalCatalog.hourly.set(item.key, item));
-    inhouseItems.forEach((item) => rentalCatalog.hourly.set(item.key, item));
-    perdayItems.forEach((item) => rentalCatalog.perday.set(item.key, item));
+    hourlyGroups.forEach((items) => {
+        items.forEach((item) => rentalCatalog.hourly.set(item.key, item));
+    });
+    perdayGroups.forEach((items) => {
+        items.forEach((item) => rentalCatalog.perday.set(item.key, item));
+    });
 
-    renderRentalSection(hourlyContainer, 'JamRoom', jamroomItems, 'hourly');
-    renderRentalSection(hourlyContainer, 'InHouse Rentals', inhouseItems, 'hourly');
-    renderRentalSection(perdayContainer, 'Per Day Rentals', perdayItems, 'perday');
+    const hasHourly = hourlyGroups.size > 0;
+    const hasPerday = perdayGroups.size > 0;
 
-    initializeRequiredSelections();
+    if (!hasHourly) {
+        hourlyContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No hourly rental options configured.</p>';
+    } else {
+        hourlyGroups.forEach((items, categoryName) => {
+            renderRentalSection(hourlyContainer, categoryName, items, 'hourly');
+        });
+    }
+
+    if (!hasPerday) {
+        perdayContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No per-day options configured.</p>';
+    } else {
+        perdayGroups.forEach((items, categoryName) => {
+            renderRentalSection(perdayContainer, `${categoryName} (Per-day)`, items, 'perday');
+        });
+    }
+
     setActiveSelectionMap();
     applyPerdayItemAvailability();
 

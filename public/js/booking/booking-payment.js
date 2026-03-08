@@ -79,10 +79,20 @@ const renderBookingPaymentSection = (bookingResponse) => {
     };
 
     bindClick('payWithUPI', () => {
+        if (paymentManager && typeof paymentManager.tryOpenUPIApp === 'function') {
+            paymentManager.tryOpenUPIApp(upiLink, 'UPI app');
+            return;
+        }
+
         window.location.href = upiLink;
     });
 
     bindClick('payWithPhonePe', () => {
+        if (paymentManager && typeof paymentManager.openPhonePe === 'function') {
+            paymentManager.openPhonePe(upiLink);
+            return;
+        }
+
         sharePaymentLink();
     });
 

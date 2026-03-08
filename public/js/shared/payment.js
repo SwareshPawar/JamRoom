@@ -6,7 +6,7 @@
 class PaymentManager {
     constructor(config = {}) {
         this.upiId = config.upiId || '';
-        this.upiName = config.upiName || 'JamRoom Studio';
+        this.upiName = config.upiName || 'Swaresh Pawar';
         this.amount = config.amount || '';
         this.currency = config.currency || 'INR';
         this.notificationDuration = config.notificationDuration || 3000;
@@ -76,10 +76,10 @@ class PaymentManager {
             this.tryOpenUPIApp(upiLink, 'any UPI app');
         });
 
-        // PhonePe button - now shows share dialog
+        // PhonePe button prefers PhonePe app on Android, then falls back gracefully
         this.setupButton(phonePeBtn, () => {
             const upiLink = this.createUPILink();
-            this.sharePaymentLink(upiLink, 'PhonePe');
+            this.openPhonePe(upiLink);
         });
 
         // Google Pay button - now copies UPI link
@@ -110,6 +110,36 @@ class PaymentManager {
     }
 
     /**
+     * Create Android intent URL that targets PhonePe package.
+     */
+    createPhonePeIntentLink(upiLink) {
+        const query = String(upiLink || '').split('?')[1] || '';
+        return `intent://pay?${query}#Intent;scheme=upi;package=com.phonepe.app;end`;
+    }
+
+    /**
+     * Launch URL via a temporary anchor to preserve user-gesture context.
+     */
+    launchDeepLink(url) {
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.rel = 'noopener';
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+
+        setTimeout(() => {
+            if (document.body.contains(anchor)) {
+                document.body.removeChild(anchor);
+            }
+        }, 0);
+    }
+
+    isAndroidDevice() {
+        return /android/i.test(navigator.userAgent || '');
+    }
+
+    /**
      * Setup individual button with error handling
      */ 
     setupButton(buttonId, clickHandler) {
@@ -128,42 +158,56 @@ class PaymentManager {
      * @param {string} appName - Name of the app being opened
      */
     tryOpenUPIApp(upiLink, appName = 'UPI app') {
-        let appOpened = false;
-        
-        // Create hidden iframe to attempt deep link
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = upiLink;
-        document.body.appendChild(iframe);
-        
-        // Remove iframe after attempt
-        setTimeout(() => {
-            if (document.body.contains(iframe)) {
-                document.body.removeChild(iframe);
-            }
-        }, 1000);
-        
-        // Set up detection for app launch failure
-        const startTime = Date.now();
-        
-        // Check if app opened (user left the page)
-        const checkAppLaunch = () => {
-            const timeDiff = Date.now() - startTime;
-            if (document.hidden || timeDiff > 2000) {
-                appOpened = true;
-                return;
+        const hasLeftPage = { value: false };
+
+        const markLaunched = () => {
+            hasLeftPage.value = true;
+            cleanup();
+        };
+
+        const onVisibilityChange = () => {
+            if (document.hidden) {
+                markLaunched();
             }
         };
-        
-        // Listen for visibility change (app opened)
-        document.addEventListener('visibilitychange', checkAppLaunch, { once: true });
-        
-        // Fallback after 3 seconds if app didn't open
+
+        const cleanup = () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('blur', markLaunched);
+            window.removeEventListener('pagehide', markLaunched);
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('blur', markLaunched);
+        window.addEventListener('pagehide', markLaunched);
+
+        this.launchDeepLink(upiLink);
+
         setTimeout(() => {
-            if (!appOpened) {
-                this.showAppNotFoundDialog(appName);
+            cleanup();
+            if (!hasLeftPage.value) {
+                this.showAppNotFoundDialog(appName, upiLink);
             }
-        }, 3000);
+        }, 2200);
+    }
+
+    /**
+     * Try opening PhonePe first, then fallback to universal UPI.
+     */
+    openPhonePe(upiLink) {
+        const universalLink = upiLink || this.createUPILink();
+
+        if (this.isAndroidDevice()) {
+            const phonePeIntent = this.createPhonePeIntentLink(universalLink);
+            this.launchDeepLink(phonePeIntent);
+
+            setTimeout(() => {
+                this.tryOpenUPIApp(universalLink, 'PhonePe');
+            }, 600);
+            return;
+        }
+
+        this.tryOpenUPIApp(universalLink, 'PhonePe');
     }
 
     /**
@@ -175,8 +219,7 @@ class PaymentManager {
         if (navigator.share) {
             const shareData = {
                 title: 'JamRoom UPI Payment',
-                text: `UPI payment for JamRoom booking\nUPI ID: ${this.upiId}\nAmount: ${this.amount ? '₹' + this.amount : 'Enter amount'}\nLink: ${upiLink}`,
-                url: upiLink
+                text: `UPI payment for JamRoom booking\nUPI ID: ${this.upiId}\nAmount: ${this.amount ? '₹' + this.amount : 'Enter amount'}\nLink: ${upiLink}`
             };
             
             navigator.share(shareData).catch(err => {
@@ -239,21 +282,32 @@ class PaymentManager {
     /**
      * Show dialog when UPI app is not found
      */
-    showAppNotFoundDialog(appName) {
+    showAppNotFoundDialog(appName, upiLink = '') {
+        const safeUpiId = String(this.upiId || '').replace(/'/g, "\\'");
+        const encodedUpiLink = encodeURIComponent(String(upiLink || ''));
+
         const message = `
             <div class="payment-dialog-content">
                 <p><strong>${appName} not found or couldn't be opened.</strong></p>
                 <p>Here are alternative ways to pay:</p>
                 <ul class="payment-dialog-list">
                     <li><strong>Copy UPI ID:</strong> ${this.upiId}</li>
+                    ${upiLink ? '<li><strong>Copy UPI payment link</strong> and open in any UPI app</li>' : ''}
                     <li><strong>Open any UPI app manually</strong> (PhonePe, GPay, Paytm, etc.)</li>
                     <li><strong>Scan the QR code</strong> above</li>
                 </ul>
                 <div class="payment-dialog-actions">
-                    <button onclick="window.paymentManager?.copyToClipboard('${this.upiId}', '📋 UPI ID copied!'); this.closest('[data-dialog]')?.remove();" 
+                    <button onclick="window.paymentManager?.copyToClipboard('${safeUpiId}', '📋 UPI ID copied!'); this.closest('[data-dialog]')?.remove();" 
                             class="payment-dialog-btn payment-dialog-btn-success">
                         📋 Copy UPI ID
                     </button>
+                    ${upiLink
+                        ? `<button onclick="window.paymentManager?.copyToClipboard(decodeURIComponent('${encodedUpiLink}'), '📋 UPI link copied!'); this.closest('[data-dialog]')?.remove();"
+                                class="payment-dialog-btn payment-dialog-btn-secondary">
+                                🔗 Copy UPI Link
+                           </button>`
+                        : ''
+                    }
                     <button onclick="this.closest('[data-dialog]')?.remove();" 
                             class="payment-dialog-btn payment-dialog-btn-secondary">
                         ✕ Close
