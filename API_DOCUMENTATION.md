@@ -13,12 +13,14 @@ Authorization: Bearer <your_jwt_token>
 > **🆕 March 2026 API Updates**:
 > - `POST /api/admin/bookings/:id/send-ebill` supports multi-recipient invoice sending (`includeCustomer`, `additionalEmails`)
 > - `PUT /api/admin/bookings/:id/edit` supports item-level rental edits with server-side subtotal/tax/total recalculation
+> - `GET /api/admin/bookings` now supports server-side pagination/search/sort (`page`, `limit`, `q`, `sortBy`) with pagination metadata
+> - `PUT /api/admin/users/:id` supports admin-side updates to registered user details (`name`, `email`, `mobile`)
 
 ## 🧪 Testing & Development Tools
 
 ### Test Pages
 - **Comprehensive API Tests**: `/test.html` - Full test suite for all endpoints
-- **Rental System Tests**: `/test-rental-system.html` - Visual testing for enhanced rental features
+- **Shared Modules/UI Tests**: `/test-modules.html` - Frontend module and shared-style checks
 
 ### Utility Scripts
 ```bash
@@ -459,9 +461,9 @@ Content-Disposition: attachment; filename="booking-65def....pdf"
 ## 👨‍💼 Admin Endpoints
 
 ### Get All Bookings (Admin)
-**GET** `/api/admin/bookings?status=PENDING`
+**GET** `/api/admin/bookings`
 
-Get all bookings with optional status filter.
+Get bookings with optional filters and server-side pagination/search/sort for Manage Bookings.
 
 **Headers:**
 ```
@@ -472,12 +474,17 @@ Authorization: Bearer <admin_token>
 - `status` (optional): PENDING, CONFIRMED, REJECTED, CANCELLED
 - `date` (optional): Specific date
 - `startDate` & `endDate` (optional): Date range
+- `q` (optional): Search term across booking/user fields
+- `sortBy` (optional): `created_desc` (default), `created_asc`, `date_desc`, `date_asc`, `price_desc`, `price_asc`, `status_asc`
+- `page` (optional): 1-based page number
+- `limit` (optional): page size (1-100, default: 5)
 
 **Response:** `200 OK`
 ```json
 {
   "success": true,
-  "count": 5,
+  "count": 42,
+  "pageCount": 5,
   "bookings": [
     {
       "_id": "65def...",
@@ -497,7 +504,15 @@ Authorization: Bearer <admin_token>
       "userName": "John Doe",
       "userEmail": "john@example.com"
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 5,
+    "totalCount": 42,
+    "totalPages": 9,
+    "hasNextPage": true,
+    "hasPrevPage": false
+  }
 }
 ```
 
@@ -830,6 +845,47 @@ Authorization: Bearer <admin_token>
 
 ---
 
+### Update Admin User (Admin)
+**PUT** `/api/admin/users/:id`
+
+Update registered user details from admin panel.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body:**
+```json
+{
+  "name": "Updated Customer",
+  "email": "updated@example.com",
+  "mobile": "9876543210"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "User details updated successfully",
+  "user": {
+    "_id": "65abc...",
+    "name": "Updated Customer",
+    "email": "updated@example.com",
+    "mobile": "9876543210",
+    "role": "user",
+    "createdAt": "2026-03-07T09:30:00.000Z"
+  }
+}
+```
+
+**Common Error Responses:**
+- `400`: missing/invalid name-email payload, duplicate email, or validation failure
+- `404`: user not found
+
+---
+
 ### Reset User Default Password (Admin)
 **POST** `/api/admin/users/:id/reset-default-password`
 
@@ -1085,7 +1141,7 @@ All endpoints return consistent error responses:
    - Status: PENDING
 
 4. **Admin Approval**
-   - Admin: GET `/api/admin/bookings?status=PENDING`
+  - Admin: GET `/api/admin/bookings?status=PENDING&page=1&limit=5`
    - Admin: PUT `/api/admin/bookings/:id/approve`
    - Emails sent with calendar invite
 

@@ -1,6 +1,6 @@
 # JamRoom Design Unification Tracker
 
-Last Updated: March 8, 2026 (Mobile density, modal centering, loader consistency, and admin helper-card polish applied; final QA remains)
+Last Updated: March 9, 2026 (Admin bookings pagination/user-edit flow and iPhone booking/admin/shared polish logged; final QA remains)
 Owner: JamRoom Team
 Scope: Unify all user and admin pages to match home page visual language with consistent layout, colors, typography, and theme behavior.
 Canonical Source: This file is the single source of truth for UI unification phase status, checklist progress, and UI-specific tracking updates.
@@ -138,7 +138,7 @@ Tasks:
 
 - [x] Align with same colors, typography, surfaces, and controls.
 - [ ] Keep dense admin workflows and tab-heavy layout functional.
-- [ ] Ensure dark/light consistency in tables, modals, charts, and forms.
+- [x] Ensure dark/light consistency in tables, modals, charts, and forms.
 
 Exit Criteria:
 
@@ -196,6 +196,9 @@ Exit Criteria:
 | 2026-03-08 | Phase 6 | Fixed modal alignment regression by forcing `.modal.show` to `display:flex !important` to avoid global `.show` utility conflicts. | Copilot |
 | 2026-03-08 | Phase 5 | Added themed helper/status cards in admin create-booking modal for override/availability guidance and state messages. | Copilot |
 | 2026-03-08 | Phase 6 | Scoped table-column hide rules to booking/revenue tables so Users `Created` and `Actions` columns remain visible on desktop. | Copilot |
+| 2026-03-09 | Phase 5 | Added server-driven Manage Bookings pagination/search/sort in admin, moved controls below table, and enabled in-table horizontal scroll behavior. | Copilot |
+| 2026-03-09 | Phase 5 | Added registered-user edit/update workflow in admin Users tab (`PUT /api/admin/users/:id`) with modal-based detail updates. | Copilot |
+| 2026-03-09 | Phase 6 | Applied iPhone hardening across `admin.css`, `booking.css`, and `shared.css` (overflow/wrapping/radio/checkbox visibility), and regrouped booking form/availability block for clarity. | Copilot |
 
 ## 6. Risks And Watchouts
 

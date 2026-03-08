@@ -352,7 +352,7 @@ node clearDatabase.js
 node checkDatabase.js
 
 # Run tests
-# Visit /test.html or /test-rental-system.html
+# Visit /test.html or /test-modules.html
 ```
 
 **For Production Maintenance:**
@@ -370,7 +370,7 @@ node makeAdmin.js
 ## 🧪 Testing Tools
 
 1. **Comprehensive API Tests**: Visit `/test.html`
-2. **Enhanced Rental System Tests**: Visit `/test-rental-system.html`
+2. **Shared Modules/UI Tests**: Visit `/test-modules.html`
 3. **Test Accounts**: Created automatically with `createTestUsers.js`
 
 ## �🐛 Common Issues

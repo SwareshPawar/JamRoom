@@ -14,7 +14,9 @@
 
 📧 **Multi-Recipient eBill Sending**: Admin can send eBills to customer and additional custom recipients from the admin panel  
 🧾 **Admin Booking Edit Upgrade**: Edit booking type, add/remove rental items, and persist item-level rental updates with server-side total recalculation  
-📱 **Phone-First Booking Shell (PWA)**: Added `/booking-mobile.html` app shell, manifest, service worker, and mobile redirect flow for installable home-screen experience  
+📋 **Manage Bookings Pagination Upgrade**: Admin bookings now support backend-driven pagination, search, sort, and page-size controls  
+👤 **Registered User Edit Flow**: Admin can update existing user name/email/mobile from the Users tab via modal workflow  
+📱 **Direct Mobile Booking Flow (PWA)**: Booking runs directly on `/booking.html` with responsive layout plus manifest/service-worker support  
 🎛️ **Rental UI Consistency Pass**: Booking rentals now follow the same base/child row alignment and controls used in admin create/edit workflows  
 💳 **Modern UPI Compatibility Flow**: Replaced brittle app-specific deep links with universal `upi://pay` plus share/copy/QR fallbacks for better browser support  
 
@@ -32,14 +34,15 @@
 - ✅ UPI QR Code for Payments
 - ✅ Universal UPI payment launch + link share/copy fallbacks
 - ✅ Email Notifications & Calendar Invites (.ics)
-- ✅ Mobile app-like booking shell with add-to-home-screen support
+- ✅ Mobile-first booking page with add-to-home-screen support
 
 ### 🛠️ Admin Features
 - ✅ Dashboard with Statistics & Analytics
-- ✅ View All Bookings with Filters
+- ✅ View All Bookings with Filters, Search, Sort, and Pagination
 - ✅ Approve/Reject Booking Requests
 - ✅ **PDF Download**: Download invoices for any booking
 - ✅ **eBill Recipients Control**: Send invoice to customer and/or additional emails
+- ✅ **Registered User Detail Editing**: Update name/email/mobile for existing users
 - ✅ Create Time Slots (Single & Bulk Creation)
 - ✅ Block/Unblock Time Slots
 - ✅ **Rental Management**: Configure prices, types, and categories
@@ -79,7 +82,7 @@
 
 ### 🧪 Testing Tools
 - **`/test.html`** - Comprehensive API test suite
-- **`/test-rental-system.html`** - Visual rental system testing
+- **`/test-modules.html`** - Shared modules and UI test page
 - **Auto-created test accounts**: `testuser@jamroom.com` / `testadmin@jamroom.com`
 
 ## 📁 Project Architecture
@@ -160,7 +163,7 @@ jamroom-booking/
 
 ### 🧪 Testing Tools
 - **`/test.html`** - Comprehensive API test suite
-- **`/test-rental-system.html`** - Visual rental system testing
+- **`/test-modules.html`** - Shared modules and UI test page
 - **Auto-created test accounts**: `testuser@jamroom.com` / `testadmin@jamroom.com`
 
 ## 📚 Complete Documentation

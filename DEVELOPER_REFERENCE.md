@@ -17,8 +17,8 @@
 ### **March 2026 Implementation Standards**
 - **UPI Launch Pattern**: Prefer universal `upi://pay` + QR + share/copy fallback. Avoid provider-specific deep links (`phonepe://`, `tez://`, `gpay://`, `paytmmp://`) as primary flow.
 - **Admin Edit Pattern**: When editing bookings, send `rentals[]` and let backend recompute totals; do not trust client-calculated final totals.
-- **Mobile Shell Pattern**: Use `/booking-mobile.html` as phone-first shell with iframe to `/booking.html?mobile=1&embedded=1`.
-- **Section UX Pattern (Mobile)**: Booking shell should default key panels collapsed on load for compact navigation.
+- **Mobile Booking Pattern**: Use `/booking.html` directly for all devices; do not add iframe shell wrappers for phone mode.
+- **Section UX Pattern (Mobile)**: Keep mobile sections compact/collapsible where needed without route-level redirection.
 - **Admin Create Status Policy**: Admin-created bookings must be enforced as `bookingStatus=CONFIRMED` and `paymentStatus=PAID`.
 - **Historical Override Policy**: Use `overrideDateTime=true` only for historical missed-bill entries where conflict/blocked checks should be intentionally bypassed.
 - **Shared Navigation Pattern**: Render header/nav via `public/js/shared/navigation.js` into `#navigationContainer`; do not handcraft page-specific nav variants.
@@ -146,6 +146,7 @@ function checkSlots() // Not descriptive enough
 /api/admin/bookings/:id/edit
 /api/admin/bookings/:id/send-ebill
 /api/admin/users
+/api/admin/users/:id
 /api/admin/users/:id/reset-default-password
 /api/admin/stats
 /api/admin/settings
@@ -306,18 +307,16 @@ index.html - Landing page
 login.html - User login
 register.html - User registration
 booking.html - User booking interface ⭐ Main user functionality
-booking-mobile.html - Phone-first booking app shell (iframe wrapper)
 admin.html - Admin dashboard ⭐ Main admin functionality
 reset-password.html - Password reset
 test.html - API testing suite
-test-rental-system.html - Rental system tests
+test-modules.html - Shared modules and UI tests
 ```
 
 #### **PWA/Mobile Assets**
 ```
 manifest.webmanifest - Install metadata (name/icons/start_url)
-sw-booking.js - Service worker for mobile booking shell cache
-css/booking-mobile.css - Mobile shell styles
+sw-booking.js - Service worker for booking page assets/cache
 icons/ - PWA launcher icons
 ```
 
@@ -719,6 +718,7 @@ const ADMIN_ENDPOINTS = {
   SEND_EBILL: '/api/admin/bookings/:id/send-ebill',
   DELETE_BOOKING: '/api/admin/bookings/:id',
   USERS: '/api/admin/users',
+  UPDATE_USER: '/api/admin/users/:id',
   RESET_DEFAULT_PASSWORD: '/api/admin/users/:id/reset-default-password'
 };
 ```
@@ -1142,7 +1142,7 @@ async function updateSettings(settingsData) {
 '/api/bookings/availability/:date' // GET - Get availability for date
 
 // ✅ ADMIN ENDPOINTS
-'/api/admin/bookings'              // GET - Get all bookings
+'/api/admin/bookings'              // GET - Get bookings (filters + pagination/search/sort)
 '/api/admin/bookings'              // POST - Create booking as admin
 '/api/admin/bookings/:id/approve'  // PUT - Approve booking
 '/api/admin/bookings/:id/reject'   // PUT - Reject booking  
@@ -1150,6 +1150,7 @@ async function updateSettings(settingsData) {
 '/api/admin/bookings/:id/send-ebill' // POST - Send eBill to selected recipients
 '/api/admin/bookings/:id'          // DELETE - Delete booking
 '/api/admin/users'                 // GET/POST - User search/create from admin
+'/api/admin/users/:id'             // PUT - Update registered user details
 '/api/admin/users/:id/reset-default-password' // POST - Reset user temp password
 '/api/admin/stats'                 // GET - Get dashboard stats
 '/api/admin/settings'              // GET/PUT - Admin settings

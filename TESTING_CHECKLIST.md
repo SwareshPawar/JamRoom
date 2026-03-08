@@ -54,17 +54,20 @@ Live UI verification notes:
 - [ ] QR frame remains inside the UPI card on narrow screens
 - [ ] UPI action buttons stack correctly on mobile
 
-### Mobile Shell Behavior
-- [ ] Phone redirect to `/booking-mobile.html` works when desktop override is not set
-- [ ] `booking-mobile.html` loads iframe `/booking.html?mobile=1&embedded=1`
-- [ ] `New Booking` and `My Bookings` sections start collapsed on mobile shell load
-- [ ] Bottom dock navigation expands and scrolls to target section correctly
+### Mobile Booking Behavior
+- [ ] `/booking.html` works directly on phone viewports (no shell redirect dependency)
+- [ ] Hourly/per-day toggle does not cause horizontal page overflow on mobile
+- [ ] `New Booking` and `My Bookings` sections remain reachable and readable at <=480px
+- [ ] Booking action controls remain tap-friendly on small screens
 - [ ] PWA install prompt appears where supported
 
 ### Admin Workflow Regression Checks
 - [ ] Send eBill supports customer + additional emails in one action
 - [ ] Invalid additional recipient email is rejected with validation message
 - [ ] Admin edit booking with item-level rentals recalculates totals server-side
+- [ ] Manage Bookings uses backend pagination/search/sort (not client-only slicing)
+- [ ] Changing page size or page index triggers fresh backend fetch and updates metadata
+- [ ] Admin can update existing user details (`name/email/mobile`) from Users tab
 
 ---
 

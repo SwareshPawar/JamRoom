@@ -198,7 +198,7 @@
 ### Admin Routes (`/routes/admin.routes.js`)
 - `GET /api/admin/revenue` - Get revenue analytics
 - `GET /api/admin/bookings/calendar` - Get calendar formatted bookings
-- `GET /api/admin/bookings` - Get all bookings (with filters)
+- `GET /api/admin/bookings` - Get bookings with filters + pagination/search/sort
 - `POST /api/admin/bookings` - Create confirmed/paid booking for registered user
 - `PUT /api/admin/bookings/:id/approve` - Approve booking
 - `PUT /api/admin/bookings/:id/reject` - Reject booking
@@ -207,6 +207,7 @@
 - `PUT /api/admin/bookings/:id/edit` - Edit booking *(NEW)*
 - `GET /api/admin/users` - Fetch users for admin booking/create-user flows
 - `POST /api/admin/users` - Create user from admin panel
+- `PUT /api/admin/users/:id` - Update user details from admin panel
 - `POST /api/admin/users/:id/reset-default-password` - Reset user temporary password
 - `DELETE /api/admin/users/:id` - Delete user and related bookings
 - `GET /api/admin/stats` - Get dashboard statistics
@@ -232,12 +233,10 @@
 2. **`/public/login.html`** - User login page
 3. **`/public/register.html`** - User registration page
 4. **`/public/booking.html`** - User booking interface
-5. **`/public/booking-mobile.html`** - Mobile app-shell wrapper for booking iframe
-6. **`/public/admin.html`** - Admin dashboard
-7. **`/public/reset-password.html`** - Password reset page
-8. **`/public/manifest.webmanifest`** - PWA install metadata
-9. **`/public/sw-booking.js`** - Booking shell service worker
-10. **`/public/css/booking-mobile.css`** - Mobile shell styles
+5. **`/public/admin.html`** - Admin dashboard
+6. **`/public/reset-password.html`** - Password reset page
+7. **`/public/manifest.webmanifest`** - PWA install metadata
+8. **`/public/sw-booking.js`** - Booking page service worker
 
 ### Key Frontend Variables & Functions
 
@@ -264,10 +263,9 @@ let settings = null;
 - settings: System settings (rental types, prices)
 ```
 
-**Mobile Shell Query Flags:**
-- `?mobile=1` enables mobile-app mode styles/behavior
-- `?embedded=1` enables iframe-embedded mode (used by `/booking-mobile.html`)
-- `?desktop=1` forces desktop mode and bypasses phone auto-redirect
+**Mobile Behavior:**
+- Booking now uses `/booking.html` directly for both desktop and mobile (no iframe shell)
+- Responsive styles are handled by `public/css/pages/booking.css` and shared shell rules
 
 #### Admin Page (`admin.html`)
 ```javascript
@@ -491,12 +489,10 @@ JamRoom/
 │   ├── login.html              # Login page
 │   ├── register.html           # Registration
 │   ├── booking.html            # User booking
-│   ├── booking-mobile.html     # Phone-first booking shell
 │   ├── admin.html              # Admin panel
 │   ├── reset-password.html     # Password reset
 │   ├── manifest.webmanifest    # PWA manifest
-│   ├── sw-booking.js           # Service worker for booking shell
-│   ├── css/booking-mobile.css  # Mobile shell styling
+│   ├── sw-booking.js           # Service worker for booking assets
 │   └── icons/                  # PWA app icons
 │
 └── 📁 backend/                 # Legacy/backup files
@@ -574,11 +570,11 @@ EMAIL_REPLY_TO=support@jamroom.com
 - Historical override mode allows bypassing date/time conflict checks for missed-bill backfill entries
 - Confirmation recipients are merged from always-notify list, settings admin emails, and admin users
 
-#### 4. Phone-First Booking PWA Shell
-**Added**:
-- `/booking-mobile.html` app-shell with iframe embedding `/booking.html?mobile=1&embedded=1`
-- `/manifest.webmanifest`, `/sw-booking.js`, and app icons for installability
-- Mobile redirect in `/booking.html` with desktop override support
+#### 4. Direct Mobile Booking Flow
+**Updated**:
+- Mobile flow now uses `/booking.html` directly (legacy booking-mobile shell removed)
+- `/manifest.webmanifest` and `/sw-booking.js` remain for installability/performance support
+- Responsive behavior is handled through shared and page-level CSS without iframe embedding
 
 #### 5. Rental UX Consistency and Defaults
 **Updated**:
@@ -792,11 +788,11 @@ function calculatePrice(item, quantity, duration) {
 
 ### Testing & Quality Assurance
 
-**Test Page Created**: `public/test-rental-system.html`
-- Comprehensive test scenarios for all rental features
-- Visual test cards with step-by-step instructions
-- Expected results for validation
-- Direct links to all system components
+**Module Test Page**: `public/test-modules.html`
+- Shared module loading checks (`utils`, `alerts`, `auth`, `tabs`, `payment`, `data`)
+- UI component rendering checks against shared CSS tokens
+- Quick sanity checks for common client-side helpers
+- Lightweight browser smoke validation before deeper flow tests
 
 **Comprehensive Test Suite**: `public/test.html`
 - API endpoint testing
@@ -845,7 +841,7 @@ node updateInstrumentRentals.js  # Apply enhancements
 
 # Testing preparation
 node createTestUsers.js      # Create test accounts
-# Access test pages: /test.html, /test-rental-system.html
+# Access test pages: /test.html, /test-modules.html
 ```
 
 ## �📚 Additional Resources
