@@ -35,8 +35,9 @@
         }
 
         .booking-mode-option {
-            display: flex;
-            align-items: center;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: start;
             gap: 10px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -50,6 +51,20 @@
 
         .booking-mode-option input[type="radio"] {
             accent-color: var(--primary-color);
+            width: auto;
+            min-width: 20px;
+            max-width: 20px;
+            height: 20px;
+            margin: 0;
+            padding: 0;
+            flex: 0 0 auto;
+            align-self: start;
+        }
+
+        .booking-mode-option span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            line-height: 1.25;
         }
 
         .booking-flow-block {
