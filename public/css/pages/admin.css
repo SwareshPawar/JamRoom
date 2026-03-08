@@ -126,7 +126,7 @@
 
 .settings-gst-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 15px;
 }
 
@@ -170,13 +170,13 @@
 .admin-inline-form {
     display: flex;
     gap: 10px;
-    align-items: end;
+    align-items: flex-end;
     flex-wrap: wrap;
 }
 
 .admin-inline-form-group {
     margin-bottom: 0;
-    min-width: 260px;
+    min-width: min(260px, 100%);
     flex: 1;
 }
 
@@ -212,13 +212,13 @@
 
 .form-grid-2 {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 15px;
 }
 
 .form-grid-3 {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
 }
 
@@ -1417,7 +1417,16 @@ table td small {
 }
 
 .form-group {
+    display: grid;
+    gap: 6px;
+    align-content: start;
     margin-bottom: 20px;
+    width: 100%;
+    min-width: 0;
+}
+
+.form-group > * {
+    min-width: 0;
 }
 
 label {
@@ -1425,12 +1434,17 @@ label {
     margin-bottom: 8px;
     font-weight: 600;
     color: var(--text-color);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 
 input,
 select,
 textarea {
+    display: block;
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     padding: 12px;
     border: 1px solid var(--border-color);
     border-radius: 5px;
@@ -1449,7 +1463,7 @@ textarea:focus {
 
 .time-container {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 15px;
 }
 
@@ -1737,11 +1751,19 @@ textarea:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
     margin-bottom: 20px;
+}
+
+.modal-header h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .close {
     font-size: 2em;
+    line-height: 1;
+    flex: 0 0 auto;
     cursor: pointer;
     color: var(--text-color-light);
 }
@@ -1751,6 +1773,7 @@ textarea:focus {
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .calendar-controls select {
@@ -1830,9 +1853,29 @@ textarea:focus {
         grid-template-columns: 1fr;
     }
 
+    .settings-gst-grid,
+    .form-grid-2,
+    .form-grid-3 {
+        grid-template-columns: 1fr;
+    }
+
     .rental-subitem-remove {
         grid-column: 1;
         justify-self: stretch;
+    }
+
+    .rental-type-subitems-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .rental-subitem-add {
+        white-space: normal;
+        width: 100%;
+    }
+
+    .hourly-price-label {
+        white-space: normal;
     }
 
     .admin-rental-qty {
@@ -1943,7 +1986,13 @@ textarea:focus {
     .typeahead-input-row,
     .blocked-item-row,
     .modal-actions-row,
-    .action-row-end,
+    .action-row-end {
+        min-width: 0;
+    }
+
+    .users-table-controls > * {
+        min-width: 0;
+    }
     .custom-range-grid,
     .revenue-filter-grid,
     .settings-gst-grid,
@@ -1955,6 +2004,26 @@ textarea:focus {
 
     .users-layout {
         margin-bottom: 8px;
+    }
+
+    .users-table-controls,
+    .admin-inline-form {
+        width: 100%;
+    }
+
+    .users-search-input,
+    .admin-inline-form-group {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .admin-inline-form .btn {
+        width: 100%;
+        white-space: normal;
+    }
+
+    .users-table-controls .btn {
+        white-space: normal;
     }
 
     .btn,
@@ -1980,5 +2049,34 @@ textarea:focus {
     .stats-grid,
     .revenue-summary-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .tab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    .calendar-controls {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .calendar-controls select,
+    .calendar-controls .btn {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .bookings-page-meta {
+        min-width: 0;
     }
 }

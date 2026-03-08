@@ -182,17 +182,20 @@ body {
     align-items: flex-start;
     justify-content: space-between;
     gap: 14px;
+    min-width: 0;
 }
 
 .app-header h1 {
     margin: 0;
     font-size: clamp(1.3rem, 1.8vw, 1.9rem);
+    overflow-wrap: anywhere;
 }
 
 .app-brand {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 0;
 }
 
 .app-subtitle {
@@ -200,6 +203,7 @@ body {
     color: color-mix(in srgb, var(--text-inverse) 92%, transparent);
     font-size: 0.95rem;
     font-weight: 500;
+    overflow-wrap: anywhere;
 }
 
 .app-greeting {
@@ -207,6 +211,7 @@ body {
     color: color-mix(in srgb, var(--text-inverse) 95%, transparent);
     font-size: 0.9rem;
     font-weight: 600;
+    overflow-wrap: anywhere;
 }
 
 .app-header-actions {
@@ -215,6 +220,7 @@ body {
     justify-content: flex-end;
     gap: 8px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .app-header-actions .btn,
@@ -231,6 +237,7 @@ body {
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+    min-width: 0;
 }
 
 .nav-links {
@@ -242,6 +249,7 @@ body {
 
 .main-nav .nav-links {
     width: 100%;
+    min-width: 0;
 }
 
 .nav-link {
@@ -257,6 +265,8 @@ body {
     font-weight: 600;
     border: 1px solid var(--border-color-light);
     background: var(--surface-elevated);
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .nav-link:hover,
@@ -273,6 +283,7 @@ body {
 
 .main-nav .user-info {
     justify-content: flex-end;
+    min-width: 0;
 }
 
 .main-nav .user-info button,
@@ -1227,6 +1238,7 @@ textarea:disabled {
         flex-direction: column;
         align-items: stretch;
         gap: 8px;
+        overflow-x: clip;
     }
 
     .app-header h1 {
@@ -1261,6 +1273,9 @@ textarea:disabled {
         padding: 8px 10px;
         font-size: 0.82rem;
         min-height: 36px;
+        min-width: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 
     .main-nav {
@@ -1272,7 +1287,7 @@ textarea:disabled {
 
     .main-nav .nav-links {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
     }
 
@@ -1282,6 +1297,8 @@ textarea:disabled {
         min-height: 36px;
         font-size: 0.84rem;
         line-height: 1.2;
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 
     .main-content {
@@ -1398,9 +1415,19 @@ textarea:disabled {
     }
 }
 
+@supports (padding: max(0px)) {
+    @media (max-width: 768px) {
+        body {
+            padding-left: max(10px, env(safe-area-inset-left));
+            padding-right: max(10px, env(safe-area-inset-right));
+            padding-bottom: max(10px, env(safe-area-inset-bottom));
+        }
+    }
+}
+
 @media (max-width: 480px) {
     .main-nav .nav-links {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
     }
 
     .main-nav .nav-link {
@@ -1409,7 +1436,7 @@ textarea:disabled {
     }
 
     .app-header-actions {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
     }
 
     .app-header-actions .btn,

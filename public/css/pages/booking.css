@@ -2,7 +2,7 @@
         
         .main-content {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             gap: 30px;
             min-width: 0;
         }
@@ -24,13 +24,13 @@
         
         .time-container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             gap: 15px;
         }
 
         .booking-mode-switch {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             gap: 10px;
         }
 
@@ -45,6 +45,7 @@
             background: var(--surface-1);
             font-weight: 600;
             color: var(--text-color);
+            min-width: 0;
         }
 
         .booking-mode-option input[type="radio"] {
@@ -106,6 +107,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
             background: var(--surface-elevated);
             border: 1px solid color-mix(in srgb, var(--warning-color) 28%, transparent);
             border-radius: 6px;
@@ -150,6 +153,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
             padding: 8px 0;
             font-size: 0.95em;
         }
@@ -187,6 +192,7 @@
             max-height: 340px;
             overflow-y: auto;
             overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
         }
         
         .rental-category {
@@ -393,6 +399,10 @@
                 grid-template-columns: 1fr;
             }
 
+            .booking-mode-option {
+                align-items: flex-start;
+            }
+
             .rental-option {
                 grid-template-columns: auto minmax(0, 1fr);
             }
@@ -527,6 +537,9 @@
             padding: 0 15px;
             color: var(--text-color-light);
             font-size: 0.9em;
+            display: inline-block;
+            max-width: 100%;
+            overflow-wrap: anywhere;
         }
         
         .qr-section {
@@ -556,6 +569,7 @@
             margin: 5px 0;
             border-radius: 5px;
             font-size: 0.9em;
+            overflow-wrap: anywhere;
         }
         
         .timeline-item.booked {
@@ -629,6 +643,7 @@
             color: var(--text-color);
             margin-bottom: 15px;
             letter-spacing: -0.01em;
+            overflow-wrap: anywhere;
         }
 
         .booking-card-header {
@@ -647,6 +662,7 @@
         .booking-rentals-list {
             margin: 5px 0 10px 20px;
             color: var(--text-color-light);
+            overflow-wrap: anywhere;
         }
 
         .booking-actions-row {
@@ -872,5 +888,29 @@
                 padding: 8px 10px;
                 margin: 0;
                 font-size: 0.84rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .booking-card h4 {
+                font-size: 1rem;
+            }
+
+            .rental-option.child {
+                margin-left: 0;
+            }
+
+            .perday-booked-item,
+            .selected-rentals .rental-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .payment-guide-btn,
+            .payment-close-btn {
+                display: block;
+                width: 100%;
+                margin-left: 0;
+                margin-top: 8px;
             }
         }
