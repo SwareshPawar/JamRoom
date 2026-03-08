@@ -66,11 +66,16 @@
                     </div>
 
                     <!-- Reference View - Schedule for selected date -->
-                    <div class="reference-view">
-                        <h3>Availability for Selected Date</h3>
-                        <p><small>Shows unavailable time slots</small></p>
-                        <div id="referenceTimeline" class="timeline">
-                            <div class="booking-theme-status booking-theme-status-muted">Select a date to view availability</div>
+                    <div class="reference-view" aria-live="polite">
+                        <div class="reference-view-head">
+                            <h3 class="reference-view-title">Availability for Selected Date</h3>
+                            <p class="reference-view-subtitle">Unavailable time slots for the selected date are shown below.</p>
+                        </div>
+
+                        <div class="reference-view-body">
+                            <div id="referenceTimeline" class="timeline">
+                                <div class="booking-theme-status booking-theme-status-muted">Select a date to view availability</div>
+                            </div>
                         </div>
                     </div>
 

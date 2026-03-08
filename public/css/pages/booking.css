@@ -376,28 +376,41 @@
         }
         
         .rental-checkbox {
+            -webkit-appearance: none;
             appearance: none;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--primary-color-dark);
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            min-height: 24px;
+            border: 2px solid var(--primary-color);
             border-radius: 4px;
             cursor: pointer;
             position: relative;
+            background: var(--surface-0);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color) 28%, transparent);
             transition: all 0.3s ease;
+            flex: 0 0 auto;
         }
         
         .rental-checkbox:checked {
-            background: var(--primary-color-dark);
+            background: var(--primary-color);
+            border-color: var(--primary-color-dark);
         }
         
         .rental-checkbox:checked::after {
             content: '✓';
             position: absolute;
             color: var(--text-inverse);
-            font-size: 14px;
+            font-size: 15px;
+            font-weight: 700;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+        }
+
+        .rental-checkbox:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px var(--focus-ring);
         }
 
         @media (max-width: 900px) {
@@ -572,11 +585,40 @@
             padding: 20px;
             border-radius: 8px;
             margin-top: 20px;
+            border: 1px solid var(--border-color);
+            display: grid;
+            gap: 10px;
+        }
+
+        .reference-view-head {
+            display: grid;
+            gap: 4px;
+        }
+
+        .reference-view-title {
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .reference-view-subtitle {
+            margin: 0;
+            color: var(--text-color-light);
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+
+        .reference-view-body {
+            background: var(--surface-elevated);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 8px 10px;
         }
         
         .timeline {
             position: relative;
-            margin: 20px 0;
+            margin: 0;
         }
         
         .timeline-item {
