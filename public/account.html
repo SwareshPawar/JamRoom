@@ -30,10 +30,10 @@
             <div id="navigationContainer"></div>
 
             <div class="tabs">
-                <button class="tab-btn active" onclick="showTab('profile')">👤 Profile</button>
-                <button class="tab-btn" onclick="showTab('bookings')">📋 My Bookings</button>
-                <button class="tab-btn" onclick="showTab('password')">🔐 Password</button>
-                <button class="tab-btn" onclick="showTab('settings')">⚙️ Settings</button>
+                <button class="tab-btn active" onclick="showTab('profile', this)">👤 Profile</button>
+                <button class="tab-btn" onclick="showTab('bookings', this)">📋 My Bookings</button>
+                <button class="tab-btn" onclick="showTab('password', this)">🔐 Password</button>
+                <button class="tab-btn" onclick="showTab('settings', this)">⚙️ Settings</button>
             </div>
 
         <div class="tab-content">
@@ -161,7 +161,7 @@
         }
 
         // Tab functionality
-        function showTab(tabName) {
+        function showTab(tabName, triggerElement = null) {
             // Hide all tab panes
             document.querySelectorAll('.tab-pane').forEach(pane => {
                 pane.classList.remove('active');
@@ -174,7 +174,14 @@
             
             // Show selected tab
             document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
+
+            const activeButton = triggerElement
+                || (typeof event !== 'undefined' ? event.target : null)
+                || document.querySelector(`.tab-btn[onclick*="showTab('${tabName}'"]`);
+
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
 
             // Load data for specific tabs
             if (tabName === 'bookings' && !document.getElementById('bookingsList').hasAttribute('data-loaded')) {

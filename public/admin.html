@@ -63,12 +63,12 @@
         <!-- Tabs -->
         <div class="section">
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('bookings')">📋 Bookings</button>
-                <button class="tab" onclick="switchTab('calendar')">📅 Calendar</button>
-                <button class="tab" onclick="switchTab('revenue')">💰 Revenue</button>
-                <button class="tab" onclick="switchTab('blocked')">🚫 Blocked Times</button>
-                <button class="tab" onclick="switchTab('settings')">⚙️ Settings</button>
-                <button class="tab" onclick="switchTab('users')">👥 Users</button>
+                <button class="tab active" onclick="switchTab('bookings', this)">📋 Bookings</button>
+                <button class="tab" onclick="switchTab('calendar', this)">📅 Calendar</button>
+                <button class="tab" onclick="switchTab('revenue', this)">💰 Revenue</button>
+                <button class="tab" onclick="switchTab('blocked', this)">🚫 Blocked Times</button>
+                <button class="tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
+                <button class="tab" onclick="switchTab('users', this)">👥 Users</button>
             </div>
 
             <!-- Bookings Tab -->
@@ -814,10 +814,18 @@
         };
 
         // Tab switching
-        window.switchTab = (tab) => {
+        window.switchTab = (tab, triggerElement = null) => {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            event.target.classList.add('active');
+
+            const activeButton = triggerElement
+                || (typeof event !== 'undefined' ? event.target : null)
+                || document.querySelector(`.tab[onclick*="switchTab('${tab}'"]`);
+
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+
             document.getElementById(tab + 'Tab').classList.add('active');
 
             if (tab === 'bookings') loadBookings();
