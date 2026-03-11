@@ -47,8 +47,14 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     const endTimeSelect = document.getElementById('endTime');
     const loadingEl = document.getElementById('startTimeLoading');
 
+    if (!startTimeSelect || !endTimeSelect) {
+        return;
+    }
+
     // Show loading state
-    loadingEl.style.display = 'block';
+    if (loadingEl) {
+        loadingEl.style.display = 'block';
+    }
     startTimeSelect.disabled = true;
 
     // Reset end time when start time changes
@@ -59,7 +65,9 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
 
     if (!selectedDate) {
         startTimeSelect.innerHTML = '<option value="">Select date first</option>';
-        loadingEl.style.display = 'none';
+        if (loadingEl) {
+            loadingEl.style.display = 'none';
+        }
         return;
     }
 
@@ -137,7 +145,9 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         console.error('Error populating time slots:', error);
         startTimeSelect.innerHTML = '<option value="">Error loading times</option>';
     } finally {
-        loadingEl.style.display = 'none';
+        if (loadingEl) {
+            loadingEl.style.display = 'none';
+        }
     }
 };
 
@@ -259,6 +269,11 @@ const populateTimeSlots = async () => {
 // Load availability reference for selected date
 const loadAvailability = async (date) => {
     const container = document.getElementById('referenceTimeline');
+    if (!container) {
+        await populateStartTimeSlots(date, null);
+        return;
+    }
+
     if (!date) {
         container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">Select a date to view availability</div>';
         window.currentAvailabilityData = null;

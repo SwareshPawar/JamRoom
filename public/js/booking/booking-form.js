@@ -212,8 +212,14 @@ const handleBookingFormSubmit = async (e) => {
 const bindBookingDateChange = (bookingDateEl) => {
     if (!bookingDateEl) return;
 
-    bookingDateEl.addEventListener('change', async (e) => {
-        const selectedDate = e.target.value;
+    let previousDateValue = null;
+
+    const handleDateSelection = async (selectedDate) => {
+        if (selectedDate === previousDateValue) {
+            return;
+        }
+
+        previousDateValue = selectedDate;
         const startTimeSelect = document.getElementById('startTime');
         const endTimeSelect = document.getElementById('endTime');
 
@@ -241,7 +247,20 @@ const bindBookingDateChange = (bookingDateEl) => {
         }
 
         updatePriceDisplay();
-    });
+    };
+
+    const onDateChange = async (e) => {
+        const selectedDate = (e?.target?.value || bookingDateEl.value || '').trim();
+        await handleDateSelection(selectedDate);
+    };
+
+    bookingDateEl.addEventListener('change', onDateChange);
+    bookingDateEl.addEventListener('input', onDateChange);
+
+    // Some mobile browsers restore form values without firing input/change.
+    if (bookingDateEl.value) {
+        handleDateSelection(bookingDateEl.value.trim());
+    }
 };
 
 const initBookingFormHandlers = () => {
