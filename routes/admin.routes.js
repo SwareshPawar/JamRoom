@@ -113,6 +113,93 @@ const normalizeMobileLast10 = (mobile) => {
   return digits.length >= 10 ? digits.slice(-10) : '';
 };
 
+const normalizeIndianMobile = (mobile) => {
+  const rawValue = String(mobile || '').trim();
+  if (!rawValue) return '';
+
+  const digits = rawValue.replace(/\D/g, '');
+  if (!digits) return '';
+
+  if (digits.length === 10) {
+    return digits;
+  }
+
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return digits.slice(1);
+  }
+
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits.slice(2);
+  }
+
+  if (digits.length > 10) {
+    return digits.slice(-10);
+  }
+
+  return digits;
+};
+
+const isValidIndianMobile = (mobile) => /^[6-9]\d{9}$/.test(String(mobile || ''));
+
+const parseDateInputToStartOfDay = (value) => {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  let year;
+  let month;
+  let day;
+
+  const ymdMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymdMatch) {
+    year = Number(ymdMatch[1]);
+    month = Number(ymdMatch[2]);
+    day = Number(ymdMatch[3]);
+  } else {
+    const dmyMatch = raw.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+    if (dmyMatch) {
+      day = Number(dmyMatch[1]);
+      month = Number(dmyMatch[2]);
+      year = Number(dmyMatch[3]);
+    }
+  }
+
+  if (!year || !month || !day) {
+    const fallback = new Date(raw);
+    if (Number.isNaN(fallback.getTime())) {
+      return null;
+    }
+
+    fallback.setHours(0, 0, 0, 0);
+    return fallback;
+  }
+
+  const parsed = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+};
+
+const formatDateAsYmd = (dateValue) => {
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) {
+    return '';
+  }
+
+  const year = dateValue.getFullYear();
+  const month = String(dateValue.getMonth() + 1).padStart(2, '0');
+  const day = String(dateValue.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const resolveAdminNotificationEmails = async (settings = null) => {
   const recipients = new Set();
 
@@ -549,8 +636,14 @@ router.get('/bookings/calendar', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.get('/availability/:date', protect, isAdmin, async (req, res) => {
   try {
-    const date = new Date(req.params.date);
-    date.setHours(0, 0, 0, 0);
+    const date = parseDateInputToStartOfDay(req.params.date);
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format. Use YYYY-MM-DD.'
+      });
+    }
+
     const dayStart = new Date(date);
     const dayEnd = new Date(date);
     dayEnd.setHours(23, 59, 59, 999);
@@ -567,7 +660,7 @@ router.get('/availability/:date', protect, isAdmin, async (req, res) => {
 
     res.json({
       success: true,
-      date: date.toISOString().split('T')[0],
+      date: formatDateAsYmd(date),
       bookings,
       blockedTimes
     });
@@ -1348,6 +1441,14 @@ router.post('/users', protect, isAdmin, async (req, res) => {
       });
     }
 
+    const normalizedMobile = normalizeIndianMobile(mobile);
+    if (normalizedMobile && !isValidIndianMobile(normalizedMobile)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid Indian mobile number'
+      });
+    }
+
     const userPayload = {
       name: name.trim(),
       email: normalizedEmail,
@@ -1357,8 +1458,8 @@ router.post('/users', protect, isAdmin, async (req, res) => {
       tempPasswordSetAt: new Date()
     };
 
-    if (mobile && mobile.trim()) {
-      userPayload.mobile = mobile.trim();
+    if (normalizedMobile) {
+      userPayload.mobile = normalizedMobile;
     }
 
     const user = await User.create(userPayload);
@@ -1407,6 +1508,15 @@ router.post('/users', protect, isAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('Create admin user error:', error);
+
+    if (error && error.name === 'ValidationError') {
+      const firstValidationError = Object.values(error.errors || {})[0];
+      return res.status(400).json({
+        success: false,
+        message: firstValidationError?.message || 'Validation failed while creating user'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Server error creating user'
@@ -1455,10 +1565,17 @@ router.put('/users/:id', protect, isAdmin, async (req, res) => {
     }
 
     const previousEmail = normalizeEmail(user.email);
+    const normalizedMobile = normalizeIndianMobile(mobile);
+    if (normalizedMobile && !isValidIndianMobile(normalizedMobile)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid Indian mobile number'
+      });
+    }
 
     user.name = String(name).trim();
     user.email = normalizedEmail;
-    user.mobile = mobile && String(mobile).trim() ? String(mobile).trim() : undefined;
+    user.mobile = normalizedMobile || undefined;
 
     await user.save();
 
@@ -2279,8 +2396,13 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     }
 
     // Convert date to start of day
-    const bookingDate = new Date(date);
-    bookingDate.setHours(0, 0, 0, 0);
+    const bookingDate = parseDateInputToStartOfDay(date);
+    if (!bookingDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid booking date. Use YYYY-MM-DD format.'
+      });
+    }
 
     // Helper function to check time conflicts
     const checkTimeConflict = (start1, end1, start2, end2) => {

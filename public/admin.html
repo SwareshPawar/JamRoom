@@ -760,6 +760,74 @@
             return `${displayHour}:${minutes} ${ampm}`;
         };
 
+        const normalizeIndianMobileInput = (value) => {
+            const rawValue = String(value || '').trim();
+            if (!rawValue) return '';
+
+            let digits = rawValue.replace(/\D/g, '');
+            if (!digits) return '';
+
+            if (digits.length === 11 && digits.startsWith('0')) {
+                digits = digits.slice(1);
+            }
+
+            if (digits.length === 12 && digits.startsWith('91')) {
+                digits = digits.slice(2);
+            }
+
+            if (digits.length > 10) {
+                digits = digits.slice(-10);
+            }
+
+            return /^[6-9]\d{9}$/.test(digits) ? digits : null;
+        };
+
+        const normalizeIsoDateInput = (value) => {
+            const rawValue = String(value || '').trim();
+            if (!rawValue) return '';
+
+            let year;
+            let month;
+            let day;
+
+            const ymdMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (ymdMatch) {
+                year = Number(ymdMatch[1]);
+                month = Number(ymdMatch[2]);
+                day = Number(ymdMatch[3]);
+            } else {
+                const dmyMatch = rawValue.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+                if (dmyMatch) {
+                    day = Number(dmyMatch[1]);
+                    month = Number(dmyMatch[2]);
+                    year = Number(dmyMatch[3]);
+                }
+            }
+
+            if (!year || !month || !day) {
+                const fallback = new Date(rawValue);
+                if (Number.isNaN(fallback.getTime())) {
+                    return '';
+                }
+
+                year = fallback.getFullYear();
+                month = fallback.getMonth() + 1;
+                day = fallback.getDate();
+            }
+
+            const parsed = new Date(year, month - 1, day);
+            if (
+                Number.isNaN(parsed.getTime()) ||
+                parsed.getFullYear() !== year ||
+                parsed.getMonth() !== month - 1 ||
+                parsed.getDate() !== day
+            ) {
+                return '';
+            }
+
+            return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        };
+
         const closeModal = (modalId) => {
             document.getElementById(modalId).classList.remove('show');
         };
@@ -961,10 +1029,18 @@
             event.preventDefault();
 
             const userId = document.getElementById('editRegisteredUserId').value;
+            const rawMobile = document.getElementById('editRegisteredUserMobile').value;
+            const normalizedMobile = normalizeIndianMobileInput(rawMobile);
+
+            if (rawMobile.trim() && !normalizedMobile) {
+                showAlert('userAlert', 'Please enter a valid Indian mobile number.', 'warning');
+                return;
+            }
+
             const payload = {
                 name: document.getElementById('editRegisteredUserName').value.trim(),
-                email: document.getElementById('editRegisteredUserEmail').value.trim(),
-                mobile: document.getElementById('editRegisteredUserMobile').value.trim()
+                email: document.getElementById('editRegisteredUserEmail').value.trim().toLowerCase(),
+                mobile: normalizedMobile || ''
             };
 
             if (!payload.name || !payload.email) {
@@ -1494,13 +1570,32 @@
 
         document.getElementById('editRegisteredUserForm').addEventListener('submit', submitRegisteredUserEdit);
 
+        ['usersTabUserMobile', 'registerUserMobile', 'editRegisteredUserMobile'].forEach((fieldId) => {
+            const input = document.getElementById(fieldId);
+            if (!input) return;
+
+            input.addEventListener('blur', () => {
+                const normalizedMobile = normalizeIndianMobileInput(input.value);
+                if (normalizedMobile) {
+                    input.value = normalizedMobile;
+                }
+            });
+        });
+
         document.getElementById('usersTabCreateUserForm').addEventListener('submit', async (event) => {
             event.preventDefault();
 
+            const rawMobile = document.getElementById('usersTabUserMobile').value;
+            const normalizedMobile = normalizeIndianMobileInput(rawMobile);
+            if (rawMobile.trim() && !normalizedMobile) {
+                showAlert('userAlert', 'Please enter a valid Indian mobile number.', 'warning');
+                return;
+            }
+
             const payload = {
                 name: document.getElementById('usersTabUserName').value.trim(),
-                email: document.getElementById('usersTabUserEmail').value.trim(),
-                mobile: document.getElementById('usersTabUserMobile').value.trim()
+                email: document.getElementById('usersTabUserEmail').value.trim().toLowerCase(),
+                mobile: normalizedMobile || ''
             };
 
             try {
@@ -1869,6 +1964,8 @@
         let selectedCreateUser = null;
         let createBookingSettings = null;
         let createBookingAvailabilityData = null;
+        let createAvailabilityRequestSeq = 0;
+        let createDateInputLastValue = '';
 
         const createBookingStartSlots = [
             { value: '09:00', label: '9:00 AM' },
@@ -2084,6 +2181,11 @@
         const updateCreateDateInputConstraints = () => {
             const dateInput = document.getElementById('createDate');
             const today = new Date().toISOString().split('T')[0];
+            const normalizedDateValue = normalizeIsoDateInput(dateInput.value);
+
+            if (normalizedDateValue && dateInput.value !== normalizedDateValue) {
+                dateInput.value = normalizedDateValue;
+            }
 
             if (isCreateDateTimeOverrideEnabled()) {
                 dateInput.removeAttribute('min');
@@ -2091,7 +2193,7 @@
             }
 
             dateInput.min = today;
-            if (dateInput.value && dateInput.value < today) {
+            if (normalizedDateValue && normalizedDateValue < today) {
                 dateInput.value = today;
             }
         };
@@ -2193,8 +2295,10 @@
         const loadCreateBookingAvailability = async (date) => {
             const timelineContainer = document.getElementById('createReferenceTimeline');
             const overrideDateTime = isCreateDateTimeOverrideEnabled();
+            const normalizedDate = normalizeIsoDateInput(date);
+            const requestId = ++createAvailabilityRequestSeq;
 
-            if (!date) {
+            if (!normalizedDate) {
                 createBookingAvailabilityData = null;
                 timelineContainer.innerHTML = '<div class="admin-theme-status admin-theme-status-muted">Select a date to view availability</div>';
                 populateCreateStartTimes('', null);
@@ -2204,14 +2308,14 @@
             if (overrideDateTime) {
                 createBookingAvailabilityData = null;
                 timelineContainer.innerHTML = '<div class="admin-theme-status admin-theme-status-warning">Override is enabled. All time slots are selectable for this date.</div>';
-                populateCreateStartTimes(date, null);
+                populateCreateStartTimes(normalizedDate, null);
                 return;
             }
 
             timelineContainer.innerHTML = '<div class="admin-theme-status admin-theme-status-loading">Loading availability...</div>';
 
             try {
-                const response = await fetch(`${API_URL}/api/admin/availability/${date}`, {
+                const response = await fetch(`${API_URL}/api/admin/availability/${encodeURIComponent(normalizedDate)}`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
@@ -2221,14 +2325,23 @@
                 }
 
                 const data = await response.json();
+
+                if (requestId !== createAvailabilityRequestSeq) {
+                    return;
+                }
+
                 createBookingAvailabilityData = data;
                 renderCreateAvailabilityTimeline(data);
-                populateCreateStartTimes(date, data);
+                populateCreateStartTimes(normalizedDate, data);
             } catch (error) {
+                if (requestId !== createAvailabilityRequestSeq) {
+                    return;
+                }
+
                 console.error('Error loading create-booking availability:', error);
                 createBookingAvailabilityData = null;
                 timelineContainer.innerHTML = '<div class="admin-theme-status admin-theme-status-danger">Failed to load availability data</div>';
-                populateCreateStartTimes(date, null);
+                populateCreateStartTimes(normalizedDate, null);
             }
         };
 
@@ -2245,6 +2358,8 @@
             updateCreateDateInputConstraints();
 
             createBookingAvailabilityData = null;
+            createAvailabilityRequestSeq += 1;
+            createDateInputLastValue = '';
 
             document.getElementById('createReferenceTimeline').innerHTML = '<div class="admin-theme-status admin-theme-status-muted">Select a date to view availability</div>';
             document.getElementById('createStartTime').innerHTML = '<option value="">Select date first</option>';
@@ -2264,7 +2379,12 @@
             resetCreateBookingForm();
             document.getElementById('createBookingModal').classList.add('show');
 
-            const selectedDate = document.getElementById('createDate').value;
+            const dateInput = document.getElementById('createDate');
+            const today = new Date().toISOString().split('T')[0];
+            const selectedDate = normalizeIsoDateInput(dateInput.value) || today;
+            if (dateInput.value !== selectedDate) {
+                dateInput.value = selectedDate;
+            }
 
             await Promise.all([
                 loadCreateBookingUsers(),
@@ -2498,9 +2618,15 @@
             const form = event.target;
             const formData = new FormData(form);
             const userId = document.getElementById('createUserId').value;
+            const normalizedBookingDate = normalizeIsoDateInput(formData.get('date'));
 
             if (!userId) {
                 showAlert('', 'Please select a registered user before creating booking.', 'warning');
+                return;
+            }
+
+            if (!normalizedBookingDate) {
+                showAlert('', 'Please select a valid booking date.', 'warning');
                 return;
             }
 
@@ -2588,7 +2714,7 @@
 
             const bookingData = {
                 userId,
-                date: formData.get('date'),
+                date: normalizedBookingDate,
                 startTime,
                 endTime,
                 duration: calculatedDuration,
@@ -2655,13 +2781,43 @@
             }, 200);
         });
 
-        document.getElementById('createDate').addEventListener('change', async (event) => {
-            await loadCreateBookingAvailability(event.target.value);
+        const handleCreateDateInputChange = async (rawValue) => {
+            const dateInput = document.getElementById('createDate');
+            const normalizedDate = normalizeIsoDateInput(rawValue);
+
+            if (normalizedDate && dateInput.value !== normalizedDate) {
+                dateInput.value = normalizedDate;
+            }
+
+            if (!normalizedDate) {
+                createDateInputLastValue = '';
+                await loadCreateBookingAvailability('');
+                return;
+            }
+
+            if (normalizedDate === createDateInputLastValue) {
+                return;
+            }
+
+            createDateInputLastValue = normalizedDate;
+            await loadCreateBookingAvailability(normalizedDate);
+        };
+
+        const createDateEl = document.getElementById('createDate');
+        createDateEl.addEventListener('change', async (event) => {
+            await handleCreateDateInputChange(event.target.value);
+        });
+        createDateEl.addEventListener('input', async (event) => {
+            await handleCreateDateInputChange(event.target.value);
+        });
+        createDateEl.addEventListener('blur', async (event) => {
+            await handleCreateDateInputChange(event.target.value);
         });
 
         document.getElementById('createDateTimeOverride').addEventListener('change', async () => {
             updateCreateDateInputConstraints();
-            const selectedDate = document.getElementById('createDate').value;
+            const selectedDate = normalizeIsoDateInput(document.getElementById('createDate').value);
+            createDateInputLastValue = selectedDate || '';
             await loadCreateBookingAvailability(selectedDate);
             populateCreateEndTimes();
             updateCreateDurationDisplay();
@@ -2679,10 +2835,17 @@
         document.getElementById('registerCreateUserForm').addEventListener('submit', async (event) => {
             event.preventDefault();
 
+            const rawMobile = document.getElementById('registerUserMobile').value;
+            const normalizedMobile = normalizeIndianMobileInput(rawMobile);
+            if (rawMobile.trim() && !normalizedMobile) {
+                showAlert('', 'Please enter a valid Indian mobile number.', 'warning');
+                return;
+            }
+
             const payload = {
                 name: document.getElementById('registerUserName').value.trim(),
-                email: document.getElementById('registerUserEmail').value.trim(),
-                mobile: document.getElementById('registerUserMobile').value.trim()
+                email: document.getElementById('registerUserEmail').value.trim().toLowerCase(),
+                mobile: normalizedMobile || ''
             };
 
             try {
