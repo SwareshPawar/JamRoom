@@ -618,8 +618,16 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
         endTime: booking.endTime,
         duration: booking.duration,
         rentalType: booking.rentalType,
+        rentals: booking.rentals,
+        subtotal: booking.subtotal,
+        taxAmount: booking.taxAmount,
+        priceAdjustmentType: booking.priceAdjustmentType,
+        priceAdjustmentAmount: booking.priceAdjustmentAmount,
+        priceAdjustmentValue: booking.priceAdjustmentValue,
+        priceAdjustmentNote: booking.priceAdjustmentNote,
         price: booking.price,
         bandName: booking.bandName,
+        notes: booking.notes,
         createdAt: booking.createdAt
       }))
     });

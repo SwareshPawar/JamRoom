@@ -243,10 +243,16 @@
                     
                     <!-- Rental Types and Pricing Section -->
                     <h3 class="settings-section-title">🏷️ Rental Types & Pricing</h3>
+                    <div class="settings-rental-toolbar">
+                        <p class="settings-rental-toolbar-note">Expand only the category you want to edit.</p>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="addRentalType()">+ Add Rental Type</button>
+                    </div>
                     <div id="rentalTypesContainer">
                         <!-- Rental types will be loaded here dynamically -->
                     </div>
-                    <button type="button" class="btn btn-secondary add-rental-btn" onclick="addRentalType()">+ Add Rental Type</button>
+                    <div class="settings-rental-toolbar settings-rental-toolbar-bottom">
+                        <button type="button" class="btn btn-secondary add-rental-btn" onclick="addRentalType()">+ Add Rental Type</button>
+                    </div>
                     
                     <button type="submit" class="btn btn-success">Save Settings</button>
                 </form>
@@ -1975,6 +1981,7 @@
             
             rentalTypes.forEach((rental, index) => {
                 const hasSubItems = rental.subItems && rental.subItems.length > 0;
+                const categoryTitle = (rental.name || '').trim() || `Category ${index + 1}`;
                 const subItemsHTML = hasSubItems ? rental.subItems.map((sub, subIndex) => {
                     const isPerday = (sub.rentalType || 'inhouse') === 'perday';
                     return `
@@ -2020,104 +2027,84 @@
                 rentalDiv.className = 'rental-type-card';
                 rentalDiv.dataset.rentalIndex = index;
                 rentalDiv.innerHTML = `
-                    <div class="rental-type-header-grid">
-                        <div>
-                            <label class="rental-type-label">Category Name*</label>
-                            <input type="text" value="${rental.name || ''}" onchange="updateRentalType(${index}, 'name', this.value)" 
-                                   class="rental-type-input"
-                                   placeholder="e.g., Synths, Guitars, JamRoom">
+                    <details class="rental-type-collapse" ${index === 0 ? 'open' : ''}>
+                        <summary class="rental-type-summary">
+                            <div class="rental-type-summary-main">
+                                <strong>${escapeHtml(categoryTitle)}</strong>
+                                <span>${hasSubItems ? `${rental.subItems.length} item(s)` : 'Base pricing only'}</span>
+                            </div>
+                            <span class="rental-type-summary-hint">Tap to expand</span>
+                        </summary>
+
+                        <div class="rental-type-collapse-body">
+                            <div class="rental-type-header-grid">
+                                <div>
+                                    <label class="rental-type-label">Category Name*</label>
+                                    <input type="text" value="${rental.name || ''}" onchange="updateRentalType(${index}, 'name', this.value)" 
+                                           class="rental-type-input"
+                                           placeholder="e.g., Synths, Guitars, JamRoom">
+                                </div>
+                                <div>
+                                    <label class="rental-type-label">Base Price (₹/hr)* <small class="rental-type-note">(used if no sub-items)</small></label>
+                                    <input type="number" value="${rental.basePrice || ''}" onchange="updateRentalType(${index}, 'basePrice', parseInt(this.value))" 
+                                           class="rental-type-input" min="0">
+                                </div>
+                                <button type="button" onclick="removeRentalType(${index})" class="btn btn-danger rental-type-remove">Remove</button>
+                            </div>
+                            <div class="rental-type-description-wrap">
+                                <label class="rental-type-label">Description</label>
+                                <textarea onchange="updateRentalType(${index}, 'description', this.value)" 
+                                          class="rental-type-input rental-type-textarea" 
+                                          rows="2" placeholder="Optional description">${rental.description || ''}</textarea>
+                            </div>
+
+                            <!-- Sub-items Section -->
+                            <div class="rental-type-subitems-section">
+                                <div class="rental-type-subitems-head">
+                                    <label class="rental-type-subitems-title">🎸 Individual Items (Optional)</label>
+                                    <button type="button" onclick="addSubItem(${index})" class="btn btn-primary btn-sm rental-subitem-add">+ Add Item</button>
+                                </div>
+                                <p class="rental-type-subitems-note">Add individual items with different prices (e.g., Moog Synth - ₹500/hr, Roland Synth - ₹400/hr)</p>
+                                <div class="rental-type-hint-box">
+                                    <p class="rental-type-hint-title">💡 Rental Types:</p>
+                                    <p class="rental-type-hint-text">
+                                        <strong>🔗 In-house:</strong> Tied to jam session duration (e.g., guitar for 2-hour session = ₹200 × 2 = ₹400)<br>
+                                        <strong>📅 Per-day:</strong> Flat daily rate regardless of session length (e.g., guitar for any session = ₹800/day)
+                                    </p>
+                                </div>
+                                <div class="sub-items-container" data-rental="${index}">
+                                    ${subItemsHTML || '<p class="rental-type-subitems-empty">No individual items. Users will see the base price above.</p>'}
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="rental-type-label">Base Price (₹/hr)* <small class="rental-type-note">(used if no sub-items)</small></label>
-                            <input type="number" value="${rental.basePrice || ''}" onchange="updateRentalType(${index}, 'basePrice', parseInt(this.value))" 
-                                   class="rental-type-input" min="0">
-                        </div>
-                        <button type="button" onclick="removeRentalType(${index})" class="btn btn-danger rental-type-remove">Remove</button>
-                    </div>
-                    <div class="rental-type-description-wrap">
-                        <label class="rental-type-label">Description</label>
-                        <textarea onchange="updateRentalType(${index}, 'description', this.value)" 
-                                  class="rental-type-input rental-type-textarea" 
-                                  rows="2" placeholder="Optional description">${rental.description || ''}</textarea>
-                    </div>
-                    
-                    <!-- Sub-items Section -->
-                    <div class="rental-type-subitems-section">
-                        <div class="rental-type-subitems-head">
-                            <label class="rental-type-subitems-title">🎸 Individual Items (Optional)</label>
-                            <button type="button" onclick="addSubItem(${index})" class="btn btn-primary btn-sm rental-subitem-add">+ Add Item</button>
-                        </div>
-                        <p class="rental-type-subitems-note">Add individual items with different prices (e.g., Moog Synth - ₹500/hr, Roland Synth - ₹400/hr)</p>
-                        <div class="rental-type-hint-box">
-                            <p class="rental-type-hint-title">💡 Rental Types:</p>
-                            <p class="rental-type-hint-text">
-                                <strong>🔗 In-house:</strong> Tied to jam session duration (e.g., guitar for 2-hour session = ₹200 × 2 = ₹400)<br>
-                                <strong>📅 Per-day:</strong> Flat daily rate regardless of session length (e.g., guitar for any session = ₹800/day)
-                            </p>
-                        </div>
-                        <div class="sub-items-container" data-rental="${index}">
-                            ${subItemsHTML || '<p class="rental-type-subitems-empty">No individual items. Users will see the base price above.</p>'}
-                        </div>
-                    </div>
+                    </details>
                 `;
                 container.appendChild(rentalDiv);
             });
         }
         
         function addSubItem(rentalIndex) {
-            const subItemsContainer = document.querySelector(`.sub-items-container[data-rental="${rentalIndex}"]`);
-            if (!subItemsContainer) return;
-            
-            // Remove "No individual items" message if it exists
-            const noItemsMessage = subItemsContainer.querySelector('p');
-            if (noItemsMessage && noItemsMessage.textContent.includes('No individual items')) {
-                noItemsMessage.remove();
+            const currentData = getCurrentRentalTypes() || [];
+            if (!currentData[rentalIndex]) return;
+
+            if (!Array.isArray(currentData[rentalIndex].subItems)) {
+                currentData[rentalIndex].subItems = [];
             }
-            
-            // Find the current number of sub-items in this container
-            const existingSubItems = subItemsContainer.querySelectorAll('div[data-rental]');
-            const subIndex = existingSubItems.length;
-            
-            // Create new sub-item div
-            const newSubItem = document.createElement('div');
-            newSubItem.className = 'rental-subitem-row';
-            newSubItem.setAttribute('data-rental', rentalIndex);
-            newSubItem.innerHTML = `
-                <div>
-                    <label class="rental-subitem-label">Item Name</label>
-                    <input type="text" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="name"
-                           class="rental-subitem-input">
-                </div>
-                <div>
-                    <label class="rental-subitem-label">Description</label>
-                    <input type="text" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="description"
-                           class="rental-subitem-input" placeholder="Optional">
-                </div>
-                <div>
-                    <label class="rental-subitem-label">Rental Type</label>
-                    <select data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="rentalType" onchange="togglePerdayPrice(${rentalIndex}, ${subIndex})"
-                            class="rental-subitem-input">
-                        <option value="inhouse" selected>In-house</option>
-                        <option value="perday">Per-day</option>
-                    </select>
-                </div>
-                <div class="hourly-price-field">
-                    <label class="rental-subitem-label hourly-price-label">
-                        Price (₹/hr) <span class="price-flag price-flag-active">(active)</span>
-                    </label>
-                    <input type="number" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="price"
-                           class="rental-subitem-input" min="0">
-                </div>
-                <div class="perday-price-field admin-hidden">
-                    <label class="rental-subitem-label">
-                        Per-day Price (₹/day) <span class="price-flag price-flag-active">(active for per-day rentals)</span>
-                    </label>
-                    <input type="number" value="" data-rental="${rentalIndex}" data-subitem="${subIndex}" data-field="perdayPrice"
-                           class="rental-subitem-input rental-subitem-input-perday" min="0" placeholder="Required for per-day">
-                </div>
-                <button type="button" onclick="removeSubItem(${rentalIndex}, ${subIndex})" class="btn btn-danger btn-sm rental-subitem-remove">×</button>`;
-            
-            subItemsContainer.appendChild(newSubItem);
+
+            // Add new item at top for faster entry/edit flow on mobile and desktop.
+            currentData[rentalIndex].subItems.unshift({
+                name: '',
+                description: '',
+                rentalType: 'inhouse',
+                price: 0,
+                perdayPrice: 0
+            });
+
+            loadRentalTypes(currentData);
+
+            const rentalCard = document.querySelector(`.rental-type-card[data-rental-index="${rentalIndex}"]`);
+            const collapse = rentalCard?.querySelector('.rental-type-collapse');
+            if (collapse) collapse.open = true;
         }
         
         function removeSubItem(rentalIndex, subItemIndex) {
