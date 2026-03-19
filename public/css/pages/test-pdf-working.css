@@ -101,16 +101,19 @@
             border: 1px solid #90cdf4;
         }
         
-        .loading {
+        .loading:not(button):not(input):not(select):not(textarea):not(.btn) {
             display: none;
             text-align: center;
             color: #667eea;
             font-weight: 500;
             margin: 20px 0;
+            border: 0;
+            animation: none;
+            transform: none;
         }
         
         .loading.show {
-            display: block;
+            display: flex;
         }
         
         .code-block {

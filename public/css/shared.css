@@ -990,14 +990,31 @@ textarea:disabled {
 .p-4 { padding: var(--spacing-lg); }
 .p-5 { padding: var(--spacing-xl); }
 
-.loading {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(102, 126, 234, 0.3);
-    border-top: 3px solid var(--primary-color);
+.loading:not(button):not(input):not(select):not(textarea):not(.btn) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    padding: 16px 20px;
+    color: var(--text-color-light);
+    line-height: 1.4;
+    border: 0;
+    border-radius: 0;
+    animation: none;
+    transform: none;
+}
+
+.loading:not(button):not(input):not(select):not(textarea):not(.btn)::before {
+    content: '';
+    width: 16px;
+    height: 16px;
+    border: 2px solid color-mix(in srgb, var(--primary-color) 30%, transparent);
+    border-top-color: var(--primary-color);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: spin 0.85s linear infinite;
+    flex-shrink: 0;
 }
 
 .loader {
