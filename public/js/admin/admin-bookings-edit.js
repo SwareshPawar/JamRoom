@@ -284,6 +284,40 @@
         return { enabled, rate };
     };
 
+    const getNormalizedPriceAdjustment = () => {
+        const rawType = document.getElementById('editPriceAdjustmentType')?.value;
+        const normalizedType = ['discount', 'surcharge'].includes(String(rawType || '').trim().toLowerCase())
+            ? String(rawType).trim().toLowerCase()
+            : 'none';
+
+        const parsedAmount = Number(document.getElementById('editPriceAdjustmentAmount')?.value || 0);
+        const normalizedAmount = Number.isFinite(parsedAmount) && parsedAmount > 0
+            ? parsedAmount
+            : 0;
+
+        if (normalizedType === 'discount') {
+            return {
+                type: 'discount',
+                amount: normalizedAmount,
+                signedValue: -normalizedAmount
+            };
+        }
+
+        if (normalizedType === 'surcharge') {
+            return {
+                type: 'surcharge',
+                amount: normalizedAmount,
+                signedValue: normalizedAmount
+            };
+        }
+
+        return {
+            type: 'none',
+            amount: 0,
+            signedValue: 0
+        };
+    };
+
     const recalculateEditBookingTotals = (deps) => {
         const duration = parseFloat(document.getElementById('editDuration')?.value) || 0;
         const items = collectSelectedEditRentals(deps, { strict: false });
@@ -309,16 +343,17 @@
 
         const gstConfig = getCurrentGstConfig(deps);
         const taxAmount = gstConfig.enabled ? Math.round(subtotal * gstConfig.rate) : 0;
-        const totalAmount = subtotal + taxAmount;
+        const adjustment = getNormalizedPriceAdjustment();
+        const totalAmount = subtotal + taxAmount + adjustment.signedValue;
 
         const subtotalEl = document.getElementById('editSubtotal');
         const taxEl = document.getElementById('editTaxAmount');
         const totalEl = document.getElementById('editPrice');
         if (subtotalEl) subtotalEl.value = subtotal.toFixed(2);
         if (taxEl) taxEl.value = taxAmount.toFixed(2);
-        if (totalEl) totalEl.value = totalAmount.toFixed(2);
+        if (totalEl) totalEl.value = Math.max(0, totalAmount).toFixed(2);
 
-        return { items, subtotal, taxAmount, totalAmount };
+        return { items, subtotal, taxAmount, totalAmount, adjustment };
     };
 
     const loadEditBookingRentals = async (booking, deps) => {
@@ -371,6 +406,26 @@
             if (editRentalType) editRentalType.value = booking.rentalType || '';
             if (editNotes) editNotes.value = booking.notes || '';
 
+            const editAdjustmentType = document.getElementById('editPriceAdjustmentType');
+            const editAdjustmentAmount = document.getElementById('editPriceAdjustmentAmount');
+            const editAdjustmentNote = document.getElementById('editPriceAdjustmentNote');
+
+            const fallbackAdjustmentType = Number(booking?.priceAdjustmentValue || 0) < 0
+                ? 'discount'
+                : Number(booking?.priceAdjustmentValue || 0) > 0
+                    ? 'surcharge'
+                    : 'none';
+            const resolvedAdjustmentType = ['none', 'discount', 'surcharge'].includes(String(booking?.priceAdjustmentType || '').toLowerCase())
+                ? String(booking.priceAdjustmentType).toLowerCase()
+                : fallbackAdjustmentType;
+            const resolvedAdjustmentAmount = Number.isFinite(Number(booking?.priceAdjustmentAmount))
+                ? Number(booking.priceAdjustmentAmount)
+                : Math.abs(Number(booking?.priceAdjustmentValue || 0));
+
+            if (editAdjustmentType) editAdjustmentType.value = resolvedAdjustmentType;
+            if (editAdjustmentAmount) editAdjustmentAmount.value = Math.max(0, resolvedAdjustmentAmount).toFixed(2);
+            if (editAdjustmentNote) editAdjustmentNote.value = booking?.priceAdjustmentNote || '';
+
             if (editRentals) {
                 editRentals.innerHTML = '<div class="loading-inline-muted">Loading rental options...</div>';
             }
@@ -410,6 +465,12 @@
             const rentals = collectSelectedEditRentals(deps, { strict: true });
             const pricing = recalculateEditBookingTotals(deps);
 
+            if (pricing.totalAmount < 0) {
+                throw new Error('Discount cannot be greater than subtotal plus tax.');
+            }
+
+            const adjustment = getNormalizedPriceAdjustment();
+
             const formData = {
                 date: document.getElementById('editDate')?.value,
                 startTime: document.getElementById('editStartTime')?.value,
@@ -426,6 +487,9 @@
                 subtotal: pricing.subtotal,
                 taxAmount: pricing.taxAmount,
                 totalAmount: pricing.totalAmount,
+                priceAdjustmentType: adjustment.type,
+                priceAdjustmentAmount: adjustment.amount,
+                priceAdjustmentNote: document.getElementById('editPriceAdjustmentNote')?.value || '',
                 notes: document.getElementById('editNotes')?.value
             };
 

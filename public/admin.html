@@ -501,9 +501,29 @@
                         <input type="number" id="editTaxAmount" readonly class="readonly-soft">
                     </div>
                     <div class="form-group">
-                        <label for="editPrice">Total (₹)</label>
+                        <label for="editPrice">Final Total (₹)</label>
                         <input type="number" id="editPrice" readonly class="readonly-soft">
                     </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label for="editPriceAdjustmentType">Special Price Override</label>
+                        <select id="editPriceAdjustmentType">
+                            <option value="none">None</option>
+                            <option value="discount">Discount (-)</option>
+                            <option value="surcharge">Surcharge (+)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPriceAdjustmentAmount">Adjustment Amount (₹)</label>
+                        <input type="number" id="editPriceAdjustmentAmount" min="0" step="1" value="0" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="editPriceAdjustmentNote">Adjustment Note</label>
+                    <input type="text" id="editPriceAdjustmentNote" placeholder="Optional reason for discount/surcharge">
                 </div>
 
                 <div class="form-group">
@@ -593,6 +613,41 @@
                     <div id="createBookingRentals" class="admin-rentals-panel">
                         <div class="loading-inline-muted">Loading rental options...</div>
                     </div>
+                </div>
+
+                <div class="form-grid-3">
+                    <div class="form-group">
+                        <label for="createSubtotal">Subtotal (₹)</label>
+                        <input type="number" id="createSubtotal" readonly class="readonly-soft" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="createTaxAmount">Tax (₹)</label>
+                        <input type="number" id="createTaxAmount" readonly class="readonly-soft" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="createFinalTotal">Final Total (₹)</label>
+                        <input type="number" id="createFinalTotal" readonly class="readonly-soft" value="0">
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label for="createPriceAdjustmentType">Special Price Override</label>
+                        <select id="createPriceAdjustmentType" name="priceAdjustmentType">
+                            <option value="none">None</option>
+                            <option value="discount">Discount (-)</option>
+                            <option value="surcharge">Surcharge (+)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="createPriceAdjustmentAmount">Adjustment Amount (₹)</label>
+                        <input type="number" id="createPriceAdjustmentAmount" name="priceAdjustmentAmount" min="0" step="1" value="0" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="createPriceAdjustmentNote">Adjustment Note</label>
+                    <input type="text" id="createPriceAdjustmentNote" name="priceAdjustmentNote" placeholder="Optional reason for discount/surcharge">
                 </div>
                 
                 <div class="form-group">
@@ -826,6 +881,88 @@
             }
 
             return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        };
+
+        const normalizePriceAdjustmentInput = (typeValue, amountValue) => {
+            const normalizedType = ['discount', 'surcharge'].includes(String(typeValue || '').trim().toLowerCase())
+                ? String(typeValue).trim().toLowerCase()
+                : 'none';
+
+            const parsedAmount = Number(amountValue);
+            const normalizedAmount = Number.isFinite(parsedAmount) && parsedAmount > 0
+                ? parsedAmount
+                : 0;
+
+            if (normalizedType === 'discount') {
+                return {
+                    type: 'discount',
+                    amount: normalizedAmount,
+                    signedValue: -normalizedAmount
+                };
+            }
+
+            if (normalizedType === 'surcharge') {
+                return {
+                    type: 'surcharge',
+                    amount: normalizedAmount,
+                    signedValue: normalizedAmount
+                };
+            }
+
+            return {
+                type: 'none',
+                amount: 0,
+                signedValue: 0
+            };
+        };
+
+        const ADMIN_DRAFT_TTL_MS = 1000 * 60 * 60 * 24;
+        const ADMIN_CREATE_BOOKING_DRAFT_KEY = 'jamroom_admin_create_booking_draft_v1';
+        const ADMIN_USERS_TAB_CREATE_DRAFT_KEY = 'jamroom_admin_users_tab_create_draft_v1';
+        const ADMIN_REGISTER_USER_DRAFT_KEY = 'jamroom_admin_register_user_draft_v1';
+        const ADMIN_MAKE_ADMIN_DRAFT_KEY = 'jamroom_admin_make_admin_draft_v1';
+
+        const readDraftStorage = (key) => {
+            try {
+                const rawValue = localStorage.getItem(key);
+                if (!rawValue) return null;
+
+                const parsedValue = JSON.parse(rawValue);
+                if (!parsedValue || typeof parsedValue !== 'object') {
+                    return null;
+                }
+
+                return parsedValue;
+            } catch (error) {
+                console.warn(`Failed to parse admin draft for ${key}:`, error);
+                return null;
+            }
+        };
+
+        const clearDraftStorage = (key) => {
+            localStorage.removeItem(key);
+        };
+
+        const writeDraftStorage = (key, data) => {
+            if (!data) {
+                clearDraftStorage(key);
+                return;
+            }
+
+            try {
+                localStorage.setItem(key, JSON.stringify({
+                    savedAt: Date.now(),
+                    ...data
+                }));
+            } catch (error) {
+                console.warn(`Failed to persist admin draft for ${key}:`, error);
+            }
+        };
+
+        const isDraftExpired = (draft) => {
+            const savedAt = Number(draft?.savedAt) || 0;
+            if (!savedAt) return true;
+            return (Date.now() - savedAt) > ADMIN_DRAFT_TTL_MS;
         };
 
         const closeModal = (modalId) => {
@@ -1391,6 +1528,8 @@
         document.getElementById('editDuration').addEventListener('change', recalculateEditBookingTotals);
         document.getElementById('editBookingRentals').addEventListener('input', recalculateEditBookingTotals);
         document.getElementById('editBookingRentals').addEventListener('change', recalculateEditBookingTotals);
+        document.getElementById('editPriceAdjustmentType').addEventListener('change', recalculateEditBookingTotals);
+        document.getElementById('editPriceAdjustmentAmount').addEventListener('input', recalculateEditBookingTotals);
 
         // Edit booking form handler
         document.getElementById('editBookingForm').addEventListener('submit', async (e) => {
@@ -1561,6 +1700,161 @@
             gstDetails.style.display = this.checked ? 'block' : 'none';
         });
 
+        let usersTabDraftSaveTimer = null;
+        let registerUserDraftSaveTimer = null;
+        let makeAdminDraftSaveTimer = null;
+
+        const collectUsersTabCreateDraft = () => {
+            const name = (document.getElementById('usersTabUserName')?.value || '').trim();
+            const email = (document.getElementById('usersTabUserEmail')?.value || '').trim();
+            const mobile = (document.getElementById('usersTabUserMobile')?.value || '').trim();
+
+            if (!name && !email && !mobile) return null;
+            return { name, email, mobile };
+        };
+
+        const saveUsersTabCreateDraft = () => {
+            writeDraftStorage(ADMIN_USERS_TAB_CREATE_DRAFT_KEY, collectUsersTabCreateDraft());
+        };
+
+        const scheduleUsersTabCreateDraftSave = () => {
+            if (usersTabDraftSaveTimer) {
+                clearTimeout(usersTabDraftSaveTimer);
+            }
+
+            usersTabDraftSaveTimer = setTimeout(() => {
+                usersTabDraftSaveTimer = null;
+                saveUsersTabCreateDraft();
+            }, 220);
+        };
+
+        const restoreUsersTabCreateDraft = () => {
+            const draft = readDraftStorage(ADMIN_USERS_TAB_CREATE_DRAFT_KEY);
+            if (!draft) return;
+            if (isDraftExpired(draft)) {
+                clearDraftStorage(ADMIN_USERS_TAB_CREATE_DRAFT_KEY);
+                return;
+            }
+
+            if (typeof draft.name === 'string') {
+                document.getElementById('usersTabUserName').value = draft.name;
+            }
+            if (typeof draft.email === 'string') {
+                document.getElementById('usersTabUserEmail').value = draft.email;
+            }
+            if (typeof draft.mobile === 'string') {
+                document.getElementById('usersTabUserMobile').value = draft.mobile;
+            }
+        };
+
+        const clearUsersTabCreateDraft = () => {
+            if (usersTabDraftSaveTimer) {
+                clearTimeout(usersTabDraftSaveTimer);
+                usersTabDraftSaveTimer = null;
+            }
+
+            clearDraftStorage(ADMIN_USERS_TAB_CREATE_DRAFT_KEY);
+        };
+
+        const collectRegisterUserDraft = () => {
+            const name = (document.getElementById('registerUserName')?.value || '').trim();
+            const email = (document.getElementById('registerUserEmail')?.value || '').trim();
+            const mobile = (document.getElementById('registerUserMobile')?.value || '').trim();
+
+            if (!name && !email && !mobile) return null;
+            return { name, email, mobile };
+        };
+
+        const saveRegisterUserDraft = () => {
+            writeDraftStorage(ADMIN_REGISTER_USER_DRAFT_KEY, collectRegisterUserDraft());
+        };
+
+        const scheduleRegisterUserDraftSave = () => {
+            if (registerUserDraftSaveTimer) {
+                clearTimeout(registerUserDraftSaveTimer);
+            }
+
+            registerUserDraftSaveTimer = setTimeout(() => {
+                registerUserDraftSaveTimer = null;
+                saveRegisterUserDraft();
+            }, 220);
+        };
+
+        const restoreRegisterUserDraft = () => {
+            const draft = readDraftStorage(ADMIN_REGISTER_USER_DRAFT_KEY);
+            if (!draft) return;
+            if (isDraftExpired(draft)) {
+                clearDraftStorage(ADMIN_REGISTER_USER_DRAFT_KEY);
+                return;
+            }
+
+            if (typeof draft.name === 'string') {
+                document.getElementById('registerUserName').value = draft.name;
+            }
+            if (typeof draft.email === 'string') {
+                document.getElementById('registerUserEmail').value = draft.email;
+            }
+            if (typeof draft.mobile === 'string') {
+                document.getElementById('registerUserMobile').value = draft.mobile;
+            }
+        };
+
+        const clearRegisterUserDraft = () => {
+            if (registerUserDraftSaveTimer) {
+                clearTimeout(registerUserDraftSaveTimer);
+                registerUserDraftSaveTimer = null;
+            }
+
+            clearDraftStorage(ADMIN_REGISTER_USER_DRAFT_KEY);
+        };
+
+        const collectMakeAdminDraft = () => {
+            const email = (document.getElementById('userEmail')?.value || '').trim();
+            if (!email) return null;
+            return { email };
+        };
+
+        const saveMakeAdminDraft = () => {
+            writeDraftStorage(ADMIN_MAKE_ADMIN_DRAFT_KEY, collectMakeAdminDraft());
+        };
+
+        const scheduleMakeAdminDraftSave = () => {
+            if (makeAdminDraftSaveTimer) {
+                clearTimeout(makeAdminDraftSaveTimer);
+            }
+
+            makeAdminDraftSaveTimer = setTimeout(() => {
+                makeAdminDraftSaveTimer = null;
+                saveMakeAdminDraft();
+            }, 220);
+        };
+
+        const restoreMakeAdminDraft = () => {
+            const draft = readDraftStorage(ADMIN_MAKE_ADMIN_DRAFT_KEY);
+            if (!draft) return;
+            if (isDraftExpired(draft)) {
+                clearDraftStorage(ADMIN_MAKE_ADMIN_DRAFT_KEY);
+                return;
+            }
+
+            if (typeof draft.email === 'string') {
+                document.getElementById('userEmail').value = draft.email;
+            }
+        };
+
+        const clearMakeAdminDraft = () => {
+            if (makeAdminDraftSaveTimer) {
+                clearTimeout(makeAdminDraftSaveTimer);
+                makeAdminDraftSaveTimer = null;
+            }
+
+            clearDraftStorage(ADMIN_MAKE_ADMIN_DRAFT_KEY);
+        };
+
+        restoreUsersTabCreateDraft();
+        restoreRegisterUserDraft();
+        restoreMakeAdminDraft();
+
         document.getElementById('usersSearchInput').addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -1581,6 +1875,13 @@
                 }
             });
         });
+
+        document.getElementById('usersTabCreateUserForm').addEventListener('input', scheduleUsersTabCreateDraftSave);
+        document.getElementById('usersTabCreateUserForm').addEventListener('change', scheduleUsersTabCreateDraftSave);
+        document.getElementById('registerCreateUserForm').addEventListener('input', scheduleRegisterUserDraftSave);
+        document.getElementById('registerCreateUserForm').addEventListener('change', scheduleRegisterUserDraftSave);
+        document.getElementById('makeAdminForm').addEventListener('input', scheduleMakeAdminDraftSave);
+        document.getElementById('makeAdminForm').addEventListener('change', scheduleMakeAdminDraftSave);
 
         document.getElementById('usersTabCreateUserForm').addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -1626,6 +1927,7 @@
 
                 showAlert('userAlert', `User created successfully. Temporary password: ${data.temporaryPassword}${inviteStatus}`, data.inviteEmailSent === false ? 'warning' : 'success');
                 document.getElementById('usersTabCreateUserForm').reset();
+                clearUsersTabCreateDraft();
                 await loadUsersManagementList();
             } catch (error) {
                 showAlert('userAlert', error.message, 'error');
@@ -1659,6 +1961,7 @@
 
                 showAlert('userAlert', `Admin access granted to ${email}`, 'success');
                 document.getElementById('makeAdminForm').reset();
+                clearMakeAdminDraft();
                 await loadUsersManagementList();
             } catch (error) {
                 showAlert('userAlert', error.message, 'error');
@@ -1966,6 +2269,210 @@
         let createBookingAvailabilityData = null;
         let createAvailabilityRequestSeq = 0;
         let createDateInputLastValue = '';
+        let createBookingDraftSaveTimer = null;
+        let isApplyingCreateBookingDraft = false;
+
+        const clearCreateBookingDraft = () => {
+            if (createBookingDraftSaveTimer) {
+                clearTimeout(createBookingDraftSaveTimer);
+                createBookingDraftSaveTimer = null;
+            }
+
+            clearDraftStorage(ADMIN_CREATE_BOOKING_DRAFT_KEY);
+        };
+
+        const collectCreateBookingDraft = () => {
+            const userId = (document.getElementById('createUserId')?.value || '').trim();
+            const userSearch = (document.getElementById('createUserSearch')?.value || '').trim();
+            const date = normalizeIsoDateInput(document.getElementById('createDate')?.value || '');
+            const startTime = (document.getElementById('createStartTime')?.value || '').trim();
+            const endTime = (document.getElementById('createEndTime')?.value || '').trim();
+            const bandName = (document.getElementById('createBandName')?.value || '').trim();
+            const notes = (document.getElementById('createNotes')?.value || '').trim();
+            const overrideDateTime = document.getElementById('createDateTimeOverride')?.checked === true;
+            const adjustmentType = document.getElementById('createPriceAdjustmentType')?.value || 'none';
+            const adjustmentAmount = Number(document.getElementById('createPriceAdjustmentAmount')?.value || 0);
+            const adjustmentNote = (document.getElementById('createPriceAdjustmentNote')?.value || '').trim();
+
+            const rentals = Array.from(document.querySelectorAll('#createBookingRentals input[name="rental"]:checked'))
+                .map((inputEl) => {
+                    try {
+                        const rentalData = JSON.parse(decodeURIComponent(inputEl.dataset.rental || ''));
+                        const rentalId = String(rentalData?.id || '').trim();
+                        if (!rentalId) return null;
+
+                        const qtyEl = document.getElementById(getRentalInputId(rentalId));
+                        const quantity = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
+                        return { id: rentalId, quantity };
+                    } catch (error) {
+                        return null;
+                    }
+                })
+                .filter(Boolean);
+
+            const hasDraftValue =
+                !!userId ||
+                !!userSearch ||
+                !!date ||
+                !!startTime ||
+                !!endTime ||
+                !!bandName ||
+                !!notes ||
+                overrideDateTime ||
+                adjustmentType !== 'none' ||
+                adjustmentAmount > 0 ||
+                !!adjustmentNote ||
+                rentals.length > 0;
+
+            if (!hasDraftValue) return null;
+
+            return {
+                userId,
+                userSearch,
+                date,
+                startTime,
+                endTime,
+                bandName,
+                notes,
+                overrideDateTime,
+                adjustmentType,
+                adjustmentAmount,
+                adjustmentNote,
+                rentals
+            };
+        };
+
+        const saveCreateBookingDraft = () => {
+            if (isApplyingCreateBookingDraft) return;
+            writeDraftStorage(ADMIN_CREATE_BOOKING_DRAFT_KEY, collectCreateBookingDraft());
+        };
+
+        const scheduleCreateBookingDraftSave = () => {
+            if (createBookingDraftSaveTimer) {
+                clearTimeout(createBookingDraftSaveTimer);
+            }
+
+            createBookingDraftSaveTimer = setTimeout(() => {
+                createBookingDraftSaveTimer = null;
+                saveCreateBookingDraft();
+            }, 220);
+        };
+
+        const applyCreateBookingRentalsDraft = (rentalDrafts = []) => {
+            const rentalInputs = Array.from(document.querySelectorAll('#createBookingRentals input[name="rental"]'));
+
+            rentalInputs.forEach((inputEl) => {
+                inputEl.checked = false;
+                const rentalRow = inputEl.closest('.admin-rental-row');
+                const qtyInput = rentalRow?.querySelector('.admin-rental-qty input[type="number"]');
+                if (qtyInput && !qtyInput.disabled) {
+                    qtyInput.value = '1';
+                }
+            });
+
+            const draftMap = new Map(
+                (Array.isArray(rentalDrafts) ? rentalDrafts : [])
+                    .map((entry) => [String(entry?.id || '').trim(), Math.max(1, Number(entry?.quantity) || 1)])
+                    .filter(([id]) => id)
+            );
+
+            if (draftMap.size === 0) return;
+
+            rentalInputs.forEach((inputEl) => {
+                try {
+                    const rentalData = JSON.parse(decodeURIComponent(inputEl.dataset.rental || ''));
+                    const rentalId = String(rentalData?.id || '').trim();
+                    if (!rentalId || !draftMap.has(rentalId)) return;
+
+                    inputEl.checked = true;
+
+                    const qtyInput = document.getElementById(getRentalInputId(rentalId));
+                    if (qtyInput && !qtyInput.disabled) {
+                        qtyInput.value = String(draftMap.get(rentalId));
+                    }
+                } catch (error) {
+                    // Ignore malformed rental metadata during restore.
+                }
+            });
+        };
+
+        const restoreCreateBookingDraft = async () => {
+            const draft = readDraftStorage(ADMIN_CREATE_BOOKING_DRAFT_KEY);
+            if (!draft) return false;
+            if (isDraftExpired(draft)) {
+                clearDraftStorage(ADMIN_CREATE_BOOKING_DRAFT_KEY);
+                return false;
+            }
+
+            isApplyingCreateBookingDraft = true;
+
+            try {
+                const overrideCheckbox = document.getElementById('createDateTimeOverride');
+                const dateInput = document.getElementById('createDate');
+                const startInput = document.getElementById('createStartTime');
+                const endInput = document.getElementById('createEndTime');
+
+                if (typeof draft.overrideDateTime === 'boolean' && overrideCheckbox) {
+                    overrideCheckbox.checked = draft.overrideDateTime;
+                    updateCreateDateInputConstraints();
+                }
+
+                const normalizedDate = normalizeIsoDateInput(draft.date || '');
+                if (normalizedDate && dateInput) {
+                    dateInput.value = normalizedDate;
+                }
+
+                if (typeof draft.bandName === 'string') {
+                    document.getElementById('createBandName').value = draft.bandName;
+                }
+
+                if (typeof draft.notes === 'string') {
+                    document.getElementById('createNotes').value = draft.notes;
+                }
+
+                const createAdjustmentTypeEl = document.getElementById('createPriceAdjustmentType');
+                if (createAdjustmentTypeEl && ['none', 'discount', 'surcharge'].includes(String(draft.adjustmentType || 'none'))) {
+                    createAdjustmentTypeEl.value = String(draft.adjustmentType || 'none');
+                }
+
+                const createAdjustmentAmountEl = document.getElementById('createPriceAdjustmentAmount');
+                if (createAdjustmentAmountEl && Number.isFinite(Number(draft.adjustmentAmount))) {
+                    createAdjustmentAmountEl.value = String(Math.max(0, Number(draft.adjustmentAmount)));
+                }
+
+                if (typeof draft.adjustmentNote === 'string') {
+                    document.getElementById('createPriceAdjustmentNote').value = draft.adjustmentNote;
+                }
+
+                if (draft.userId && adminCreateUsers.some((user) => String(user._id) === String(draft.userId))) {
+                    selectCreateBookingUser(String(draft.userId));
+                } else if (typeof draft.userSearch === 'string') {
+                    document.getElementById('createUserSearch').value = draft.userSearch;
+                }
+
+                if (normalizedDate) {
+                    createDateInputLastValue = normalizedDate;
+                    await loadCreateBookingAvailability(normalizedDate);
+                }
+
+                if (startInput && draft.startTime && startInput.querySelector(`option[value="${draft.startTime}"]`)) {
+                    startInput.value = draft.startTime;
+                    populateCreateEndTimes();
+                }
+
+                if (endInput && draft.endTime && endInput.querySelector(`option[value="${draft.endTime}"]`)) {
+                    endInput.value = draft.endTime;
+                }
+
+                applyCreateBookingRentalsDraft(draft.rentals || []);
+                updateCreateDurationDisplay();
+                recalculateCreateBookingTotals();
+
+                return true;
+            } finally {
+                isApplyingCreateBookingDraft = false;
+            }
+        };
 
         const createBookingStartSlots = [
             { value: '09:00', label: '9:00 AM' },
@@ -2373,6 +2880,8 @@
             document.getElementById('createUserSearch').value = '';
             document.getElementById('createUserSelected').textContent = 'No user selected';
             document.getElementById('createUserTypeahead').style.display = 'none';
+
+            recalculateCreateBookingTotals();
         };
 
         async function showCreateBookingModal() {
@@ -2391,6 +2900,8 @@
                 loadCreateBookingRentals(),
                 loadCreateBookingAvailability(selectedDate)
             ]);
+
+            await restoreCreateBookingDraft();
         }
 
         function hideCreateBookingModal() {
@@ -2460,10 +2971,12 @@
             document.getElementById('createUserSearch').value = `${user.name} (${user.email})`;
             document.getElementById('createUserSelected').textContent = `Selected: ${user.name} | ${user.email}${user.mobile ? ` | ${user.mobile}` : ''}`;
             document.getElementById('createUserTypeahead').style.display = 'none';
+            scheduleCreateBookingDraftSave();
         }
 
         function openRegisterUserModal() {
             document.getElementById('registerCreateUserForm').reset();
+            restoreRegisterUserDraft();
             document.getElementById('registerUserModal').classList.add('show');
         }
 
@@ -2479,6 +2992,7 @@
                 if (result.success && result.settings) {
                     createBookingSettings = result.settings;
                     displayCreateBookingRentals(result.settings.rentalTypes || []);
+                    recalculateCreateBookingTotals();
                 } else {
                     document.getElementById('createBookingRentals').innerHTML = '<div class="text-danger">Error loading rental options</div>';
                 }
@@ -2612,52 +3126,12 @@
             container.innerHTML = html;
         }
 
-        async function submitCreateBooking(event) {
-            event.preventDefault();
-
-            const form = event.target;
-            const formData = new FormData(form);
-            const userId = document.getElementById('createUserId').value;
-            const normalizedBookingDate = normalizeIsoDateInput(formData.get('date'));
-
-            if (!userId) {
-                showAlert('', 'Please select a registered user before creating booking.', 'warning');
-                return;
-            }
-
-            if (!normalizedBookingDate) {
-                showAlert('', 'Please select a valid booking date.', 'warning');
-                return;
-            }
-
-            const startTime = formData.get('startTime');
-            const endTime = formData.get('endTime');
-
-            if (!startTime || !endTime) {
-                showAlert('', 'Please choose both start and end time.', 'warning');
-                return;
-            }
-
-            const calculatedDuration = calculateCreateDurationHours(startTime, endTime);
-            const overrideDateTime = isCreateDateTimeOverrideEnabled();
-
-            if (calculatedDuration <= 0) {
-                showAlert('', 'End time must be after start time.', 'warning');
-                return;
-            }
-
-            const unavailableRanges = getCreateUnavailableRanges(createBookingAvailabilityData);
-            if (!overrideDateTime && unavailableRanges.length > 0 && isCreateTimeRangeUnavailable(startTime, endTime, unavailableRanges)) {
-                showAlert('', 'Selected time range overlaps with an unavailable slot. Please choose another time.', 'warning');
-                return;
-            }
-
+        const collectCreateSelectedRentals = (calculatedDuration, { strict = true } = {}) => {
             const selectedRentals = [];
             const rentalInputs = document.querySelectorAll('#createBookingRentals input[name="rental"]:checked');
 
-            if (rentalInputs.length === 0) {
-                showAlert('', 'Please select at least one rental item.', 'warning');
-                return;
+            if (strict && rentalInputs.length === 0) {
+                throw new Error('Please select at least one rental item.');
             }
 
             rentalInputs.forEach((input) => {
@@ -2707,10 +3181,113 @@
                 calculatedSubtotal += itemTotal;
             });
 
+            return {
+                selectedRentals,
+                calculatedSubtotal
+            };
+        };
+
+        const recalculateCreateBookingTotals = () => {
+            const startTime = document.getElementById('createStartTime').value;
+            const endTime = document.getElementById('createEndTime').value;
+            const calculatedDuration = calculateCreateDurationHours(startTime, endTime);
             const gstEnabled = createBookingSettings?.gstConfig?.enabled || false;
             const gstRate = createBookingSettings?.gstConfig?.rate || 0.18;
+            const adjustment = normalizePriceAdjustmentInput(
+                document.getElementById('createPriceAdjustmentType')?.value,
+                document.getElementById('createPriceAdjustmentAmount')?.value
+            );
+
+            let calculatedSubtotal = 0;
+            if (calculatedDuration > 0) {
+                const calcResult = collectCreateSelectedRentals(calculatedDuration, { strict: false });
+                calculatedSubtotal = calcResult.calculatedSubtotal;
+            }
+
             const taxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
-            const totalAmount = calculatedSubtotal + taxAmount;
+            const finalTotal = calculatedSubtotal + taxAmount + adjustment.signedValue;
+
+            const subtotalEl = document.getElementById('createSubtotal');
+            const taxEl = document.getElementById('createTaxAmount');
+            const finalTotalEl = document.getElementById('createFinalTotal');
+
+            if (subtotalEl) subtotalEl.value = calculatedSubtotal.toFixed(2);
+            if (taxEl) taxEl.value = taxAmount.toFixed(2);
+            if (finalTotalEl) finalTotalEl.value = Math.max(0, finalTotal).toFixed(2);
+
+            return {
+                calculatedDuration,
+                calculatedSubtotal,
+                taxAmount,
+                adjustment,
+                finalTotal
+            };
+        };
+
+        async function submitCreateBooking(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const userId = document.getElementById('createUserId').value;
+            const normalizedBookingDate = normalizeIsoDateInput(formData.get('date'));
+
+            if (!userId) {
+                showAlert('', 'Please select a registered user before creating booking.', 'warning');
+                return;
+            }
+
+            if (!normalizedBookingDate) {
+                showAlert('', 'Please select a valid booking date.', 'warning');
+                return;
+            }
+
+            const startTime = formData.get('startTime');
+            const endTime = formData.get('endTime');
+
+            if (!startTime || !endTime) {
+                showAlert('', 'Please choose both start and end time.', 'warning');
+                return;
+            }
+
+            const pricingSummary = recalculateCreateBookingTotals();
+            const calculatedDuration = pricingSummary.calculatedDuration;
+            const overrideDateTime = isCreateDateTimeOverrideEnabled();
+
+            if (calculatedDuration <= 0) {
+                showAlert('', 'End time must be after start time.', 'warning');
+                return;
+            }
+
+            const unavailableRanges = getCreateUnavailableRanges(createBookingAvailabilityData);
+            if (!overrideDateTime && unavailableRanges.length > 0 && isCreateTimeRangeUnavailable(startTime, endTime, unavailableRanges)) {
+                showAlert('', 'Selected time range overlaps with an unavailable slot. Please choose another time.', 'warning');
+                return;
+            }
+
+            let selectedRentals;
+            let calculatedSubtotal;
+
+            try {
+                const rentalSummary = collectCreateSelectedRentals(calculatedDuration, { strict: true });
+                selectedRentals = rentalSummary.selectedRentals;
+                calculatedSubtotal = rentalSummary.calculatedSubtotal;
+            } catch (selectionError) {
+                showAlert('', selectionError.message, 'warning');
+                return;
+            }
+
+            const adjustment = normalizePriceAdjustmentInput(
+                document.getElementById('createPriceAdjustmentType')?.value,
+                document.getElementById('createPriceAdjustmentAmount')?.value
+            );
+            const taxAmount = pricingSummary.taxAmount;
+            const totalAmount = calculatedSubtotal + taxAmount + adjustment.signedValue;
+
+            if (totalAmount < 0) {
+                showAlert('', 'Discount cannot be greater than subtotal plus tax.', 'warning');
+                return;
+            }
 
             const bookingData = {
                 userId,
@@ -2729,6 +3306,9 @@
                 subtotal: calculatedSubtotal,
                 taxAmount,
                 totalAmount,
+                priceAdjustmentType: adjustment.type,
+                priceAdjustmentAmount: adjustment.amount,
+                priceAdjustmentNote: (document.getElementById('createPriceAdjustmentNote')?.value || '').trim(),
                 bandName: formData.get('bandName'),
                 notes: formData.get('notes'),
                 overrideDateTime
@@ -2753,6 +3333,7 @@
 
                 const bookedFor = selectedCreateUser?.name || 'selected user';
                 showAlert('', `Booking created successfully for ${bookedFor}.\nTotal: ₹${totalAmount}`, 'success');
+                clearCreateBookingDraft();
                 hideCreateBookingModal();
                 await loadStats();
                 await loadBookings();
@@ -2769,6 +3350,7 @@
             selectedCreateUser = null;
             document.getElementById('createUserSelected').textContent = 'No user selected';
             renderCreateUserTypeahead(event.target.value);
+            scheduleCreateBookingDraftSave();
         });
 
         document.getElementById('createUserSearch').addEventListener('focus', (event) => {
@@ -2801,6 +3383,7 @@
 
             createDateInputLastValue = normalizedDate;
             await loadCreateBookingAvailability(normalizedDate);
+            scheduleCreateBookingDraftSave();
         };
 
         const createDateEl = document.getElementById('createDate');
@@ -2821,16 +3404,42 @@
             await loadCreateBookingAvailability(selectedDate);
             populateCreateEndTimes();
             updateCreateDurationDisplay();
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
         });
 
         document.getElementById('createStartTime').addEventListener('change', () => {
             populateCreateEndTimes();
             updateCreateDurationDisplay();
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
         });
 
         document.getElementById('createEndTime').addEventListener('change', () => {
             updateCreateDurationDisplay();
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
         });
+
+        document.getElementById('createBandName').addEventListener('input', scheduleCreateBookingDraftSave);
+        document.getElementById('createNotes').addEventListener('input', scheduleCreateBookingDraftSave);
+        document.getElementById('createBookingRentals').addEventListener('change', () => {
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
+        });
+        document.getElementById('createBookingRentals').addEventListener('input', () => {
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
+        });
+        document.getElementById('createPriceAdjustmentType').addEventListener('change', () => {
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
+        });
+        document.getElementById('createPriceAdjustmentAmount').addEventListener('input', () => {
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
+        });
+        document.getElementById('createPriceAdjustmentNote').addEventListener('input', scheduleCreateBookingDraftSave);
 
         document.getElementById('registerCreateUserForm').addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -2869,6 +3478,7 @@
                 selectCreateBookingUser(data.user._id);
                 closeModal('registerUserModal');
                 showAlert('', `User created successfully. Temporary password: ${data.temporaryPassword}`, 'success');
+                clearRegisterUserDraft();
             } catch (error) {
                 showAlert('', `Error creating user: ${error.message}`, 'error');
             } finally {

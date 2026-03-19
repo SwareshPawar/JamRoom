@@ -42,6 +42,11 @@ async function initializeBookingPage() {
 
         // Load settings and bookings
         await loadSettings();
+
+        if (typeof window.restoreBookingFormDraft === 'function') {
+            await window.restoreBookingFormDraft();
+        }
+
         await loadMyBookings();
 
     } catch (error) {

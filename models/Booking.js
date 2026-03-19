@@ -85,6 +85,25 @@ const bookingSchema = new mongoose.Schema({
     required: [true, 'Tax amount is required'],
     min: 0
   },
+  priceAdjustmentType: {
+    type: String,
+    enum: ['none', 'discount', 'surcharge'],
+    default: 'none'
+  },
+  priceAdjustmentAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  priceAdjustmentValue: {
+    type: Number,
+    default: 0
+  },
+  priceAdjustmentNote: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   paymentStatus: {
     type: String,
     enum: ['PENDING', 'PAID', 'REFUNDED'],

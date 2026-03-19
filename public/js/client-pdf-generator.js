@@ -133,14 +133,36 @@ function generateBillHTML(booking, settings) {
         return `${hours}:${minutes} ${ampm}`;
     }
     
-    // Calculate pricing - use booking amounts if available, otherwise calculate from booking.price
-    let subtotal, taxAmount, totalAmount;
+    // Calculate pricing - use booking amounts if available, otherwise calculate from booking.price.
+    let subtotal;
+    let taxAmount;
+
+    const fallbackAdjustmentType = Number(booking?.priceAdjustmentValue || 0) < 0
+        ? 'discount'
+        : Number(booking?.priceAdjustmentValue || 0) > 0
+            ? 'surcharge'
+            : 'none';
+
+    const adjustmentType = ['none', 'discount', 'surcharge'].includes(String(booking?.priceAdjustmentType || '').toLowerCase())
+        ? String(booking.priceAdjustmentType).toLowerCase()
+        : fallbackAdjustmentType;
+    const adjustmentAmount = Number.isFinite(Number(booking?.priceAdjustmentAmount))
+        ? Number(booking.priceAdjustmentAmount)
+        : Math.abs(Number(booking?.priceAdjustmentValue || 0));
+    const adjustmentValue = Number.isFinite(Number(booking?.priceAdjustmentValue))
+        ? Number(booking.priceAdjustmentValue)
+        : (adjustmentType === 'discount' ? -adjustmentAmount : adjustmentType === 'surcharge' ? adjustmentAmount : 0);
+    const adjustmentLabel = adjustmentValue < 0 ? 'Discount' : 'Surcharge';
+    const adjustmentNote = String(booking?.priceAdjustmentNote || '').trim();
+    let totalAmount;
     
     if (booking.subtotal !== undefined && booking.taxAmount !== undefined) {
         // Use the amounts calculated during booking creation
         subtotal = booking.subtotal;
         taxAmount = booking.taxAmount;
-        totalAmount = booking.price; // This should be the total including tax
+        totalAmount = Number.isFinite(Number(booking.price))
+            ? Number(booking.price)
+            : (subtotal + taxAmount + adjustmentValue);
     } else {
         // Calculate from booking price with configurable GST
         subtotal = booking.price;
@@ -150,7 +172,7 @@ function generateBillHTML(booking, settings) {
         const taxRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
         
         taxAmount = gstEnabled ? Math.round(subtotal * taxRate) : 0;
-        totalAmount = subtotal + taxAmount;
+        totalAmount = subtotal + taxAmount + adjustmentValue;
     }
     
     return `
@@ -798,6 +820,18 @@ function generateBillHTML(booking, settings) {
                     <tr>
                         <td class="label">🧾 ${settings.gstConfig.displayName || 'GST'} (${Math.round((settings.gstConfig.rate || 0.18) * 100)}%):</td>
                         <td class="amount">₹${taxAmount.toFixed(2)}</td>
+                    </tr>
+                    ` : ''}
+                    ${adjustmentValue !== 0 ? `
+                    <tr>
+                        <td class="label">${adjustmentLabel}:</td>
+                        <td class="amount" style="color: ${adjustmentValue < 0 ? '#d63384' : '#0c63e7'};">${adjustmentValue < 0 ? '-' : '+'}₹${Math.abs(adjustmentValue).toFixed(2)}</td>
+                    </tr>
+                    ` : ''}
+                    ${adjustmentValue !== 0 && adjustmentNote ? `
+                    <tr>
+                        <td class="label">Adjustment Note:</td>
+                        <td class="amount" style="font-weight: 500; color: #4a5568;">${adjustmentNote}</td>
                     </tr>
                     ` : ''}
                     <tr class="total-row">

@@ -25,6 +25,111 @@ const setActiveSelectionMap = () => {
     selectedRentals = getMapForMode(currentBookingMode);
 };
 
+const buildSelectedRentalEntry = (item, rentalKey, quantity = 1) => ({
+    name: item.name,
+    fullId: rentalKey,
+    category: item.category,
+    description: item.description,
+    basePrice: item.price,
+    price: item.price,
+    quantity,
+    isRequired: !!item.isRequired,
+    rentalType: item.rentalType,
+    perdayPrice: item.rentalType === 'perday' ? item.price : 0
+});
+
+const normalizeDraftQuantityForItem = (item, rawQuantity) => {
+    const baseQuantity = Math.max(1, Number(rawQuantity) || 1);
+    if (!isQuantityControlEnabled(item)) {
+        return 1;
+    }
+
+    const maxLimits = {
+        'JamRoom__Microphone': 4,
+        'JamRoom__Audio Jacks': 4
+    };
+
+    const maxLimit = maxLimits[item.key] || 99;
+    return Math.max(1, Math.min(maxLimit, baseQuantity));
+};
+
+const clearModeSelectionsFromUI = (mode) => {
+    const selectedMap = getMapForMode(mode);
+    selectedMap.clear();
+
+    document
+        .querySelectorAll(`.rental-option[data-rental-mode="${mode}"]`)
+        .forEach((optionEl) => {
+            const checkbox = optionEl.querySelector('.rental-checkbox');
+            if (checkbox && !checkbox.disabled) {
+                checkbox.checked = false;
+            }
+
+            optionEl.classList.remove('selected');
+
+            const quantityDisplay = optionEl.querySelector('.quantity-display');
+            if (quantityDisplay) {
+                quantityDisplay.textContent = '1';
+            }
+        });
+};
+
+const applyModeDraftSelection = (mode, draftItems = []) => {
+    const selectedMap = getMapForMode(mode);
+    const catalog = rentalCatalog[mode];
+    if (!catalog) return;
+
+    draftItems.forEach((entry) => {
+        const rentalKey = String(entry?.key || '').trim();
+        if (!rentalKey) return;
+
+        const item = catalog.get(rentalKey);
+        if (!item) return;
+
+        const quantity = normalizeDraftQuantityForItem(item, entry?.quantity);
+
+        const rentalDiv = document.querySelector(`[data-rental-id="${rentalKey}"][data-rental-mode="${mode}"]`);
+        const checkbox = rentalDiv?.querySelector('.rental-checkbox');
+        if (!rentalDiv || !checkbox || checkbox.disabled) return;
+
+        checkbox.checked = true;
+        rentalDiv.classList.add('selected');
+
+        const quantityDisplay = rentalDiv.querySelector('.quantity-display');
+        if (quantityDisplay) {
+            quantityDisplay.textContent = String(quantity);
+        }
+
+        selectedMap.set(rentalKey, buildSelectedRentalEntry(item, rentalKey, quantity));
+    });
+};
+
+const getBookingRentalDraftSnapshot = () => ({
+    hourly: [...hourlySelectedRentals.entries()].map(([key, rental]) => ({
+        key,
+        quantity: Math.max(1, Number(rental?.quantity) || 1)
+    })),
+    perday: [...perdaySelectedRentals.entries()].map(([key, rental]) => ({
+        key,
+        quantity: Math.max(1, Number(rental?.quantity) || 1)
+    }))
+});
+
+const applyBookingRentalDraftSelection = (draftSelection = {}) => {
+    clearModeSelectionsFromUI('hourly');
+    clearModeSelectionsFromUI('perday');
+
+    applyModeDraftSelection('hourly', Array.isArray(draftSelection.hourly) ? draftSelection.hourly : []);
+    applyModeDraftSelection('perday', Array.isArray(draftSelection.perday) ? draftSelection.perday : []);
+
+    setActiveSelectionMap();
+    applyPerdayItemAvailability();
+
+    if (typeof updatePriceDisplay === 'function') {
+        updatePriceDisplay();
+    }
+};
+
 const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
 const combineDateAndTime = (dateValue, timeValue) => {
@@ -379,6 +484,10 @@ const switchBookingMode = (mode) => {
     if (typeof updatePriceDisplay === 'function') {
         updatePriceDisplay();
     }
+
+    if (typeof window.scheduleBookingFormDraftSave === 'function') {
+        window.scheduleBookingFormDraftSave();
+    }
 };
 
 const bindBookingModeControls = () => {
@@ -431,6 +540,10 @@ const setPerDayInputConstraints = () => {
         if (currentBookingMode === 'perday') {
             fetchPerdayItemAvailability();
         }
+
+        if (typeof window.scheduleBookingFormDraftSave === 'function') {
+            window.scheduleBookingFormDraftSave();
+        }
     });
 
     endInput.addEventListener('change', () => {
@@ -441,6 +554,10 @@ const setPerDayInputConstraints = () => {
 
         if (currentBookingMode === 'perday') {
             fetchPerdayItemAvailability();
+        }
+
+        if (typeof window.scheduleBookingFormDraftSave === 'function') {
+            window.scheduleBookingFormDraftSave();
         }
     });
 
@@ -454,6 +571,10 @@ const setPerDayInputConstraints = () => {
 
         if (currentBookingMode === 'perday') {
             fetchPerdayItemAvailability();
+        }
+
+        if (typeof window.scheduleBookingFormDraftSave === 'function') {
+            window.scheduleBookingFormDraftSave();
         }
     });
 
@@ -682,18 +803,7 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
     }
 
     if (checkbox.checked) {
-        selectedMap.set(rentalKey, {
-            name: item.name,
-            fullId: rentalKey,
-            category: item.category,
-            description: item.description,
-            basePrice: item.price,
-            price: item.price,
-            quantity: 1,
-            isRequired: !!item.isRequired,
-            rentalType: item.rentalType,
-            perdayPrice: item.rentalType === 'perday' ? item.price : 0
-        });
+        selectedMap.set(rentalKey, buildSelectedRentalEntry(item, rentalKey, 1));
         rentalDiv.classList.add('selected');
     } else {
         selectedMap.delete(rentalKey);
@@ -704,6 +814,10 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
 
     if (mode === currentBookingMode && typeof updatePriceDisplay === 'function') {
         updatePriceDisplay();
+    }
+
+    if (typeof window.scheduleBookingFormDraftSave === 'function') {
+        window.scheduleBookingFormDraftSave();
     }
 };
 
@@ -733,6 +847,10 @@ const updateQuantity = (rentalKey, change, mode = 'hourly') => {
 
     if (mode === currentBookingMode && typeof updatePriceDisplay === 'function') {
         updatePriceDisplay();
+    }
+
+    if (typeof window.scheduleBookingFormDraftSave === 'function') {
+        window.scheduleBookingFormDraftSave();
     }
 };
 
@@ -805,3 +923,5 @@ window.getBookingMode = getBookingMode;
 window.getPerDayBookingInfo = getPerDayBookingInfo;
 window.switchBookingMode = switchBookingMode;
 window.resetBookingRentalState = resetBookingRentalState;
+window.getBookingRentalDraftSnapshot = getBookingRentalDraftSnapshot;
+window.applyBookingRentalDraftSelection = applyBookingRentalDraftSelection;

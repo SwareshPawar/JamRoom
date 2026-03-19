@@ -14,8 +14,37 @@ class NavigationManager {
         this.currentPage = this.detectCurrentPage();
         this.user = null;
         this.isAuthenticated = false;
+        this.hasRendered = false;
+        this.bootstrapFallbackTimer = null;
         
         console.log(`🧭 NavigationManager: Detected page '${this.currentPage}'`);
+    }
+
+    clearBootstrapFallbackTimer() {
+        if (this.bootstrapFallbackTimer) {
+            clearTimeout(this.bootstrapFallbackTimer);
+            this.bootstrapFallbackTimer = null;
+        }
+    }
+
+    scheduleGuestFallback(containerId = 'navigationContainer', delayMs = 1400) {
+        this.clearBootstrapFallbackTimer();
+
+        this.bootstrapFallbackTimer = setTimeout(() => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const hasOnlyLoadingShell =
+                container.children.length === 1 &&
+                !!container.querySelector('.nav-loading-shell');
+            const isEmpty = container.childElementCount === 0 && !String(container.textContent || '').trim();
+
+            if ((hasOnlyLoadingShell || isEmpty) && !this.hasRendered) {
+                this.init(null);
+                this.render(containerId);
+                console.warn('🧭 NavigationManager: Fallback rendered guest menu after delayed initialization');
+            }
+        }, delayMs);
     }
 
     /**
@@ -268,6 +297,8 @@ class NavigationManager {
             const container = document.getElementById(containerId);
             if (container) {
                 container.innerHTML = navHTML;
+                this.hasRendered = true;
+                this.clearBootstrapFallbackTimer();
                 this.refreshThemeToggleLabels();
                 document.dispatchEvent(new CustomEvent('jamroom:navigation-rendered'));
                 console.log(`🧭 NavigationManager: Rendered navigation for ${this.currentPage} page`);
@@ -300,6 +331,9 @@ class NavigationManager {
                     mainContainer.innerHTML = navHTML;
                 }
             }
+
+            this.hasRendered = true;
+            this.clearBootstrapFallbackTimer();
         } else {
             console.warn('🧭 NavigationManager: No navigation container found');
         }
@@ -394,6 +428,7 @@ window.NavigationManager = new NavigationManager();
 document.addEventListener('DOMContentLoaded', () => {
     if (window.NavigationManager && typeof window.NavigationManager.showLoadingPlaceholder === 'function') {
         window.NavigationManager.showLoadingPlaceholder('navigationContainer');
+        window.NavigationManager.scheduleGuestFallback('navigationContainer', 1400);
     }
 
     // Initialize responsive behavior
@@ -407,6 +442,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     console.log('🧭 NavigationManager: Ready for initialization');
+});
+
+window.addEventListener('load', () => {
+    if (!window.NavigationManager) return;
+    window.NavigationManager.scheduleGuestFallback('navigationContainer', 250);
 });
 
 console.log('🧭 navigation.js: Navigation module loaded');

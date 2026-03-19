@@ -9,6 +9,7 @@ class AuthManager {
             apiUrl: window.location.origin,
             loginUrl: '/login.html',
             onAuthChange: null,
+            authTimeoutMs: 7000,
             autoInit: true,
             ...options
         };
@@ -16,6 +17,13 @@ class AuthManager {
         this.currentUser = null;
         this.isAuthenticated = false;
         this.isAdmin = false;
+
+        const storedUser = this.getStoredUserSafe();
+        if (storedUser) {
+            this.currentUser = storedUser;
+            this.isAuthenticated = true;
+            this.isAdmin = !!(storedUser && (storedUser.isAdmin || storedUser.role === 'admin'));
+        }
         
         if (this.options.autoInit) {
             this.init();
@@ -49,11 +57,23 @@ class AuthManager {
                 headers.Authorization = `Bearer ${token}`;
             }
 
-            const response = await fetch(`${this.options.apiUrl}/api/auth/me`, {
-                method: 'GET',
-                headers,
-                credentials: 'include'
-            });
+            const controller = new AbortController();
+            const timeoutMs = Math.max(1500, Number(this.options.authTimeoutMs) || 7000);
+            const timeoutHandle = setTimeout(() => {
+                controller.abort();
+            }, timeoutMs);
+
+            let response;
+            try {
+                response = await fetch(`${this.options.apiUrl}/api/auth/me`, {
+                    method: 'GET',
+                    headers,
+                    credentials: 'include',
+                    signal: controller.signal
+                });
+            } finally {
+                clearTimeout(timeoutHandle);
+            }
 
             if (response.ok) {
                 const data = await response.json();
@@ -64,21 +84,59 @@ class AuthManager {
                 return null;
             }
         } catch (error) {
+            const token = localStorage.getItem('token');
             const isAbortLike = error && (
                 error.name === 'AbortError' ||
                 (typeof error.message === 'string' && /aborted|failed to fetch/i.test(error.message))
             );
 
+            const storedUser = this.getStoredUserSafe();
+
             // Rapid page transitions can cancel in-flight auth checks; avoid false logout noise.
             if (isAbortLike) {
+                if (storedUser) {
+                    this.setUserData(storedUser);
+                    console.warn('AuthManager: Auth check timed out/interrupted, using cached session for navigation');
+                    return storedUser;
+                }
+
+                if (token && this.currentUser) {
+                    console.warn('AuthManager: Auth check timed out/interrupted, preserving in-memory session');
+                    return this.currentUser;
+                }
+
                 console.debug('AuthManager: Auth check request interrupted during navigation');
-                return this.currentUser;
+                return null;
             }
 
             console.error('AuthManager: Auth check failed', error);
             this.clearUserData();
             return null;
         }
+    }
+
+    getStoredUserSafe() {
+        try {
+            const jamroomStored = localStorage.getItem('jamroom_user');
+            if (jamroomStored) {
+                const parsed = JSON.parse(jamroomStored);
+                if (parsed && typeof parsed === 'object') {
+                    return parsed;
+                }
+            }
+
+            const legacyStored = localStorage.getItem('user');
+            if (legacyStored) {
+                const parsedLegacy = JSON.parse(legacyStored);
+                if (parsedLegacy && typeof parsedLegacy === 'object') {
+                    return parsedLegacy;
+                }
+            }
+        } catch (parseError) {
+            console.warn('AuthManager: Failed to parse cached user data', parseError);
+        }
+
+        return null;
     }
 
     /**

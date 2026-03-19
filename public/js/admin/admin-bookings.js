@@ -42,6 +42,33 @@
         });
     };
 
+    const getBookingAdjustment = (booking) => {
+        const fallbackType = Number(booking?.priceAdjustmentValue || 0) < 0
+            ? 'discount'
+            : Number(booking?.priceAdjustmentValue || 0) > 0
+                ? 'surcharge'
+                : 'none';
+
+        const type = ['none', 'discount', 'surcharge'].includes(String(booking?.priceAdjustmentType || '').toLowerCase())
+            ? String(booking.priceAdjustmentType).toLowerCase()
+            : fallbackType;
+
+        const amount = Number.isFinite(Number(booking?.priceAdjustmentAmount))
+            ? Number(booking.priceAdjustmentAmount)
+            : Math.abs(Number(booking?.priceAdjustmentValue || 0));
+
+        const signedValue = Number.isFinite(Number(booking?.priceAdjustmentValue))
+            ? Number(booking.priceAdjustmentValue)
+            : (type === 'discount' ? -amount : type === 'surcharge' ? amount : 0);
+
+        return {
+            type,
+            amount,
+            signedValue,
+            note: String(booking?.priceAdjustmentNote || '').trim()
+        };
+    };
+
     const state = {
         bookingsById: new Map(),
         allBookings: [],
@@ -188,6 +215,9 @@
             : `${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`;
         const durationText = isPerday ? `${perDayDays} day(s)` : `${booking.duration} hour(s)`;
         const modeText = isPerday ? 'Per-day' : 'Hourly';
+        const adjustment = getBookingAdjustment(booking);
+        const adjustmentLabel = adjustment.signedValue < 0 ? 'Discount' : 'Surcharge';
+        const adjustmentColorClass = adjustment.signedValue < 0 ? 'text-danger' : 'text-info';
 
         return `
             <div class="booking-expand-body booking-modal-body">
@@ -223,6 +253,12 @@
                         <div class="booking-kv-grid booking-kv-grid-price">
                             <p><strong>Subtotal:</strong> ${formatCurrency(booking.subtotal)}</p>
                             <p><strong>Tax:</strong> ${formatCurrency(booking.taxAmount)}</p>
+                            ${adjustment.signedValue !== 0
+                                ? `<p><strong>${adjustmentLabel}:</strong> <span class="${adjustmentColorClass}">${adjustment.signedValue < 0 ? '-' : '+'}${formatCurrency(Math.abs(adjustment.signedValue))}</span></p>`
+                                : ''}
+                            ${adjustment.note
+                                ? `<p><strong>Adjustment Note:</strong> ${escapeHtml(adjustment.note)}</p>`
+                                : ''}
                             <p><strong>Total:</strong> ${formatCurrency(booking.price)}</p>
                         </div>
                     </section>
@@ -435,6 +471,11 @@
             const rentalSummary = booking.rentals && booking.rentals.length > 0
                 ? booking.rentals.map((r) => `${escapeHtml(r.name)} x ${Math.max(1, Number(r.quantity) || 1)}`).join('<br>')
                 : escapeHtml(booking.rentalType || 'N/A');
+            const adjustment = getBookingAdjustment(booking);
+            const adjustmentLabel = adjustment.signedValue < 0 ? 'Discount' : 'Surcharge';
+            const adjustmentLine = adjustment.signedValue !== 0
+                ? `<br>${adjustmentLabel}: ${adjustment.signedValue < 0 ? '-' : '+'}${formatCurrency(Math.abs(adjustment.signedValue))}`
+                : '';
 
             html += `
                 <tr class="booking-row-clickable" onclick="openBookingDetailsModal('${booking._id}')" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openBookingDetailsModal('${booking._id}'); }" tabindex="0">
@@ -447,7 +488,7 @@
                     <td>
                         ${formatCurrency(booking.price)}
                         ${booking.subtotal !== undefined && booking.taxAmount !== undefined
-                            ? `<br><small>Subtotal: ${formatCurrency(booking.subtotal)}<br>Tax: ${formatCurrency(booking.taxAmount)}</small>`
+                            ? `<br><small>Subtotal: ${formatCurrency(booking.subtotal)}<br>Tax: ${formatCurrency(booking.taxAmount)}${adjustmentLine}</small>`
                             : ''}
                     </td>
                     <td><span class="status-badge status-${statusClass}">${escapeHtml(booking.bookingStatus)}</span></td>

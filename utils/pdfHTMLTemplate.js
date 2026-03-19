@@ -31,16 +31,42 @@ const formatTime12Hour = (time24) => {
  * Calculate pricing breakdown with configurable GST
  * @param {Object} booking - Booking object
  * @param {Object} settings - Admin settings with GST config
- * @returns {Object} Price breakdown { subtotal, taxAmount, totalAmount }
+ * @returns {Object} Price breakdown { subtotal, taxAmount, adjustmentValue, adjustmentLabel, adjustmentNote, totalAmount }
  */
 const calculatePricing = (booking, settings = null) => {
-    let subtotal, taxAmount, totalAmount;
+    let subtotal;
+    let taxAmount;
+
+    const fallbackAdjustmentType = Number(booking?.priceAdjustmentValue || 0) < 0
+        ? 'discount'
+        : Number(booking?.priceAdjustmentValue || 0) > 0
+            ? 'surcharge'
+            : 'none';
+
+    const adjustmentType = ['none', 'discount', 'surcharge'].includes(String(booking?.priceAdjustmentType || '').toLowerCase())
+        ? String(booking.priceAdjustmentType).toLowerCase()
+        : fallbackAdjustmentType;
+
+    const adjustmentAmount = Number.isFinite(Number(booking?.priceAdjustmentAmount))
+        ? Number(booking.priceAdjustmentAmount)
+        : Math.abs(Number(booking?.priceAdjustmentValue || 0));
+
+    const adjustmentValue = Number.isFinite(Number(booking?.priceAdjustmentValue))
+        ? Number(booking.priceAdjustmentValue)
+        : (adjustmentType === 'discount' ? -adjustmentAmount : adjustmentType === 'surcharge' ? adjustmentAmount : 0);
+
+    const adjustmentLabel = adjustmentValue < 0 ? 'Discount' : 'Surcharge';
+    const adjustmentNote = String(booking?.priceAdjustmentNote || '').trim();
     
     if (booking.subtotal !== undefined && booking.taxAmount !== undefined) {
         // Use the amounts calculated during booking creation
         subtotal = booking.subtotal;
         taxAmount = booking.taxAmount;
-        totalAmount = booking.price; // This should be the total including tax
+        // booking.price should already include tax and adjustment when stored.
+        // Keep fallback recomputation for compatibility with older records.
+        totalAmount = Number.isFinite(Number(booking.price))
+            ? Number(booking.price)
+            : (subtotal + taxAmount + adjustmentValue);
     } else {
         // Calculate from booking price
         subtotal = booking.price;
@@ -50,10 +76,17 @@ const calculatePricing = (booking, settings = null) => {
         const taxRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
         
         taxAmount = gstEnabled ? Math.round(subtotal * taxRate) : 0;
-        totalAmount = subtotal + taxAmount;
+        totalAmount = subtotal + taxAmount + adjustmentValue;
     }
     
-    return { subtotal, taxAmount, totalAmount };
+    return {
+        subtotal,
+        taxAmount,
+        adjustmentValue,
+        adjustmentLabel,
+        adjustmentNote,
+        totalAmount
+    };
 };
 
 /**
@@ -69,7 +102,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const perDayStartLabel = booking.perDayStartDate ? new Date(booking.perDayStartDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');
     const perDayEndLabel = booking.perDayEndDate ? new Date(booking.perDayEndDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');
     const perDayTimeRangeLabel = `${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)}`;
-    const { subtotal, taxAmount, totalAmount } = calculatePricing(booking, settings);
+    const { subtotal, taxAmount, adjustmentValue, adjustmentLabel, adjustmentNote, totalAmount } = calculatePricing(booking, settings);
     const safeDuration = Math.max(1, Number(booking.duration) || 1);
 
     const itemRows = (booking.rentals && booking.rentals.length > 0)
@@ -584,6 +617,18 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                     <tr>
                         <td class="label">🧾 ${settings.gstConfig.displayName || 'GST'} (${Math.round((settings.gstConfig.rate || 0.18) * 100)}%):</td>
                         <td class="amount">₹${taxAmount.toFixed(2)}</td>
+                    </tr>
+                    ` : ''}
+                    ${adjustmentValue !== 0 ? `
+                    <tr>
+                        <td class="label">${adjustmentLabel}:</td>
+                        <td class="amount" style="color: ${adjustmentValue < 0 ? '#d63384' : '#0c63e7'};">${adjustmentValue < 0 ? '-' : '+'}₹${Math.abs(adjustmentValue).toFixed(2)}</td>
+                    </tr>
+                    ` : ''}
+                    ${adjustmentValue !== 0 && adjustmentNote ? `
+                    <tr>
+                        <td class="label">Adjustment Note:</td>
+                        <td class="amount" style="font-weight: 500; color: #4a5568;">${adjustmentNote}</td>
                     </tr>
                     ` : ''}
                     <tr class="total-row">

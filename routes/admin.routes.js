@@ -200,6 +200,68 @@ const formatDateAsYmd = (dateValue) => {
   return `${year}-${month}-${day}`;
 };
 
+const derivePriceAdjustmentTypeFromValue = (value) => {
+  const numericValue = Number(value || 0);
+  if (!Number.isFinite(numericValue) || numericValue === 0) {
+    return 'none';
+  }
+
+  return numericValue < 0 ? 'discount' : 'surcharge';
+};
+
+const normalizePriceAdjustmentInput = (
+  {
+    rawType,
+    rawAmount,
+    rawNote
+  },
+  {
+    fallbackType = 'none',
+    fallbackAmount = 0,
+    fallbackNote = ''
+  } = {}
+) => {
+  const allowedTypes = new Set(['none', 'discount', 'surcharge']);
+
+  const requestedType = String(
+    rawType === undefined || rawType === null || rawType === ''
+      ? fallbackType
+      : rawType
+  ).trim().toLowerCase();
+  const type = allowedTypes.has(requestedType) ? requestedType : 'none';
+
+  const amountSource = rawAmount === undefined || rawAmount === null || rawAmount === ''
+    ? fallbackAmount
+    : rawAmount;
+  const parsedAmount = Number(amountSource);
+
+  if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+    return {
+      error: 'Adjustment amount must be a non-negative number'
+    };
+  }
+
+  const amount = type === 'none' ? 0 : parsedAmount;
+  const signedValue =
+    type === 'discount'
+      ? -amount
+      : type === 'surcharge'
+        ? amount
+        : 0;
+
+  const noteSource = rawNote === undefined || rawNote === null
+    ? fallbackNote
+    : rawNote;
+  const note = String(noteSource || '').trim();
+
+  return {
+    type,
+    amount,
+    value: signedValue,
+    note
+  };
+};
+
 const resolveAdminNotificationEmails = async (settings = null) => {
   const recipients = new Set();
 
@@ -1062,13 +1124,30 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     const bookingDate = new Date(booking.date);
     const displayDate = bookingDate.toLocaleDateString('en-IN');
 
-    // Calculate total with configurable GST
-    const subtotal = booking.subtotal || booking.price;
+    // Calculate total with configurable GST and optional admin adjustment
+    const subtotal = Number.isFinite(Number(booking.subtotal))
+      ? Number(booking.subtotal)
+      : Number(booking.price || 0);
     const gstEnabled = settings.gstConfig?.enabled || false;
     const gstRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
     const gstDisplayName = settings.gstConfig?.displayName || 'GST';
-    const taxAmount = gstEnabled ? Math.round(subtotal * gstRate) : 0;
-    const totalAmount = subtotal + taxAmount;
+    const taxAmount = Number.isFinite(Number(booking.taxAmount))
+      ? Number(booking.taxAmount)
+      : (gstEnabled ? Math.round(subtotal * gstRate) : 0);
+
+    const adjustmentType = String(booking.priceAdjustmentType || derivePriceAdjustmentTypeFromValue(booking.priceAdjustmentValue)).toLowerCase();
+    const adjustmentAmount = Number.isFinite(Number(booking.priceAdjustmentAmount))
+      ? Number(booking.priceAdjustmentAmount)
+      : Math.abs(Number(booking.priceAdjustmentValue || 0));
+    const signedAdjustment = Number.isFinite(Number(booking.priceAdjustmentValue))
+      ? Number(booking.priceAdjustmentValue)
+      : (adjustmentType === 'discount' ? -adjustmentAmount : adjustmentType === 'surcharge' ? adjustmentAmount : 0);
+    const computedTotalAmount = subtotal + taxAmount + signedAdjustment;
+    const totalAmount = Number.isFinite(Number(booking.price))
+      ? Number(booking.price)
+      : computedTotalAmount;
+    const adjustmentLabel = signedAdjustment < 0 ? 'Discount' : 'Surcharge';
+    const adjustmentDisplayAmount = Math.abs(signedAdjustment);
 
     // Send email with PDF attachment
     const emailSubject = `Invoice for Your ${settings?.studioName || 'JamRoom'} Booking - ${displayDate}`;
@@ -1114,6 +1193,12 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">${gstDisplayName} (${Math.round(gstRate * 100)}%):</td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">₹${taxAmount.toFixed(2)}</td>
+                </tr>
+                ` : ''}
+                ${signedAdjustment !== 0 ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">${adjustmentLabel}:</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: ${signedAdjustment < 0 ? '#d63384' : '#0c63e7'};">${signedAdjustment < 0 ? '-' : '+'}₹${adjustmentDisplayAmount.toFixed(2)}</td>
                 </tr>
                 ` : ''}
                 <tr style="font-weight: bold; font-size: 16px; color: #667eea;">
@@ -1870,7 +1955,10 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       rentals,
       subtotal,
       taxAmount,
-      totalAmount
+      totalAmount,
+      priceAdjustmentType,
+      priceAdjustmentAmount,
+      priceAdjustmentNote
     } = req.body;
     
     const booking = await Booking.findById(req.params.id);
@@ -1885,6 +1973,34 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
     const settings = await AdminSettings.getSettings();
     const gstEnabled = settings?.gstConfig?.enabled || false;
     const gstRate = gstEnabled ? (settings?.gstConfig?.rate || 0.18) : 0;
+
+    const existingAdjustmentFallbackType = String(
+      booking.priceAdjustmentType || derivePriceAdjustmentTypeFromValue(booking.priceAdjustmentValue)
+    ).toLowerCase();
+    const existingAdjustmentFallbackAmount = Number.isFinite(Number(booking.priceAdjustmentAmount))
+      ? Number(booking.priceAdjustmentAmount)
+      : Math.abs(Number(booking.priceAdjustmentValue || 0));
+    const existingAdjustmentFallbackNote = booking.priceAdjustmentNote || '';
+
+    const normalizedAdjustment = normalizePriceAdjustmentInput(
+      {
+        rawType: priceAdjustmentType,
+        rawAmount: priceAdjustmentAmount,
+        rawNote: priceAdjustmentNote
+      },
+      {
+        fallbackType: existingAdjustmentFallbackType,
+        fallbackAmount: existingAdjustmentFallbackAmount,
+        fallbackNote: existingAdjustmentFallbackNote
+      }
+    );
+
+    if (normalizedAdjustment.error) {
+      return res.status(400).json({
+        success: false,
+        message: normalizedAdjustment.error
+      });
+    }
 
     // Update booking fields
     if (date) booking.date = new Date(date);
@@ -1964,12 +2080,23 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       });
 
       const calculatedTaxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
-      const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount;
+      const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount + normalizedAdjustment.value;
+
+      if (calculatedTotalAmount < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Discount cannot make final total negative'
+        });
+      }
 
       booking.rentals = sanitizedRentals;
       booking.subtotal = calculatedSubtotal;
       booking.taxAmount = calculatedTaxAmount;
       booking.price = calculatedTotalAmount;
+      booking.priceAdjustmentType = normalizedAdjustment.type;
+      booking.priceAdjustmentAmount = normalizedAdjustment.amount;
+      booking.priceAdjustmentValue = normalizedAdjustment.value;
+      booking.priceAdjustmentNote = normalizedAdjustment.note;
 
       if (!normalizedRentalType) {
         booking.rentalType = sanitizedRentals.length === 1
@@ -2018,7 +2145,25 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
           });
         }
         booking.price = parsedPrice;
+      } else {
+        const computedSubtotal = Number.isFinite(Number(booking.subtotal)) ? Number(booking.subtotal) : 0;
+        const computedTax = Number.isFinite(Number(booking.taxAmount)) ? Number(booking.taxAmount) : 0;
+        const computedTotal = computedSubtotal + computedTax + normalizedAdjustment.value;
+
+        if (computedTotal < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Discount cannot make final total negative'
+          });
+        }
+
+        booking.price = computedTotal;
       }
+
+      booking.priceAdjustmentType = normalizedAdjustment.type;
+      booking.priceAdjustmentAmount = normalizedAdjustment.amount;
+      booking.priceAdjustmentValue = normalizedAdjustment.value;
+      booking.priceAdjustmentNote = normalizedAdjustment.note;
     }
     
     await booking.save();
@@ -2338,7 +2483,10 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       subtotal, 
       bandName, 
       notes,
-      overrideDateTime
+      overrideDateTime,
+      priceAdjustmentType,
+      priceAdjustmentAmount,
+      priceAdjustmentNote
     } = req.body;
 
     const shouldOverrideDateTime = overrideDateTime === true || String(overrideDateTime).toLowerCase() === 'true';
@@ -2455,13 +2603,40 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     const settings = await AdminSettings.getSettings();
     
     // Validate and recalculate totals based on admin settings
-    const calculatedSubtotal = subtotal || 0;
+    const parsedSubtotal = Number(subtotal);
+    const calculatedSubtotal = Number.isFinite(parsedSubtotal) ? parsedSubtotal : 0;
+    if (calculatedSubtotal < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subtotal must be a non-negative number'
+      });
+    }
     const gstEnabled = settings.gstConfig?.enabled || false;
     const gstRate = gstEnabled ? (settings.gstConfig.rate || 0.18) : 0;
+
+    const normalizedAdjustment = normalizePriceAdjustmentInput({
+      rawType: priceAdjustmentType,
+      rawAmount: priceAdjustmentAmount,
+      rawNote: priceAdjustmentNote
+    });
+
+    if (normalizedAdjustment.error) {
+      return res.status(400).json({
+        success: false,
+        message: normalizedAdjustment.error
+      });
+    }
     
     // Recalculate tax amount based on current admin settings
     const calculatedTaxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
-    const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount;
+    const calculatedTotalAmount = calculatedSubtotal + calculatedTaxAmount + normalizedAdjustment.value;
+
+    if (calculatedTotalAmount < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount cannot make final total negative'
+      });
+    }
     const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
 
     // Create rental type summary for backward compatibility
@@ -2478,6 +2653,10 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       rentals: rentals, // New multiple rentals array
       subtotal: calculatedSubtotal,
       taxAmount: calculatedTaxAmount,
+      priceAdjustmentType: normalizedAdjustment.type,
+      priceAdjustmentAmount: normalizedAdjustment.amount,
+      priceAdjustmentValue: normalizedAdjustment.value,
+      priceAdjustmentNote: normalizedAdjustment.note,
       price: calculatedTotalAmount, // Total amount including tax
       userName: selectedUser.name,
       userEmail: selectedUser.email,
@@ -2608,6 +2787,10 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         rentals: populatedBooking.rentals,
         subtotal: populatedBooking.subtotal,
         taxAmount: populatedBooking.taxAmount,
+        priceAdjustmentType: populatedBooking.priceAdjustmentType,
+        priceAdjustmentAmount: populatedBooking.priceAdjustmentAmount,
+        priceAdjustmentValue: populatedBooking.priceAdjustmentValue,
+        priceAdjustmentNote: populatedBooking.priceAdjustmentNote,
         price: populatedBooking.price,
         bandName: populatedBooking.bandName,
         notes: populatedBooking.notes,

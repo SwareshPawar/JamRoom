@@ -19,6 +19,218 @@ const setSubmitButtonLoading = (submitBtn, isLoading, loadingText = 'Creating Bo
     submitBtn.disabled = false;
 };
 
+const BOOKING_DRAFT_STORAGE_KEY = 'jamroom_booking_form_draft_v1';
+const BOOKING_DRAFT_MAX_AGE_MS = 1000 * 60 * 60 * 24;
+let bookingDraftSaveTimer = null;
+let isRestoringBookingDraft = false;
+let hasBeforeUnloadDraftBinding = false;
+
+const parseDraftJSON = (rawValue) => {
+    if (!rawValue) return null;
+
+    try {
+        return JSON.parse(rawValue);
+    } catch (error) {
+        console.warn('Failed to parse booking draft:', error);
+        return null;
+    }
+};
+
+const clearBookingFormDraft = () => {
+    if (bookingDraftSaveTimer) {
+        clearTimeout(bookingDraftSaveTimer);
+        bookingDraftSaveTimer = null;
+    }
+
+    localStorage.removeItem(BOOKING_DRAFT_STORAGE_KEY);
+};
+
+const collectBookingFormDraft = () => {
+    const bookingMode = window.getBookingMode ? window.getBookingMode() : 'hourly';
+    const bookingDate = document.getElementById('bookingDate')?.value || '';
+    const startTime = document.getElementById('startTime')?.value || '';
+    const endTime = document.getElementById('endTime')?.value || '';
+    const perdayStartDate = document.getElementById('perdayStartDate')?.value || '';
+    const perdayEndDate = document.getElementById('perdayEndDate')?.value || '';
+    const perdayPickupTime = document.getElementById('perdayPickupTime')?.value || '';
+    const perdayReturnTime = document.getElementById('perdayReturnTime')?.value || '';
+    const bandName = document.getElementById('bandName')?.value || '';
+    const notes = document.getElementById('notes')?.value || '';
+    const rentalsSnapshot = typeof window.getBookingRentalDraftSnapshot === 'function'
+        ? window.getBookingRentalDraftSnapshot()
+        : { hourly: [], perday: [] };
+
+    const hasDraftValues =
+        !!bookingDate ||
+        !!startTime ||
+        !!endTime ||
+        !!perdayStartDate ||
+        !!perdayEndDate ||
+        !!perdayPickupTime ||
+        !!perdayReturnTime ||
+        !!bandName.trim() ||
+        !!notes.trim() ||
+        (Array.isArray(rentalsSnapshot.hourly) && rentalsSnapshot.hourly.length > 0) ||
+        (Array.isArray(rentalsSnapshot.perday) && rentalsSnapshot.perday.length > 0);
+
+    if (!hasDraftValues) {
+        return null;
+    }
+
+    return {
+        version: 1,
+        savedAt: Date.now(),
+        bookingMode,
+        bookingDate,
+        startTime,
+        endTime,
+        perdayStartDate,
+        perdayEndDate,
+        perdayPickupTime,
+        perdayReturnTime,
+        bandName,
+        notes,
+        rentals: rentalsSnapshot
+    };
+};
+
+const saveBookingFormDraft = () => {
+    if (isRestoringBookingDraft) {
+        return;
+    }
+
+    const draft = collectBookingFormDraft();
+    if (!draft) {
+        clearBookingFormDraft();
+        return;
+    }
+
+    try {
+        localStorage.setItem(BOOKING_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch (error) {
+        console.warn('Failed to persist booking draft:', error);
+    }
+};
+
+const scheduleBookingFormDraftSave = (delayMs = 220) => {
+    if (bookingDraftSaveTimer) {
+        clearTimeout(bookingDraftSaveTimer);
+    }
+
+    bookingDraftSaveTimer = setTimeout(() => {
+        bookingDraftSaveTimer = null;
+        saveBookingFormDraft();
+    }, delayMs);
+};
+
+const restoreBookingFormDraft = async () => {
+    const parsedDraft = parseDraftJSON(localStorage.getItem(BOOKING_DRAFT_STORAGE_KEY));
+    if (!parsedDraft || typeof parsedDraft !== 'object') {
+        return false;
+    }
+
+    const savedAt = Number(parsedDraft.savedAt) || 0;
+    if (!savedAt || (Date.now() - savedAt) > BOOKING_DRAFT_MAX_AGE_MS) {
+        clearBookingFormDraft();
+        return false;
+    }
+
+    isRestoringBookingDraft = true;
+
+    try {
+        const selectedMode = parsedDraft.bookingMode === 'perday' ? 'perday' : 'hourly';
+        const modeInput = document.querySelector(`input[name="bookingMode"][value="${selectedMode}"]`);
+        if (modeInput) {
+            modeInput.checked = true;
+        }
+
+        if (typeof window.switchBookingMode === 'function') {
+            window.switchBookingMode(selectedMode);
+        }
+
+        const bandNameEl = document.getElementById('bandName');
+        if (bandNameEl && typeof parsedDraft.bandName === 'string') {
+            bandNameEl.value = parsedDraft.bandName;
+        }
+
+        const notesEl = document.getElementById('notes');
+        if (notesEl && typeof parsedDraft.notes === 'string') {
+            notesEl.value = parsedDraft.notes;
+        }
+
+        const perdayStartDateEl = document.getElementById('perdayStartDate');
+        if (perdayStartDateEl && parsedDraft.perdayStartDate) {
+            perdayStartDateEl.value = parsedDraft.perdayStartDate;
+        }
+
+        const perdayEndDateEl = document.getElementById('perdayEndDate');
+        if (perdayEndDateEl && parsedDraft.perdayEndDate) {
+            perdayEndDateEl.value = parsedDraft.perdayEndDate;
+        }
+
+        const perdayPickupTimeEl = document.getElementById('perdayPickupTime');
+        if (perdayPickupTimeEl && parsedDraft.perdayPickupTime) {
+            perdayPickupTimeEl.value = parsedDraft.perdayPickupTime;
+        }
+
+        const perdayReturnTimeEl = document.getElementById('perdayReturnTime');
+        if (perdayReturnTimeEl && parsedDraft.perdayReturnTime) {
+            perdayReturnTimeEl.value = parsedDraft.perdayReturnTime;
+        }
+
+        if (typeof window.applyBookingRentalDraftSelection === 'function') {
+            window.applyBookingRentalDraftSelection(parsedDraft.rentals || {});
+        }
+
+        if (selectedMode === 'hourly') {
+            const bookingDateEl = document.getElementById('bookingDate');
+            const selectedDate = String(parsedDraft.bookingDate || '').trim();
+            if (bookingDateEl && selectedDate) {
+                bookingDateEl.value = selectedDate;
+            }
+
+            if (selectedDate && typeof loadAvailability === 'function') {
+                await loadAvailability(selectedDate);
+            }
+
+            const startTimeEl = document.getElementById('startTime');
+            if (startTimeEl && parsedDraft.startTime && startTimeEl.querySelector(`option[value="${parsedDraft.startTime}"]`)) {
+                startTimeEl.value = parsedDraft.startTime;
+            }
+
+            if (typeof populateEndTimeSlots === 'function') {
+                populateEndTimeSlots();
+            }
+
+            const endTimeEl = document.getElementById('endTime');
+            if (endTimeEl && parsedDraft.endTime && endTimeEl.querySelector(`option[value="${parsedDraft.endTime}"]`)) {
+                endTimeEl.value = parsedDraft.endTime;
+            }
+        } else {
+            if (perdayStartDateEl) {
+                perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (perdayEndDateEl) {
+                perdayEndDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (perdayPickupTimeEl) {
+                perdayPickupTimeEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        if (typeof updatePriceDisplay === 'function') {
+            updatePriceDisplay();
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Failed to restore booking draft:', error);
+        return false;
+    } finally {
+        isRestoringBookingDraft = false;
+    }
+};
+
 const buildRentalsForSubmission = (duration) => {
     let subtotal = 0;
     const rentalsArray = [];
@@ -165,6 +377,8 @@ const resetBookingFormState = () => {
     } else {
         selectedRentals.clear();
     }
+
+    clearBookingFormDraft();
 };
 
 const handleBookingFormSubmit = async (e) => {
@@ -195,6 +409,7 @@ const handleBookingFormSubmit = async (e) => {
             window.renderBookingPaymentSection(data);
         }
 
+        clearBookingFormDraft();
         resetBookingFormState();
         await loadMyBookings();
         if (submittedMode === 'hourly') {
@@ -252,6 +467,7 @@ const bindBookingDateChange = (bookingDateEl) => {
     const onDateChange = async (e) => {
         const selectedDate = (e?.target?.value || bookingDateEl.value || '').trim();
         await handleDateSelection(selectedDate);
+        scheduleBookingFormDraftSave();
     };
 
     bookingDateEl.addEventListener('change', onDateChange);
@@ -274,12 +490,16 @@ const initBookingFormHandlers = () => {
         startTimeEl.addEventListener('change', () => {
             populateEndTimeSlots();
             updatePriceDisplay();
+            scheduleBookingFormDraftSave();
         });
     }
 
     const endTimeEl = document.getElementById('endTime');
     if (endTimeEl) {
-        endTimeEl.addEventListener('change', updatePriceDisplay);
+        endTimeEl.addEventListener('change', () => {
+            updatePriceDisplay();
+            scheduleBookingFormDraftSave();
+        });
     }
 
     const bookingDateEl = document.getElementById('bookingDate');
@@ -289,8 +509,30 @@ const initBookingFormHandlers = () => {
     if (bookingDateEl) {
         bookingDateEl.setAttribute('min', today);
     }
+
+    if (bookingForm) {
+        bookingForm.addEventListener('input', (event) => {
+            const targetId = event?.target?.id;
+            if (targetId === 'bandName' || targetId === 'notes') {
+                scheduleBookingFormDraftSave();
+            }
+        });
+
+        bookingForm.addEventListener('change', () => {
+            scheduleBookingFormDraftSave();
+        });
+    }
+
+    if (!hasBeforeUnloadDraftBinding) {
+        window.addEventListener('beforeunload', saveBookingFormDraft);
+        hasBeforeUnloadDraftBinding = true;
+    }
 };
 
 window.initBookingFormHandlers = initBookingFormHandlers;
 window.handleBookingFormSubmit = handleBookingFormSubmit;
 window.buildBookingFormPayload = buildBookingFormPayload;
+window.saveBookingFormDraft = saveBookingFormDraft;
+window.scheduleBookingFormDraftSave = scheduleBookingFormDraftSave;
+window.restoreBookingFormDraft = restoreBookingFormDraft;
+window.clearBookingFormDraft = clearBookingFormDraft;
