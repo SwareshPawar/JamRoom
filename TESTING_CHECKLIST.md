@@ -40,6 +40,37 @@ Live UI verification notes:
 
 ---
 
+## 🧪 Navigation + Draft + Pricing Override Smoke Test (March 19, 2026)
+
+### Shared Navigation/Auth Resilience
+- [ ] On slow network, header does not remain stuck on "Loading menu..."
+- [ ] Guest fallback navigation appears automatically when auth bootstrap is delayed
+- [ ] Auth recovers to logged-in menu after delayed `auth/me` response
+- [ ] Hard refresh does not require manual reload to show menu
+
+### Booking Form Draft Persistence (`/booking.html`)
+- [ ] Select booking mode/date/time/rentals/notes and refresh page
+- [ ] Form restores previously selected values and quantities
+- [ ] Per-day fields restore correctly when per-day mode was active
+- [ ] Draft is cleared after successful booking submission
+
+### Admin Draft Persistence
+- [ ] Create Booking modal restores selected user/date/time/rentals/notes after refresh/modal reopen
+- [ ] Users tab create-user form restores name/email/mobile after refresh
+- [ ] Register-user modal restores name/email/mobile after refresh
+- [ ] Make-admin form restores email after refresh
+- [ ] Drafts clear after successful submit for each form
+
+### Admin Special Price Override
+- [ ] Create Booking supports `none/discount/surcharge` with amount + optional note
+- [ ] Edit Booking supports same override controls and pre-fills existing value
+- [ ] Final total updates as `subtotal + tax + signed adjustment`
+- [ ] Discount cannot reduce final total below zero
+- [ ] Booking detail modal and table show adjustment label/value
+- [ ] PDF/eBill summary includes discount/surcharge row and note when present
+
+---
+
 ## 🧪 Payment + Mobile Compatibility Smoke Test (March 2026)
 
 ### UPI Flow Compatibility

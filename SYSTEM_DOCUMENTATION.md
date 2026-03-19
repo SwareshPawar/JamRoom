@@ -98,19 +98,40 @@
 ```javascript
 {
   userId: ObjectId (ref: 'User', required),
+  bookingMode: String (enum: ['hourly', 'perday']),
   date: Date (required),
   startTime: String (required, format: 'HH:MM'),
   endTime: String (required, format: 'HH:MM'),
   duration: Number (required, in hours),
+  perDayStartDate: Date (optional),
+  perDayEndDate: Date (optional),
+  perDayDays: Number (optional),
   rentalType: String (required),
-  price: Number (required),
+  rentals: [
+    {
+      name: String,
+      description: String,
+      price: Number,
+      quantity: Number,
+      rentalType: String (optional)
+    }
+  ],
+  subtotal: Number (required),
+  taxAmount: Number (required),
+  price: Number (required, final total),
+  priceAdjustmentType: String (enum: ['none', 'discount', 'surcharge']),
+  priceAdjustmentAmount: Number (absolute value),
+  priceAdjustmentValue: Number (signed: discount negative, surcharge positive),
+  priceAdjustmentNote: String (optional),
   bookingStatus: String (enum: ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED']),
   paymentStatus: String (enum: ['PENDING', 'PAID', 'REFUNDED']),
   userName: String (required),
   userEmail: String (required),
+  userMobile: String (optional),
   bandName: String (optional),
   notes: String (optional),
-  createdAt: Date (default: Date.now)
+  createdAt: Date (default: Date.now),
+  updatedAt: Date
 }
 ```
 
@@ -406,9 +427,11 @@ rentalTypes: [
 ```
 1. Admin opens create booking modal
 2. Admin selects registered user (or creates user inline)
-3. Admin selects date/time/rentals and submits:
+3. Admin selects date/time/rentals and optional price override, then submits:
   - Enforced status: bookingStatus = CONFIRMED
   - Enforced payment: paymentStatus = PAID
+  - Optional override: discount/surcharge amount and note
+  - Final amount formula: subtotal + taxAmount + signedAdjustment
 4. If override mode enabled (`overrideDateTime=true`):
   - Conflict and blocked-time checks are bypassed
   - Booking note is tagged with admin override marker
@@ -431,7 +454,7 @@ rentalTypes: [
 Edit Flow:
 1. Admin clicks "Edit" → Open edit modal
 2. Form pre-populated with current values
-3. Admin modifies fields → Validate & submit
+3. Admin modifies fields (including optional discount/surcharge) → Validate & submit
 4. System updates booking → Send notification email
 5. Refresh admin table
 
@@ -440,6 +463,15 @@ Delete Flow:
 2. Admin confirms → DELETE API call
 3. System deletes booking → Send notification email
 4. Refresh admin table & stats
+```
+
+### 6. Navigation/Auth/Draft Resilience Flow
+```
+1. Page loads shared navigation shell
+2. If auth check is delayed/interrupted, guest nav fallback renders automatically
+3. Auth manager applies timeout + cached-session fallback for smoother startup
+4. Booking/admin form drafts autosave in localStorage during entry
+5. On refresh/reopen, draft fields are restored and then cleared after successful submit
 ```
 
 ---
@@ -602,6 +634,27 @@ EMAIL_REPLY_TO=support@jamroom.com
 #### 9. Undo Recovery Validation
 **Updated**:
 - Re-applied and validated key UI changes after accidental undo (header action placement, greeting line, booking width consistency).
+
+#### 10. Navigation Fallback Hardening
+**Updated**:
+- Shared navigation adds delayed fallback rendering so menu does not remain stuck on loading.
+- Fallback guest navigation is rendered when auth bootstrap is delayed or interrupted.
+
+#### 11. Auth Timeout + Cached Session Fallback
+**Updated**:
+- Auth check now uses abort timeout protection.
+- Cached user (`jamroom_user` / legacy `user`) can be used for safe UI continuity during transient network failures.
+
+#### 12. Refresh-Safe Draft Persistence
+**Updated**:
+- User booking form now autosaves/restores mode/date/time/rentals/notes and clears draft after successful booking submit.
+- Admin create-booking and user-management forms now autosave/restore drafts and clear drafts on successful submit.
+
+#### 13. Admin Special Price Override
+**Updated**:
+- Admin create/edit booking supports `priceAdjustmentType` (`none|discount|surcharge`), `priceAdjustmentAmount`, and optional `priceAdjustmentNote`.
+- Signed value is persisted as `priceAdjustmentValue` and final total is computed as `subtotal + taxAmount + signedAdjustment`.
+- Adjustment details are shown in admin booking detail/table views and included in PDF/eBill summaries.
 
 ### Latest Changes (January 2026)
 

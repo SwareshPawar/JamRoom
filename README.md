@@ -19,6 +19,11 @@
 📱 **Direct Mobile Booking Flow (PWA)**: Booking runs directly on `/booking.html` with responsive layout plus manifest/service-worker support  
 🎛️ **Rental UI Consistency Pass**: Booking rentals now follow the same base/child row alignment and controls used in admin create/edit workflows  
 💳 **Modern UPI Compatibility Flow**: Replaced brittle app-specific deep links with universal `upi://pay` plus share/copy/QR fallbacks for better browser support  
+🧭 **Resilient Navigation Loading**: Shared menu now auto-falls back to a visible guest nav when auth/network is slow, preventing blank or stuck loading headers  
+🔐 **Auth Timeout + Cached Session Fallback**: Auth checks use timeout/abort with safe cached-user fallback for smoother mobile/desktop startup  
+💾 **Refresh-Safe Booking Drafts**: `/booking.html` now restores selected mode/date/time/rentals/notes after refresh and clears draft on successful booking  
+🗂️ **Admin Form Draft Persistence**: Admin create-booking and user-management forms now autosave/restore drafts to survive refreshes  
+➕➖ **Admin Special Price Override**: Admin can apply discount or surcharge amount with optional note; final bill and PDF summaries reflect adjustment transparently  
 
 ## 🚀 Core Features
 

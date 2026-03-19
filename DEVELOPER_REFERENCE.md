@@ -21,6 +21,10 @@
 - **Section UX Pattern (Mobile)**: Keep mobile sections compact/collapsible where needed without route-level redirection.
 - **Admin Create Status Policy**: Admin-created bookings must be enforced as `bookingStatus=CONFIRMED` and `paymentStatus=PAID`.
 - **Historical Override Policy**: Use `overrideDateTime=true` only for historical missed-bill entries where conflict/blocked checks should be intentionally bypassed.
+- **Navigation Resilience Pattern**: Shared nav must always show a fallback menu if auth/bootstrap is delayed; avoid indefinite loading header states.
+- **Auth Resilience Pattern**: Auth bootstrap calls should use timeout + abort handling and may use cached session data to prevent false logouts on transient failures.
+- **Form Draft Pattern**: High-input workflows (booking/admin create/edit forms) should autosave drafts to localStorage with TTL and clear-on-success semantics.
+- **Admin Price Override Pattern**: Use `priceAdjustmentType` (`none|discount|surcharge`) + `priceAdjustmentAmount` + optional note; final total formula is `subtotal + taxAmount + signedAdjustment`.
 - **Shared Navigation Pattern**: Render header/nav via `public/js/shared/navigation.js` into `#navigationContainer`; do not handcraft page-specific nav variants.
 - **Header Action Pattern**: Keep theme/logout/tests controls in `.app-header-actions`; keep primary route links in `.main-nav .nav-links`.
 - **Theme Pattern**: Use `public/js/shared/theme.js` and tokenized styles in `public/css/shared.css`; avoid page-local hardcoded theme colors.
@@ -204,16 +208,34 @@ function checkSlots() // Not descriptive enough
 // models/Booking.js - EXACT FIELD NAMES
 {
   userId: ObjectId,           // Reference to User._id
+  bookingMode: String,        // 'hourly'|'perday'
   date: Date,                 // Booking date
   startTime: String,          // Format: "HH:MM" (24-hour)
   endTime: String,            // Format: "HH:MM" (24-hour)
   duration: Number,           // Hours as number
+  perDayStartDate: Date,      // Optional per-day start
+  perDayEndDate: Date,        // Optional per-day end
+  perDayDays: Number,         // Optional per-day span
   rentalType: String,         // Exact rental type name
-  price: Number,              // Total calculated price
+  rentals: [{                 // Item-level pricing source
+    name: String,
+    description: String,
+    price: Number,
+    quantity: Number,
+    rentalType: String
+  }],
+  subtotal: Number,           // Before tax/adjustment
+  taxAmount: Number,          // GST amount
+  priceAdjustmentType: String,// 'none'|'discount'|'surcharge'
+  priceAdjustmentAmount: Number, // Absolute adjustment value
+  priceAdjustmentValue: Number,  // Signed adjustment (+/-)
+  priceAdjustmentNote: String,// Optional audit note
+  price: Number,              // Final total after tax + adjustment
   bookingStatus: String,      // 'PENDING'|'CONFIRMED'|'REJECTED'|'CANCELLED'
   paymentStatus: String,      // 'PENDING'|'PAID'|'REFUNDED'
   userName: String,           // User's name (denormalized)
   userEmail: String,          // User's email (denormalized)
+  userMobile: String,         // Optional mobile (denormalized)
   bandName: String,           // Optional band name
   notes: String,              // Optional booking notes
   createdAt: Date,            // Auto-generated

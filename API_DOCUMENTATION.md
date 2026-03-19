@@ -545,6 +545,9 @@ Authorization: Bearer <admin_token>
     }
   ],
   "subtotal": 600,
+  "priceAdjustmentType": "discount",
+  "priceAdjustmentAmount": 100,
+  "priceAdjustmentNote": "Manual loyalty discount",
   "bandName": "Band Name",
   "notes": "Optional admin note",
   "overrideDateTime": false
@@ -556,6 +559,13 @@ Authorization: Bearer <admin_token>
 - Created booking is always enforced as:
   - `bookingStatus = CONFIRMED`
   - `paymentStatus = PAID`
+- Optional pricing override fields:
+  - `priceAdjustmentType`: `none | discount | surcharge`
+  - `priceAdjustmentAmount`: non-negative number
+  - `priceAdjustmentNote`: optional audit note
+- Final booking total is calculated as:
+  - `price = subtotal + taxAmount + signedAdjustment`
+  - where signed adjustment is negative for `discount`, positive for `surcharge`
 - When `overrideDateTime=true`, conflict/blocked-time validations are bypassed for historical entries and note is tagged with an admin override marker
 - Uses the same confirmation email/calendar flow as admin approve
 
@@ -569,6 +579,10 @@ Authorization: Bearer <admin_token>
     "userName": "Customer Name",
     "bookingStatus": "CONFIRMED",
     "paymentStatus": "PAID",
+    "priceAdjustmentType": "discount",
+    "priceAdjustmentAmount": 100,
+    "priceAdjustmentValue": -100,
+    "priceAdjustmentNote": "Manual loyalty discount",
     "price": 708
   }
 }
@@ -663,6 +677,7 @@ Authorization: Bearer <admin_token>
 - `includeCustomer` is optional, defaults to `true`
 - `additionalEmails` accepts either an array or comma/newline-separated string
 - Recipients are normalized and deduplicated before sending
+- Billing summary automatically includes adjustment row(s) when booking has admin discount/surcharge metadata
 
 **Response:** `200 OK`
 ```json
@@ -701,6 +716,9 @@ Authorization: Bearer <admin_token>
   "startTime": "14:00",
   "endTime": "16:00",
   "duration": 2,
+  "priceAdjustmentType": "surcharge",
+  "priceAdjustmentAmount": 150,
+  "priceAdjustmentNote": "Late-night add-on",
   "notes": "Updated by admin",
   "rentals": [
     {
@@ -723,6 +741,9 @@ Authorization: Bearer <admin_token>
 
 **Behavior:**
 - When `rentals` is provided, backend validates each rental item and recalculates `subtotal`, `taxAmount`, and `price` server-side
+- Optional override fields (`priceAdjustmentType`, `priceAdjustmentAmount`, `priceAdjustmentNote`) are accepted in both item-level and legacy paths
+- Final booking total is computed server-side as `subtotal + taxAmount + signedAdjustment`
+- Validation blocks discount values that would make final total negative
 - When `rentals` is not provided, legacy subtotal/tax/total/price fields remain supported for backward compatibility
 
 **Response:** `200 OK`
@@ -736,6 +757,10 @@ Authorization: Bearer <admin_token>
     "rentalType": "Multiple Items (2)",
     "subtotal": 1400,
     "taxAmount": 252,
+    "priceAdjustmentType": "surcharge",
+    "priceAdjustmentAmount": 150,
+    "priceAdjustmentValue": 150,
+    "priceAdjustmentNote": "Late-night add-on",
     "price": 1652
   }
 }

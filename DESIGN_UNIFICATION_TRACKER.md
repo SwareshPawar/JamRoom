@@ -1,6 +1,6 @@
 # JamRoom Design Unification Tracker
 
-Last Updated: March 9, 2026 (Admin bookings pagination/user-edit flow and iPhone booking/admin/shared polish logged; final QA remains)
+Last Updated: March 19, 2026 (Navigation/auth resilience, booking/admin draft persistence UX, and admin pricing override UI consistency updates logged; final QA remains)
 Owner: JamRoom Team
 Scope: Unify all user and admin pages to match home page visual language with consistent layout, colors, typography, and theme behavior.
 Canonical Source: This file is the single source of truth for UI unification phase status, checklist progress, and UI-specific tracking updates.
@@ -199,6 +199,9 @@ Exit Criteria:
 | 2026-03-09 | Phase 5 | Added server-driven Manage Bookings pagination/search/sort in admin, moved controls below table, and enabled in-table horizontal scroll behavior. | Copilot |
 | 2026-03-09 | Phase 5 | Added registered-user edit/update workflow in admin Users tab (`PUT /api/admin/users/:id`) with modal-based detail updates. | Copilot |
 | 2026-03-09 | Phase 6 | Applied iPhone hardening across `admin.css`, `booking.css`, and `shared.css` (overflow/wrapping/radio/checkbox visibility), and regrouped booking form/availability block for clarity. | Copilot |
+| 2026-03-19 | Phase 6 | Hardened shared navigation bootstrap in `public/js/shared/navigation.js` with delayed guest-menu fallback rendering to prevent stuck header loading states. | Copilot |
+| 2026-03-19 | Phase 6 | Added refresh-safe draft persistence UX for booking and admin forms (autosave/restore/clear-on-success) to reduce data loss during reloads. | Copilot |
+| 2026-03-19 | Phase 5 | Added admin create/edit special pricing override controls (discount/surcharge with note) and aligned summary labels to "Final Total" for clarity. | Copilot |
 
 ## 6. Risks And Watchouts
 

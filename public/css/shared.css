@@ -1294,9 +1294,9 @@ textarea:disabled {
     .app-header-actions a {
         width: 100%;
         text-align: center;
-        padding: 8px 10px;
-        font-size: 0.82rem;
-        min-height: 36px;
+        padding: 10px 12px;
+        font-size: 0.9rem;
+        min-height: 42px;
         min-width: 0;
         white-space: normal;
         overflow-wrap: anywhere;
@@ -1317,9 +1317,9 @@ textarea:disabled {
 
     .main-nav .nav-link {
         text-align: center;
-        padding: 8px 10px;
-        min-height: 36px;
-        font-size: 0.84rem;
+        padding: 10px 12px;
+        min-height: 44px;
+        font-size: 0.96rem;
         line-height: 1.2;
         white-space: normal;
         overflow-wrap: anywhere;
@@ -1455,8 +1455,8 @@ textarea:disabled {
     }
 
     .main-nav .nav-link {
-        font-size: 0.8rem;
-        min-height: 34px;
+        font-size: 0.92rem;
+        min-height: 42px;
     }
 
     .app-header-actions {
