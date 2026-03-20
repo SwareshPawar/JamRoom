@@ -1,39 +1,69 @@
 {
-  "name": "JamRoom Booking",
-  "short_name": "JamRoom", 
-  "description": "Quick booking for JamRoom sessions.",
+  "name": "Swar Jamroom Studio",
+  "short_name": "SwarJRS JamRoom",
+  "description": "Book your jam session at Swar Jamroom Studio — professional equipment, soundproof rooms, flexible slots.",
   "start_url": "/booking.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#eef2ff",
-  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "theme_color": "#38bdf8",
+  "lang": "en",
+  "categories": ["music", "entertainment", "lifestyle"],
   "icons": [
     {
+      "src": "/icons/jamroom-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/jamroom-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/jamroom-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/icons/jamroom-icon.svg",
-      "sizes": "192x192", 
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
       "src": "/icons/jamroom-maskable.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml", 
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/icons/jamroom-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
     }
   ],
   "shortcuts": [
     {
       "name": "New Booking",
-      "short_name": "New",
+      "short_name": "Book Now",
       "url": "/booking.html",
-      "description": "Open straight to new booking form."
+      "description": "Open straight to new booking form.",
+      "icons": [{ "src": "/icons/jamroom-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "My Bookings", 
+      "name": "My Bookings",
       "short_name": "My Bookings",
       "url": "/booking.html#bookings",
-      "description": "View recent and upcoming bookings."
+      "description": "View recent and upcoming bookings.",
+      "icons": [{ "src": "/icons/jamroom-192.png", "sizes": "192x192" }]
     }
   ]
 }

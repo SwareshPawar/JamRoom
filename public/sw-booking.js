@@ -1,11 +1,15 @@
-const CACHE_NAME = 'jamroom-v2';
+const CACHE_NAME = 'jamroom-v3';
 const STATIC_ASSETS = [
   '/booking.html',
   '/login.html', 
   '/index.html',
   '/manifest.webmanifest',
+  '/icons/jamroom-192.png',
+  '/icons/jamroom-512.png',
+  '/icons/jamroom-maskable.png',
   '/icons/jamroom-icon.svg',
   '/icons/jamroom-maskable.svg',
+  '/js/shared/pwa-install.js',
   '/js/client-pdf-generator.js',
   '/js/pdfHTMLTemplate.js'
 ];
