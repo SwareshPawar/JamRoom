@@ -5,12 +5,172 @@
 
 (() => {
     const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+    let sendEBillSearchDebounceTimer = null;
+    let sendEBillSearchRequestSeq = 0;
 
     const parseEmailListInput = (inputValue) => {
         return String(inputValue || '')
             .split(/[\s,;]+/)
             .map((email) => email.trim().toLowerCase())
             .filter(Boolean);
+    };
+
+    const escapeHtml = (value) => {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    };
+
+    const hideSendEBillTypeahead = () => {
+        const typeahead = document.getElementById('sendEBillUserTypeahead');
+        if (!typeahead) return;
+
+        typeahead.innerHTML = '';
+        typeahead.style.display = 'none';
+        typeahead.classList.add('admin-hidden');
+    };
+
+    const showSendEBillTypeahead = () => {
+        const typeahead = document.getElementById('sendEBillUserTypeahead');
+        if (!typeahead) return;
+
+        typeahead.style.display = 'block';
+        typeahead.classList.remove('admin-hidden');
+    };
+
+    const addSendEBillEmailToTextarea = (email) => {
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        if (!isValidEmail(normalizedEmail)) return;
+
+        const textarea = document.getElementById('sendEBillAdditionalEmails');
+        if (!textarea) return;
+
+        const existingEmails = parseEmailListInput(textarea.value);
+        if (existingEmails.includes(normalizedEmail)) {
+            return;
+        }
+
+        const prefix = textarea.value.trim() ? ', ' : '';
+        textarea.value = `${textarea.value.trim()}${prefix}${normalizedEmail}`;
+        textarea.focus();
+    };
+
+    const renderSendEBillTypeaheadResults = (users) => {
+        const typeahead = document.getElementById('sendEBillUserTypeahead');
+        if (!typeahead) return;
+
+        if (!Array.isArray(users) || users.length === 0) {
+            typeahead.innerHTML = '<div class="typeahead-empty">No matching user found.</div>';
+            showSendEBillTypeahead();
+            return;
+        }
+
+        typeahead.innerHTML = users.slice(0, 15).map((user) => {
+            const safeName = escapeHtml(user.name || 'User');
+            const safeEmail = escapeHtml((user.email || '').toLowerCase());
+            const safeMobile = escapeHtml(user.mobile || '');
+            const mobileText = safeMobile ? ` | ${safeMobile}` : '';
+
+            return `
+                <button
+                    type="button"
+                    class="typeahead-option-btn"
+                    data-send-ebill-email="${safeEmail}"
+                >
+                    <div class="typeahead-option-name">${safeName}</div>
+                    <div class="typeahead-option-meta">${safeEmail}${mobileText}</div>
+                </button>
+            `;
+        }).join('');
+
+        showSendEBillTypeahead();
+    };
+
+    const searchSendEBillUsers = async (query) => {
+        const trimmedQuery = String(query || '').trim();
+        if (!trimmedQuery) {
+            hideSendEBillTypeahead();
+            return;
+        }
+
+        const requestId = ++sendEBillSearchRequestSeq;
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/admin/users?q=${encodeURIComponent(trimmedQuery)}&limit=20`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to search users');
+            }
+
+            const result = await response.json();
+            if (requestId !== sendEBillSearchRequestSeq) {
+                return;
+            }
+
+            const users = Array.isArray(result.users)
+                ? result.users.filter((user) => isValidEmail(user.email || ''))
+                : [];
+
+            renderSendEBillTypeaheadResults(users);
+        } catch (error) {
+            if (requestId !== sendEBillSearchRequestSeq) {
+                return;
+            }
+
+            const typeahead = document.getElementById('sendEBillUserTypeahead');
+            if (!typeahead) return;
+
+            typeahead.innerHTML = '<div class="typeahead-empty">Unable to load user suggestions.</div>';
+            showSendEBillTypeahead();
+        }
+    };
+
+    const setupSendEBillUserTypeahead = () => {
+        const searchInput = document.getElementById('sendEBillUserSearch');
+        const typeahead = document.getElementById('sendEBillUserTypeahead');
+        if (!searchInput || !typeahead || searchInput.getAttribute('data-send-ebill-setup') === 'true') {
+            return;
+        }
+
+        const handleSearch = () => {
+            const query = searchInput.value || '';
+            if (sendEBillSearchDebounceTimer) {
+                clearTimeout(sendEBillSearchDebounceTimer);
+            }
+
+            sendEBillSearchDebounceTimer = setTimeout(() => {
+                searchSendEBillUsers(query);
+            }, 220);
+        };
+
+        searchInput.addEventListener('input', handleSearch);
+        searchInput.addEventListener('focus', handleSearch);
+
+        typeahead.addEventListener('click', (event) => {
+            const option = event.target.closest('[data-send-ebill-email]');
+            if (!option) return;
+
+            const email = option.getAttribute('data-send-ebill-email');
+            addSendEBillEmailToTextarea(email);
+            hideSendEBillTypeahead();
+            searchInput.value = '';
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('#sendEBillUserSearch') && !event.target.closest('#sendEBillUserTypeahead')) {
+                hideSendEBillTypeahead();
+            }
+        });
+
+        searchInput.setAttribute('data-send-ebill-setup', 'true');
     };
 
     const deleteBooking = async (bookingId, deps) => {
@@ -58,11 +218,14 @@
         const bookingIdInput = document.getElementById('sendEBillBookingId');
         const includeCustomerInput = document.getElementById('sendEBillIncludeCustomer');
         const additionalEmailsInput = document.getElementById('sendEBillAdditionalEmails');
+        const userSearchInput = document.getElementById('sendEBillUserSearch');
         const modal = document.getElementById('sendEBillModal');
 
         if (bookingIdInput) bookingIdInput.value = bookingId;
         if (includeCustomerInput) includeCustomerInput.checked = true;
         if (additionalEmailsInput) additionalEmailsInput.value = '';
+        if (userSearchInput) userSearchInput.value = '';
+        hideSendEBillTypeahead();
         if (modal) modal.classList.add('show');
     };
 
@@ -217,4 +380,10 @@
     window.AdminBookingActions.openSendEBillModal = openSendEBillModal;
     window.AdminBookingActions.submitSendEBill = submitSendEBill;
     window.AdminBookingActions.downloadPDF = downloadPDF;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupSendEBillUserTypeahead);
+    } else {
+        setupSendEBillUserTypeahead();
+    }
 })();

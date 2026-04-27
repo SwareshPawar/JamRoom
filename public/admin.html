@@ -44,19 +44,19 @@
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>Total Bookings</h3>
-                <div class="number" id="totalBookings">0</div>
+                <div class="number stat-number-loading" id="totalBookings" aria-live="polite">Loading...</div>
             </div>
             <div class="stat-card">
                 <h3>Pending Approval</h3>
-                <div class="number" id="pendingBookings">0</div>
+                <div class="number stat-number-loading" id="pendingBookings" aria-live="polite">Loading...</div>
             </div>
             <div class="stat-card">
                 <h3>Confirmed</h3>
-                <div class="number" id="confirmedBookings">0</div>
+                <div class="number stat-number-loading" id="confirmedBookings" aria-live="polite">Loading...</div>
             </div>
             <div class="stat-card">
                 <h3>Total Revenue</h3>
-                <div class="number" id="totalRevenue">₹0</div>
+                <div class="number stat-number-loading" id="totalRevenue" aria-live="polite">Loading...</div>
             </div>
         </div>
 
@@ -413,6 +413,20 @@
                     Send to booking user email
                 </label>
                 <small class="settings-help-text">Keep enabled to send the PDF bill to the customer on record.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="sendEBillUserSearch">Find existing user (optional)</label>
+                <input
+                    type="text"
+                    id="sendEBillUserSearch"
+                    placeholder="Type name, email, or mobile"
+                    autocomplete="off"
+                >
+                <div id="sendEBillUserTypeahead" class="create-user-typeahead admin-hidden"></div>
+                <small class="settings-help-text settings-help-top-gap">
+                    Search users and click a result to add their email below.
+                </small>
             </div>
 
             <div class="form-group">

@@ -357,16 +357,22 @@ class NavigationManager {
     /**
      * Logout function
      */
-    static logout() {
-        // Use shared AuthManager if available
-        if (window.AuthManager) {
-            window.AuthManager.logout();
-        } else {
-            // Fallback logout
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login.html';
+    static async logout() {
+        // Use the active AuthManager instance first (class itself does not expose instance methods).
+        const authInstance = window.authManager || (typeof window.getAuthManager === 'function' ? window.getAuthManager() : null);
+
+        if (authInstance && typeof authInstance.logout === 'function') {
+            await authInstance.logout();
+            return;
         }
+
+        // Fallback logout
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('jamroom_user');
+        localStorage.removeItem('jamroom_auth');
+        localStorage.removeItem('jamroom_admin');
+        window.location.href = '/login.html';
     }
 
     /**
