@@ -10,6 +10,7 @@ const { isAdmin } = require('../middleware/admin');
 const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
 const { generateBill, generateBillForDownload, generateBillFilename, generateBillForDownloadWithFilename } = require('../utils/billGenerator');
+const { generateQuotationPDF } = require('../utils/billGenerator');
 const { 
   sendBookingConfirmationNotifications, 
   sendBookingConfirmationWhatsApp,
@@ -3151,5 +3152,314 @@ Sent at: ${new Date().toLocaleString('en-IN')}`;
     });
   }
 });
+
+// ─── Quotation Helpers ─────────────────────────────────────────────────────
+
+const normalizeRentalTypeValue = (value) => {
+  const normalized = String(value || 'inhouse').toLowerCase();
+  if (normalized === 'perday') return 'perday';
+  if (normalized === 'persession') return 'persession';
+  return 'inhouse';
+};
+
+const parseDateAndTime = (dateValue, timeValue) => {
+  const safeDate = String(dateValue || '').trim();
+  const safeTime = String(timeValue || '').trim();
+  if (!safeDate || !safeTime) return null;
+  const [hours, minutes] = safeTime.split(':').map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+  const date = new Date(`${safeDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+};
+
+const calculateQuotationTotals = ({ rentals, schedules }) => {
+  const safeRentals = Array.isArray(rentals) ? rentals : [];
+  const inhouseSchedule = schedules?.inhouse || {};
+  const perdaySchedule = schedules?.perday || {};
+
+  const hasInhouse = safeRentals.some((r) => normalizeRentalTypeValue(r?.rentalType) === 'inhouse');
+  const hasPerday = safeRentals.some((r) => normalizeRentalTypeValue(r?.rentalType) === 'perday');
+  const hasPersession = safeRentals.some((r) => normalizeRentalTypeValue(r?.rentalType) === 'persession');
+
+  const inhouseDate = String(inhouseSchedule?.date || '').trim();
+  const inhouseStartTime = String(inhouseSchedule?.startTime || '').trim();
+  const inhouseEndTime = String(inhouseSchedule?.endTime || '').trim();
+
+  let inhouseDurationHours = 0;
+  if (hasInhouse) {
+    if (!inhouseDate || !inhouseStartTime || !inhouseEndTime) {
+      throw new Error('In-house schedule (date, start time, end time) is required for in-house quotation items.');
+    }
+    const [startHour, startMinute] = inhouseStartTime.split(':').map(Number);
+    const [endHour, endMinute] = inhouseEndTime.split(':').map(Number);
+    if (!Number.isInteger(startHour) || !Number.isInteger(startMinute) || !Number.isInteger(endHour) || !Number.isInteger(endMinute)) {
+      throw new Error('Invalid in-house start/end time in quotation.');
+    }
+    const startMinutes = (startHour * 60) + startMinute;
+    let endMinutes = (endHour * 60) + endMinute;
+    if (endMinutes <= startMinutes) endMinutes += 24 * 60;
+    inhouseDurationHours = (endMinutes - startMinutes) / 60;
+    if (!(inhouseDurationHours > 0)) {
+      throw new Error('In-house end time must be after start time.');
+    }
+  }
+
+  const perdayStartDate = String(perdaySchedule?.startDate || '').trim();
+  const perdayEndDate = String(perdaySchedule?.endDate || '').trim();
+  const perdayPickupTime = String(perdaySchedule?.pickupTime || '').trim();
+  const perdayReturnTime = String(perdaySchedule?.returnTime || '').trim();
+
+  let perdayDays = 0;
+  if (hasPerday) {
+    if (!perdayStartDate || !perdayEndDate || !perdayPickupTime || !perdayReturnTime) {
+      throw new Error('Per-day schedule (start date, end date, pickup time, return time) is required for per-day quotation items.');
+    }
+    const startDateTime = parseDateAndTime(perdayStartDate, perdayPickupTime);
+    const endDateTime = parseDateAndTime(perdayEndDate, perdayReturnTime);
+    if (!startDateTime || !endDateTime) {
+      throw new Error('Invalid per-day date/time selection in quotation.');
+    }
+    const diffMs = endDateTime.getTime() - startDateTime.getTime();
+    const dayMs = 24 * 60 * 60 * 1000;
+    if (diffMs < dayMs) {
+      throw new Error('Per-day return must be at least 24 hours after pickup in quotation.');
+    }
+    if (diffMs % dayMs !== 0) {
+      throw new Error('Per-day return must be in exact 24-hour blocks in quotation.');
+    }
+    perdayDays = diffMs / dayMs;
+  }
+
+  let subtotal = 0;
+  for (const rental of safeRentals) {
+    const rentalType = normalizeRentalTypeValue(rental?.rentalType);
+    const itemPrice = Number(rental?.price || 0);
+    const itemQuantity = Math.max(1, Number(rental?.quantity || 1));
+    if (rentalType === 'persession') {
+      subtotal += itemPrice * itemQuantity;
+    } else if (rentalType === 'perday') {
+      subtotal += itemPrice * itemQuantity * perdayDays;
+    } else {
+      subtotal += itemPrice * itemQuantity * inhouseDurationHours;
+    }
+  }
+
+  return {
+    subtotal,
+    hasInhouse,
+    hasPerday,
+    hasPersession,
+    inhouseDurationHours,
+    perdayDays,
+    schedules: {
+      inhouse: { date: inhouseDate, startTime: inhouseStartTime, endTime: inhouseEndTime, durationHours: inhouseDurationHours },
+      perday: { startDate: perdayStartDate, endDate: perdayEndDate, pickupTime: perdayPickupTime, returnTime: perdayReturnTime, days: perdayDays }
+    }
+  };
+};
+
+// @route   POST /api/admin/quotations/send
+// @desc    Generate and send quotation email (with PDF) to selected recipients
+// @access  Private/Admin
+router.post('/quotations/send', protect, isAdmin, async (req, res) => {
+  try {
+    const recipientUserId = String(req.body?.recipientUserId || '').trim();
+    const includeSelectedUser = req.body?.includeSelectedUser !== false;
+    const additionalEmails = parseOptionalEmailList(req.body?.additionalEmails);
+    const quotation = req.body?.quotation || {};
+
+    const invalidAdditionalEmails = additionalEmails.filter((email) => !isValidEmail(email));
+    if (invalidAdditionalEmails.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid additional email address(es): ${invalidAdditionalEmails.join(', ')}`
+      });
+    }
+
+    const rawRentals = Array.isArray(quotation?.rentals) ? quotation.rentals : [];
+    if (rawRentals.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please include at least one rental item in quotation' });
+    }
+
+    const sanitizedRentals = [];
+    for (const rental of rawRentals) {
+      const rentalName = String(rental?.name || '').trim();
+      const rentalCategory = String(rental?.category || '').trim();
+      const rentalDescription = String(rental?.description || '').trim();
+      const rentalPrice = Number(rental?.price || 0);
+      const rentalQuantity = Math.max(1, Number(rental?.quantity || 1));
+      const rentalType = normalizeRentalTypeValue(rental?.rentalType);
+      if (!rentalName) {
+        return res.status(400).json({ success: false, message: 'Each quotation item must have a name' });
+      }
+      if (!Number.isFinite(rentalPrice) || rentalPrice < 0) {
+        return res.status(400).json({ success: false, message: `Invalid price for quotation item: ${rentalName}` });
+      }
+      sanitizedRentals.push({ name: rentalName, category: rentalCategory, description: rentalDescription, price: rentalPrice, quantity: rentalQuantity, rentalType });
+    }
+
+    let selectedUser = null;
+    if (recipientUserId) {
+      selectedUser = await User.findById(recipientUserId).select('name email mobile');
+      if (!selectedUser) {
+        return res.status(404).json({ success: false, message: 'Selected user not found' });
+      }
+    }
+
+    const recipientSet = new Set();
+    if (includeSelectedUser && selectedUser?.email) {
+      const selectedUserEmail = normalizeEmail(selectedUser.email);
+      if (!isValidEmail(selectedUserEmail)) {
+        return res.status(400).json({ success: false, message: `Invalid selected user email: ${selectedUser.email}` });
+      }
+      recipientSet.add(selectedUserEmail);
+    }
+    additionalEmails.forEach((email) => { if (isValidEmail(email)) recipientSet.add(email); });
+
+    const recipientEmails = Array.from(recipientSet);
+    if (recipientEmails.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please include selected user email or provide at least one additional recipient email'
+      });
+    }
+
+    const calculation = calculateQuotationTotals({
+      rentals: sanitizedRentals,
+      schedules: quotation?.schedules || {}
+    });
+
+    const settings = await AdminSettings.getSettings();
+    const gstEnabled = settings?.gstConfig?.enabled || false;
+    const gstRate = gstEnabled ? (settings?.gstConfig?.rate || 0.18) : 0;
+    const gstDisplayName = settings?.gstConfig?.displayName || 'GST';
+    const taxAmount = gstEnabled ? Math.round(calculation.subtotal * gstRate) : 0;
+    const totalAmount = calculation.subtotal + taxAmount;
+
+    const rentalTypeLabel = String(quotation?.rentalType || '').trim()
+      || deriveDynamicBookingLabel(sanitizedRentals, 'Quotation');
+    const quoteNotes = String(quotation?.notes || '').trim();
+    const generatedAt = new Date();
+
+    const selectedTypeLabels = [];
+    if (calculation.hasInhouse) selectedTypeLabels.push('In-house');
+    if (calculation.hasPerday) selectedTypeLabels.push('Per-day');
+    if (calculation.hasPersession) selectedTypeLabels.push('Per-session');
+
+    const laymanTypeDescriptions = {
+      'In-house': 'In-studio equipment and room usage billed per hour — ideal for recording sessions, rehearsals, or practice.',
+      'Per-day': 'Equipment rented for full-day blocks — suitable for outdoor shoots, events, or productions away from the studio.',
+      'Per-session': 'Flat rate per project, concert, show, or event timeline — billed as a single session regardless of hours.'
+    };
+
+    const rowsHtml = sanitizedRentals.map((item) => {
+      const rentalType = normalizeRentalTypeValue(item.rentalType);
+      let itemTotal = 0;
+      let rateMeta = 'Per hour';
+      if (rentalType === 'persession') {
+        itemTotal = item.price * item.quantity;
+        rateMeta = 'Per session';
+      } else if (rentalType === 'perday') {
+        itemTotal = item.price * item.quantity * calculation.perdayDays;
+        rateMeta = `Per day x ${calculation.perdayDays} day(s)`;
+      } else {
+        itemTotal = item.price * item.quantity * calculation.inhouseDurationHours;
+        rateMeta = `Per hour x ${calculation.inhouseDurationHours} hr(s)`;
+      }
+      return `
+        <tr>
+          <td style="padding:10px;border-bottom:1px solid #ececec;">${item.name}${item.category ? ` <small style="color:#666;">(${item.category})</small>` : ''}</td>
+          <td style="padding:10px;border-bottom:1px solid #ececec;text-align:center;">${item.quantity}</td>
+          <td style="padding:10px;border-bottom:1px solid #ececec;text-align:right;">&#8377;${item.price.toFixed(2)}</td>
+          <td style="padding:10px;border-bottom:1px solid #ececec;text-align:center;">${rateMeta}</td>
+          <td style="padding:10px;border-bottom:1px solid #ececec;text-align:right;font-weight:600;">&#8377;${itemTotal.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+
+    const subject = `Quotation from ${settings?.studioName || 'JamRoom'} - ${rentalTypeLabel}`;
+    const emailHtml = `
+      <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#222;">
+        <div style="background:#0f172a;color:#fff;padding:20px 24px;border-radius:10px 10px 0 0;">
+          <h2 style="margin:0;font-size:24px;">Quotation</h2>
+          <p style="margin:6px 0 0 0;opacity:0.9;">${settings?.studioName || 'JamRoom'}</p>
+        </div>
+        <div style="border:1px solid #e5e7eb;border-top:0;border-radius:0 0 10px 10px;padding:20px 24px;">
+          <p style="margin:0 0 10px 0;">Hello${selectedUser?.name ? ` ${selectedUser.name}` : ''},</p>
+          <p style="margin:0 0 14px 0;color:#4b5563;">Please find your requested quotation details below.</p>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:14px;"><tbody>
+            <tr><td style="padding:6px 0;color:#4b5563;">Quotation Label</td><td style="padding:6px 0;text-align:right;font-weight:600;">${rentalTypeLabel}</td></tr>
+            <tr><td style="padding:6px 0;color:#4b5563;">Selected Types</td><td style="padding:6px 0;text-align:right;">${selectedTypeLabels.join(', ') || 'N/A'}</td></tr>
+            ${selectedTypeLabels.map((label) => `<tr><td style="padding:4px 0 4px 12px;color:#4b5563;font-size:12px;">&rarr; ${label}</td><td style="padding:4px 0;text-align:right;font-size:12px;color:#6b7280;">${laymanTypeDescriptions[label] || ''}</td></tr>`).join('')}
+            ${calculation.hasInhouse ? `<tr><td style="padding:6px 0;color:#4b5563;">In-house Schedule</td><td style="padding:6px 0;text-align:right;">${calculation.schedules.inhouse.date} | ${calculation.schedules.inhouse.startTime} - ${calculation.schedules.inhouse.endTime} (${calculation.inhouseDurationHours} hr)</td></tr>` : ''}
+            ${calculation.hasPerday ? `<tr><td style="padding:6px 0;color:#4b5563;">Per-day Range</td><td style="padding:6px 0;text-align:right;">${calculation.schedules.perday.startDate} ${calculation.schedules.perday.pickupTime} to ${calculation.schedules.perday.endDate} ${calculation.schedules.perday.returnTime} (${calculation.perdayDays} day(s))</td></tr>` : ''}
+            <tr><td style="padding:6px 0;color:#4b5563;">Generated On</td><td style="padding:6px 0;text-align:right;">${generatedAt.toLocaleString('en-IN')}</td></tr>
+          </tbody></table>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+            <thead><tr style="background:#f9fafb;">
+              <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;">Item</th>
+              <th style="text-align:center;padding:10px;border-bottom:1px solid #e5e7eb;">Qty</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid #e5e7eb;">Rate</th>
+              <th style="text-align:center;padding:10px;border-bottom:1px solid #e5e7eb;">Billing</th>
+              <th style="text-align:right;padding:10px;border-bottom:1px solid #e5e7eb;">Amount</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><tbody>
+            <tr><td style="padding:6px 0;color:#4b5563;">Subtotal</td><td style="padding:6px 0;text-align:right;">&#8377;${calculation.subtotal.toFixed(2)}</td></tr>
+            ${gstEnabled ? `<tr><td style="padding:6px 0;color:#4b5563;">${gstDisplayName} (${Math.round(gstRate * 100)}%)</td><td style="padding:6px 0;text-align:right;">&#8377;${taxAmount.toFixed(2)}</td></tr>` : ''}
+            <tr><td style="padding:8px 0;font-weight:700;">Total</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#0f172a;">&#8377;${totalAmount.toFixed(2)}</td></tr>
+          </tbody></table>
+          ${quoteNotes ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px;"><strong>Notes:</strong> ${quoteNotes}</div>` : ''}
+          <p style="margin:0;color:#4b5563;">For confirmation or changes, reply to this email.</p>
+        </div>
+      </div>`;
+
+    // Generate PDF attachment (non-fatal)
+    let pdfBuffer = null;
+    const pdfFilename = `Quotation_${(settings?.studioName || 'JamRoom').replace(/[^a-zA-Z0-9]/g, '_')}_${generatedAt.toISOString().split('T')[0]}.pdf`;
+    try {
+      pdfBuffer = await generateQuotationPDF({
+        rentalTypeLabel, selectedTypeLabels, calculation,
+        rentals: sanitizedRentals, quoteNotes, generatedAt,
+        gstEnabled, gstRate, gstDisplayName, taxAmount, totalAmount,
+        recipientName: selectedUser?.name || ''
+      }, settings);
+    } catch (pdfError) {
+      console.error('Quotation PDF generation failed (non-fatal):', pdfError.message);
+    }
+
+    const emailAttachments = pdfBuffer
+      ? [{ filename: pdfFilename, content: pdfBuffer, contentType: 'application/pdf' }]
+      : [];
+
+    for (const recipient of recipientEmails) {
+      await sendEmail({ to: recipient, subject, html: emailHtml, attachments: emailAttachments });
+    }
+
+    console.log(`Quotation sent to ${recipientEmails.length} recipient(s), PDF: ${pdfBuffer ? 'attached' : 'skipped'}`);
+
+    res.json({
+      success: true,
+      message: `Quotation sent to ${recipientEmails.length} recipient(s)${pdfBuffer ? ' with PDF attachment' : ''}`,
+      recipients: recipientEmails,
+      pdfAttached: !!pdfBuffer,
+      quotation: {
+        rentalType: rentalTypeLabel,
+        schedules: calculation.schedules,
+        inhouseDurationHours: calculation.inhouseDurationHours,
+        perdayDays: calculation.perdayDays,
+        subtotal: calculation.subtotal,
+        taxAmount,
+        totalAmount
+      }
+    });
+  } catch (error) {
+    console.error('Send quotation error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to send quotation' });
+  }
+});
+
 
 module.exports = router;

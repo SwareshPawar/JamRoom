@@ -75,6 +75,7 @@
             <div id="bookingsTab" class="tab-content active">
                 <div class="admin-toolbar">
                     <h2>Manage Bookings</h2>
+                    <button class="btn btn-secondary" onclick="showQuotationModal()">🧾 Generate Quotation</button>
                     <button class="btn btn-primary" onclick="showCreateBookingModal()">➕ Create Booking</button>
                 </div>
                 <div id="bookingAlert" class="alert"></div>
@@ -780,6 +781,124 @@
             </form>
         </div>
     </div>
+
+    <!-- Quotation Modal -->
+    <div id="quotationModal" class="modal admin-create-booking-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Generate Quotation</h2>
+                <span class="close" onclick="hideQuotationModal()">&times;</span>
+            </div>
+            <form id="quotationForm" onsubmit="submitQuotation(event)">
+                <div class="form-group">
+                    <label for="quoteUserSearch">Select User (Optional)</label>
+                    <input type="text" id="quoteUserSearch" placeholder="Search by name, email, or mobile" autocomplete="off">
+                    <input type="hidden" id="quoteUserId">
+                    <small id="quoteUserSelected" class="settings-help-text">No user selected. You can still send to custom email IDs.</small>
+                    <div id="quoteUserTypeahead" class="create-user-typeahead admin-hidden"></div>
+                </div>
+                <div class="form-group">
+                    <label class="settings-checkbox-label">
+                        <input type="checkbox" id="quoteIncludeSelectedUser" class="settings-checkbox-input" checked>
+                        <span class="settings-checkbox-text">Send quote to selected user email</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="quoteAdditionalEmails">Additional recipient emails (optional)</label>
+                    <textarea id="quoteAdditionalEmails" rows="2" placeholder="email1@example.com, email2@example.com"></textarea>
+                    <small class="settings-help-text">Use comma, semicolon, space, or new line separated email addresses.</small>
+                </div>
+                <div class="form-group">
+                    <label for="quoteBookingType">Quotation Label</label>
+                    <input type="text" id="quoteBookingType" placeholder="Auto-derived from selected items if left empty">
+                </div>
+                <div class="form-group">
+                    <label>Available Rental Items*</label>
+                    <div id="quotationRentals" class="admin-rentals-panel">
+                        <div class="loading-inline-muted">Loading rental options...</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Quotation Type(s) <span style="font-weight:400;color:#6b7280;font-size:0.9em;">— select all that apply to this quote</span></label>
+                    <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+                        <label class="settings-checkbox-label">
+                            <input type="checkbox" id="quoteTypeHourly" class="settings-checkbox-input quote-type-checkbox" value="inhouse" checked>
+                            <span class="settings-checkbox-text">⏱️ <strong>Hourly Booking</strong><span style="color:#4b5563;font-weight:400;"> — In-studio equipment and room usage billed per hour (recording, rehearsal, practice)</span></span>
+                        </label>
+                        <label class="settings-checkbox-label">
+                            <input type="checkbox" id="quoteTypePerday" class="settings-checkbox-input quote-type-checkbox" value="perday" checked>
+                            <span class="settings-checkbox-text">📅 <strong>Per Day Rental</strong><span style="color:#4b5563;font-weight:400;"> — Equipment rented for full-day blocks (outdoor shoot, event, production away from studio)</span></span>
+                        </label>
+                        <label class="settings-checkbox-label">
+                            <input type="checkbox" id="quoteTypeSession" class="settings-checkbox-input quote-type-checkbox" value="persession" checked>
+                            <span class="settings-checkbox-text">🎯 <strong>Per Session / Event</strong><span style="color:#4b5563;font-weight:400;"> — Flat rate per project, concert, show, or event timeline</span></span>
+                        </label>
+                    </div>
+                    <small class="settings-help-text">Uncheck a type to hide those items and their schedule fields from this quotation.</small>
+                </div>
+                <div class="form-group" id="quoteInhouseScheduleSection">
+                    <label>⏱️ Hourly Booking Schedule<span style="font-weight:400;color:#4b5563;font-size:0.9em;"> — date and time window for in-studio usage</span></label>
+                    <div class="form-grid-3">
+                        <div><input type="date" id="quoteInhouseDate" placeholder="In-house date"></div>
+                        <div><input type="time" id="quoteInhouseStartTime" placeholder="Start time"></div>
+                        <div><input type="time" id="quoteInhouseEndTime" placeholder="End time"></div>
+                    </div>
+                </div>
+                <div class="form-group" id="quotePerdayScheduleSection">
+                    <label>📅 Per Day Rental Schedule<span style="font-weight:400;color:#4b5563;font-size:0.9em;"> — pickup and return dates (must be exact 24-hour blocks)</span></label>
+                    <div class="form-grid-2">
+                        <div>
+                            <label for="quotePerdayStartDate">Start Date / Pickup</label>
+                            <input type="date" id="quotePerdayStartDate">
+                        </div>
+                        <div>
+                            <label for="quotePerdayEndDate">End Date / Return</label>
+                            <input type="date" id="quotePerdayEndDate">
+                        </div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div>
+                            <label for="quotePerdayPickupTime">Pickup Time</label>
+                            <input type="time" id="quotePerdayPickupTime" value="10:00">
+                        </div>
+                        <div>
+                            <label for="quotePerdayReturnTime">Return Time</label>
+                            <input type="time" id="quotePerdayReturnTime" value="10:00">
+                        </div>
+                    </div>
+                    <small class="settings-help-text">Per-day count is calculated from pickup to return and must be in exact 24-hour multiples.</small>
+                </div>
+                <div id="quoteItemsSummaryWrap" class="form-group" style="display:none;">
+                    <label>Selected Items Summary</label>
+                    <div id="quoteItemsSummary" style="overflow-x:auto;"></div>
+                </div>
+                <div class="form-grid-3">
+                    <div class="form-group">
+                        <label for="quoteSubtotal">Subtotal (&#8377;)</label>
+                        <input type="number" id="quoteSubtotal" readonly class="readonly-soft" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="quoteTaxAmount">Tax (&#8377;)</label>
+                        <input type="number" id="quoteTaxAmount" readonly class="readonly-soft" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="quoteTotalAmount">Final Total (&#8377;)</label>
+                        <input type="number" id="quoteTotalAmount" readonly class="readonly-soft" value="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="quoteNotes">Notes (optional)</label>
+                    <textarea id="quoteNotes" rows="3" placeholder="Any quote notes..."></textarea>
+                </div>
+                <div class="action-row-end">
+                    <button type="button" onclick="hideQuotationModal()" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Send Quotation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
 
     <script>
         const API_URL = window.location.origin;
@@ -2041,6 +2160,12 @@
         function loadRentalTypes(rentalTypes = []) {
             const container = document.getElementById('rentalTypesContainer');
             container.innerHTML = '';
+
+            const normalizeSettingsMaxQuantity = (value) => {
+                const parsed = parseInt(value, 10);
+                if (!Number.isFinite(parsed) || parsed < 1) return 10;
+                return Math.min(100, parsed);
+            };
             
             rentalTypes.forEach((rental, index) => {
                 const hasSubItems = rental.subItems && rental.subItems.length > 0;
@@ -2080,6 +2205,11 @@
                             <input type="number" value="${sub.perdayPrice || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="perdayPrice"
                                    class="rental-subitem-input rental-subitem-input-perday" min="0" placeholder="Required for per-day">
                         </div>
+                        <div>
+                            <label class="rental-subitem-label">Max Quantity</label>
+                            <input type="number" value="${normalizeSettingsMaxQuantity(sub.maxQuantity)}" data-rental="${index}" data-subitem="${subIndex}" data-field="maxQuantity"
+                                   class="rental-subitem-input" min="1" max="100" placeholder="10">
+                        </div>
                         <button type="button" onclick="removeSubItem(${index}, ${subIndex})" class="btn btn-danger btn-sm rental-subitem-remove">×</button>
                     </div>
                     `;
@@ -2102,7 +2232,7 @@
                             <div class="rental-type-header-grid">
                                 <div>
                                     <label class="rental-type-label">Category Name*</label>
-                                    <input type="text" value="${rental.name || ''}" onchange="updateRentalType(${index}, 'name', this.value)" 
+                                    <input type="text" value="${rental.name || ''}" data-field="categoryName" onchange="updateRentalType(${index}, 'name', this.value)" 
                                            class="rental-type-input"
                                            placeholder="e.g., Synths, Guitars, JamRoom">
                                 </div>
@@ -2116,14 +2246,19 @@
                                 </div>
                                 <div>
                                     <label class="rental-type-label">Base Price (₹/hr)* <small class="rental-type-note">(used if no sub-items)</small></label>
-                                    <input type="number" value="${rental.basePrice || ''}" onchange="updateRentalType(${index}, 'basePrice', parseInt(this.value))" 
+                                    <input type="number" value="${rental.basePrice || ''}" data-field="categoryBasePrice" onchange="updateRentalType(${index}, 'basePrice', parseInt(this.value))" 
                                            class="rental-type-input" min="0">
+                                </div>
+                                <div>
+                                    <label class="rental-type-label">Max Quantity</label>
+                                    <input type="number" value="${normalizeSettingsMaxQuantity(rental.maxQuantity)}" data-field="categoryMaxQuantity" onchange="updateRentalType(${index}, 'maxQuantity', parseInt(this.value))"
+                                           class="rental-type-input" min="1" max="100" placeholder="10">
                                 </div>
                                 <button type="button" onclick="removeRentalType(${index})" class="btn btn-danger rental-type-remove">Remove</button>
                             </div>
                             <div class="rental-type-description-wrap">
                                 <label class="rental-type-label">Description</label>
-                                <textarea onchange="updateRentalType(${index}, 'description', this.value)" 
+                                <textarea data-field="categoryDescription" onchange="updateRentalType(${index}, 'description', this.value)" 
                                           class="rental-type-input rental-type-textarea" 
                                           rows="2" placeholder="Optional description">${rental.description || ''}</textarea>
                             </div>
@@ -2342,7 +2477,8 @@
                 name: '',
                 description: '',
                 price: 0,
-                perdayPrice: 0
+                perdayPrice: 0,
+                maxQuantity: 10
             });
 
             loadRentalTypes(currentData);
@@ -2392,6 +2528,7 @@
                 name: '',
                 basePrice: 0,
                 description: '',
+                maxQuantity: 10,
                 subItems: []
             });
             loadRentalTypes(currentData);
@@ -2422,16 +2559,24 @@
         function getCurrentRentalTypes() {
             const container = document.getElementById('rentalTypesContainer');
             const rentalTypes = [];
+
+            const normalizeSettingsMaxQuantity = (value) => {
+                const parsed = parseInt(value, 10);
+                if (!Number.isFinite(parsed) || parsed < 1) return 10;
+                return Math.min(100, parsed);
+            };
             
             Array.from(container.children).forEach((div, index) => {
                 // Get main rental type fields
-                const nameInput = div.querySelector('input[type="text"]');
-                const priceInput = div.querySelector('input[type="number"]');
-                const descInput = div.querySelector('textarea');
+                const nameInput = div.querySelector('input[data-field="categoryName"]');
+                const priceInput = div.querySelector('input[data-field="categoryBasePrice"]');
+                const maxQuantityInput = div.querySelector('input[data-field="categoryMaxQuantity"]');
+                const descInput = div.querySelector('textarea[data-field="categoryDescription"]');
                 const categoryRentalTypeSelect = div.querySelector('select[data-field="categoryRentalType"]');
                 
                 const name = nameInput?.value?.trim();
                 const basePrice = parseInt(priceInput?.value) || 0;
+                const maxQuantity = normalizeSettingsMaxQuantity(maxQuantityInput?.value);
                 const description = descInput?.value?.trim();
                 const categoryRentalType = categoryRentalTypeSelect?.value || 'inhouse';
                 
@@ -2446,12 +2591,14 @@
                         const subDescInput = subDiv.querySelector('input[data-field="description"]');
                         const subPriceInput = subDiv.querySelector('input[data-field="price"]');
                         const subPerdayPriceInput = subDiv.querySelector('input[data-field="perdayPrice"]');
+                        const subMaxQuantityInput = subDiv.querySelector('input[data-field="maxQuantity"]');
                         
                         const subName = subNameInput?.value?.trim() || '';
                         const subDesc = subDescInput?.value?.trim() || '';
                         const subPrice = parseInt(subPriceInput?.value) || 0;
                         const subRentalType = categoryRentalType;
                         const subPerdayPrice = parseInt(subPerdayPriceInput?.value) || 0;
+                        const subMaxQuantity = normalizeSettingsMaxQuantity(subMaxQuantityInput?.value);
                         
                         // Only save sub-items that have at least a name
                         if (subName) {
@@ -2459,7 +2606,8 @@
                                 name: subName,
                                 description: subDesc,
                                 price: subPrice,
-                                rentalType: subRentalType
+                                rentalType: subRentalType,
+                                maxQuantity: subMaxQuantity
                             };
                             
                             // Add per-day price only for perday rentals
@@ -2487,6 +2635,7 @@
                     const rental = {
                         name,
                         basePrice,
+                        maxQuantity,
                         rentalType: categoryRentalType,
                         description: description || ''
                     };
@@ -2512,6 +2661,11 @@
         let createDateInputLastValue = '';
         let createBookingDraftSaveTimer = null;
         let isApplyingCreateBookingDraft = false;
+
+        // ── Quotation state ──────────────────────────────────────
+        let selectedQuotationUser = null;
+        let quoteSearchDebounceTimer = null;
+        let quoteSearchRequestSeq = 0;
 
         const clearCreateBookingDraft = () => {
             if (createBookingDraftSaveTimer) {
@@ -2838,7 +2992,528 @@
             });
         };
 
-        window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
+        
+        // ── Quotation helpers ─────────────────────────────────────────────────
+
+        const getQuotationQtyInputId = (rentalId) => `quote_quantity_${String(rentalId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        const getQuotationQtyEnableInputId = (rentalId) => `quote_quantity_enable_${String(rentalId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+        const sanitizeQuotationMaxQuantity = (value) => {
+            const parsed = parseInt(value, 10);
+            if (!Number.isFinite(parsed) || parsed < 1) return 10;
+            return Math.min(100, parsed);
+        };
+
+        const syncQuotationQuantityInputState = (rentalId) => {
+            const safeRentalId = String(rentalId || '').trim();
+            if (!safeRentalId) return;
+
+            const rentalInputId = getQuotationQtyInputId(safeRentalId);
+            const qtyEnableInputId = getQuotationQtyEnableInputId(safeRentalId);
+            const rentalCheckbox = document.getElementById(`quote_rental_${rentalInputId}`);
+            const qtyEnableCheckbox = document.getElementById(qtyEnableInputId);
+            const qtyInput = document.getElementById(rentalInputId);
+
+            if (!rentalCheckbox || !qtyEnableCheckbox || !qtyInput) return;
+
+            const isRentalSelected = rentalCheckbox.checked;
+            qtyEnableCheckbox.disabled = !isRentalSelected;
+            if (!isRentalSelected) {
+                qtyEnableCheckbox.checked = false;
+                qtyInput.disabled = true;
+                qtyInput.value = '1';
+                return;
+            }
+
+            qtyInput.disabled = !qtyEnableCheckbox.checked;
+            if (!qtyEnableCheckbox.checked) {
+                qtyInput.value = '1';
+            }
+        };
+
+        const parseQuoteEmailListInput = (inputValue) => {
+            return String(inputValue || '').split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
+        };
+
+        const isValidQuoteEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+
+        const resetQuotationForm = () => {
+            const form = document.getElementById('quotationForm');
+            if (form) form.reset();
+            selectedQuotationUser = null;
+            document.getElementById('quoteUserId').value = '';
+            document.getElementById('quoteUserSearch').value = '';
+            document.getElementById('quoteUserSelected').textContent = 'No user selected. You can still send to custom email IDs.';
+            document.getElementById('quoteUserTypeahead').style.display = 'none';
+            document.getElementById('quoteUserTypeahead').classList.add('admin-hidden');
+            document.getElementById('quoteIncludeSelectedUser').checked = true;
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('quoteInhouseDate').value = today;
+            document.getElementById('quoteInhouseStartTime').value = '10:00';
+            document.getElementById('quoteInhouseEndTime').value = '12:00';
+            document.getElementById('quotePerdayStartDate').value = today;
+            document.getElementById('quotePerdayEndDate').value = today;
+            document.getElementById('quotePerdayPickupTime').value = '10:00';
+            document.getElementById('quotePerdayReturnTime').value = '10:00';
+            document.getElementById('quoteBookingType').value = '';
+            document.getElementById('quoteAdditionalEmails').value = '';
+            document.getElementById('quoteNotes').value = '';
+            document.getElementById('quoteSubtotal').value = '0';
+            document.getElementById('quoteTaxAmount').value = '0';
+            document.getElementById('quoteTotalAmount').value = '0';
+            // Reset type checkboxes and schedule visibility
+            ['quoteTypeHourly', 'quoteTypePerday', 'quoteTypeSession'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.checked = true;
+            });
+            const inhs = document.getElementById('quoteInhouseScheduleSection');
+            const pds = document.getElementById('quotePerdayScheduleSection');
+            if (inhs) inhs.style.display = '';
+            if (pds) pds.style.display = '';
+        };
+
+        const renderQuotationUserTypeahead = (users = []) => {
+            const typeahead = document.getElementById('quoteUserTypeahead');
+            if (!typeahead) return;
+            if (!Array.isArray(users) || users.length === 0) {
+                typeahead.innerHTML = '<div class="typeahead-empty">No matching users found.</div>';
+                typeahead.style.display = 'block';
+                typeahead.classList.remove('admin-hidden');
+                return;
+            }
+            typeahead.innerHTML = users.slice(0, 20).map((user) => {
+                const safeName = escapeHtml(user.name || 'User');
+                const safeEmail = escapeHtml(user.email || '');
+                const safeMobile = escapeHtml(user.mobile || '');
+                return `<button type="button" class="typeahead-option-btn" onclick="selectQuotationUser('${user._id}')">
+                    <div class="typeahead-option-name">${safeName}</div>
+                    <div class="typeahead-option-meta">${safeEmail}${safeMobile ? ` | ${safeMobile}` : ''}</div>
+                </button>`;
+            }).join('');
+            typeahead.style.display = 'block';
+            typeahead.classList.remove('admin-hidden');
+        };
+
+        const searchQuotationUsers = async (query) => {
+            const normalizedQuery = String(query || '').trim();
+            const typeahead = document.getElementById('quoteUserTypeahead');
+            if (!typeahead) return;
+            if (!normalizedQuery) {
+                typeahead.style.display = 'none';
+                typeahead.classList.add('admin-hidden');
+                typeahead.innerHTML = '';
+                return;
+            }
+            const requestId = ++quoteSearchRequestSeq;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/users?q=${encodeURIComponent(normalizedQuery)}&limit=20`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to search users');
+                const result = await res.json();
+                if (requestId !== quoteSearchRequestSeq) return;
+                renderQuotationUserTypeahead(Array.isArray(result.users) ? result.users : []);
+            } catch (error) {
+                if (requestId !== quoteSearchRequestSeq) return;
+                typeahead.innerHTML = '<div class="typeahead-empty">Unable to load user suggestions.</div>';
+                typeahead.style.display = 'block';
+                typeahead.classList.remove('admin-hidden');
+            }
+        };
+
+        function selectQuotationUser(userId) {
+            const typeahead = document.getElementById('quoteUserTypeahead');
+            const pickFromList = (users) => {
+                const user = (users || []).find((u) => String(u._id) === String(userId));
+                if (!user) return false;
+                selectedQuotationUser = user;
+                document.getElementById('quoteUserId').value = user._id;
+                document.getElementById('quoteUserSearch').value = `${user.name} (${user.email})`;
+                document.getElementById('quoteUserSelected').textContent = `Selected: ${user.name} | ${user.email}${user.mobile ? ` | ${user.mobile}` : ''}`;
+                if (typeahead) { typeahead.style.display = 'none'; typeahead.classList.add('admin-hidden'); }
+                return true;
+            };
+            if (pickFromList(adminCreateUsers)) return;
+            loadCreateBookingUsers(document.getElementById('quoteUserSearch').value || '').then(() => pickFromList(adminCreateUsers));
+        }
+
+        const getSelectedQuoteTypes = () => {
+            const types = [];
+            if (document.getElementById('quoteTypeHourly')?.checked) types.push('inhouse');
+            if (document.getElementById('quoteTypePerday')?.checked) types.push('perday');
+            if (document.getElementById('quoteTypeSession')?.checked) types.push('persession');
+            return types;
+        };
+
+        const updateQuoteTypeFilter = () => {
+            const selectedTypes = getSelectedQuoteTypes();
+            const inhouseSection = document.getElementById('quoteInhouseScheduleSection');
+            const perdaySection = document.getElementById('quotePerdayScheduleSection');
+            if (inhouseSection) inhouseSection.style.display = selectedTypes.includes('inhouse') ? '' : 'none';
+            if (perdaySection) perdaySection.style.display = selectedTypes.includes('perday') ? '' : 'none';
+            document.querySelectorAll('#quotationRentals [data-rental-type-group]').forEach((group) => {
+                const groupType = group.dataset.rentalTypeGroup;
+                group.style.display = (selectedTypes.length === 0 || selectedTypes.includes(groupType)) ? '' : 'none';
+            });
+            document.querySelectorAll('#quotationRentals input[name="quotationRental"]:checked').forEach((input) => {
+                const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental || '{}'));
+                const rentalType = String(rentalData.rentalType || 'inhouse').toLowerCase();
+                if (selectedTypes.length > 0 && !selectedTypes.includes(rentalType)) {
+                    input.checked = false;
+                    if (rentalData?.id) {
+                        syncQuotationQuantityInputState(rentalData.id);
+                    }
+                }
+            });
+            recalculateQuotationTotals();
+        };
+
+        const displayQuotationRentals = (rentalTypes = []) => {
+            const container = document.getElementById('quotationRentals');
+            if (!container) return;
+            if (!Array.isArray(rentalTypes) || rentalTypes.length === 0) {
+                container.innerHTML = '<div class="loading-inline-muted">No rental options configured</div>';
+                return;
+            }
+            let html = '';
+            rentalTypes.forEach((type) => {
+                const categoryRentalType = String(type.rentalType || 'inhouse').toLowerCase();
+                html += `<div class="quote-rental-group" data-rental-type-group="${categoryRentalType}">`;
+                html += `<div class="admin-rental-category">${escapeHtml(type.name)}</div>`;
+                if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0 && categoryRentalType !== 'perday') {
+                    const baseId = `${type.name}_base`;
+                    const qtyInputId = getQuotationQtyInputId(baseId);
+                    const maxQuantity = sanitizeQuotationMaxQuantity(type.maxQuantity);
+                    const qtyEnableInputId = getQuotationQtyEnableInputId(baseId);
+                    const encodedBaseData = encodeURIComponent(JSON.stringify({
+                        id: baseId, name: `${type.name} (Base)`, category: type.name,
+                        price: type.basePrice, perdayPrice: 0, rentalType: categoryRentalType,
+                        description: type.description || '', isRequired: false, isBase: true,
+                        maxQuantity
+                    }));
+                    const basePriceUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
+                    html += `<div class="admin-rental-row base">
+                        <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedBaseData}">
+                        <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}${basePriceUnit}</label>
+                        <div class="admin-rental-qty">
+                            <label class="settings-checkbox-label" style="margin-bottom:4px;">
+                                <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
+                                <span class="settings-checkbox-text">Enable Qty</span>
+                            </label>
+                            <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
+                            <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>
+                        </div>
+                    </div>`;
+                }
+                if (Array.isArray(type.subItems) && type.subItems.length > 0) {
+                    type.subItems.forEach((subItem) => {
+                        const itemId = `${type.name}__${subItem.name}`;
+                        const qtyInputId = getQuotationQtyInputId(itemId);
+                        const qtyEnableInputId = getQuotationQtyEnableInputId(itemId);
+                        const isPerday = categoryRentalType === 'perday';
+                        const isPerSession = categoryRentalType === 'persession';
+                        const maxQuantity = sanitizeQuotationMaxQuantity(subItem.maxQuantity ?? type.maxQuantity);
+                        const displayPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
+                        const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
+                        const encodedRentalData = encodeURIComponent(JSON.stringify({
+                            id: itemId, name: subItem.name, category: type.name,
+                            price: displayPrice, perdayPrice: subItem.perdayPrice || 0,
+                            rentalType: categoryRentalType, description: subItem.description || '',
+                            isRequired: false, isBase: false, maxQuantity
+                        }));
+                        html += `<div class="admin-rental-row child">
+                            <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedRentalData}">
+                            <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">
+                                ${isPerday ? '📅' : isPerSession ? '🎯' : '🔗'} ${escapeHtml(subItem.name)} - ${displayPrice === 0 ? 'FREE' : `₹${displayPrice}${priceUnit}`}
+                            </label>
+                            <div class="admin-rental-qty">
+                                <label class="settings-checkbox-label" style="margin-bottom:4px;">
+                                    <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
+                                    <span class="settings-checkbox-text">Enable Qty</span>
+                                </label>
+                                <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
+                                <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>
+                            </div>
+                        </div>`;
+                    });
+                } else if (type.name !== 'JamRoom' && Number(type.basePrice || 0) > 0) {
+                    const itemId = `${type.name}__${type.name}`;
+                    const qtyInputId = getQuotationQtyInputId(itemId);
+                    const qtyEnableInputId = getQuotationQtyEnableInputId(itemId);
+                    const maxQuantity = sanitizeQuotationMaxQuantity(type.maxQuantity);
+                    const encodedRentalData = encodeURIComponent(JSON.stringify({
+                        id: itemId, name: type.name, category: type.name, price: type.basePrice,
+                        perdayPrice: 0, rentalType: categoryRentalType,
+                        description: type.description || `${type.name} rental`, isRequired: false, isBase: false,
+                        maxQuantity
+                    }));
+                    const categoryUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
+                    html += `<div class="admin-rental-row child">
+                        <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedRentalData}">
+                        <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">🔗 ${escapeHtml(type.name)} - ₹${type.basePrice}${categoryUnit}</label>
+                        <div class="admin-rental-qty">
+                            <label class="settings-checkbox-label" style="margin-bottom:4px;">
+                                <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
+                                <span class="settings-checkbox-text">Enable Qty</span>
+                            </label>
+                            <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
+                            <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>
+                        </div>
+                    </div>`;
+                }
+                html += '</div>'; // end quote-rental-group
+            });
+            container.innerHTML = html;
+            updateQuoteTypeFilter();
+        };
+
+        const calculateQuoteInhouseDurationHours = ({ strict = true, required = false } = {}) => {
+            const dateValue = document.getElementById('quoteInhouseDate')?.value || '';
+            const startTime = document.getElementById('quoteInhouseStartTime')?.value || '';
+            const endTime = document.getElementById('quoteInhouseEndTime')?.value || '';
+            if (!dateValue || !startTime || !endTime) {
+                if (strict && required) throw new Error('Select in-house date, start time, and end time for in-house items.');
+                return { durationHours: 0, isValid: false, date: dateValue, startTime, endTime };
+            }
+            const [startHour, startMinute] = startTime.split(':').map(Number);
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+            if (!Number.isInteger(startHour) || !Number.isInteger(startMinute) || !Number.isInteger(endHour) || !Number.isInteger(endMinute)) {
+                if (strict && required) throw new Error('Invalid in-house time selection.');
+                return { durationHours: 0, isValid: false, date: dateValue, startTime, endTime };
+            }
+            const startMinutes = (startHour * 60) + startMinute;
+            let endMinutes = (endHour * 60) + endMinute;
+            if (endMinutes <= startMinutes) endMinutes += 24 * 60;
+            const durationHours = (endMinutes - startMinutes) / 60;
+            const isValid = durationHours > 0;
+            if (!isValid && strict && required) throw new Error('In-house end time must be after start time.');
+            return { durationHours, isValid, date: dateValue, startTime, endTime };
+        };
+
+        const combineDateAndTimeForQuote = (dateValue, timeValue) => {
+            if (!dateValue || !timeValue) return null;
+            const [hours, minutes] = String(timeValue).split(':').map(Number);
+            if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+            const date = new Date(`${dateValue}T00:00:00`);
+            if (Number.isNaN(date.getTime())) return null;
+            date.setHours(hours, minutes, 0, 0);
+            return date;
+        };
+
+        const calculateQuotePerdayDays = ({ strict = true, required = false } = {}) => {
+            const startDate = document.getElementById('quotePerdayStartDate')?.value || '';
+            const endDate = document.getElementById('quotePerdayEndDate')?.value || '';
+            const pickupTime = document.getElementById('quotePerdayPickupTime')?.value || '';
+            const returnTime = document.getElementById('quotePerdayReturnTime')?.value || '';
+            if (!startDate || !endDate || !pickupTime || !returnTime) {
+                if (strict && required) throw new Error('Select per-day start/end date and pickup/return time for per-day items.');
+                return { days: 0, isValid: false, startDate, endDate, pickupTime, returnTime };
+            }
+            const startDateTime = combineDateAndTimeForQuote(startDate, pickupTime);
+            const endDateTime = combineDateAndTimeForQuote(endDate, returnTime);
+            if (!startDateTime || !endDateTime) {
+                if (strict && required) throw new Error('Invalid per-day date/time selection.');
+                return { days: 0, isValid: false, startDate, endDate, pickupTime, returnTime };
+            }
+            const diffMs = endDateTime.getTime() - startDateTime.getTime();
+            const dayMs = 24 * 60 * 60 * 1000;
+            if (diffMs < dayMs) {
+                if (strict && required) throw new Error('Per-day return must be at least 24 hours after pickup.');
+                return { days: 0, isValid: false, startDate, endDate, pickupTime, returnTime };
+            }
+            if (diffMs % dayMs !== 0) {
+                if (strict && required) throw new Error('Per-day return must be in exact 24-hour blocks.');
+                return { days: 0, isValid: false, startDate, endDate, pickupTime, returnTime };
+            }
+            return { days: diffMs / dayMs, isValid: true, startDate, endDate, pickupTime, returnTime };
+        };
+
+        const collectQuotationSelectedRentals = ({ strict = true } = {}) => {
+            const selectedRentals = [];
+            const inputs = document.querySelectorAll('#quotationRentals input[name="quotationRental"]:checked');
+            if (strict && inputs.length === 0) throw new Error('Please select at least one rental item for quotation.');
+            inputs.forEach((input) => {
+                const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental || '{}'));
+                const rentalType = String(rentalData.rentalType || 'inhouse').toLowerCase();
+                const qtyInput = document.getElementById(getQuotationQtyInputId(rentalData.id));
+                const qtyEnableInput = document.getElementById(getQuotationQtyEnableInputId(rentalData.id));
+                const maxQuantity = sanitizeQuotationMaxQuantity(rentalData.maxQuantity);
+                const qtyEnabled = qtyEnableInput?.checked === true;
+                const rawQty = Math.max(1, Number(qtyInput?.value || 1));
+                const quantity = qtyEnabled ? Math.min(maxQuantity, rawQty) : 1;
+
+                if (qtyInput) {
+                    qtyInput.max = String(maxQuantity);
+                    qtyInput.value = String(quantity);
+                }
+                selectedRentals.push({
+                    name: rentalData.name, category: rentalData.category || '',
+                    description: rentalData.description || '', price: Number(rentalData.price || 0),
+                    quantity, rentalType
+                });
+            });
+            const hasInhouse = selectedRentals.some((item) => item.rentalType === 'inhouse');
+            const hasPerday = selectedRentals.some((item) => item.rentalType === 'perday');
+            const inhouseSchedule = calculateQuoteInhouseDurationHours({ strict, required: hasInhouse });
+            const perdaySchedule = calculateQuotePerdayDays({ strict, required: hasPerday });
+            let subtotal = 0;
+            selectedRentals.forEach((rental) => {
+                if (rental.rentalType === 'persession') {
+                    subtotal += rental.price * rental.quantity;
+                } else if (rental.rentalType === 'perday') {
+                    if (perdaySchedule.isValid) subtotal += rental.price * rental.quantity * perdaySchedule.days;
+                } else {
+                    if (inhouseSchedule.isValid) subtotal += rental.price * rental.quantity * inhouseSchedule.durationHours;
+                }
+            });
+            return { selectedRentals, inhouseSchedule, perdaySchedule, subtotal };
+        };
+
+        const recalculateQuotationTotals = () => {
+            let quoteData = { selectedRentals: [], subtotal: 0 };
+            try { quoteData = collectQuotationSelectedRentals({ strict: false }); } catch (e) { /* no-op */ }
+            const gstEnabled = createBookingSettings?.gstConfig?.enabled || false;
+            const gstRate = createBookingSettings?.gstConfig?.rate || 0.18;
+            const taxAmount = gstEnabled ? Math.round(quoteData.subtotal * gstRate) : 0;
+            const totalAmount = quoteData.subtotal + taxAmount;
+            document.getElementById('quoteSubtotal').value = quoteData.subtotal.toFixed(2);
+            document.getElementById('quoteTaxAmount').value = taxAmount.toFixed(2);
+            document.getElementById('quoteTotalAmount').value = totalAmount.toFixed(2);
+
+            // Render items summary
+            const summaryWrap = document.getElementById('quoteItemsSummaryWrap');
+            const summaryEl = document.getElementById('quoteItemsSummary');
+            if (!summaryWrap || !summaryEl) return;
+            if (quoteData.selectedRentals.length === 0) {
+                summaryWrap.style.display = 'none';
+                return;
+            }
+            summaryWrap.style.display = '';
+            const rows = quoteData.selectedRentals.map((r) => {
+                let billingLabel = 'Per hour';
+                let itemTotal = 0;
+                if (r.rentalType === 'persession') {
+                    billingLabel = 'Per session';
+                    itemTotal = r.price * r.quantity;
+                } else if (r.rentalType === 'perday') {
+                    const pd = quoteData.perdaySchedule;
+                    billingLabel = pd && pd.isValid ? `Per day x ${pd.days}` : 'Per day';
+                    itemTotal = pd && pd.isValid ? r.price * r.quantity * pd.days : 0;
+                } else {
+                    const ih = quoteData.inhouseSchedule;
+                    billingLabel = ih && ih.isValid ? `Per hour x ${ih.durationHours}` : 'Per hour';
+                    itemTotal = ih && ih.isValid ? r.price * r.quantity * ih.durationHours : 0;
+                }
+                return `<tr>
+                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(r.name)}${r.category ? ` <small style="color:#6b7280;">(${escapeHtml(r.category)})</small>` : ''}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${r.quantity}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">₹${r.price.toFixed(2)}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${billingLabel}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">₹${itemTotal.toFixed(2)}</td>
+                </tr>`;
+            }).join('');
+            summaryEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+                <thead><tr style="background:#f9fafb;">
+                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Item</th>
+                    <th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Qty</th>
+                    <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Rate</th>
+                    <th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Billing</th>
+                    <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Amount</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        };
+
+        async function showQuotationModal() {
+            try {
+                resetQuotationForm();
+                if (!createBookingSettings || !Array.isArray(createBookingSettings.rentalTypes)) {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${API_URL}/api/admin/settings`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error('Failed to load settings for quotation');
+                    const result = await res.json();
+                    createBookingSettings = result.settings || {};
+                }
+                displayQuotationRentals(createBookingSettings.rentalTypes || []);
+                recalculateQuotationTotals();
+                document.getElementById('quotationModal').classList.add('show');
+            } catch (error) {
+                showErrorAlert(error.message || 'Unable to open quotation generator');
+            }
+        }
+
+        function hideQuotationModal() {
+            closeModal('quotationModal');
+            resetQuotationForm();
+        }
+
+        async function submitQuotation(event) {
+            event.preventDefault();
+            try {
+                const includeSelectedUser = document.getElementById('quoteIncludeSelectedUser').checked;
+                const additionalEmails = parseQuoteEmailListInput(document.getElementById('quoteAdditionalEmails').value || '');
+                const invalidEmails = additionalEmails.filter((email) => !isValidQuoteEmail(email));
+                if (invalidEmails.length > 0) throw new Error(`Invalid email address(es): ${invalidEmails.join(', ')}`);
+                if (includeSelectedUser && !selectedQuotationUser?.email) {
+                    throw new Error('Select a user or disable selected-user email option.');
+                }
+                if (!includeSelectedUser && additionalEmails.length === 0) {
+                    throw new Error('Provide at least one recipient email.');
+                }
+                const quoteData = collectQuotationSelectedRentals({ strict: true });
+                const rentalTypes = Array.isArray(createBookingSettings?.rentalTypes) ? createBookingSettings.rentalTypes : [];
+                const derivedLabel = typeof window.deriveAdminBookingTypeLabel === 'function'
+                    ? window.deriveAdminBookingTypeLabel(quoteData.selectedRentals, rentalTypes) : '';
+                const quoteLabel = String(document.getElementById('quoteBookingType').value || '').trim() || derivedLabel || 'Quotation';
+                showLoading('Sending quotation...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/quotations/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        recipientUserId: selectedQuotationUser?._id || '',
+                        includeSelectedUser,
+                        additionalEmails,
+                        quotation: {
+                            rentalType: quoteLabel,
+                            rentals: quoteData.selectedRentals,
+                            schedules: {
+                                inhouse: {
+                                    date: quoteData.inhouseSchedule?.date || '',
+                                    startTime: quoteData.inhouseSchedule?.startTime || '',
+                                    endTime: quoteData.inhouseSchedule?.endTime || ''
+                                },
+                                perday: {
+                                    startDate: quoteData.perdaySchedule?.startDate || '',
+                                    endDate: quoteData.perdaySchedule?.endDate || '',
+                                    pickupTime: quoteData.perdaySchedule?.pickupTime || '',
+                                    returnTime: quoteData.perdaySchedule?.returnTime || ''
+                                }
+                            },
+                            notes: String(document.getElementById('quoteNotes').value || '').trim()
+                        }
+                    })
+                });
+                const result = await res.json();
+                if (!res.ok || !result.success) throw new Error(result.message || 'Failed to send quotation');
+                hideQuotationModal();
+                const recipientLabel = (result.recipients || []).join(', ');
+                if (result.pdfAttached === false) {
+                    showWarningAlert(`Quotation sent to: ${recipientLabel}. PDF attachment could not be generated.`);
+                } else {
+                    showSuccessAlert(`Quotation sent to: ${recipientLabel}${result.pdfAttached ? ' (PDF attached)' : ''}`);
+                }
+            } catch (error) {
+                showErrorAlert(error.message || 'Failed to send quotation');
+            } finally {
+                hideLoading();
+            }
+        }
+
+window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
         window.deriveAdminBookingTypeLabel = deriveAdminBookingTypeLabel;
 
         const isCreateDateTimeOverrideEnabled = () => {
@@ -3862,8 +4537,57 @@
             // Initialize admin functionality
             checkAuth();
         });
+
+        // Quotation event listeners
+        const quoteUserSearchEl = document.getElementById('quoteUserSearch');
+        if (quoteUserSearchEl) {
+            quoteUserSearchEl.addEventListener('input', (event) => {
+                if (quoteSearchDebounceTimer) clearTimeout(quoteSearchDebounceTimer);
+                quoteSearchDebounceTimer = setTimeout(() => searchQuotationUsers(event.target.value || ''), 220);
+            });
+        }
+        const quotationRentalsEl = document.getElementById('quotationRentals');
+        if (quotationRentalsEl) {
+            quotationRentalsEl.addEventListener('change', (event) => {
+                const target = event.target;
+                if (!target) {
+                    recalculateQuotationTotals();
+                    return;
+                }
+
+                if (target.name === 'quotationRental') {
+                    try {
+                        const rentalData = JSON.parse(decodeURIComponent(target.dataset.rental || '{}'));
+                        if (rentalData?.id) {
+                            syncQuotationQuantityInputState(rentalData.id);
+                        }
+                    } catch (error) {
+                        // Ignore malformed rental metadata and continue recalculation.
+                    }
+                }
+
+                if (target.classList?.contains('quote-qty-enable')) {
+                    const rentalId = String(target.id || '').replace(/^quote_quantity_enable_/, '');
+                    syncQuotationQuantityInputState(rentalId);
+                }
+
+                recalculateQuotationTotals();
+            });
+            quotationRentalsEl.addEventListener('input', recalculateQuotationTotals);
+        }
+        document.querySelectorAll('.quote-type-checkbox').forEach((cb) => {
+            cb.addEventListener('change', updateQuoteTypeFilter);
+        });
+
+        // Quotation schedule input listeners
+        ['quoteInhouseDate','quoteInhouseStartTime','quoteInhouseEndTime',
+         'quotePerdayStartDate','quotePerdayEndDate','quotePerdayPickupTime','quotePerdayReturnTime'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', recalculateQuotationTotals);
+        });
     </script>
     </div> <!-- app-container -->
+
 </body>
 </html>
 

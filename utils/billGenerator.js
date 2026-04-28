@@ -275,3 +275,214 @@ module.exports = {
   generateBillFilename,
   generateBillHTML
 };
+
+/**
+ * Build standalone HTML document for a quotation PDF
+ */
+const generateQuotationHTML = (data, settings) => {
+  const studioName = settings?.studioName || 'JamRoom';
+  const {
+    rentalTypeLabel,
+    selectedTypeLabels,
+    calculation,
+    rentals,
+    quoteNotes,
+    generatedAt,
+    gstEnabled,
+    gstRate,
+    gstDisplayName,
+    taxAmount,
+    totalAmount,
+    recipientName
+  } = data;
+
+  const typeDescriptions = {
+    'In-house': 'In-studio equipment and room usage billed per hour',
+    'Per-day': 'Equipment rented for full-day blocks — suitable for outdoor shoots, events, or productions away from the studio',
+    'Per-session': 'Flat rate per project, event, concert, show, or production timeline'
+  };
+
+  const typeRows = (selectedTypeLabels || []).map((label) => `
+    <tr>
+      <td style="padding:7px 14px;color:#374151;font-size:13px;font-weight:600;white-space:nowrap;">${label}</td>
+      <td style="padding:7px 14px;font-size:13px;color:#4b5563;">${typeDescriptions[label] || ''}</td>
+    </tr>`).join('');
+
+  const scheduleRows = [];
+  if (calculation.hasInhouse && calculation.schedules?.inhouse?.date) {
+    scheduleRows.push(`<tr><td style="padding:5px 0;color:#4b5563;font-size:13px;width:200px;">Date</td><td style="padding:5px 0;font-size:13px;">${calculation.schedules.inhouse.date}</td></tr>`);
+    scheduleRows.push(`<tr><td style="padding:5px 0;color:#4b5563;font-size:13px;">Time Window</td><td style="padding:5px 0;font-size:13px;">${calculation.schedules.inhouse.startTime} – ${calculation.schedules.inhouse.endTime} (${calculation.inhouseDurationHours} hr)</td></tr>`);
+  }
+  if (calculation.hasPerday && calculation.schedules?.perday?.startDate) {
+    scheduleRows.push(`<tr><td style="padding:5px 0;color:#4b5563;font-size:13px;">Pickup</td><td style="padding:5px 0;font-size:13px;">${calculation.schedules.perday.startDate} at ${calculation.schedules.perday.pickupTime}</td></tr>`);
+    scheduleRows.push(`<tr><td style="padding:5px 0;color:#4b5563;font-size:13px;">Return</td><td style="padding:5px 0;font-size:13px;">${calculation.schedules.perday.endDate} at ${calculation.schedules.perday.returnTime} (${calculation.perdayDays} day(s))</td></tr>`);
+  }
+
+  const itemRows = (rentals || []).map((item) => {
+    const rentalType = String(item.rentalType || 'inhouse').toLowerCase();
+    let billing = '';
+    let itemTotal = 0;
+    if (rentalType === 'persession') {
+      billing = 'Per Session';
+      itemTotal = item.price * item.quantity;
+    } else if (rentalType === 'perday') {
+      billing = `Per Day &times; ${calculation.perdayDays}`;
+      itemTotal = item.price * item.quantity * (calculation.perdayDays || 0);
+    } else {
+      billing = `Per Hour &times; ${calculation.inhouseDurationHours}`;
+      itemTotal = item.price * item.quantity * (calculation.inhouseDurationHours || 0);
+    }
+    return `
+    <tr>
+      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;">${item.name}${item.category ? ` <span style="color:#9ca3af;font-size:12px;">(${item.category})</span>` : ''}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-size:13px;">${item.quantity}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:13px;">&#8377;${item.price.toFixed(2)}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;text-align:center;font-size:13px;color:#4b5563;">${billing}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:13px;font-weight:600;">&#8377;${itemTotal.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  const gstRow = gstEnabled
+    ? `<tr><td style="padding:5px 0;color:#4b5563;">${gstDisplayName || 'GST'} (${Math.round((gstRate || 0) * 100)}%)</td><td style="text-align:right;">&#8377;${(taxAmount || 0).toFixed(2)}</td></tr>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Quotation &ndash; ${rentalTypeLabel}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;color:#1f2937;background:#fff;padding:28px}
+    .hdr{background:#0f172a;color:#fff;padding:22px 26px;border-radius:8px 8px 0 0}
+    .hdr h1{font-size:21px;margin-bottom:3px}
+    .hdr p{font-size:13px;opacity:.85}
+    .body{border:1px solid #e5e7eb;border-top:0;border-radius:0 0 8px 8px;padding:22px 26px}
+    .sec{font-size:12px;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:.5px;margin:18px 0 8px}
+    table.meta{width:100%;border-collapse:collapse;font-size:13px}
+    table.meta td{padding:4px 0}
+    table.types{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;background:#f9fafb}
+    table.items{width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden}
+    table.items th{background:#f9fafb;padding:9px 12px;font-size:12px;border-bottom:1px solid #e5e7eb;text-align:left}
+    table.totals{width:100%;border-collapse:collapse;font-size:13px}
+    table.totals td{padding:5px 0}
+    .total-final td{font-weight:700;font-size:14px;color:#0f172a;border-top:1px solid #e5e7eb;padding-top:8px}
+    .notes{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;font-size:13px;margin-top:16px}
+    .footer{font-size:11px;color:#9ca3af;margin-top:22px}
+  </style>
+</head>
+<body>
+  <div class="hdr">
+    <h1>Quotation</h1>
+    <p>${studioName}</p>
+  </div>
+  <div class="body">
+    ${recipientName ? `<p style="font-size:13px;margin-bottom:14px;">Dear <strong>${recipientName}</strong>,</p>` : ''}
+    <p style="font-size:13px;color:#4b5563;margin-bottom:18px;">Please find your requested quotation details below. This is a price estimate only and not a confirmed booking.</p>
+
+    <div class="sec">Quotation Details</div>
+    <table class="meta">
+      <tr><td style="color:#4b5563;width:200px;">Quotation Label</td><td style="font-weight:600;">${rentalTypeLabel}</td></tr>
+      <tr><td style="color:#4b5563;">Generated On</td><td>${generatedAt instanceof Date ? generatedAt.toLocaleString('en-IN') : generatedAt}</td></tr>
+    </table>
+
+    ${selectedTypeLabels && selectedTypeLabels.length > 0 ? `
+    <div class="sec">Booking Type(s) Included</div>
+    <table class="types">${typeRows}</table>` : ''}
+
+    ${scheduleRows.length > 0 ? `
+    <div class="sec">Schedule</div>
+    <table class="meta">${scheduleRows.join('')}</table>` : ''}
+
+    <div class="sec">Items</div>
+    <table class="items">
+      <thead><tr>
+        <th>Item</th>
+        <th style="text-align:center;">Qty</th>
+        <th style="text-align:right;">Rate</th>
+        <th style="text-align:center;">Billing</th>
+        <th style="text-align:right;">Amount</th>
+      </tr></thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+
+    <div class="sec">Totals</div>
+    <table class="totals">
+      <tr><td style="color:#4b5563;">Subtotal</td><td style="text-align:right;">&#8377;${(calculation.subtotal || 0).toFixed(2)}</td></tr>
+      ${gstRow}
+      <tr class="total-final"><td>Total</td><td style="text-align:right;">&#8377;${(totalAmount || 0).toFixed(2)}</td></tr>
+    </table>
+
+    ${quoteNotes ? `<div class="notes"><strong>Notes:</strong> ${quoteNotes}</div>` : ''}
+    <p class="footer">This quotation is valid for 7 days. Prices are subject to availability at the time of booking confirmation.</p>
+  </div>
+</body>
+</html>`;
+};
+
+/**
+ * Generate a PDF buffer for a quotation
+ */
+const generateQuotationPDF = async (quotationData, settings) => {
+  let browser;
+  try {
+    const launchConfigs = [];
+
+    try {
+      launchConfigs.push(await createPuppeteerConfig());
+    } catch (configError) {
+      console.error('Quotation PDF config creation failed, using fallback config:', configError.message);
+    }
+
+    launchConfigs.push({
+      headless: true,
+      timeout: isServerless ? 25000 : 30000,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
+    });
+
+    let lastLaunchError = null;
+    for (const launchConfig of launchConfigs) {
+      try {
+        browser = await puppeteer.launch(launchConfig);
+        break;
+      } catch (launchError) {
+        lastLaunchError = launchError;
+        console.error('Quotation PDF launch attempt failed:', launchError.message);
+      }
+    }
+
+    if (!browser) {
+      throw (lastLaunchError || new Error('Unable to launch browser for quotation PDF'));
+    }
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 820, height: 600 });
+    const htmlContent = generateQuotationHTML(quotationData, settings);
+    await page.setContent(htmlContent, { waitUntil: ['domcontentloaded', 'networkidle0'], timeout: 25000 });
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error('Generated quotation PDF is empty');
+    }
+
+    await browser.close();
+    return pdfBuffer;
+  } catch (error) {
+    if (browser) {
+      try { await browser.close(); } catch (e) { /* ignore */ }
+    }
+    throw new Error(`Quotation PDF generation failed: ${error.message}`);
+  }
+};
+
+module.exports.generateQuotationPDF = generateQuotationPDF;
+module.exports.generateQuotationHTML = generateQuotationHTML;
