@@ -9,6 +9,12 @@ const adminSettingsSchema = new mongoose.Schema({
     description: {
       type: String
     },
+    // Category-level rental type controls how all child items are billed.
+    rentalType: {
+      type: String,
+      enum: ['inhouse', 'perday', 'persession'],
+      default: 'inhouse'
+    },
     basePrice: {
       type: Number,
       required: true,
@@ -36,7 +42,7 @@ const adminSettingsSchema = new mongoose.Schema({
       // Rental type: 'inhouse' (tied to jamroom duration) or 'perday' (independent)
       rentalType: {
         type: String,
-        enum: ['inhouse', 'perday'],
+        enum: ['inhouse', 'perday', 'persession'],
         default: 'inhouse'
       },
       // Per-day price (only used when rentalType is 'perday')
@@ -47,19 +53,27 @@ const adminSettingsSchema = new mongoose.Schema({
       }
     }]
   }],
-  prices: {
-    hourlyRate: {
-      type: Number,
-      default: 500
-    },
-    instrumentsRate: {
-      type: Number,
-      default: 300
-    },
-    soundSystemRate: {
-      type: Number,
-      default: 400
-    }
+  bookingCategoryBindings: {
+    pairs: [{
+      leftCategory: {
+        type: String,
+        trim: true
+      },
+      rightCategory: {
+        type: String,
+        trim: true
+      },
+      leftRentalType: {
+        type: String,
+        enum: ['inhouse', 'perday', 'persession'],
+        default: 'inhouse'
+      },
+      rightRentalType: {
+        type: String,
+        enum: ['inhouse', 'perday', 'persession'],
+        default: 'inhouse'
+      }
+    }]
   },
   upiId: {
     type: String,
@@ -192,13 +206,7 @@ adminSettingsSchema.statics.getSettings = async function() {
   if (!settings) {
     // Create default settings
     settings = await this.create({
-      rentalTypes: [
-        { name: 'JamRoom', description: 'Basic jam room rental', basePrice: 500 },
-        { name: 'Instruments', description: 'Instrument rental only', basePrice: 300 },
-        { name: 'Sound System', description: 'Sound system rental', basePrice: 400 },
-        { name: 'JamRoom + Instruments', description: 'Room with instruments', basePrice: 700 },
-        { name: 'Full Package', description: 'Everything included', basePrice: 1000 }
-      ],
+      rentalTypes: [],
       adminEmails: ['admin@jamroom.com'],
       whatsappNotifications: {
         enabled: true,

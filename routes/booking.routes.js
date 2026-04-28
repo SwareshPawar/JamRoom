@@ -57,6 +57,75 @@ const getDisplayUpiName = (settings) => {
   return configuredName;
 };
 
+const deriveDynamicBookingLabel = (rentals = [], explicitLabel = '') => {
+  const normalizedExplicitLabel = String(explicitLabel || '').trim();
+  if (normalizedExplicitLabel) {
+    return normalizedExplicitLabel;
+  }
+
+  const normalizedRentals = Array.isArray(rentals) ? rentals.filter(Boolean) : [];
+  if (normalizedRentals.length === 0) {
+    return '';
+  }
+
+  const categories = [];
+  const itemNames = [];
+
+  normalizedRentals.forEach((rental) => {
+    const categoryName = String(rental?.category || '').trim();
+    const itemName = String(rental?.name || '').trim();
+    const isBaseItem = /\(base\)/i.test(itemName) || String(rental?.fullId || '').includes('_base');
+
+    if (categoryName && !categories.includes(categoryName)) {
+      categories.push(categoryName);
+    }
+
+    if (!isBaseItem && itemName && !itemNames.includes(itemName)) {
+      itemNames.push(itemName);
+    }
+  });
+
+  if (itemNames.length === 1) {
+    return itemNames[0];
+  }
+
+  if (categories.length === 1) {
+    return categories[0];
+  }
+
+  return itemNames[0] || categories[0] || String(normalizedRentals[0]?.name || '');
+};
+
+const deriveAvailableBookingModes = (rentalTypes = []) => {
+  let hasHourly = false;
+  let hasPerday = false;
+
+  const safeRentalTypes = Array.isArray(rentalTypes) ? rentalTypes : [];
+
+  safeRentalTypes.forEach((type) => {
+    const typeName = String(type?.name || '').trim();
+    const subItems = Array.isArray(type?.subItems) ? type.subItems : [];
+
+    if ((typeName === 'JamRoom' || subItems.length === 0) && Number(type?.basePrice || 0) > 0) {
+      hasHourly = true;
+    }
+
+    subItems.forEach((subItem) => {
+      const rentalType = String(subItem?.rentalType || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'hourly';
+      if (rentalType === 'perday') {
+        hasPerday = true;
+      } else {
+        hasHourly = true;
+      }
+    });
+  });
+
+  const modes = [];
+  if (hasHourly) modes.push('hourly');
+  if (hasPerday) modes.push('perday');
+  return modes;
+};
+
 /**
  * Helper function to check time conflicts
  */
@@ -190,8 +259,7 @@ const getPerdayBookedItemQuantities = async ({
     const rentals = Array.isArray(booking.rentals) ? booking.rentals : [];
     rentals.forEach((rental) => {
       const rentalType = String(rental?.rentalType || '').toLowerCase();
-      const isPerdayRental = booking.bookingMode === 'perday' || rentalType === 'perday';
-      if (!isPerdayRental) return;
+      if (rentalType !== 'perday') return;
 
       const rentalNameKey = normalizeRentalName(rental?.name);
       if (!rentalNameKey) return;
@@ -244,6 +312,7 @@ router.post('/', protect, async (req, res) => {
       subtotal,
       taxAmount,
       totalAmount,
+      rentalType,
       bandName,
       notes,
       perDayStartDate,
@@ -293,18 +362,23 @@ router.post('/', protect, async (req, res) => {
         });
       }
 
-      const rentalTypeValue = String(rental.rentalType || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'inhouse';
-      if (normalizedMode === 'perday' && rentalTypeValue !== 'perday') {
+      const normalizedRentalTypeRaw = String(rental.rentalType || 'inhouse').toLowerCase();
+      const rentalTypeValue = normalizedRentalTypeRaw === 'perday'
+        ? 'perday'
+        : normalizedRentalTypeRaw === 'persession'
+          ? 'persession'
+          : 'inhouse';
+      if (normalizedMode === 'perday' && rentalTypeValue !== 'perday' && rentalTypeValue !== 'persession') {
         return res.status(400).json({
           success: false,
-          message: 'Per-day booking can include only per-day rental items'
+          message: 'Per-day booking can include only per-day or per-session rental items'
         });
       }
 
-      if (normalizedMode === 'hourly' && rentalTypeValue !== 'inhouse') {
+      if (normalizedMode === 'hourly' && rentalTypeValue === 'perday') {
         return res.status(400).json({
           success: false,
-          message: 'Hourly booking can include only JamRoom/InHouse rental items'
+          message: 'Hourly booking can include only in-house or per-session rental items'
         });
       }
     }
@@ -414,6 +488,11 @@ router.post('/', protect, async (req, res) => {
 
       const conflictingItems = [];
       rentals.forEach((rental) => {
+        const rentalType = String(rental?.rentalType || '').toLowerCase();
+        if (rentalType !== 'perday') {
+          return;
+        }
+
         const requestedNameKey = normalizeRentalName(rental?.name);
         if (!requestedNameKey) return;
 
@@ -437,12 +516,23 @@ router.post('/', protect, async (req, res) => {
     // Validate and recalculate totals based on admin settings
     let calculatedSubtotal = 0;
     rentals.forEach((rental) => {
-      const rentalType = String(rental?.rentalType || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'inhouse';
+      const normalizedRentalTypeRaw = String(rental?.rentalType || 'inhouse').toLowerCase();
+      const rentalType = normalizedRentalTypeRaw === 'perday'
+        ? 'perday'
+        : normalizedRentalTypeRaw === 'persession'
+          ? 'persession'
+          : 'inhouse';
       const itemPrice = Number(rental?.price || 0);
       const itemQuantity = Math.max(1, Number(rental?.quantity || 1));
 
       if (normalizedMode === 'perday') {
-        calculatedSubtotal += itemPrice * itemQuantity * computedPerDayDays;
+        if (rentalType === 'persession') {
+          calculatedSubtotal += itemPrice * itemQuantity;
+        } else {
+          calculatedSubtotal += itemPrice * itemQuantity * computedPerDayDays;
+        }
+      } else if (rentalType === 'persession') {
+        calculatedSubtotal += itemPrice * itemQuantity;
       } else if (rentalType === 'perday') {
         calculatedSubtotal += itemPrice * itemQuantity;
       } else {
@@ -470,7 +560,7 @@ router.post('/', protect, async (req, res) => {
     });
 
     // Create rental type summary for backward compatibility
-    const rentalTypeSummary = rentals.length === 1 ? rentals[0].name : `Multiple Items (${rentals.length})`;
+    const rentalTypeSummary = deriveDynamicBookingLabel(rentals, rentalType);
 
     // Create booking with multiple rentals
     const booking = await Booking.create({
@@ -518,6 +608,9 @@ router.post('/', protect, async (req, res) => {
         const days = normalizedMode === 'perday' ? computedPerDayDays : 1;
         itemTotal = perdayPrice * rental.quantity * days;
         return `<li>${rental.name} × ${rental.quantity} × ${days} day(s) - ₹${itemTotal}</li>`;
+      } else if (String(rental.rentalType || '').toLowerCase() === 'persession') {
+        itemTotal = rental.price * rental.quantity;
+        return `<li>${rental.name} × ${rental.quantity} (Per session) - ₹${itemTotal}</li>`;
       } else {
         // Hourly rentals: use price with duration factor
         itemTotal = rental.price * rental.quantity * durationForPricing;
@@ -782,17 +875,20 @@ router.get('/my-bookings', protect, async (req, res) => {
 });
 
 // @route   GET /api/bookings/settings
-// @desc    Get public booking settings (rental types and base price)
+// @desc    Get public booking settings (rental types and available booking modes)
 // @access  Public (no auth required)
 router.get('/settings', async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+    const bookingModes = deriveAvailableBookingModes(rentalTypes);
     
     res.json({
       success: true,
       settings: {
-        rentalTypes: settings.rentalTypes,
-        basePrice: settings.basePrice,
+        rentalTypes,
+        bookingCategoryBindings: settings.bookingCategoryBindings || { pairs: [] },
+        bookingModes,
         gstConfig: settings.gstConfig || { enabled: false, rate: 0.18, displayName: 'GST' }
       }
     });

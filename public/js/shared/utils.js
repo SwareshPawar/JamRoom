@@ -268,6 +268,113 @@ class JamRoomUtils {
         };
     }
 
+    static normalizeRentalMode(mode) {
+        return String(mode || '').toLowerCase() === 'perday' ? 'perday' : 'hourly';
+    }
+
+    static buildBookingLabelOptions(rentalTypes = [], options = {}) {
+        const mode = options.mode === 'all' ? 'all' : this.normalizeRentalMode(options.mode);
+        const optionMap = new Map();
+
+        const addOption = (value, meta = {}) => {
+            const normalizedValue = String(value || '').trim();
+            if (!normalizedValue) return;
+
+            const optionKey = normalizedValue.toLowerCase();
+            if (!optionMap.has(optionKey)) {
+                optionMap.set(optionKey, {
+                    value: normalizedValue,
+                    label: normalizedValue,
+                    ...meta
+                });
+            }
+        };
+
+        const shouldIncludeMode = (targetMode) => mode === 'all' || targetMode === mode;
+
+        rentalTypes.forEach((type) => {
+            const typeName = String(type?.name || '').trim();
+            if (!typeName) return;
+
+            const subItems = Array.isArray(type?.subItems) ? type.subItems : [];
+            const categoryRentalType = String(type?.rentalType || '').toLowerCase();
+            const hasSubItems = subItems.length > 0;
+            const inferredHasPerday = categoryRentalType === 'perday'
+                || subItems.some((subItem) => String(subItem?.rentalType || '').toLowerCase() === 'perday');
+            const inferredHasHourly = categoryRentalType === 'inhouse'
+                || categoryRentalType === 'persession'
+                || (typeName === 'JamRoom' && Number(type?.basePrice || 0) > 0)
+                || (!hasSubItems && Number(type?.basePrice || 0) > 0)
+                || subItems.some((subItem) => String(subItem?.rentalType || '').toLowerCase() !== 'perday');
+
+            if (inferredHasHourly && shouldIncludeMode('hourly')) {
+                addOption(typeName, { kind: 'category', category: typeName, mode: 'hourly' });
+            }
+
+            if (inferredHasPerday && shouldIncludeMode('perday')) {
+                addOption(typeName, { kind: 'category', category: typeName, mode: 'perday' });
+            }
+        });
+
+        return Array.from(optionMap.values());
+    }
+
+    static deriveBookingLabel(rentals = [], availableOptions = []) {
+        const optionValues = new Set(
+            (Array.isArray(availableOptions) ? availableOptions : [])
+                .map((option) => String(option?.value || '').trim().toLowerCase())
+                .filter(Boolean)
+        );
+        const hasOptions = optionValues.size > 0;
+        const normalizedRentals = Array.isArray(rentals)
+            ? rentals.filter(Boolean)
+            : [];
+
+        const matchOption = (label) => {
+            const normalizedLabel = String(label || '').trim();
+            if (!normalizedLabel) return '';
+            if (!hasOptions) return normalizedLabel;
+            return optionValues.has(normalizedLabel.toLowerCase()) ? normalizedLabel : '';
+        };
+
+        const meaningfulItems = [];
+        const categories = [];
+
+        normalizedRentals.forEach((rental) => {
+            const itemName = String(rental?.name || '').trim();
+            const categoryName = String(rental?.category || '').trim();
+            const isBaseItem = /\(base\)/i.test(itemName) || String(rental?.fullId || '').includes('_base');
+
+            if (categoryName && !categories.includes(categoryName)) {
+                categories.push(categoryName);
+            }
+
+            if (!isBaseItem && itemName && !meaningfulItems.includes(itemName)) {
+                meaningfulItems.push(itemName);
+            }
+        });
+
+        if (meaningfulItems.length === 1) {
+            return matchOption(meaningfulItems[0]) || meaningfulItems[0];
+        }
+
+        if (categories.length === 1) {
+            return matchOption(categories[0]) || categories[0];
+        }
+
+        const firstMatchingItem = meaningfulItems.find((itemName) => matchOption(itemName));
+        if (firstMatchingItem) {
+            return firstMatchingItem;
+        }
+
+        const firstMatchingCategory = categories.find((categoryName) => matchOption(categoryName));
+        if (firstMatchingCategory) {
+            return firstMatchingCategory;
+        }
+
+        return meaningfulItems[0] || categories[0] || '';
+    }
+
     /**
      * Local storage utilities
      */

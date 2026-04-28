@@ -45,6 +45,11 @@ const updatePriceDisplay = () => {
             itemTotal = rental.price * rental.quantity * perDayDays;
             displayQuantity = rental.quantity;
             durationText = perDayDays > 0 ? `${perDayDays} day(s)` : 'Waiting for valid pickup/return';
+        } else if (rental.rentalType === 'persession') {
+            // Per-session rentals: charged once per booking session.
+            itemTotal = rental.price * rental.quantity;
+            displayQuantity = rental.quantity;
+            durationText = 'Per session';
         } else if (rental.isRequired || rental.fullId.includes('_base')) {
             // JamRoom base rentals
             itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;

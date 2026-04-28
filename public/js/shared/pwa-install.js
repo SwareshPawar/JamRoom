@@ -1,4 +1,4 @@
-/**
+  /**
  * pwa-install.js
  * Shows a native-style "Add to Home Screen" banner for Android Chrome
  * (and any browser that fires beforeinstallprompt).

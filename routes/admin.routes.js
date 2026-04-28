@@ -88,6 +88,45 @@ const normalizeEmail = (email) => {
   return String(email || '').trim().toLowerCase();
 };
 
+const deriveDynamicBookingLabel = (rentals = [], explicitLabel = '') => {
+  const normalizedExplicitLabel = String(explicitLabel || '').trim();
+  if (normalizedExplicitLabel) {
+    return normalizedExplicitLabel;
+  }
+
+  const normalizedRentals = Array.isArray(rentals) ? rentals.filter(Boolean) : [];
+  if (normalizedRentals.length === 0) {
+    return '';
+  }
+
+  const categories = [];
+  const itemNames = [];
+
+  normalizedRentals.forEach((rental) => {
+    const categoryName = String(rental?.category || '').trim();
+    const itemName = String(rental?.name || '').trim();
+    const isBaseItem = /\(base\)/i.test(itemName) || String(rental?.fullId || '').includes('_base');
+
+    if (categoryName && !categories.includes(categoryName)) {
+      categories.push(categoryName);
+    }
+
+    if (!isBaseItem && itemName && !itemNames.includes(itemName)) {
+      itemNames.push(itemName);
+    }
+  });
+
+  if (itemNames.length === 1) {
+    return itemNames[0];
+  }
+
+  if (categories.length === 1) {
+    return categories[0];
+  }
+
+  return itemNames[0] || categories[0] || String(normalizedRentals[0]?.name || '');
+};
+
 const isValidEmail = (email) => {
   const normalized = normalizeEmail(email);
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
@@ -1849,7 +1888,18 @@ router.get('/settings', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.put('/settings', protect, isAdmin, async (req, res) => {
   try {
-    const { rentalTypes, prices, upiId, upiName, adminEmails, businessHours, slotDuration, studioName, studioAddress, gstConfig } = req.body;
+    const {
+      rentalTypes,
+      bookingCategoryBindings,
+      upiId,
+      upiName,
+      adminEmails,
+      businessHours,
+      slotDuration,
+      studioName,
+      studioAddress,
+      gstConfig
+    } = req.body;
 
     let settings = await AdminSettings.findOne();
     
@@ -1857,7 +1907,7 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
       settings = await AdminSettings.create(req.body);
     } else {
       if (rentalTypes) settings.rentalTypes = rentalTypes;
-      if (prices) settings.prices = prices;
+      if (bookingCategoryBindings) settings.bookingCategoryBindings = bookingCategoryBindings;
       if (upiId) settings.upiId = upiId;
       if (upiName) settings.upiName = upiName;
       if (adminEmails) settings.adminEmails = adminEmails;
@@ -2044,7 +2094,12 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
         const rentalName = String(rental?.name || '').trim();
         const rentalPrice = Number(rental?.price);
         const rentalQuantity = parseInt(rental?.quantity, 10);
-        const rentalTypeValue = String(rental?.rentalType || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'inhouse';
+        const normalizedRentalTypeRaw = String(rental?.rentalType || 'inhouse').toLowerCase();
+        const rentalTypeValue = normalizedRentalTypeRaw === 'perday'
+          ? 'perday'
+          : normalizedRentalTypeRaw === 'persession'
+            ? 'persession'
+            : 'inhouse';
         const rentalDescription = String(rental?.description || '').trim();
 
         if (!rentalName) {
@@ -2082,6 +2137,8 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       sanitizedRentals.forEach((rentalItem) => {
         if (rentalItem.rentalType === 'perday') {
           calculatedSubtotal += rentalItem.price * rentalItem.quantity;
+        } else if (rentalItem.rentalType === 'persession') {
+          calculatedSubtotal += rentalItem.price * rentalItem.quantity;
         } else {
           calculatedSubtotal += rentalItem.price * rentalItem.quantity * booking.duration;
         }
@@ -2107,9 +2164,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       booking.priceAdjustmentNote = normalizedAdjustment.note;
 
       if (!normalizedRentalType) {
-        booking.rentalType = sanitizedRentals.length === 1
-          ? sanitizedRentals[0].name
-          : `Multiple Items (${sanitizedRentals.length})`;
+        booking.rentalType = deriveDynamicBookingLabel(rentals, '');
       }
     } else {
       // Backward-compatible edit path.
@@ -2489,6 +2544,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       duration, 
       rentals, 
       subtotal, 
+      rentalType,
       bandName, 
       notes,
       overrideDateTime,
@@ -2648,7 +2704,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
 
     // Create rental type summary for backward compatibility
-    const rentalTypeSummary = rentals.length === 1 ? rentals[0].name : `Multiple Items (${rentals.length})`;
+    const rentalTypeSummary = deriveDynamicBookingLabel(rentals, rentalType);
 
     // Create booking
     const booking = await Booking.create({
@@ -2687,6 +2743,9 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         const perdayPrice = rental.perdayPrice || rental.price;
         itemTotal = perdayPrice * rental.quantity;
         return `${rental.name} × ${rental.quantity} (per day) - ₹${itemTotal}`;
+      } else if (String(rental.rentalType || '').toLowerCase() === 'persession') {
+        itemTotal = rental.price * rental.quantity;
+        return `${rental.name} × ${rental.quantity} (per session) - ₹${itemTotal}`;
       } else {
         // Hourly rentals: use price with duration factor
         itemTotal = rental.price * rental.quantity * duration;

@@ -85,18 +85,7 @@ const seedDatabase = async () => {
     if (!settings) {
       console.log('Creating default admin settings...');
       settings = await AdminSettings.create({
-        rentalTypes: [
-          { name: 'JamRoom', description: 'Basic jam room rental', basePrice: 500 },
-          { name: 'Instruments', description: 'Instrument rental only', basePrice: 300 },
-          { name: 'Sound System', description: 'Sound system rental', basePrice: 400 },
-          { name: 'JamRoom + Instruments', description: 'Room with instruments', basePrice: 700 },
-          { name: 'Full Package', description: 'Everything included', basePrice: 1000 }
-        ],
-        prices: {
-          hourlyRate: 500,
-          instrumentsRate: 300,
-          soundSystemRate: 400
-        },
+        rentalTypes: [],
         upiId: process.env.UPI_ID || 'jamroom@paytm',
         upiName: process.env.UPI_NAME || 'Swaresh Pawar',
         adminEmails: [],

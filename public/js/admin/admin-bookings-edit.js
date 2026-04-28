@@ -63,6 +63,7 @@
                 const encodedBaseData = encodeURIComponent(JSON.stringify({
                     id: baseId,
                     name: `${type.name} (Base)`,
+                    category: type.name,
                     price: basePrice,
                     perdayPrice: 0,
                     rentalType: 'inhouse',
@@ -92,7 +93,7 @@
                 type.subItems.forEach((subItem) => {
                     const itemId = `${type.name}__${subItem.name}`;
                     const qtyInputId = getEditRentalInputId(itemId, deps);
-                    const configuredRentalType = subItem.rentalType || 'inhouse';
+                    const configuredRentalType = type.rentalType || subItem.rentalType || 'inhouse';
                     const matchKey = getRentalMatchKey(subItem.name, configuredRentalType);
                     const matchedRental = existingMap.get(matchKey);
 
@@ -102,16 +103,18 @@
 
                     const effectiveRentalType = matchedRental?.rentalType || configuredRentalType;
                     const isPerday = effectiveRentalType === 'perday';
+                    const isPerSession = effectiveRentalType === 'persession';
                     const defaultPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
                     const effectivePrice = matchedRental ? Number(matchedRental.price || defaultPrice) : defaultPrice;
-                    const priceUnit = isPerday ? '/day' : '/hr';
+                    const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
                     const isFree = effectivePrice === 0;
-                    const showQuantityControls = isPerday || isFree || (subItem.name || '').includes('IEM');
+                    const showQuantityControls = isPerday || isPerSession || isFree || (subItem.name || '').includes('IEM');
                     const quantityValue = Math.max(parseInt(matchedRental?.quantity, 10) || 1, 1);
 
                     const encodedRentalData = encodeURIComponent(JSON.stringify({
                         id: itemId,
                         name: subItem.name,
+                        category: type.name,
                         price: effectivePrice,
                         perdayPrice: isPerday ? effectivePrice : (subItem.perdayPrice || 0),
                         rentalType: effectiveRentalType,
@@ -121,12 +124,13 @@
                         allowCustomQuantity: isPerday || isFree || (subItem.name || '').includes('IEM')
                     }));
 
-                    const icon = isFree ? '🆓' : (isPerday ? '📅' : '🔗');
-                    const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : ' (In-house)');
+                    const icon = isFree ? '🆓' : (isPerday ? '📅' : isPerSession ? '🎯' : '🔗');
+                    const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : isPerSession ? ' (Per-session)' : ' (In-house)');
                     const priceDisplay = isFree ? 'FREE' : `₹${effectivePrice}${priceUnit}`;
                     const details = [
                         isPerday ? 'Flat per-day pricing' : '',
-                        (!isPerday && !isFree) ? 'Tied to session duration' : '',
+                        (isPerSession && !isFree) ? 'Flat per-session pricing' : '',
+                        (!isPerday && !isPerSession && !isFree) ? 'Tied to session duration' : '',
                         isFree ? 'Free add-on' : ''
                     ].filter(Boolean).join(' | ');
 
@@ -160,6 +164,7 @@
                 const encodedRentalData = encodeURIComponent(JSON.stringify({
                     id: itemId,
                     name: type.name,
+                    category: type.name,
                     price: effectivePrice,
                     perdayPrice: 0,
                     rentalType: 'inhouse',
@@ -205,6 +210,7 @@
                 const encodedRentalData = encodeURIComponent(JSON.stringify({
                     id: itemId,
                     name: rental?.name || 'Custom Item',
+                    category: rental?.category || '',
                     price: effectivePrice,
                     perdayPrice: isPerday ? effectivePrice : (Number(rental?.perdayPrice) || 0),
                     rentalType: isPerday ? 'perday' : 'inhouse',
@@ -246,12 +252,13 @@
             const quantityElement = document.getElementById(getEditRentalInputId(rentalData.id, deps));
             const rawQuantity = parseInt(quantityElement?.value, 10) || 1;
             const isPerday = rentalData.rentalType === 'perday';
+            const isPerSession = rentalData.rentalType === 'persession';
             const isFree = (isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0)) === 0;
             const isIem = (rentalData.name || '').includes('IEM');
             const isBase = rentalData.isRequired || String(rentalData.id).includes('_base');
 
             let effectiveQuantity = rawQuantity;
-            if (!isPerday && !isFree && !isIem && !isBase && !rentalData.allowCustomQuantity) {
+            if (!isPerday && !isPerSession && !isFree && !isIem && !isBase && !rentalData.allowCustomQuantity) {
                 effectiveQuantity = 1;
             }
 
@@ -259,6 +266,7 @@
 
             selectedRentals.push({
                 name: rentalData.name,
+                category: rentalData.category || '',
                 price: unitPrice,
                 perdayPrice: rentalData.perdayPrice || 0,
                 quantity: effectiveQuantity,
@@ -321,12 +329,15 @@
     const recalculateEditBookingTotals = (deps) => {
         const duration = parseFloat(document.getElementById('editDuration')?.value) || 0;
         const items = collectSelectedEditRentals(deps, { strict: false });
+        const editRentalTypeEl = document.getElementById('editRentalType');
 
         let subtotal = 0;
         items.forEach((item) => {
             let itemTotal;
 
             if (item.rentalType === 'perday') {
+                itemTotal = item.price * item.quantity;
+            } else if (item.rentalType === 'persession') {
                 itemTotal = item.price * item.quantity;
             } else if (item.isRequired || String(item.fullId).includes('_base')) {
                 itemTotal = item.price * item.quantity * duration;
@@ -352,6 +363,22 @@
         if (subtotalEl) subtotalEl.value = subtotal.toFixed(2);
         if (taxEl) taxEl.value = taxAmount.toFixed(2);
         if (totalEl) totalEl.value = Math.max(0, totalAmount).toFixed(2);
+
+        if (editRentalTypeEl && typeof window.populateAdminBookingTypeSelect === 'function') {
+            const settingsSource = deps.getCreateBookingSettings() || deps.getAdminSettingsData() || {};
+            const rentalTypes = Array.isArray(settingsSource?.rentalTypes) ? settingsSource.rentalTypes : [];
+            const currentValue = String(editRentalTypeEl.value || '').trim();
+            const options = window.populateAdminBookingTypeSelect('editRentalType', rentalTypes, {
+                selectedValue: currentValue
+            });
+            const derivedValue = typeof window.deriveAdminBookingTypeLabel === 'function'
+                ? window.deriveAdminBookingTypeLabel(items, rentalTypes)
+                : '';
+
+            if ((!currentValue || !options.some((option) => option.value === currentValue)) && derivedValue) {
+                editRentalTypeEl.value = derivedValue;
+            }
+        }
 
         return { items, subtotal, taxAmount, totalAmount, adjustment };
     };
@@ -381,6 +408,12 @@
         }
 
         renderEditBookingRentals(settingsToUse.rentalTypes || [], booking, deps);
+
+        if (typeof window.populateAdminBookingTypeSelect === 'function') {
+            window.populateAdminBookingTypeSelect('editRentalType', settingsToUse.rentalTypes || [], {
+                selectedValue: booking?.rentalType || ''
+            });
+        }
     };
 
     const openEditBooking = async (bookingId, bookingData, deps) => {
@@ -478,6 +511,7 @@
                 rentalType: bookingTypeLabel,
                 rentals: rentals.map((rental) => ({
                     name: rental.name,
+                    category: rental.category,
                     price: rental.price,
                     perdayPrice: rental.perdayPrice,
                     quantity: rental.quantity,

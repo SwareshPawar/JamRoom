@@ -47,16 +47,15 @@
                 <form id="bookingForm">
                     <div class="form-group">
                         <label>Booking Type*</label>
-                        <div class="booking-mode-switch" id="bookingModeSwitch">
-                            <label class="booking-mode-option">
-                                <input type="radio" name="bookingMode" value="hourly" checked>
-                                <span>JamRoom + InHouse (Hourly)</span>
-                            </label>
-                            <label class="booking-mode-option">
-                                <input type="radio" name="bookingMode" value="perday">
-                                <span>Per Day Rentals</span>
-                            </label>
-                        </div>
+                        <div class="booking-mode-switch" id="bookingModeSwitch"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bookingTypeSelect">Booking Catalog*</label>
+                        <select id="bookingTypeSelect" required>
+                            <option value="">Loading booking catalog...</option>
+                        </select>
+                        <small class="field-help">Options come from Admin Settings > Rental Types & Pricing.</small>
                     </div>
 
                     <div id="hourlyBookingBlock" class="booking-flow-block">

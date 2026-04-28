@@ -45,6 +45,32 @@ const clearBookingFormDraft = () => {
     localStorage.removeItem(BOOKING_DRAFT_STORAGE_KEY);
 };
 
+const refreshBookingTypeOptions = () => {
+    const bookingTypeSelect = document.getElementById('bookingTypeSelect');
+    if (!bookingTypeSelect || typeof window.getBookingCategoryOptions !== 'function') return [];
+
+    const options = window.getBookingCategoryOptions();
+    const currentValue = String(bookingTypeSelect.value || '').trim();
+    const nextValue = currentValue || options[0]?.value || '';
+
+    bookingTypeSelect.innerHTML = [
+        '<option value="">Select booking type</option>',
+        ...options.map((option) => `<option value="${option.value}">${option.label}</option>`)
+    ].join('');
+
+    bookingTypeSelect.disabled = options.length === 0;
+    if (nextValue && options.some((option) => option.value === nextValue)) {
+        bookingTypeSelect.value = nextValue;
+        if (typeof window.setActiveBookingCategory === 'function') {
+            window.setActiveBookingCategory(nextValue);
+        }
+    }
+
+    return options;
+};
+
+window.refreshBookingTypeOptions = refreshBookingTypeOptions;
+
 const collectBookingFormDraft = () => {
     const bookingMode = window.getBookingMode ? window.getBookingMode() : 'hourly';
     const bookingDate = document.getElementById('bookingDate')?.value || '';
@@ -56,6 +82,7 @@ const collectBookingFormDraft = () => {
     const perdayReturnTime = document.getElementById('perdayReturnTime')?.value || '';
     const bandName = document.getElementById('bandName')?.value || '';
     const notes = document.getElementById('notes')?.value || '';
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
     const rentalsSnapshot = typeof window.getBookingRentalDraftSnapshot === 'function'
         ? window.getBookingRentalDraftSnapshot()
         : { hourly: [], perday: [] };
@@ -68,6 +95,7 @@ const collectBookingFormDraft = () => {
         !!perdayEndDate ||
         !!perdayPickupTime ||
         !!perdayReturnTime ||
+        !!bookingType.trim() ||
         !!bandName.trim() ||
         !!notes.trim() ||
         (Array.isArray(rentalsSnapshot.hourly) && rentalsSnapshot.hourly.length > 0) ||
@@ -88,6 +116,7 @@ const collectBookingFormDraft = () => {
         perdayEndDate,
         perdayPickupTime,
         perdayReturnTime,
+        bookingType,
         bandName,
         notes,
         rentals: rentalsSnapshot
@@ -139,14 +168,6 @@ const restoreBookingFormDraft = async () => {
 
     try {
         const selectedMode = parsedDraft.bookingMode === 'perday' ? 'perday' : 'hourly';
-        const modeInput = document.querySelector(`input[name="bookingMode"][value="${selectedMode}"]`);
-        if (modeInput) {
-            modeInput.checked = true;
-        }
-
-        if (typeof window.switchBookingMode === 'function') {
-            window.switchBookingMode(selectedMode);
-        }
 
         const bandNameEl = document.getElementById('bandName');
         if (bandNameEl && typeof parsedDraft.bandName === 'string') {
@@ -156,6 +177,19 @@ const restoreBookingFormDraft = async () => {
         const notesEl = document.getElementById('notes');
         if (notesEl && typeof parsedDraft.notes === 'string') {
             notesEl.value = parsedDraft.notes;
+        }
+
+        refreshBookingTypeOptions();
+
+        const bookingTypeEl = document.getElementById('bookingTypeSelect');
+        if (bookingTypeEl && typeof parsedDraft.bookingType === 'string') {
+            const savedBookingType = parsedDraft.bookingType.trim();
+            if (savedBookingType && bookingTypeEl.querySelector(`option[value="${savedBookingType}"]`)) {
+                bookingTypeEl.value = savedBookingType;
+                if (typeof window.setActiveBookingCategory === 'function') {
+                    window.setActiveBookingCategory(savedBookingType);
+                }
+            }
         }
 
         const perdayStartDateEl = document.getElementById('perdayStartDate');
@@ -181,6 +215,8 @@ const restoreBookingFormDraft = async () => {
         if (typeof window.applyBookingRentalDraftSelection === 'function') {
             window.applyBookingRentalDraftSelection(parsedDraft.rentals || {});
         }
+
+        refreshBookingTypeOptions();
 
         if (selectedMode === 'hourly') {
             const bookingDateEl = document.getElementById('bookingDate');
@@ -246,6 +282,9 @@ const buildRentalsForSubmission = (duration) => {
         if (rental.rentalType === 'perday') {
             itemTotal = rental.price * rental.quantity;
             effectiveQuantity = rental.quantity;
+        } else if (rental.rentalType === 'persession') {
+            itemTotal = (rental.price || rental.basePrice) * rental.quantity;
+            effectiveQuantity = rental.quantity;
         } else if (rental.isRequired || rental.fullId.includes('_base')) {
             itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
             effectiveQuantity = rental.quantity;
@@ -264,6 +303,7 @@ const buildRentalsForSubmission = (duration) => {
 
         rentalsArray.push({
             name: rental.name,
+            category: rental.category || '',
             description: rental.description || '',
             price: rental.price || rental.basePrice,
             quantity: effectiveQuantity,
@@ -329,7 +369,17 @@ const buildBookingFormPayload = () => {
     const { rentalsArray, subtotal } = buildRentalsForSubmission(duration);
 
     const adjustedSubtotal = bookingMode === 'perday'
-        ? rentalsArray.reduce((sum, rental) => sum + ((rental.price || 0) * (rental.quantity || 1) * perDayDays), 0)
+        ? rentalsArray.reduce((sum, rental) => {
+            const rentalType = String(rental?.rentalType || 'inhouse').toLowerCase();
+            const qty = Math.max(1, Number(rental?.quantity || 1));
+            const unitPrice = Number(rental?.price || 0);
+
+            if (rentalType === 'persession') {
+                return sum + (unitPrice * qty);
+            }
+
+            return sum + (unitPrice * qty * perDayDays);
+        }, 0)
         : subtotal;
 
     const gstEnabled = window.adminSettings?.gstConfig?.enabled || false;
@@ -337,10 +387,16 @@ const buildBookingFormPayload = () => {
 
     const taxAmount = gstEnabled ? Math.round(adjustedSubtotal * gstRate) : 0;
     const totalAmount = adjustedSubtotal + taxAmount;
+    const bookingType = document.getElementById('bookingTypeSelect')?.value.trim() || '';
+
+    if (!bookingType) {
+        throw new Error('Please select a booking type from the booking catalog.');
+    }
 
     return {
         formData: {
             bookingMode,
+            rentalType: bookingType,
             date: bookingDate,
             startTime,
             endTime,
@@ -377,6 +433,8 @@ const resetBookingFormState = () => {
     } else {
         selectedRentals.clear();
     }
+
+    refreshBookingTypeOptions();
 
     clearBookingFormDraft();
 };
@@ -485,6 +543,17 @@ const initBookingFormHandlers = () => {
         bookingForm.addEventListener('submit', handleBookingFormSubmit);
     }
 
+    const bookingTypeEl = document.getElementById('bookingTypeSelect');
+    if (bookingTypeEl) {
+        bookingTypeEl.addEventListener('change', () => {
+            const selectedCategory = bookingTypeEl.value;
+            if (typeof window.setActiveBookingCategory === 'function') {
+                window.setActiveBookingCategory(selectedCategory);
+            }
+            scheduleBookingFormDraftSave();
+        });
+    }
+
     const startTimeEl = document.getElementById('startTime');
     if (startTimeEl) {
         startTimeEl.addEventListener('change', () => {
@@ -509,6 +578,8 @@ const initBookingFormHandlers = () => {
     if (bookingDateEl) {
         bookingDateEl.setAttribute('min', today);
     }
+
+    refreshBookingTypeOptions();
 
     if (bookingForm) {
         bookingForm.addEventListener('input', (event) => {

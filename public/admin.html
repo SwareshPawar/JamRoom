@@ -253,6 +253,30 @@
                     <div class="settings-rental-toolbar settings-rental-toolbar-bottom">
                         <button type="button" class="btn btn-secondary add-rental-btn" onclick="addRentalType()">+ Add Rental Type</button>
                     </div>
+
+                    <h3 class="settings-section-title">🔗 Category Bindings</h3>
+                    <div class="settings-highlight-card">
+                        <p class="settings-help-text">Bind compatible categories so users can book them together. Allowed: same rental type, or either side is Per-session.</p>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label for="bindingCategoryA">Category A</label>
+                                <select id="bindingCategoryA">
+                                    <option value="">Select category</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="bindingCategoryB">Category B</label>
+                                <select id="bindingCategoryB">
+                                    <option value="">Select category</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>&nbsp;</label>
+                                <button type="button" class="btn btn-primary btn-full" onclick="addCategoryBindingPair()">+ Add Binding</button>
+                            </div>
+                        </div>
+                        <div id="bindingPairsList" class="rental-type-subitems-section"></div>
+                    </div>
                     
                     <button type="submit" class="btn btn-success">Save Settings</button>
                 </form>
@@ -499,7 +523,9 @@
                 </div>
                 <div class="form-group">
                     <label for="editRentalType">Booking Type / Label*</label>
-                    <input type="text" id="editRentalType" required>
+                    <select id="editRentalType" required>
+                        <option value="">Loading booking catalog...</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Booking Items*</label>
@@ -629,6 +655,14 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="createBookingType">Booking Type / Label*</label>
+                    <select id="createBookingType" name="rentalType" required>
+                        <option value="">Loading booking catalog...</option>
+                    </select>
+                    <small class="settings-help-text">Options are populated from Rental Types & Pricing settings.</small>
+                </div>
+
+                <div class="form-group">
                     <label>Rental Items*</label>
                     <div id="createBookingRentals" class="admin-rentals-panel">
                         <div class="loading-inline-muted">Loading rental options...</div>
@@ -753,6 +787,7 @@
         let usersManagementData = [];
         let usersManagementById = new Map();
         let adminSettingsData = null;
+        let categoryBindingPairs = [];
 
         // Utility functions - Using shared modules
         const showAlert = (elementId, message, type = 'info') => {
@@ -1664,6 +1699,17 @@
                 
                 // Load rental types
                 loadRentalTypes(settings.rentalTypes || []);
+
+                categoryBindingPairs = Array.isArray(settings?.bookingCategoryBindings?.pairs)
+                    ? settings.bookingCategoryBindings.pairs.map((pair) => ({
+                        leftCategory: String(pair?.leftCategory || '').trim(),
+                        rightCategory: String(pair?.rightCategory || '').trim(),
+                        leftRentalType: normalizeBindingRentalType(pair?.leftRentalType || 'inhouse'),
+                        rightRentalType: normalizeBindingRentalType(pair?.rightRentalType || 'inhouse')
+                    })).filter((pair) => pair.leftCategory && pair.rightCategory)
+                    : [];
+
+                refreshBindingMenu();
             } catch (error) {
                 showAlert('settingsAlert', 'Failed to load settings', 'error');
             }
@@ -1688,6 +1734,9 @@
                 upiName: document.getElementById('upiName').value,
                 adminEmails: document.getElementById('adminEmails').value.split(',').map(e => e.trim()).filter(e => e),
                 rentalTypes: rentalTypes,
+                bookingCategoryBindings: {
+                    pairs: collectCategoryBindingPairs()
+                },
                 gstConfig: {
                     enabled: document.getElementById('gstEnabled').checked,
                     rate: parseFloat(document.getElementById('gstRate').value) / 100 || 0.18, // Convert percentage to decimal
@@ -1996,8 +2045,10 @@
             rentalTypes.forEach((rental, index) => {
                 const hasSubItems = rental.subItems && rental.subItems.length > 0;
                 const categoryTitle = (rental.name || '').trim() || `Category ${index + 1}`;
+                const categoryRentalType = (rental.rentalType || 'inhouse');
                 const subItemsHTML = hasSubItems ? rental.subItems.map((sub, subIndex) => {
-                    const isPerday = (sub.rentalType || 'inhouse') === 'perday';
+                    const isPerday = categoryRentalType === 'perday';
+                    const isPerSession = categoryRentalType === 'persession';
                     return `
                     <div class="rental-subitem-row" data-rental="${index}">
                         <div>
@@ -2012,15 +2063,12 @@
                         </div>
                         <div>
                             <label class="rental-subitem-label">Rental Type</label>
-                            <select data-rental="${index}" data-subitem="${subIndex}" data-field="rentalType" onchange="togglePerdayPrice(${index}, ${subIndex})"
-                                    class="rental-subitem-input">
-                                <option value="inhouse" ${(sub.rentalType || 'inhouse') === 'inhouse' ? 'selected' : ''}>In-house</option>
-                                <option value="perday" ${(sub.rentalType || 'inhouse') === 'perday' ? 'selected' : ''}>Per-day</option>
-                            </select>
+                            <input type="text" value="${categoryRentalType === 'perday' ? 'Per-day' : categoryRentalType === 'persession' ? 'Per-session' : 'In-house'}"
+                                   class="rental-subitem-input" readonly>
                         </div>
                         <div class="hourly-price-field">
                             <label class="rental-subitem-label hourly-price-label">
-                                Price (₹/hr) ${isPerday ? '<span class="price-flag price-flag-inactive">(not used for per-day)</span>' : '<span class="price-flag price-flag-active">(active)</span>'}
+                                ${isPerSession ? 'Price (₹/session)' : 'Price (₹/hr)'} ${isPerday ? '<span class="price-flag price-flag-inactive">(not used for per-day)</span>' : '<span class="price-flag price-flag-active">(active)</span>'}
                             </label>
                             <input type="number" value="${sub.price || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="price"
                                    class="rental-subitem-input ${isPerday ? 'rental-subitem-input-muted' : ''}" min="0" ${isPerday ? 'placeholder="Not used"' : ''}>
@@ -2059,6 +2107,14 @@
                                            placeholder="e.g., Synths, Guitars, JamRoom">
                                 </div>
                                 <div>
+                                    <label class="rental-type-label">Rental Type*</label>
+                                    <select class="rental-type-input" data-field="categoryRentalType" onchange="updateCategoryRentalType(${index}, this.value)">
+                                        <option value="inhouse" ${categoryRentalType === 'inhouse' ? 'selected' : ''}>Per Hour (In-house)</option>
+                                        <option value="perday" ${categoryRentalType === 'perday' ? 'selected' : ''}>Per Day</option>
+                                        <option value="persession" ${categoryRentalType === 'persession' ? 'selected' : ''}>Per Session</option>
+                                    </select>
+                                </div>
+                                <div>
                                     <label class="rental-type-label">Base Price (₹/hr)* <small class="rental-type-note">(used if no sub-items)</small></label>
                                     <input type="number" value="${rental.basePrice || ''}" onchange="updateRentalType(${index}, 'basePrice', parseInt(this.value))" 
                                            class="rental-type-input" min="0">
@@ -2095,7 +2151,183 @@
                 `;
                 container.appendChild(rentalDiv);
             });
+
+            refreshBindingMenu();
         }
+
+        const normalizeBindingRentalType = (value) => {
+            const normalized = String(value || 'inhouse').toLowerCase();
+            if (normalized === 'perday') return 'perday';
+            if (normalized === 'persession') return 'persession';
+            return 'inhouse';
+        };
+
+        const getBindingEligibleCategories = () => {
+            const rentalTypes = getCurrentRentalTypes();
+            return rentalTypes
+                .map((type) => ({
+                    name: String(type?.name || '').trim(),
+                    rentalType: normalizeBindingRentalType(type?.rentalType || 'inhouse')
+                }))
+                .filter((type) => type.name);
+        };
+
+        const refreshBindingSelectors = () => {
+            const firstSelect = document.getElementById('bindingCategoryA');
+            const secondSelect = document.getElementById('bindingCategoryB');
+            if (!firstSelect || !secondSelect) return;
+
+            const categories = getBindingEligibleCategories();
+            const selectedA = firstSelect.value;
+            const selectedB = secondSelect.value;
+
+            const buildOptionsHtml = () => [
+                '<option value="">Select category</option>',
+                ...categories.map((entry) => `<option value="${entry.name}">${entry.name} (${entry.rentalType})</option>`)
+            ].join('');
+
+            firstSelect.innerHTML = buildOptionsHtml();
+            secondSelect.innerHTML = buildOptionsHtml();
+
+            if (selectedA && categories.some((entry) => entry.name === selectedA)) {
+                firstSelect.value = selectedA;
+            }
+            if (selectedB && categories.some((entry) => entry.name === selectedB)) {
+                secondSelect.value = selectedB;
+            }
+        };
+
+        const renderBindingPairs = () => {
+            const listEl = document.getElementById('bindingPairsList');
+            if (!listEl) return;
+
+            if (!Array.isArray(categoryBindingPairs) || categoryBindingPairs.length === 0) {
+                listEl.innerHTML = '<p class="rental-type-subitems-empty">No bindings configured.</p>';
+                return;
+            }
+
+            listEl.innerHTML = categoryBindingPairs
+                .map((pair, index) => `
+                    <div class="rental-subitem-row">
+                        <div>
+                            <label class="rental-subitem-label">Binding</label>
+                            <input type="text" class="rental-subitem-input" readonly value="${pair.leftCategory} (${pair.leftRentalType}) ↔ ${pair.rightCategory} (${pair.rightRentalType})">
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index})">×</button>
+                    </div>
+                `)
+                .join('');
+        };
+
+        const refreshBindingMenu = () => {
+            refreshBindingSelectors();
+
+            const validCategoryNames = new Set(getBindingEligibleCategories().map((entry) => entry.name));
+            categoryBindingPairs = (Array.isArray(categoryBindingPairs) ? categoryBindingPairs : [])
+                .filter((pair) => validCategoryNames.has(pair.leftCategory) && validCategoryNames.has(pair.rightCategory));
+
+            renderBindingPairs();
+        };
+
+        function addCategoryBindingPair() {
+            const firstSelect = document.getElementById('bindingCategoryA');
+            const secondSelect = document.getElementById('bindingCategoryB');
+            if (!firstSelect || !secondSelect) return;
+
+            const leftCategory = String(firstSelect.value || '').trim();
+            const rightCategory = String(secondSelect.value || '').trim();
+
+            if (!leftCategory || !rightCategory) {
+                showAlert('settingsAlert', 'Select both categories before adding a binding.', 'warning');
+                return;
+            }
+
+            if (leftCategory === rightCategory) {
+                showAlert('settingsAlert', 'Please select two different categories.', 'warning');
+                return;
+            }
+
+            const categoryMap = new Map(getBindingEligibleCategories().map((entry) => [entry.name, entry.rentalType]));
+            const leftRentalType = categoryMap.get(leftCategory) || 'inhouse';
+            const rightRentalType = categoryMap.get(rightCategory) || 'inhouse';
+
+            const isValidPair = leftRentalType === rightRentalType
+                || leftRentalType === 'persession'
+                || rightRentalType === 'persession';
+
+            if (!isValidPair) {
+                showAlert('settingsAlert', 'Invalid binding. Allowed only same rental type, or one side as per-session.', 'warning');
+                return;
+            }
+
+            const duplicate = categoryBindingPairs.some((pair) => {
+                const direct = pair.leftCategory === leftCategory && pair.rightCategory === rightCategory;
+                const reverse = pair.leftCategory === rightCategory && pair.rightCategory === leftCategory;
+                return direct || reverse;
+            });
+
+            if (duplicate) {
+                showAlert('settingsAlert', 'This binding already exists.', 'warning');
+                return;
+            }
+
+            categoryBindingPairs.push({
+                leftCategory,
+                rightCategory,
+                leftRentalType,
+                rightRentalType
+            });
+
+            renderBindingPairs();
+            firstSelect.value = '';
+            secondSelect.value = '';
+        }
+
+        function removeCategoryBindingPair(index) {
+            const numericIndex = Number(index);
+            if (!Number.isInteger(numericIndex) || numericIndex < 0 || numericIndex >= categoryBindingPairs.length) {
+                return;
+            }
+
+            categoryBindingPairs.splice(numericIndex, 1);
+            renderBindingPairs();
+        }
+
+        const collectCategoryBindingPairs = () => {
+            const categoryMap = new Map(getBindingEligibleCategories().map((entry) => [entry.name, entry.rentalType]));
+
+            return (Array.isArray(categoryBindingPairs) ? categoryBindingPairs : [])
+                .map((pair) => {
+                    const leftCategory = String(pair?.leftCategory || '').trim();
+                    const rightCategory = String(pair?.rightCategory || '').trim();
+
+                    if (!leftCategory || !rightCategory || leftCategory === rightCategory) {
+                        return null;
+                    }
+
+                    if (!categoryMap.has(leftCategory) || !categoryMap.has(rightCategory)) {
+                        return null;
+                    }
+
+                    const leftRentalType = normalizeBindingRentalType(categoryMap.get(leftCategory));
+                    const rightRentalType = normalizeBindingRentalType(categoryMap.get(rightCategory));
+                    const isValidPair = leftRentalType === rightRentalType
+                        || leftRentalType === 'persession'
+                        || rightRentalType === 'persession';
+
+                    if (!isValidPair) {
+                        return null;
+                    }
+
+                    return {
+                        leftCategory,
+                        rightCategory,
+                        leftRentalType,
+                        rightRentalType
+                    };
+                })
+                .filter(Boolean);
+        };
         
         function addSubItem(rentalIndex) {
             const currentData = getCurrentRentalTypes() || [];
@@ -2109,7 +2341,6 @@
             currentData[rentalIndex].subItems.unshift({
                 name: '',
                 description: '',
-                rentalType: 'inhouse',
                 price: 0,
                 perdayPrice: 0
             });
@@ -2180,6 +2411,13 @@
             // This function is called when individual fields are updated
             // The actual data collection happens in getCurrentRentalTypes()
         }
+
+        function updateCategoryRentalType(index, value) {
+            const currentData = getCurrentRentalTypes();
+            if (!currentData[index]) return;
+            currentData[index].rentalType = value || 'inhouse';
+            loadRentalTypes(currentData);
+        }
         
         function getCurrentRentalTypes() {
             const container = document.getElementById('rentalTypesContainer');
@@ -2190,10 +2428,12 @@
                 const nameInput = div.querySelector('input[type="text"]');
                 const priceInput = div.querySelector('input[type="number"]');
                 const descInput = div.querySelector('textarea');
+                const categoryRentalTypeSelect = div.querySelector('select[data-field="categoryRentalType"]');
                 
                 const name = nameInput?.value?.trim();
                 const basePrice = parseInt(priceInput?.value) || 0;
                 const description = descInput?.value?.trim();
+                const categoryRentalType = categoryRentalTypeSelect?.value || 'inhouse';
                 
                 // Get sub-items
                 const subItemsContainer = div.querySelector('.sub-items-container');
@@ -2205,13 +2445,12 @@
                         const subNameInput = subDiv.querySelector('input[data-field="name"]');
                         const subDescInput = subDiv.querySelector('input[data-field="description"]');
                         const subPriceInput = subDiv.querySelector('input[data-field="price"]');
-                        const subRentalTypeSelect = subDiv.querySelector('select[data-field="rentalType"]');
                         const subPerdayPriceInput = subDiv.querySelector('input[data-field="perdayPrice"]');
                         
                         const subName = subNameInput?.value?.trim() || '';
                         const subDesc = subDescInput?.value?.trim() || '';
                         const subPrice = parseInt(subPriceInput?.value) || 0;
-                        const subRentalType = subRentalTypeSelect?.value || 'inhouse';
+                        const subRentalType = categoryRentalType;
                         const subPerdayPrice = parseInt(subPerdayPriceInput?.value) || 0;
                         
                         // Only save sub-items that have at least a name
@@ -2248,6 +2487,7 @@
                     const rental = {
                         name,
                         basePrice,
+                        rentalType: categoryRentalType,
                         description: description || ''
                     };
                     
@@ -2289,6 +2529,7 @@
             const startTime = (document.getElementById('createStartTime')?.value || '').trim();
             const endTime = (document.getElementById('createEndTime')?.value || '').trim();
             const bandName = (document.getElementById('createBandName')?.value || '').trim();
+            const bookingType = (document.getElementById('createBookingType')?.value || '').trim();
             const notes = (document.getElementById('createNotes')?.value || '').trim();
             const overrideDateTime = document.getElementById('createDateTimeOverride')?.checked === true;
             const adjustmentType = document.getElementById('createPriceAdjustmentType')?.value || 'none';
@@ -2318,6 +2559,7 @@
                 !!startTime ||
                 !!endTime ||
                 !!bandName ||
+                !!bookingType ||
                 !!notes ||
                 overrideDateTime ||
                 adjustmentType !== 'none' ||
@@ -2334,6 +2576,7 @@
                 startTime,
                 endTime,
                 bandName,
+                bookingType,
                 notes,
                 overrideDateTime,
                 adjustmentType,
@@ -2427,6 +2670,16 @@
                     document.getElementById('createBandName').value = draft.bandName;
                 }
 
+                refreshCreateBookingTypeSelect();
+
+                if (typeof draft.bookingType === 'string') {
+                    const createBookingTypeEl = document.getElementById('createBookingType');
+                    const savedBookingType = draft.bookingType.trim();
+                    if (createBookingTypeEl && savedBookingType && createBookingTypeEl.querySelector(`option[value="${savedBookingType}"]`)) {
+                        createBookingTypeEl.value = savedBookingType;
+                    }
+                }
+
                 if (typeof draft.notes === 'string') {
                     document.getElementById('createNotes').value = draft.notes;
                 }
@@ -2466,6 +2719,7 @@
                 }
 
                 applyCreateBookingRentalsDraft(draft.rentals || []);
+                refreshCreateBookingTypeSelect();
                 updateCreateDurationDisplay();
                 recalculateCreateBookingTotals();
 
@@ -2522,6 +2776,70 @@
         };
 
         const getRentalInputId = (rentalId) => `quantity_${String(rentalId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+        const buildAdminBookingTypeOptions = (rentalTypes = []) => {
+            if (!window.JamRoomUtils || typeof window.JamRoomUtils.buildBookingLabelOptions !== 'function') {
+                return [];
+            }
+
+            return window.JamRoomUtils.buildBookingLabelOptions(rentalTypes, { mode: 'all' });
+        };
+
+        const populateAdminBookingTypeSelect = (selectId, rentalTypes = [], { selectedValue = '' } = {}) => {
+            const selectEl = document.getElementById(selectId);
+            if (!selectEl) return [];
+
+            const normalizedSelectedValue = String(selectedValue || '').trim();
+            const options = buildAdminBookingTypeOptions(rentalTypes);
+            const availableOptions = options.slice();
+
+            if (normalizedSelectedValue && !availableOptions.some((option) => option.value === normalizedSelectedValue)) {
+                availableOptions.unshift({
+                    value: normalizedSelectedValue,
+                    label: `${normalizedSelectedValue} (Existing label)`
+                });
+            }
+
+            selectEl.innerHTML = [
+                '<option value="">Select booking type</option>',
+                ...availableOptions.map((option) => `<option value="${option.value}">${option.label}</option>`)
+            ].join('');
+
+            selectEl.disabled = availableOptions.length === 0;
+            if (normalizedSelectedValue && availableOptions.some((option) => option.value === normalizedSelectedValue)) {
+                selectEl.value = normalizedSelectedValue;
+            }
+
+            return availableOptions;
+        };
+
+        const deriveAdminBookingTypeLabel = (rentals = [], rentalTypes = []) => {
+            if (!window.JamRoomUtils || typeof window.JamRoomUtils.deriveBookingLabel !== 'function') {
+                return '';
+            }
+
+            return window.JamRoomUtils.deriveBookingLabel(rentals, buildAdminBookingTypeOptions(rentalTypes));
+        };
+
+        const refreshCreateBookingTypeSelect = () => {
+            const selectEl = document.getElementById('createBookingType');
+            const rentalTypes = Array.isArray(createBookingSettings?.rentalTypes) ? createBookingSettings.rentalTypes : [];
+            if (!selectEl) return [];
+
+            const currentValue = String(selectEl.value || '').trim();
+            const selectedRentals = collectCreateSelectedRentals(calculateCreateDurationHours(
+                document.getElementById('createStartTime')?.value,
+                document.getElementById('createEndTime')?.value
+            ), { strict: false }).selectedRentals;
+            const derivedValue = deriveAdminBookingTypeLabel(selectedRentals, rentalTypes);
+
+            return populateAdminBookingTypeSelect('createBookingType', rentalTypes, {
+                selectedValue: currentValue || derivedValue
+            });
+        };
+
+        window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
+        window.deriveAdminBookingTypeLabel = deriveAdminBookingTypeLabel;
 
         const isCreateDateTimeOverrideEnabled = () => {
             return document.getElementById('createDateTimeOverride')?.checked === true;
@@ -2993,6 +3311,7 @@
                 if (result.success && result.settings) {
                     createBookingSettings = result.settings;
                     displayCreateBookingRentals(result.settings.rentalTypes || []);
+                    refreshCreateBookingTypeSelect();
                     recalculateCreateBookingTotals();
                 } else {
                     document.getElementById('createBookingRentals').innerHTML = '<div class="text-danger">Error loading rental options</div>';
@@ -3014,22 +3333,26 @@
             let html = '';
 
             rentalTypes.forEach((type) => {
+                const categoryRentalType = (type.rentalType || 'inhouse');
                 html += `<div class="admin-rental-category">${escapeHtml(type.name)}</div>`;
 
-                if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0) {
+                if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0 && categoryRentalType !== 'perday') {
                     const baseId = `${type.name}_base`;
                     const qtyInputId = getRentalInputId(baseId);
                     const isJamRoomBase = type.name === 'JamRoom';
                     const encodedBaseData = encodeURIComponent(JSON.stringify({
                         id: baseId,
                         name: `${type.name} (Base)`,
+                        category: type.name,
                         price: type.basePrice,
                         perdayPrice: 0,
-                        rentalType: 'inhouse',
+                        rentalType: categoryRentalType,
                         description: type.description || '',
                         isRequired: false,
                         isBase: true
                     }));
+
+                    const basePriceUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
 
                     const shouldCheckCreateBase = false;
 
@@ -3037,7 +3360,7 @@
                         <div class="admin-rental-row base">
                             <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedBaseData}" ${shouldCheckCreateBase ? 'checked' : ''}>
                             <label for="rental_${qtyInputId}" class="admin-rental-meta">
-                                🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}/hr
+                                🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}${basePriceUnit}
                                 <span class="admin-rental-subtext">Base item</span>
                             </label>
                             <div class="admin-rental-qty">
@@ -3052,29 +3375,32 @@
                     type.subItems.forEach((subItem) => {
                         const itemId = `${type.name}__${subItem.name}`;
                         const qtyInputId = getRentalInputId(itemId);
-                        const isPerday = subItem.rentalType === 'perday';
+                        const isPerday = categoryRentalType === 'perday';
+                        const isPerSession = categoryRentalType === 'persession';
                         const displayPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
-                        const priceUnit = isPerday ? '/day' : '/hr';
+                        const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
                         const isFree = displayPrice === 0;
-                        const showQuantityControls = isPerday || isFree || (subItem.name || '').includes('IEM');
+                        const showQuantityControls = isPerday || isPerSession || isFree || (subItem.name || '').includes('IEM');
 
                         const encodedRentalData = encodeURIComponent(JSON.stringify({
                             id: itemId,
                             name: subItem.name,
+                            category: type.name,
                             price: subItem.price || 0,
                             perdayPrice: subItem.perdayPrice || 0,
-                            rentalType: subItem.rentalType || 'inhouse',
+                            rentalType: categoryRentalType,
                             description: subItem.description || '',
                             isRequired: false,
                             isBase: false
                         }));
 
-                        const icon = isFree ? '🆓' : (isPerday ? '📅' : '🔗');
-                        const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : ' (In-house)');
+                        const icon = isFree ? '🆓' : (isPerday ? '📅' : isPerSession ? '🎯' : '🔗');
+                        const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : isPerSession ? ' (Per-session)' : ' (In-house)');
                         const priceDisplay = isFree ? 'FREE' : `₹${displayPrice}${priceUnit}`;
                         const details = [
                             isPerday ? 'Flat per-day pricing' : '',
-                            (!isPerday && !isFree) ? 'Tied to session duration' : '',
+                            (isPerSession && !isFree) ? 'Flat per-session pricing' : '',
+                            (!isPerday && !isPerSession && !isFree) ? 'Tied to session duration' : '',
                             isFree ? 'Free add-on' : ''
                         ].filter(Boolean).join(' | ');
 
@@ -3100,19 +3426,22 @@
                     const encodedRentalData = encodeURIComponent(JSON.stringify({
                         id: itemId,
                         name: type.name,
+                        category: type.name,
                         price: type.basePrice,
                         perdayPrice: 0,
-                        rentalType: 'inhouse',
+                        rentalType: categoryRentalType,
                         description: type.description || `${type.name} rental`,
                         isRequired: false,
                         isBase: false
                     }));
 
+                    const categoryUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
+
                     html += `
                         <div class="admin-rental-row child">
                             <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedRentalData}">
                             <label for="rental_${qtyInputId}" class="admin-rental-meta">
-                                🔗 ${escapeHtml(type.name)} - ₹${type.basePrice}/hr
+                                🔗 ${escapeHtml(type.name)} - ₹${type.basePrice}${categoryUnit}
                                 <span class="admin-rental-subtext">Category base price item</span>
                             </label>
                             <div class="admin-rental-qty">
@@ -3140,12 +3469,13 @@
                 const quantityElement = document.getElementById(getRentalInputId(rentalData.id));
                 const rawQuantity = parseInt(quantityElement?.value, 10) || 1;
                 const isPerday = rentalData.rentalType === 'perday';
+                const isPerSession = rentalData.rentalType === 'persession';
                 const isFree = (isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0)) === 0;
                 const isIem = (rentalData.name || '').includes('IEM');
                 const isBase = rentalData.isRequired || String(rentalData.id).includes('_base');
 
                 let effectiveQuantity = rawQuantity;
-                if (!isPerday && !isFree && !isIem && !isBase) {
+                if (!isPerday && !isPerSession && !isFree && !isIem && !isBase) {
                     effectiveQuantity = 1;
                 }
 
@@ -3153,6 +3483,7 @@
 
                 selectedRentals.push({
                     name: rentalData.name,
+                    category: rentalData.category || '',
                     price: unitPrice,
                     perdayPrice: rentalData.perdayPrice || 0,
                     quantity: effectiveQuantity,
@@ -3168,6 +3499,8 @@
                 let itemTotal;
 
                 if (rental.rentalType === 'perday') {
+                    itemTotal = rental.price * rental.quantity;
+                } else if (rental.rentalType === 'persession') {
                     itemTotal = rental.price * rental.quantity;
                 } else if (rental.isRequired || String(rental.fullId).includes('_base')) {
                     itemTotal = rental.price * rental.quantity * calculatedDuration;
@@ -3254,9 +3587,15 @@
             const pricingSummary = recalculateCreateBookingTotals();
             const calculatedDuration = pricingSummary.calculatedDuration;
             const overrideDateTime = isCreateDateTimeOverrideEnabled();
+            const bookingTypeLabel = document.getElementById('createBookingType')?.value.trim() || '';
 
             if (calculatedDuration <= 0) {
                 showAlert('', 'End time must be after start time.', 'warning');
+                return;
+            }
+
+            if (!bookingTypeLabel) {
+                showAlert('', 'Please select a booking type from the booking catalog.', 'warning');
                 return;
             }
 
@@ -3296,8 +3635,10 @@
                 startTime,
                 endTime,
                 duration: calculatedDuration,
+                rentalType: bookingTypeLabel,
                 rentals: selectedRentals.map((r) => ({
                     name: r.name,
+                    category: r.category,
                     price: r.price,
                     perdayPrice: r.perdayPrice,
                     quantity: r.quantity,
@@ -3423,12 +3764,15 @@
         });
 
         document.getElementById('createBandName').addEventListener('input', scheduleCreateBookingDraftSave);
+        document.getElementById('createBookingType').addEventListener('change', scheduleCreateBookingDraftSave);
         document.getElementById('createNotes').addEventListener('input', scheduleCreateBookingDraftSave);
         document.getElementById('createBookingRentals').addEventListener('change', () => {
+            refreshCreateBookingTypeSelect();
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });
         document.getElementById('createBookingRentals').addEventListener('input', () => {
+            refreshCreateBookingTypeSelect();
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });

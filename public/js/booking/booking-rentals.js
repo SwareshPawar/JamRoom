@@ -10,14 +10,100 @@ let perdayUnavailableItems = new Set();
 let perdayBookedItemQuantities = new Map();
 let perdaySelectedRange = null;
 let perdayAvailabilityRequestSeq = 0;
+let availableBookingModes = ['hourly', 'perday'];
+let activeBookingCategory = '';
+
+const bookingCategoryModeMap = new Map();
 
 const rentalCatalog = {
     hourly: new Map(),
     perday: new Map()
 };
 
-const normalizeRentalType = (value) => String(value || 'inhouse').toLowerCase() === 'perday' ? 'perday' : 'inhouse';
+const normalizeRentalType = (value) => {
+    const normalized = String(value || 'inhouse').toLowerCase();
+    if (normalized === 'perday') return 'perday';
+    if (normalized === 'persession') return 'persession';
+    return 'inhouse';
+};
 const normalizeRentalNameKey = (name) => String(name || '').trim().toLowerCase();
+
+const inferAvailableBookingModesFromSettings = () => {
+    const configuredModes = Array.isArray(settings?.bookingModes)
+        ? settings.bookingModes
+            .map((mode) => String(mode || '').toLowerCase().trim())
+            .filter((mode) => mode === 'hourly' || mode === 'perday')
+        : [];
+
+    if (configuredModes.length > 0) {
+        return [...new Set(configuredModes)];
+    }
+
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+    let hasHourly = false;
+    let hasPerday = false;
+
+    rentalTypes.forEach((type) => {
+        const typeName = String(type?.name || '').trim();
+        const categoryRentalType = normalizeRentalType(type?.rentalType || '');
+        const subItems = Array.isArray(type?.subItems) ? type.subItems : [];
+
+        if (categoryRentalType === 'perday') {
+            hasPerday = true;
+        } else if (categoryRentalType === 'inhouse' || categoryRentalType === 'persession') {
+            hasHourly = true;
+        }
+
+        if ((typeName === 'JamRoom' || !subItems.length) && Number(type?.basePrice || 0) > 0) {
+            hasHourly = true;
+        }
+
+        subItems.forEach((subItem) => {
+            if (normalizeRentalType(subItem?.rentalType) === 'perday') {
+                hasPerday = true;
+            } else {
+                hasHourly = true;
+            }
+        });
+    });
+
+    const modes = [];
+    if (hasHourly) modes.push('hourly');
+    if (hasPerday) modes.push('perday');
+
+    return modes;
+};
+
+const getDefaultBookingMode = () => {
+    if (availableBookingModes.includes('hourly')) {
+        return 'hourly';
+    }
+
+    if (availableBookingModes.includes('perday')) {
+        return 'perday';
+    }
+
+    return 'hourly';
+};
+
+const renderBookingModeOptions = () => {
+    const modeSwitch = document.getElementById('bookingModeSwitch');
+    if (!modeSwitch) return;
+
+    availableBookingModes = inferAvailableBookingModesFromSettings();
+
+    if (availableBookingModes.length === 0) {
+        modeSwitch.innerHTML = '<small class="field-help">No booking modes are available. Configure Rental Types & Pricing in Admin settings.</small>';
+        return;
+    }
+
+    const selectedMode = availableBookingModes.includes(currentBookingMode)
+        ? currentBookingMode
+        : getDefaultBookingMode();
+
+    const modeText = selectedMode === 'perday' ? 'Per Day' : 'Per Hour / Session';
+    modeSwitch.innerHTML = `<small class="field-help">Pricing Mode: ${modeText} (auto-selected by Booking Type category)</small>`;
+};
 
 const getMapForMode = (mode) => mode === 'perday' ? perdaySelectedRentals : hourlySelectedRentals;
 
@@ -295,6 +381,13 @@ const applyPerdayItemAvailability = () => {
             const checkbox = optionEl.querySelector('.rental-checkbox');
             if (!item || !checkbox) return;
 
+            if (item.rentalType !== 'perday') {
+                checkbox.disabled = false;
+                optionEl.classList.remove('unavailable');
+                optionEl.removeAttribute('title');
+                return;
+            }
+
             const rentalNameKey = normalizeRentalNameKey(item.name);
             const isUnavailable = perdayUnavailableItems.has(rentalNameKey);
 
@@ -462,10 +555,17 @@ const toggleBookingModeFields = (mode) => {
 };
 
 const switchBookingMode = (mode) => {
-    currentBookingMode = mode === 'perday' ? 'perday' : 'hourly';
+    const requestedMode = mode === 'perday' ? 'perday' : 'hourly';
+    currentBookingMode = availableBookingModes.includes(requestedMode)
+        ? requestedMode
+        : getDefaultBookingMode();
     toggleBookingModeFields(currentBookingMode);
     setActiveSelectionMap();
     refreshPerDayDaysInfo();
+
+    if (typeof window.refreshBookingTypeOptions === 'function') {
+        window.refreshBookingTypeOptions();
+    }
 
     if (currentBookingMode === 'hourly') {
         const selectedDate = document.getElementById('bookingDate')?.value;
@@ -491,22 +591,8 @@ const switchBookingMode = (mode) => {
 };
 
 const bindBookingModeControls = () => {
-    const modeInputs = document.querySelectorAll('input[name="bookingMode"]');
-    if (!modeInputs || modeInputs.length === 0) {
-        switchBookingMode('hourly');
-        return;
-    }
-
-    modeInputs.forEach((input) => {
-        input.addEventListener('change', (event) => {
-            if (event.target.checked) {
-                switchBookingMode(event.target.value);
-            }
-        });
-    });
-
-    const selected = Array.from(modeInputs).find((input) => input.checked);
-    switchBookingMode(selected?.value || 'hourly');
+    renderBookingModeOptions();
+    switchBookingMode(getDefaultBookingMode());
 };
 
 const setPerDayInputConstraints = () => {
@@ -587,6 +673,7 @@ const setPerDayInputConstraints = () => {
 const isQuantityControlEnabled = (item) => {
     if (item.isRequired) return false;
     if (item.rentalType === 'perday') return true;
+    if (item.rentalType === 'persession') return true;
     if (item.price === 0) return true;
     if ((item.name || '').includes('IEM')) return true;
     return false;
@@ -594,13 +681,17 @@ const isQuantityControlEnabled = (item) => {
 
 const buildRentalOptionHTML = (item, mode) => {
     const showQuantity = isQuantityControlEnabled(item);
-    const priceUnit = item.rentalType === 'perday' ? '/day' : '/hr';
+    const priceUnit = item.rentalType === 'perday' ? '/day' : item.rentalType === 'persession' ? '/session' : '/hr';
     const defaultChecked = item.isRequired ? 'checked' : '';
     const defaultDisabled = item.isRequired ? 'disabled' : '';
     const selectedClass = item.isRequired ? ' selected' : '';
     const infoText = item.isRequired
         ? 'Always required'
-        : (item.rentalType === 'perday' ? 'Charged per selected day' : 'Charged for jam duration');
+        : (item.rentalType === 'perday'
+            ? 'Charged per selected day'
+            : item.rentalType === 'persession'
+                ? 'Charged once per session'
+                : 'Charged for jam duration');
 
     return `
         <div class="rental-option ${item.isRequired ? 'base' : 'child'}${selectedClass}" data-rental-id="${item.key}" data-rental-mode="${mode}">
@@ -659,9 +750,112 @@ const addGroupedItem = (groupsMap, categoryName, item) => {
     groupsMap.get(categoryName).push(item);
 };
 
+const getCategoryRentalType = (type) => {
+    const explicitType = normalizeRentalType(type?.rentalType || '');
+    if (String(type?.rentalType || '').trim()) {
+        return explicitType;
+    }
+
+    const subItems = Array.isArray(type?.subItems) ? type.subItems : [];
+    if (subItems.some((subItem) => normalizeRentalType(subItem?.rentalType) === 'perday')) {
+        return 'perday';
+    }
+
+    if (subItems.some((subItem) => normalizeRentalType(subItem?.rentalType) === 'persession')) {
+        return 'persession';
+    }
+
+    return 'inhouse';
+};
+
+const getCategoryMode = (categoryRentalType) => categoryRentalType === 'perday' ? 'perday' : 'hourly';
+
+const getConfiguredBindingPairs = () => {
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+    const knownCategories = new Set(
+        rentalTypes
+            .map((type) => String(type?.name || '').trim())
+            .filter(Boolean)
+    );
+
+    const rawPairs = Array.isArray(settings?.bookingCategoryBindings?.pairs)
+        ? settings.bookingCategoryBindings.pairs
+        : [];
+
+    return rawPairs
+        .map((pair) => {
+            const leftCategory = String(pair?.leftCategory || '').trim();
+            const rightCategory = String(pair?.rightCategory || '').trim();
+            const leftRentalType = normalizeRentalType(pair?.leftRentalType || 'inhouse');
+            const rightRentalType = normalizeRentalType(pair?.rightRentalType || 'inhouse');
+
+            if (!leftCategory || !rightCategory || leftCategory === rightCategory) {
+                return null;
+            }
+
+            if (!knownCategories.has(leftCategory) || !knownCategories.has(rightCategory)) {
+                return null;
+            }
+
+            const isValidPair = leftRentalType === rightRentalType
+                || leftRentalType === 'persession'
+                || rightRentalType === 'persession';
+            if (!isValidPair) {
+                return null;
+            }
+
+            return {
+                leftCategory,
+                rightCategory,
+                leftRentalType,
+                rightRentalType
+            };
+        })
+        .filter(Boolean);
+};
+
+const getBoundCategoryNames = (categoryName) => {
+    const normalizedCategory = String(categoryName || '').trim();
+    if (!normalizedCategory) {
+        return [];
+    }
+
+    const bound = new Set();
+    getConfiguredBindingPairs().forEach((pair) => {
+        if (pair.leftCategory === normalizedCategory) {
+            bound.add(pair.rightCategory);
+        } else if (pair.rightCategory === normalizedCategory) {
+            bound.add(pair.leftCategory);
+        }
+    });
+
+    return [...bound];
+};
+
+const getBookingCategoryOptions = () => {
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+    return rentalTypes
+        .map((type) => {
+            const categoryName = String(type?.name || '').trim();
+            if (!categoryName) return null;
+
+            const categoryRentalType = getCategoryRentalType(type);
+            const mode = getCategoryMode(categoryRentalType);
+            return {
+                value: categoryName,
+                label: categoryName,
+                category: categoryName,
+                mode,
+                rentalType: categoryRentalType
+            };
+        })
+        .filter(Boolean);
+};
+
 const categorizeRentalItems = () => {
     const hourlyGroups = new Map();
     const perdayGroups = new Map();
+    bookingCategoryModeMap.clear();
 
     const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
 
@@ -669,30 +863,33 @@ const categorizeRentalItems = () => {
         const typeName = String(type?.name || '').trim();
         if (!typeName) return;
 
+        const categoryRentalType = getCategoryRentalType(type);
+        const categoryMode = getCategoryMode(categoryRentalType);
+        bookingCategoryModeMap.set(typeName, categoryMode);
+
         const hasSubItems = Array.isArray(type.subItems) && type.subItems.length > 0;
 
-        // Base item is supported only for JamRoom category.
-        if (typeName === 'JamRoom' && toNumber(type.basePrice, 0) > 0) {
+        if (typeName === 'JamRoom' && toNumber(type.basePrice, 0) > 0 && categoryMode === 'hourly') {
             addGroupedItem(hourlyGroups, typeName, {
                 key: `${typeName}_base`,
                 name: `${typeName} (Base)`,
                 category: typeName,
                 description: type.description || 'Base room booking',
                 price: toNumber(type.basePrice, 0),
-                rentalType: 'inhouse',
+                rentalType: categoryRentalType,
                 isRequired: false
             });
         }
 
         if (!hasSubItems) {
             if (typeName !== 'JamRoom' && toNumber(type.basePrice, 0) > 0) {
-                addGroupedItem(hourlyGroups, typeName, {
+                addGroupedItem(categoryMode === 'perday' ? perdayGroups : hourlyGroups, typeName, {
                     key: `${typeName}__${typeName}`,
                     name: typeName,
                     category: typeName,
                     description: type.description || `${typeName} rental`,
                     price: toNumber(type.basePrice, 0),
-                    rentalType: 'inhouse',
+                    rentalType: categoryRentalType,
                     isRequired: false
                 });
             }
@@ -704,8 +901,7 @@ const categorizeRentalItems = () => {
             const itemName = String(subItem?.name || '').trim();
             if (!itemName) return;
 
-            const normalizedType = normalizeRentalType(subItem.rentalType);
-            const price = normalizedType === 'perday'
+            const price = categoryRentalType === 'perday'
                 ? toNumber(subItem.perdayPrice, 0)
                 : toNumber(subItem.price, 0);
 
@@ -715,11 +911,11 @@ const categorizeRentalItems = () => {
                 category: typeName,
                 description: subItem.description || type.description || '',
                 price,
-                rentalType: normalizedType,
+                rentalType: categoryRentalType,
                 isRequired: false
             };
 
-            if (normalizedType === 'perday') {
+            if (categoryMode === 'perday') {
                 addGroupedItem(perdayGroups, typeName, item);
             } else {
                 addGroupedItem(hourlyGroups, typeName, item);
@@ -747,12 +943,24 @@ const populateRentalTypes = () => {
     if (rentalTypes.length === 0) {
         hourlyContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No rental options available.</p>';
         perdayContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No per-day options available.</p>';
+        activeBookingCategory = '';
         setActiveSelectionMap();
         if (typeof updatePriceDisplay === 'function') updatePriceDisplay();
         return;
     }
 
     const { hourlyGroups, perdayGroups } = categorizeRentalItems();
+    const categoryOptions = getBookingCategoryOptions();
+
+    if (!activeBookingCategory || !categoryOptions.some((option) => option.value === activeBookingCategory)) {
+        activeBookingCategory = categoryOptions[0]?.value || '';
+    }
+
+    const boundCategories = getBoundCategoryNames(activeBookingCategory);
+    const categoriesToRender = [activeBookingCategory, ...boundCategories].filter(Boolean);
+
+    const activeMode = bookingCategoryModeMap.get(activeBookingCategory) || getDefaultBookingMode();
+    availableBookingModes = [activeMode];
 
     hourlyGroups.forEach((items) => {
         items.forEach((item) => rentalCatalog.hourly.set(item.key, item));
@@ -761,31 +969,76 @@ const populateRentalTypes = () => {
         items.forEach((item) => rentalCatalog.perday.set(item.key, item));
     });
 
-    const hasHourly = hourlyGroups.size > 0;
-    const hasPerday = perdayGroups.size > 0;
+    const uniqueByKey = (items) => {
+        const seen = new Set();
+        return items.filter((item) => {
+            const key = String(item?.key || '').trim();
+            if (!key || seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+    };
+
+    const activeHourlyItems = uniqueByKey(
+        categoriesToRender.flatMap((categoryName) => hourlyGroups.get(categoryName) || [])
+    );
+
+    const activePerdayItems = uniqueByKey(
+        categoriesToRender.flatMap((categoryName) => {
+            const perdayItems = perdayGroups.get(categoryName) || [];
+
+            if (activeMode !== 'perday') {
+                return perdayItems;
+            }
+
+            const sessionItems = (hourlyGroups.get(categoryName) || [])
+                .filter((item) => item.rentalType === 'persession');
+
+            return [...perdayItems, ...sessionItems];
+        })
+    );
+    const hasHourly = activeHourlyItems.length > 0;
+    const hasPerday = activePerdayItems.length > 0;
 
     if (!hasHourly) {
-        hourlyContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No hourly rental options configured.</p>';
+        hourlyContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No individual items configured for this category.</p>';
     } else {
-        hourlyGroups.forEach((items, categoryName) => {
-            renderRentalSection(hourlyContainer, categoryName, items, 'hourly');
-        });
+        renderRentalSection(hourlyContainer, `${activeBookingCategory} - Individual Items (Optional)`, activeHourlyItems, 'hourly');
     }
 
     if (!hasPerday) {
-        perdayContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No per-day options configured.</p>';
+        perdayContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No individual items configured for this category.</p>';
     } else {
-        perdayGroups.forEach((items, categoryName) => {
-            renderRentalSection(perdayContainer, `${categoryName} (Per-day)`, items, 'perday');
-        });
+        renderRentalSection(perdayContainer, `${activeBookingCategory} - Individual Items (Optional)`, activePerdayItems, 'perday');
     }
 
+    switchBookingMode(activeMode);
     setActiveSelectionMap();
     applyPerdayItemAvailability();
 
     if (typeof updatePriceDisplay === 'function') {
         updatePriceDisplay();
     }
+
+    if (typeof window.refreshBookingTypeOptions === 'function') {
+        window.refreshBookingTypeOptions();
+    }
+};
+
+const setActiveBookingCategory = (categoryName) => {
+    const normalizedCategory = String(categoryName || '').trim();
+    if (!normalizedCategory) {
+        return;
+    }
+
+    if (normalizedCategory === activeBookingCategory) {
+        return;
+    }
+
+    activeBookingCategory = normalizedCategory;
+    populateRentalTypes();
 };
 
 const toggleRental = (rentalKey, mode = 'hourly') => {
@@ -814,6 +1067,10 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
 
     if (mode === currentBookingMode && typeof updatePriceDisplay === 'function') {
         updatePriceDisplay();
+    }
+
+    if (typeof window.refreshBookingTypeOptions === 'function') {
+        window.refreshBookingTypeOptions();
     }
 
     if (typeof window.scheduleBookingFormDraftSave === 'function') {
@@ -855,14 +1112,9 @@ const updateQuantity = (rentalKey, change, mode = 'hourly') => {
 };
 
 const resetBookingRentalState = () => {
+    const categoryOptions = getBookingCategoryOptions();
+    activeBookingCategory = categoryOptions[0]?.value || '';
     populateRentalTypes();
-
-    const modeInputs = document.querySelectorAll('input[name="bookingMode"]');
-    modeInputs.forEach((input) => {
-        input.checked = input.value === 'hourly';
-    });
-
-    switchBookingMode('hourly');
 };
 
 // Load settings using shared API
@@ -875,9 +1127,12 @@ const loadSettings = async () => {
             settings = data.settings;
             window.adminSettings = settings;
 
-            bindBookingModeControls();
             setPerDayInputConstraints();
             populateRentalTypes();
+            bindBookingModeControls();
+            if (typeof window.refreshBookingTypeOptions === 'function') {
+                window.refreshBookingTypeOptions();
+            }
         } else {
             console.error('Failed to load settings:', data);
             showAlert('Failed to load booking settings. Please refresh the page.', 'error');
@@ -923,5 +1178,7 @@ window.getBookingMode = getBookingMode;
 window.getPerDayBookingInfo = getPerDayBookingInfo;
 window.switchBookingMode = switchBookingMode;
 window.resetBookingRentalState = resetBookingRentalState;
+window.getBookingCategoryOptions = getBookingCategoryOptions;
+window.setActiveBookingCategory = setActiveBookingCategory;
 window.getBookingRentalDraftSnapshot = getBookingRentalDraftSnapshot;
 window.applyBookingRentalDraftSelection = applyBookingRentalDraftSelection;
