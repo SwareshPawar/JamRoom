@@ -811,12 +811,7 @@
                 <div class="form-group">
                     <label for="quoteBookingType">Quotation Label</label>
                     <input type="text" id="quoteBookingType" placeholder="Auto-derived from selected items if left empty">
-                </div>
-                <div class="form-group">
-                    <label>Available Rental Items*</label>
-                    <div id="quotationRentals" class="admin-rentals-panel">
-                        <div class="loading-inline-muted">Loading rental options...</div>
-                    </div>
+                    <small class="settings-help-text">You can enter any custom label (for example, "Wedding Event Package"). This label is shown in the generated quotation PDF and sent quote details. If left blank, it is auto-derived from selected items.</small>
                 </div>
                 <div class="form-group">
                     <label>Quotation Type(s) <span style="font-weight:400;color:#6b7280;font-size:0.9em;">— select all that apply to this quote</span></label>
@@ -835,6 +830,12 @@
                         </label>
                     </div>
                     <small class="settings-help-text">Uncheck a type to hide those items and their schedule fields from this quotation.</small>
+                </div>
+                <div class="form-group">
+                    <label>Available Rental Items*</label>
+                    <div id="quotationRentals" class="admin-rentals-panel">
+                        <div class="loading-inline-muted">Loading rental options...</div>
+                    </div>
                 </div>
                 <div class="form-group" id="quoteInhouseScheduleSection">
                     <label>⏱️ Hourly Booking Schedule<span style="font-weight:400;color:#4b5563;font-size:0.9em;"> — date and time window for in-studio usage</span></label>
@@ -870,7 +871,7 @@
                 </div>
                 <div id="quoteItemsSummaryWrap" class="form-group" style="display:none;">
                     <label>Selected Items Summary</label>
-                    <div id="quoteItemsSummary" style="overflow-x:auto;"></div>
+                    <div id="quoteItemsSummary" class="quote-items-summary" style="overflow-x:auto;"></div>
                 </div>
                 <div class="form-grid-3">
                     <div class="form-group">
@@ -3179,8 +3180,7 @@
             let html = '';
             rentalTypes.forEach((type) => {
                 const categoryRentalType = String(type.rentalType || 'inhouse').toLowerCase();
-                html += `<div class="quote-rental-group" data-rental-type-group="${categoryRentalType}">`;
-                html += `<div class="admin-rental-category">${escapeHtml(type.name)}</div>`;
+                html += `<div class="quote-rental-group" data-rental-type-group="${categoryRentalType}"><details class="admin-rental-collapse"><summary class="admin-rental-summary">${escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
                 if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0 && categoryRentalType !== 'perday') {
                     const baseId = `${type.name}_base`;
                     const qtyInputId = getQuotationQtyInputId(baseId);
@@ -3262,7 +3262,7 @@
                         </div>
                     </div>`;
                 }
-                html += '</div>'; // end quote-rental-group
+                html += '</div></details></div>'; // end quote-rental-group
             });
             container.innerHTML = html;
             updateQuoteTypeFilter();
@@ -3390,39 +3390,84 @@
                 return;
             }
             summaryWrap.style.display = '';
-            const rows = quoteData.selectedRentals.map((r) => {
-                let billingLabel = 'Per hour';
-                let itemTotal = 0;
-                if (r.rentalType === 'persession') {
-                    billingLabel = 'Per session';
-                    itemTotal = r.price * r.quantity;
-                } else if (r.rentalType === 'perday') {
-                    const pd = quoteData.perdaySchedule;
-                    billingLabel = pd && pd.isValid ? `Per day x ${pd.days}` : 'Per day';
-                    itemTotal = pd && pd.isValid ? r.price * r.quantity * pd.days : 0;
-                } else {
-                    const ih = quoteData.inhouseSchedule;
-                    billingLabel = ih && ih.isValid ? `Per hour x ${ih.durationHours}` : 'Per hour';
-                    itemTotal = ih && ih.isValid ? r.price * r.quantity * ih.durationHours : 0;
+            const sortByNameThenCategory = (a, b) => {
+                const nameCompare = String(a?.name || '').localeCompare(String(b?.name || ''));
+                if (nameCompare !== 0) return nameCompare;
+                return String(a?.category || '').localeCompare(String(b?.category || ''));
+            };
+
+            const buildRow = (r, billingLabel, itemTotal) => `<tr>
+                <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(r.name)}${r.category ? ` <small style="color:#6b7280;">(${escapeHtml(r.category)})</small>` : ''}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${r.quantity}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">₹${r.price.toFixed(2)}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${billingLabel}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">₹${itemTotal.toFixed(2)}</td>
+            </tr>`;
+
+            const groupedConfigs = [
+                {
+                    rentalType: 'inhouse',
+                    title: 'Hourly Charges (In-studio, billed per hour)',
+                    getBillingLabel: () => {
+                        const ih = quoteData.inhouseSchedule;
+                        return ih && ih.isValid ? `Per hour x ${ih.durationHours}` : 'Per hour';
+                    },
+                    getItemTotal: (r) => {
+                        const ih = quoteData.inhouseSchedule;
+                        return ih && ih.isValid ? r.price * r.quantity * ih.durationHours : 0;
+                    }
+                },
+                {
+                    rentalType: 'perday',
+                    title: 'Per-Day Rental Charges (Equipment, billed per day)',
+                    getBillingLabel: () => {
+                        const pd = quoteData.perdaySchedule;
+                        return pd && pd.isValid ? `Per day x ${pd.days}` : 'Per day';
+                    },
+                    getItemTotal: (r) => {
+                        const pd = quoteData.perdaySchedule;
+                        return pd && pd.isValid ? r.price * r.quantity * pd.days : 0;
+                    }
+                },
+                {
+                    rentalType: 'persession',
+                    title: 'Per Session / Event Charges (Flat project rate)',
+                    getBillingLabel: () => 'Per session / event',
+                    getItemTotal: (r) => r.price * r.quantity
                 }
-                return `<tr>
-                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(r.name)}${r.category ? ` <small style="color:#6b7280;">(${escapeHtml(r.category)})</small>` : ''}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${r.quantity}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">₹${r.price.toFixed(2)}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${billingLabel}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">₹${itemTotal.toFixed(2)}</td>
-                </tr>`;
-            }).join('');
-            summaryEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-                <thead><tr style="background:#f9fafb;">
-                    <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Item</th>
-                    <th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Qty</th>
-                    <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Rate</th>
-                    <th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Billing</th>
-                    <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Amount</th>
-                </tr></thead>
-                <tbody>${rows}</tbody>
-            </table>`;
+            ];
+
+            const sectionHtml = groupedConfigs.map((group) => {
+                const items = quoteData.selectedRentals
+                    .filter((r) => r.rentalType === group.rentalType)
+                    .sort(sortByNameThenCategory);
+
+                if (items.length === 0) {
+                    return '';
+                }
+
+                const rows = items.map((r) => {
+                    const billingLabel = group.getBillingLabel(r);
+                    const itemTotal = group.getItemTotal(r);
+                    return buildRow(r, billingLabel, itemTotal);
+                }).join('');
+
+                return `<section class="quote-summary-group">
+                    <div class="quote-summary-group-header">${group.title}</div>
+                    <table class="quote-summary-table" style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+                        <thead><tr style="background:#f9fafb;">
+                            <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Item</th>
+                            <th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Qty</th>
+                            <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Rate</th>
+                            <th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Billing</th>
+                            <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Amount</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </section>`;
+            }).filter(Boolean).join('');
+
+            summaryEl.innerHTML = `<div class="quote-summary-groups">${sectionHtml}</div>`;
         };
 
         async function showQuotationModal() {
@@ -4009,7 +4054,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
 
             rentalTypes.forEach((type) => {
                 const categoryRentalType = (type.rentalType || 'inhouse');
-                html += `<div class="admin-rental-category">${escapeHtml(type.name)}</div>`;
+                html += `<details class="admin-rental-collapse"><summary class="admin-rental-summary">${escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
 
                 if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0 && categoryRentalType !== 'perday') {
                     const baseId = `${type.name}_base`;
@@ -4126,6 +4171,8 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                         </div>
                     `;
                 }
+
+                html += '</div></details>';
             });
 
             container.innerHTML = html;

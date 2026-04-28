@@ -714,13 +714,16 @@ const buildRentalOptionHTML = (item, mode) => {
     `;
 };
 
-const renderRentalSection = (container, title, items, mode) => {
+const renderRentalSection = (container, title, items, mode, { collapsedByDefault = true } = {}) => {
     if (!container) return;
 
-    const section = document.createElement('div');
+    const section = document.createElement('details');
     section.className = 'rental-category';
+    if (!collapsedByDefault) {
+        section.open = true;
+    }
 
-    const header = document.createElement('div');
+    const header = document.createElement('summary');
     header.className = 'category-header';
     header.innerHTML = `<strong>${title}</strong>`;
     section.appendChild(header);
@@ -981,37 +984,51 @@ const populateRentalTypes = () => {
         });
     };
 
-    const activeHourlyItems = uniqueByKey(
-        categoriesToRender.flatMap((categoryName) => hourlyGroups.get(categoryName) || [])
-    );
+    const getPerdayItemsForCategory = (categoryName) => {
+        const perdayItems = perdayGroups.get(categoryName) || [];
+        if (activeMode !== 'perday') {
+            return perdayItems;
+        }
 
-    const activePerdayItems = uniqueByKey(
-        categoriesToRender.flatMap((categoryName) => {
-            const perdayItems = perdayGroups.get(categoryName) || [];
+        const sessionItems = (hourlyGroups.get(categoryName) || [])
+            .filter((item) => item.rentalType === 'persession');
 
-            if (activeMode !== 'perday') {
-                return perdayItems;
-            }
+        return [...perdayItems, ...sessionItems];
+    };
 
-            const sessionItems = (hourlyGroups.get(categoryName) || [])
-                .filter((item) => item.rentalType === 'persession');
+    const hasAnyHourlyItems = categoriesToRender.some((categoryName) => (hourlyGroups.get(categoryName) || []).length > 0);
+    const hasAnyPerdayItems = categoriesToRender.some((categoryName) => getPerdayItemsForCategory(categoryName).length > 0);
 
-            return [...perdayItems, ...sessionItems];
-        })
-    );
-    const hasHourly = activeHourlyItems.length > 0;
-    const hasPerday = activePerdayItems.length > 0;
-
-    if (!hasHourly) {
+    if (!hasAnyHourlyItems) {
         hourlyContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No individual items configured for this category.</p>';
     } else {
-        renderRentalSection(hourlyContainer, `${activeBookingCategory} - Individual Items (Optional)`, activeHourlyItems, 'hourly');
+        categoriesToRender.forEach((categoryName) => {
+            const categoryItems = uniqueByKey(hourlyGroups.get(categoryName) || []);
+            if (categoryItems.length === 0) return;
+            renderRentalSection(
+                hourlyContainer,
+                `${categoryName} - Individual Items (Optional)`,
+                categoryItems,
+                'hourly',
+                { collapsedByDefault: true }
+            );
+        });
     }
 
-    if (!hasPerday) {
+    if (!hasAnyPerdayItems) {
         perdayContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No individual items configured for this category.</p>';
     } else {
-        renderRentalSection(perdayContainer, `${activeBookingCategory} - Individual Items (Optional)`, activePerdayItems, 'perday');
+        categoriesToRender.forEach((categoryName) => {
+            const categoryItems = uniqueByKey(getPerdayItemsForCategory(categoryName));
+            if (categoryItems.length === 0) return;
+            renderRentalSection(
+                perdayContainer,
+                `${categoryName} - Individual Items (Optional)`,
+                categoryItems,
+                'perday',
+                { collapsedByDefault: true }
+            );
+        });
     }
 
     switchBookingMode(activeMode);

@@ -44,7 +44,7 @@
         let html = '';
 
         rentalTypes.forEach((type) => {
-            html += `<div class="admin-rental-category">${deps.escapeHtml(type.name)}</div>`;
+            html += `<details class="admin-rental-collapse"><summary class="admin-rental-summary">${deps.escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
 
             if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0) {
                 const baseId = `${type.name}_base`;
@@ -188,6 +188,8 @@
                     </div>
                 `;
             }
+
+            html += '</div></details>';
         });
 
         const existingRentals = Array.isArray(booking?.rentals) ? booking.rentals : [];
@@ -197,7 +199,7 @@
         });
 
         if (unmatchedRentals.length > 0) {
-            html += '<div class="admin-rental-category">Existing Custom Items</div>';
+            html += '<details class="admin-rental-collapse"><summary class="admin-rental-summary">Existing Custom Items</summary><div class="admin-rental-section-content">';
 
             unmatchedRentals.forEach((rental, index) => {
                 const itemId = `custom_existing_${index}`;
@@ -234,6 +236,8 @@
                     </div>
                 `;
             });
+
+            html += '</div></details>';
         }
 
         container.innerHTML = html;
