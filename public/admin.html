@@ -803,17 +803,11 @@
             </div>
             <form id="quotationForm" onsubmit="submitQuotation(event)">
                 <div class="form-group">
-                    <label for="quoteUserSearch">Select User (Optional)</label>
+                    <label for="quoteUserSearch">Add Recipients from Database (Optional)</label>
                     <input type="text" id="quoteUserSearch" placeholder="Search by name, email, or mobile" autocomplete="off">
-                    <input type="hidden" id="quoteUserId">
-                    <small id="quoteUserSelected" class="settings-help-text">No user selected. You can still send to custom email IDs.</small>
                     <div id="quoteUserTypeahead" class="create-user-typeahead admin-hidden"></div>
-                </div>
-                <div class="form-group">
-                    <label class="settings-checkbox-label">
-                        <input type="checkbox" id="quoteIncludeSelectedUser" class="settings-checkbox-input" checked>
-                        <span class="settings-checkbox-text">Send quote to selected user email</span>
-                    </label>
+                    <div id="quoteSelectedUsersChips" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+                    <small class="settings-help-text">Search and select recipients from the database. Search again after each pick to add more users.</small>
                 </div>
                 <div class="form-group">
                     <label for="quoteAdditionalEmails">Additional recipient emails (optional)</label>
@@ -2822,9 +2816,10 @@
         let isApplyingCreateBookingDraft = false;
 
         // ── Quotation state ──────────────────────────────────────
-        let selectedQuotationUser = null;
+        let selectedQuotationUsers = [];
         let quoteSearchDebounceTimer = null;
         let quoteSearchRequestSeq = 0;
+        let quotationUserCache = [];
 
         const clearCreateBookingDraft = () => {
             if (createBookingDraftSaveTimer) {
@@ -3199,13 +3194,11 @@
         const resetQuotationForm = () => {
             const form = document.getElementById('quotationForm');
             if (form) form.reset();
-            selectedQuotationUser = null;
-            document.getElementById('quoteUserId').value = '';
+            selectedQuotationUsers = [];
             document.getElementById('quoteUserSearch').value = '';
-            document.getElementById('quoteUserSelected').textContent = 'No user selected. You can still send to custom email IDs.';
             document.getElementById('quoteUserTypeahead').style.display = 'none';
             document.getElementById('quoteUserTypeahead').classList.add('admin-hidden');
-            document.getElementById('quoteIncludeSelectedUser').checked = true;
+            renderQuotationUserChips();
             const defaultDeliveryOption = document.querySelector('input[name="quoteEmailDeliveryMode"][value="single"]');
             if (defaultDeliveryOption) defaultDeliveryOption.checked = true;
             const today = new Date().toISOString().split('T')[0];
@@ -3338,7 +3331,8 @@
                 if (!res.ok) throw new Error('Failed to search users');
                 const result = await res.json();
                 if (requestId !== quoteSearchRequestSeq) return;
-                renderQuotationUserTypeahead(Array.isArray(result.users) ? result.users : []);
+                quotationUserCache = Array.isArray(result.users) ? result.users : [];
+                renderQuotationUserTypeahead(quotationUserCache);
             } catch (error) {
                 if (requestId !== quoteSearchRequestSeq) return;
                 typeahead.innerHTML = '<div class="typeahead-empty">Unable to load user suggestions.</div>';
@@ -3348,19 +3342,38 @@
         };
 
         function selectQuotationUser(userId) {
+            const allSources = [...quotationUserCache, ...adminCreateUsers];
+            const user = allSources.find((u) => String(u._id) === String(userId));
+            if (!user) return;
             const typeahead = document.getElementById('quoteUserTypeahead');
-            const pickFromList = (users) => {
-                const user = (users || []).find((u) => String(u._id) === String(userId));
-                if (!user) return false;
-                selectedQuotationUser = user;
-                document.getElementById('quoteUserId').value = user._id;
-                document.getElementById('quoteUserSearch').value = `${user.name} (${user.email})`;
-                document.getElementById('quoteUserSelected').textContent = `Selected: ${user.name} | ${user.email}${user.mobile ? ` | ${user.mobile}` : ''}`;
-                if (typeahead) { typeahead.style.display = 'none'; typeahead.classList.add('admin-hidden'); }
-                return true;
-            };
-            if (pickFromList(adminCreateUsers)) return;
-            loadCreateBookingUsers(document.getElementById('quoteUserSearch').value || '').then(() => pickFromList(adminCreateUsers));
+            if (typeahead) { typeahead.style.display = 'none'; typeahead.classList.add('admin-hidden'); }
+            document.getElementById('quoteUserSearch').value = '';
+            // Prevent duplicate selections
+            if (selectedQuotationUsers.some((u) => String(u._id) === String(userId))) return;
+            selectedQuotationUsers.push(user);
+            renderQuotationUserChips();
+        }
+
+        function removeQuotationUser(userId) {
+            selectedQuotationUsers = selectedQuotationUsers.filter((u) => String(u._id) !== String(userId));
+            renderQuotationUserChips();
+        }
+
+        function renderQuotationUserChips() {
+            const container = document.getElementById('quoteSelectedUsersChips');
+            if (!container) return;
+            if (selectedQuotationUsers.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+            container.style.display = 'flex';
+            container.innerHTML = selectedQuotationUsers.map((u) => {
+                const safeId = String(u._id);
+                const safeName = escapeHtml(u.name || 'User');
+                const safeEmail = escapeHtml(u.email || '');
+                return `<span style="display:inline-flex;align-items:center;gap:5px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:4px 12px;font-size:12px;color:#1e40af;font-weight:600;">${safeName} <span style="color:#64748b;font-weight:400;">&lt;${safeEmail}&gt;</span><button type="button" onclick="removeQuotationUser('${safeId}')" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;padding:0 0 0 6px;" title="Remove">×</button></span>`;
+            }).join('');
         }
 
         const getSelectedQuoteTypes = () => {
@@ -3734,18 +3747,14 @@
         async function submitQuotation(event) {
             event.preventDefault();
             try {
-                const includeSelectedUser = document.getElementById('quoteIncludeSelectedUser').checked;
                 const additionalEmails = parseQuoteEmailListInput(document.getElementById('quoteAdditionalEmails').value || '');
                 const emailDeliveryMode = document.querySelector('input[name="quoteEmailDeliveryMode"]:checked')?.value || 'single';
                 const saveTemplate = document.getElementById('quoteSaveTemplate')?.checked === true;
                 const templateName = String(document.getElementById('quoteTemplateName')?.value || '').trim();
                 const invalidEmails = additionalEmails.filter((email) => !isValidQuoteEmail(email));
                 if (invalidEmails.length > 0) throw new Error(`Invalid email address(es): ${invalidEmails.join(', ')}`);
-                if (includeSelectedUser && !selectedQuotationUser?.email) {
-                    throw new Error('Select a user or disable selected-user email option.');
-                }
-                if (!includeSelectedUser && additionalEmails.length === 0) {
-                    throw new Error('Provide at least one recipient email.');
+                if (selectedQuotationUsers.length === 0 && additionalEmails.length === 0) {
+                    throw new Error('Add at least one recipient — search and select a user above, or enter email addresses below.');
                 }
                 if (saveTemplate && !templateName) {
                     throw new Error('Template name is required when saving quotation template.');
@@ -3761,8 +3770,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({
-                        recipientUserId: selectedQuotationUser?._id || '',
-                        includeSelectedUser,
+                        recipientUserIds: selectedQuotationUsers.map((u) => String(u._id)),
                         additionalEmails,
                         emailDeliveryMode,
                         saveTemplate,

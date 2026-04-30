@@ -3520,8 +3520,10 @@ router.delete('/quotations/saved/:id', protect, isAdmin, async (req, res) => {
 router.post('/quotations/send', protect, isAdmin, async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
-    const recipientUserId = String(req.body?.recipientUserId || '').trim();
-    const includeSelectedUser = req.body?.includeSelectedUser !== false;
+    // Support recipientUserIds array (new) and legacy single recipientUserId for backward compat
+    const recipientUserIdList = Array.isArray(req.body?.recipientUserIds)
+      ? req.body.recipientUserIds.map((id) => String(id || '').trim()).filter(Boolean)
+      : (String(req.body?.recipientUserId || '').trim() ? [String(req.body.recipientUserId).trim()] : []);
     const additionalEmails = parseOptionalEmailList(req.body?.additionalEmails);
     const emailDeliveryMode = String(req.body?.emailDeliveryMode || 'single').trim().toLowerCase() === 'separate'
       ? 'separate'
@@ -3541,29 +3543,27 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
     const parsedQuotation = sanitizeQuotationPayload(quotation, settings);
     const sanitizedRentals = parsedQuotation.rentals;
 
-    let selectedUser = null;
-    if (recipientUserId) {
-      selectedUser = await User.findById(recipientUserId).select('name email mobile');
-      if (!selectedUser) {
-        return res.status(404).json({ success: false, message: 'Selected user not found' });
-      }
-    }
+    // Fetch all selected DB users
+    const selectedUsers = recipientUserIdList.length > 0
+      ? await User.find({ _id: { $in: recipientUserIdList } }).select('name email mobile')
+      : [];
+    // Map normalized email → name for per-recipient personalization
+    const userEmailMap = new Map(
+      selectedUsers.map((u) => [normalizeEmail(u.email), u.name])
+    );
 
     const recipientSet = new Set();
-    if (includeSelectedUser && selectedUser?.email) {
-      const selectedUserEmail = normalizeEmail(selectedUser.email);
-      if (!isValidEmail(selectedUserEmail)) {
-        return res.status(400).json({ success: false, message: `Invalid selected user email: ${selectedUser.email}` });
-      }
-      recipientSet.add(selectedUserEmail);
-    }
+    selectedUsers.forEach((u) => {
+      const email = normalizeEmail(u.email);
+      if (isValidEmail(email)) recipientSet.add(email);
+    });
     additionalEmails.forEach((email) => { if (isValidEmail(email)) recipientSet.add(email); });
 
     const recipientEmails = Array.from(recipientSet);
     if (recipientEmails.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please include selected user email or provide at least one additional recipient email'
+        message: 'Add at least one recipient — select a user from the database or provide additional email addresses'
       });
     }
 
@@ -3600,97 +3600,176 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
       gstDisplayName,
       taxAmount,
       totalAmount,
-      recipientName: selectedUser?.name || ''
+      recipientName: selectedUsers[0]?.name || ''
     }, settings);
 
     const subject = `Quotation from ${settings?.studioName || 'JamRoom'} - ${rentalTypeLabel}`;
     const buildQuotationEmailHtml = ({ recipientName = '', individualEmail = false } = {}) => {
 
-      return `
-        <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#1f2937;background:#eef2f7;padding:18px;">
-          <div style="background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #dbe5f0;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
-            <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:22px 24px;">
-              <div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-start;">
-                <div style="max-width:68%;">
-                  <h2 style="margin:0 0 8px 0;font-size:28px;">${quotationPresentation.studioName}</h2>
-                  ${quotationPresentation.studioAddress ? `<div style="font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88);"><strong>Address:</strong> ${quotationPresentation.studioAddress}</div>` : ''}
-                  <div style="font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88);"><strong>Phone / WhatsApp:</strong> ${quotationPresentation.studioPhone}</div>
-                  <div style="font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88);"><strong>Email:</strong> ${quotationPresentation.studioEmail}</div>
-                </div>
-                <div style="min-width:210px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:14px 16px;">
-                  <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#bfdbfe;font-weight:700;margin-bottom:8px;">Order Summary</div>
-                  <div style="font-size:13px;line-height:1.7;color:rgba(255,255,255,0.9);"><strong>Quotation For:</strong> ${quotationPresentation.serviceTypeLabel}</div>
-                  <div style="font-size:13px;line-height:1.7;color:rgba(255,255,255,0.9);"><strong>Generated On:</strong> ${quotationPresentation.generatedAtLabel}</div>
-                  ${quotationPresentation.selectedTypeLabels.length > 0 ? `<div style="font-size:13px;line-height:1.7;color:rgba(255,255,255,0.9);"><strong>Includes:</strong> ${quotationPresentation.selectedTypeLabels.join(', ')}</div>` : ''}
-                </div>
-              </div>
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;padding:0;background:#eef2f7;font-family:Arial,sans-serif;color:#1f2937}
+  .eq{max-width:760px;margin:0 auto;padding:12px}
+  .card{background:#fff;border-radius:16px;overflow:hidden;border:1px solid #dbe5f0}
+  .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:20px}
+  .hdr-table{width:100%;border-collapse:collapse}
+  .hdr-left{vertical-align:top;padding-right:14px}
+  .hdr-right{vertical-align:top;width:210px}
+  .hdr h2{margin:0 0 8px 0;font-size:24px;color:#fff}
+  .hdr .cl{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88)}
+  .order-box{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:12px 14px}
+  .order-kicker{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#bfdbfe;font-weight:700;margin-bottom:8px}
+  .order-line{font-size:12px;line-height:1.7;color:rgba(255,255,255,0.9)}
+  .body{padding:20px}
+  .two-col{width:100%;border-collapse:collapse;margin:0 0 16px 0}
+  .two-col td{vertical-align:top}
+  .col-left{padding-right:6px}
+  .col-right{padding-left:6px}
+  .sc{background:#f8fafc;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px}
+  .tc{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px}
+  .sc-kicker{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:8px}
+  .tc-kicker{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#1d4ed8;font-weight:700;margin-bottom:8px}
+  .sc-title{font-size:17px;font-weight:800;color:#0f172a;margin-bottom:4px}
+  .tc-amount{font-size:30px;font-weight:900;color:#1d4ed8;margin-bottom:6px}
+  .sc-sub,.tc-sub{font-size:12px;line-height:1.5;color:#475569}
+  .cta{background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
+  .cta-title{font-size:15px;font-weight:800;color:#0f172a;margin-bottom:8px}
+  .cta-body{font-size:13px;line-height:1.8;color:#0f172a}
+  .terms{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:12px;padding:14px 16px;margin:0 0 12px 0}
+  .terms-hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px}
+  .terms ul{margin:0;padding-left:16px;color:#7f1d1d}
+  .terms li{margin:0 0 6px 0;font-size:13px;line-height:1.6}
+  .offer{background:linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%);border:2px solid #f59e0b;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
+  .offer-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:8px}
+  .offer-text{font-size:13px;line-height:1.8;color:#78350f;font-weight:600}
+  .offer-note{font-size:13px;line-height:1.7;color:#92400e;margin-top:6px}
+  .notes-card{background:#fff;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
+  .notes-hd{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px}
+  .footer{font-size:11px;line-height:1.8;color:#64748b;border-top:1px solid #e5e7eb;padding-top:12px}
+  @media only screen and (max-width:520px){
+    .eq{padding:8px}
+    .hdr{padding:16px}
+    .hdr-left,.hdr-right{display:block;width:100% !important;padding:0}
+    .hdr-right{margin-top:12px}
+    .hdr h2{font-size:20px}
+    .body{padding:14px}
+    .two-col,.two-col tbody,.two-col tr{display:block}
+    .two-col td{display:block;width:100% !important;padding:0 0 10px 0}
+    .col-left,.col-right{padding:0 0 10px 0}
+    .tc-amount{font-size:26px}
+  }
+</style>
+</head>
+<body>
+<div class="eq">
+  <div class="card">
+
+    <!-- HEADER -->
+    <div class="hdr">
+      <table class="hdr-table" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="hdr-left">
+            <h2>${quotationPresentation.studioName}</h2>
+            ${quotationPresentation.studioAddress ? `<div class="cl"><strong>Address:</strong> ${quotationPresentation.studioAddress}</div>` : ''}
+            <div class="cl"><strong>Phone / WhatsApp:</strong> ${quotationPresentation.studioPhone}</div>
+            <div class="cl"><strong>Email:</strong> ${quotationPresentation.studioEmail}</div>
+          </td>
+          <td class="hdr-right">
+            <div class="order-box">
+              <div class="order-kicker">Order Summary</div>
+              <div class="order-line"><strong>Quotation For:</strong> ${quotationPresentation.serviceTypeLabel}</div>
+              <div class="order-line"><strong>Generated On:</strong> ${quotationPresentation.generatedAtLabel}</div>
+              ${quotationPresentation.selectedTypeLabels.length > 0 ? `<div class="order-line"><strong>Includes:</strong> ${quotationPresentation.selectedTypeLabels.join(', ')}</div>` : ''}
             </div>
+          </td>
+        </tr>
+      </table>
+    </div>
 
-            <div style="padding:22px 24px;">
-              <p style="margin:0 0 12px 0;font-size:15px;color:#0f172a;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
-              <p style="margin:0 0 10px 0;font-size:14px;line-height:1.7;color:#475569;">${quotationPresentation.introLine}</p>
-              <p style="margin:0 0 16px 0;font-size:14px;line-height:1.7;color:#475569;">The detailed quotation PDF is attached for review and sharing.</p>
+    <!-- BODY -->
+    <div class="body">
+      <p style="margin:0 0 10px 0;font-size:15px;color:#0f172a;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
+      <p style="margin:0 0 8px 0;font-size:13px;line-height:1.7;color:#475569;">${quotationPresentation.introLine}</p>
+      <p style="margin:0 0 16px 0;font-size:13px;line-height:1.7;color:#475569;">The detailed quotation PDF is attached for review and sharing.</p>
 
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px 0;">
-                <tr>
-                  <td width="50%" valign="top" style="padding-right:7px;">
-                    <div style="background:#f8fafc;border:1px solid #dbe5f0;border-radius:14px;padding:16px 18px;height:126px;box-sizing:border-box;">
-                      <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:10px;">Service Overview</div>
-                      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:6px;">${quotationPresentation.serviceTypeLabel}</div>
-                      <div style="font-size:13px;color:#475569;">${quotationPresentation.selectedTypeLabels.length > 0 ? `Includes ${quotationPresentation.selectedTypeLabels.join(', ')}.` : ''}</div>
-                    </div>
-                  </td>
-                  <td width="50%" valign="top" style="padding-left:7px;">
-                    <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;height:126px;box-sizing:border-box;">
-                      <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#1d4ed8;font-weight:700;margin-bottom:10px;">Estimated Total</div>
-                      <div style="font-size:32px;font-weight:900;color:#1d4ed8;margin-bottom:8px;">${quotationPresentation.totalAmountLabel}</div>
-                      ${quotationPresentation.taxEnabled ? `<div style="font-size:12px;color:#475569;margin-bottom:2px;">Subtotal: <strong>${quotationPresentation.subtotalAmountLabel}</strong></div><div style="font-size:12px;color:#475569;">${quotationPresentation.gstDisplayLabel} (${quotationPresentation.gstRateLabel}): <strong>${quotationPresentation.taxAmountLabel}</strong></div>` : `<div style="font-size:12px;line-height:1.5;color:#475569;">See attached PDF for full breakdown.</div>`}
-                    </div>
-                  </td>
-                </tr>
-              </table>
-
-              <div style="background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;margin:18px 0;">
-                <div style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:10px;">To confirm your booking</div>
-                <div style="font-size:14px;line-height:1.8;color:#0f172a;">
-                  <div>Reply with <strong>CONFIRM</strong>${individualEmail ? ' on this email' : ' on this email thread'}.</div>
-                  <div>${quotationPresentation.studioWhatsAppLink ? `Or WhatsApp us at <a href="${quotationPresentation.studioWhatsAppLink}" style="color:#1d4ed8;font-weight:700;text-decoration:none;">${quotationPresentation.studioPhone}</a>.` : `Or contact us at <strong>${quotationPresentation.studioPhone}</strong>.`}</div>
-                </div>
-              </div>
-
-              <div style="background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:14px;padding:16px 18px;margin:0 0 14px 0;">
-                <div style="font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:10px;">⚠ Booking Terms</div>
-                <ul style="margin:0;padding-left:18px;color:#7f1d1d;">
-                  ${quotationPresentation.bookingTerms.map((term) => `<li style="margin:0 0 8px 0;font-size:13px;line-height:1.6;">${term}</li>`).join('')}
-                </ul>
-              </div>
-
-              <div style="background:linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%);border:2px solid #f59e0b;border-radius:14px;padding:16px 18px;margin:0 0 18px 0;position:relative;">
-                <div style="display:inline-block;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:10px;">🎁 Special Offer</div>
-                <div style="font-size:13px;line-height:1.8;color:#78350f;font-weight:600;">${quotationPresentation.offerLine}</div>
-                <div style="font-size:13px;line-height:1.7;color:#92400e;margin-top:8px;">Reach out to us for special packages tailored to your project needs.</div>
-              </div>
-
-              ${quotationPresentation.quoteNotes ? `<div style="background:#ffffff;border:1px solid #dbe5f0;border-radius:14px;padding:16px 18px;margin:0 0 18px 0;"><div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:8px;">Additional Notes</div><div style="font-size:13px;line-height:1.7;color:#475569;">${quotationPresentation.quoteNotes}</div></div>` : ''}
-
-              <div style="font-size:12px;line-height:1.8;color:#64748b;border-top:1px solid #e5e7eb;padding-top:14px;">
-                <div style="margin:0 0 6px 0;">Visit JamRoom: <a href="${DEFAULT_APP_LOGIN_URL}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:none;">${DEFAULT_APP_LOGIN_URL}</a></div>
-                <div>All rights reserved. ${quotationPresentation.studioName}</div>
-              </div>
+      <!-- SUMMARY CARDS -->
+      <table class="two-col" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="col-left" width="50%">
+            <div class="sc">
+              <div class="sc-kicker">Service Overview</div>
+              <div class="sc-title">${quotationPresentation.serviceTypeLabel}</div>
+              <div class="sc-sub">${quotationPresentation.selectedTypeLabels.length > 0 ? `Includes ${quotationPresentation.selectedTypeLabels.join(', ')}.` : ''}</div>
             </div>
-          </div>
-        </div>`;
+          </td>
+          <td class="col-right" width="50%">
+            <div class="tc">
+              <div class="tc-kicker">Estimated Total</div>
+              <div class="tc-amount">${quotationPresentation.totalAmountLabel}</div>
+              ${quotationPresentation.taxEnabled
+                ? `<div class="tc-sub">Subtotal: <strong>${quotationPresentation.subtotalAmountLabel}</strong></div><div class="tc-sub">${quotationPresentation.gstDisplayLabel} (${quotationPresentation.gstRateLabel}): <strong>${quotationPresentation.taxAmountLabel}</strong></div>`
+                : `<div class="tc-sub">See attached PDF for full breakdown.</div>`}
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <!-- CTA -->
+      <div class="cta">
+        <div class="cta-title">To confirm your booking</div>
+        <div class="cta-body">
+          <div>Reply with <strong>CONFIRM</strong>${individualEmail ? ' on this email' : ' on this email thread'}.</div>
+          <div>${quotationPresentation.studioWhatsAppLink ? `Or WhatsApp us at <a href="${quotationPresentation.studioWhatsAppLink}" style="color:#1d4ed8;font-weight:700;text-decoration:none;">${quotationPresentation.studioPhone}</a>.` : `Or contact us at <strong>${quotationPresentation.studioPhone}</strong>.`}</div>
+        </div>
+      </div>
+
+      <!-- BOOKING TERMS -->
+      <div class="terms">
+        <div class="terms-hd">⚠ Booking Terms</div>
+        <ul>
+          ${quotationPresentation.bookingTerms.map((term) => `<li>${term}</li>`).join('')}
+        </ul>
+      </div>
+
+      <!-- SPECIAL OFFER -->
+      <div class="offer">
+        <div class="offer-pill">🎁 Special Offer</div>
+        <div class="offer-text">${quotationPresentation.offerLine}</div>
+        <div class="offer-note">Reach out to us for special packages tailored to your project needs.</div>
+      </div>
+
+      ${quotationPresentation.quoteNotes ? `<div class="notes-card"><div class="notes-hd">Additional Notes</div><div style="font-size:13px;line-height:1.7;color:#475569;">${quotationPresentation.quoteNotes}</div></div>` : ''}
+
+      <!-- FOOTER -->
+      <div class="footer">
+        <div style="margin:0 0 4px 0;">Visit JamRoom: <a href="${DEFAULT_APP_LOGIN_URL}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:none;">${DEFAULT_APP_LOGIN_URL}</a></div>
+        <div>All rights reserved. ${quotationPresentation.studioName}</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>`;
     };
 
     // Generate PDF attachment (non-fatal)
     let pdfBuffer = null;
     const pdfFilename = `Quotation_${(settings?.studioName || 'JamRoom').replace(/[^a-zA-Z0-9]/g, '_')}_${generatedAt.toISOString().split('T')[0]}.pdf`;
     try {
+      // Only personalise PDF greeting when there is a single recipient
+      const pdfRecipientName = recipientEmails.length === 1
+        ? (userEmailMap.get(recipientEmails[0]) || '')
+        : '';
       pdfBuffer = await generateQuotationPDF({
         rentalTypeLabel, selectedTypeLabels, calculation,
         rentals: sanitizedRentals, quoteNotes, generatedAt,
         gstEnabled, gstRate, gstDisplayName, taxAmount, totalAmount,
-        recipientName: selectedUser?.name || ''
+        recipientName: pdfRecipientName
       }, settings);
     } catch (pdfError) {
       console.error('Quotation PDF generation failed (non-fatal):', pdfError.message);
@@ -3702,25 +3781,27 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
 
     if (emailDeliveryMode === 'separate') {
       for (const recipientEmail of recipientEmails) {
-        const isSelectedUserRecipient = selectedUser?.email
-          && normalizeEmail(selectedUser.email) === recipientEmail;
-
+        const recipientNameForEmail = userEmailMap.get(recipientEmail) || '';
         await sendEmail({
           to: recipientEmail,
           subject,
           html: buildQuotationEmailHtml({
-            recipientName: isSelectedUserRecipient ? (selectedUser?.name || '') : '',
+            recipientName: recipientNameForEmail,
             individualEmail: true
           }),
           attachments: emailAttachments
         });
       }
     } else {
+      // Only personalise the greeting when there is exactly one recipient
+      const singleRecipientName = recipientEmails.length === 1
+        ? (userEmailMap.get(recipientEmails[0]) || '')
+        : '';
       await sendEmail({
         to: recipientEmails.join(', '),
         subject,
         html: buildQuotationEmailHtml({
-          recipientName: selectedUser?.name || ''
+          recipientName: singleRecipientName
         }),
         attachments: emailAttachments
       });
