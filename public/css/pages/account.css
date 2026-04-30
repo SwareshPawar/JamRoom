@@ -57,77 +57,20 @@ body {
     margin-bottom: 20px;
 }
 
+/* Compact label spacing (shared uses 10px) */
 label {
-    display: block;
     margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--text-color);
 }
 
+/* Compact input padding (shared uses 14px 16px) */
 input,
 textarea {
-    width: 100%;
     padding: 12px;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 16px;
-    background: var(--surface-0);
-    color: var(--text-color);
-    transition: var(--transition-normal);
 }
 
+/* Accent color for checkboxes (shared handles width/padding/border) */
 input[type='checkbox'] {
-    width: auto;
-    padding: 0;
-    border: 0;
-    box-shadow: none;
     accent-color: var(--primary-color);
-}
-
-input:focus,
-textarea:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.btn {
-    padding: 12px 24px;
-    background: var(--primary-gradient);
-    color: var(--text-inverse);
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition-normal);
-    margin-right: 10px;
-    margin-bottom: 10px;
-}
-
-.btn:hover {
-    box-shadow: var(--shadow-md);
-}
-
-.btn:disabled {
-    background: var(--secondary-color);
-    cursor: not-allowed;
-}
-
-.btn-danger {
-    background: var(--danger-color);
-}
-
-.btn-danger:hover {
-    background: color-mix(in srgb, var(--danger-color) 85%, black);
-}
-
-.btn-secondary {
-    background: var(--secondary-color);
-}
-
-.btn-secondary:hover {
-    background: color-mix(in srgb, var(--secondary-color) 80%, black);
 }
 
 .profile-info {
@@ -258,7 +201,7 @@ textarea:focus {
     border-radius: 8px;
     display: inline-block;
     font-weight: 600;
-    transition: all 0.3s ease;
+    transition: var(--transition-normal);
     border: none;
     cursor: pointer;
 }

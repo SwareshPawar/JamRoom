@@ -2,8 +2,6 @@
 /* JamRoom Shared CSS - Design System and Common Components */
 /* ================================================================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
-
 /* CSS Custom Properties (Variables) */
 :root {
     /* Brand */
@@ -57,6 +55,31 @@
     --spacing-xl: 2rem;     /* 32px */
     --spacing-2xl: 3rem;    /* 48px */
     --spacing-3xl: 4rem;    /* 64px */
+
+    /* Layout */
+    --layout-page-max-width: 1200px;
+    --layout-wide-max-width: 1400px;
+    --layout-page-padding-mobile: 12px;
+    --layout-page-padding-desktop: 20px;
+
+    /* Controls */
+    --control-height: 42px;
+    --control-height-compact: 38px;
+    --touch-target-min: 40px;
+
+    /* Header actions */
+    --header-action-btn-padding-y: 9px;
+    --header-action-btn-padding-x: 14px;
+    --header-action-btn-font-size: 0.92rem;
+
+    /* Auth cards */
+    --auth-card-max-width: 450px;
+    --auth-card-padding-y: 34px;
+    --auth-card-padding-x: 24px;
+    --auth-card-radius: 16px;
+    --auth-card-padding-y-mobile: 24px;
+    --auth-card-padding-x-mobile: 18px;
+    --auth-card-radius-mobile: 12px;
     
     /* Border Radius */
     --radius-sm: 5px;
@@ -68,6 +91,8 @@
     --transition-fast: all 0.15s ease;
     --transition-normal: all 0.3s ease;
     --transition-slow: all 0.5s ease;
+    --transition-colors: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    --transition-elevation: box-shadow 0.2s ease, transform 0.2s ease;
 
     /* Backward-compatible aliases */
     --dark-color: #2c3e50;
@@ -215,32 +240,6 @@ body {
     overflow-wrap: anywhere;
 }
 
-.app-header-links {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    flex-wrap: wrap;
-    font-size: 0.84rem;
-    font-weight: 600;
-    width: 100%;
-}
-
-.app-header-links a {
-    color: var(--text-inverse);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 2px;
-}
-
-.app-header-links a:hover {
-    opacity: 0.9;
-}
-
-.app-header-links span {
-    opacity: 0.85;
-}
-
 .app-greeting {
     margin: 2px 0 0;
     color: color-mix(in srgb, var(--text-inverse) 95%, transparent);
@@ -269,6 +268,10 @@ body {
 .app-header-actions-primary .btn,
 .app-header-actions-primary a {
     margin: 0;
+    padding: 9px 14px;
+    font-size: 0.92rem;
+    min-height: 38px;
+    line-height: 1.15;
 }
 
 .main-nav {
@@ -448,7 +451,7 @@ nav a:hover {
     cursor: pointer;
     font-size: var(--font-size-md);
     font-weight: 600;
-    transition: var(--transition-normal);
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     text-decoration: none;
     display: inline-block;
     letter-spacing: 0.01em;
@@ -551,6 +554,103 @@ nav a:hover {
 .btn-outline.btn-primary:hover {
     background: var(--primary-color);
     color: white;
+}
+
+/* ================================================================================================= */
+/* Auth Page Primitives */
+/* ================================================================================================= */
+
+.auth-page {
+    min-height: 100vh;
+    padding: var(--layout-page-padding-mobile);
+}
+
+.auth-page #navigationContainer {
+    margin-bottom: 18px;
+}
+
+.auth-card {
+    background: var(--surface-elevated);
+    color: var(--text-color);
+    padding: var(--auth-card-padding-y) var(--auth-card-padding-x);
+    border-radius: var(--auth-card-radius);
+    box-shadow: var(--shadow-xl);
+    max-width: var(--auth-card-max-width);
+    width: 100%;
+    border: 1px solid var(--border-color-light);
+    margin: 0 auto;
+}
+
+.auth-page .form-group {
+    margin-bottom: 20px;
+}
+
+.auth-page label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.auth-page input,
+.auth-page textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+    transition: var(--transition-normal);
+    background: var(--surface-0);
+    color: var(--text-color);
+}
+
+.auth-page input:focus,
+.auth-page textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.auth-page .btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 1.05em;
+    margin-top: 10px;
+}
+
+.auth-page .btn:disabled {
+    background: var(--secondary-color);
+    cursor: not-allowed;
+}
+
+.auth-page .links {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.auth-page .links a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-page .links a:hover {
+    text-decoration: underline;
+}
+
+.auth-page .back-home {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.auth-page .back-home a {
+    color: var(--text-color-light);
+    text-decoration: none;
+}
+
+.auth-page .back-home a:hover {
+    color: var(--text-color);
 }
 
 /* ================================================================================================= */
@@ -1350,16 +1450,10 @@ textarea:disabled {
         text-align: center;
         padding: 10px 12px;
         font-size: 0.9rem;
-        min-height: 42px;
+        min-height: 40px;
         min-width: 0;
         white-space: normal;
         overflow-wrap: anywhere;
-    }
-
-    .app-header-links {
-        justify-content: center;
-        font-size: 0.82rem;
-        gap: 6px;
     }
 
     .main-nav {
@@ -1497,6 +1591,15 @@ textarea:disabled {
         padding: 5px;
         font-size: 0.72rem;
     }
+
+    .auth-page {
+        padding: 12px;
+    }
+
+    .auth-card {
+        padding: var(--auth-card-padding-y-mobile) var(--auth-card-padding-x-mobile);
+        border-radius: var(--auth-card-radius-mobile);
+    }
 }
 
 @supports (padding: max(0px)) {
@@ -1519,12 +1622,12 @@ textarea:disabled {
         min-height: 42px;
     }
 
-    .app-header-actions {
+    .app-header-actions-primary {
         grid-template-columns: 1fr;
     }
 
-    .app-header-actions .btn,
-    .app-header-actions a {
+    .app-header-actions-primary .btn,
+    .app-header-actions-primary a {
         text-align: center;
     }
 
@@ -1544,6 +1647,11 @@ textarea:disabled {
     input, select, textarea {
         padding: 12px 14px;
     }
+
+    .auth-page input,
+    .auth-page textarea {
+        font-size: 16px;
+    }
     
     .btn {
         padding: 10px 14px;
@@ -1555,7 +1663,7 @@ textarea:disabled {
         grid-template-columns: 1fr;
     }
 
-    .app-header-actions {
+    .app-header-actions-primary {
         grid-template-columns: 1fr;
     }
 }

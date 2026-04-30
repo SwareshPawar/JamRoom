@@ -1,973 +1,985 @@
 /* Use shared .app-container sizing from shared.css for consistent page/nav width. */
-        
-        .main-content {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 30px;
-            min-width: 0;
-        }
-        
-        /* Desktop: Hide collapse functionality */
-        .section-header {
-            cursor: default;
-        }
-        
-        .section {
-            background: var(--surface-elevated);
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: var(--shadow-md);
-            min-width: 0;
-        }
-        
-        /* Form styles now in shared.css */
-        
-        .time-container {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 15px;
-        }
-
-        .booking-mode-switch {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 10px;
-        }
-
-        .booking-mode-option {
-            display: grid;
-            grid-template-columns: auto minmax(0, 1fr);
-            align-items: start;
-            gap: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 10px 12px;
-            cursor: pointer;
-            background: var(--surface-1);
-            font-weight: 600;
-            color: var(--text-color);
-            min-width: 0;
-        }
-
-        .booking-mode-option input[type="radio"] {
-            accent-color: var(--primary-color);
-            width: auto;
-            min-width: 20px;
-            max-width: 20px;
-            height: 20px;
-            margin: 0;
-            padding: 0;
-            flex: 0 0 auto;
-            align-self: start;
-        }
-
-        .booking-mode-option span {
-            min-width: 0;
-            overflow-wrap: anywhere;
-            line-height: 1.25;
-        }
-
-        .booking-flow-block {
-            border: 1px solid var(--border-color-light);
-            border-radius: 10px;
-            padding: 14px;
-            margin-bottom: 14px;
-            background: var(--surface-1);
-            min-width: 0;
-        }
-
-        .booking-hidden-initial {
-            display: none;
-        }
-
-        .start-time-loading {
-            display: none;
-            margin-top: 5px;
-            font-size: 0.9em;
-            color: var(--text-color-light);
-        }
-
-        .field-help {
-            color: var(--text-color-light);
-            font-size: 12px;
-            display: block;
-            margin-top: 6px;
-        }
-
-        .perday-booked-panel {
-            margin-top: 10px;
-            border: 1px solid color-mix(in srgb, var(--warning-color) 40%, transparent);
-            background: color-mix(in srgb, var(--warning-color) 14%, transparent);
-            border-radius: 8px;
-            padding: 10px 12px;
-            display: none;
-        }
-
-        .perday-booked-header {
-            font-size: 12px;
-            color: var(--text-color);
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .perday-booked-list {
-            margin: 0;
-            padding: 0;
-            list-style: none;
-            display: grid;
-            gap: 6px;
-        }
-
-        .perday-booked-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 6px;
-            background: var(--surface-elevated);
-            border: 1px solid color-mix(in srgb, var(--warning-color) 28%, transparent);
-            border-radius: 6px;
-            padding: 6px 8px;
-            font-size: 13px;
-        }
-
-        .perday-booked-name {
-            font-weight: 600;
-            color: var(--text-color);
-        }
-
-        .perday-booked-qty {
-            color: var(--warning-color);
-            font-weight: 600;
-        }
-
-        .perday-booked-empty {
-            font-size: 12px;
-            color: var(--text-color-light);
-        }
-        
-        /* Note: Alert styles now handled by shared AlertManager */
-        
-        .price-display {
-            background: var(--surface-1);
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border: 1px solid var(--border-color);
-        }
-        
-        .price-breakdown {
-            text-align: left;
-        }
-        
-        .selected-rentals {
-            margin-bottom: 15px;
-        }
-        
-        .selected-rentals .rental-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            padding: 8px 0;
-            font-size: 0.95em;
-        }
-        
-        .price-total .subtotal,
-        .price-total .tax,
-        .price-total .total {
-            display: flex;
-            justify-content: space-between;
-            margin: 8px 0;
-        }
-        
-        .price-total .total {
-            font-size: 1.1em;
-            padding-top: 10px;
-            border-top: 1px solid var(--border-color);
-            color: var(--primary-color);
-        }
-
-        .price-break-divider {
-            margin: 15px 0;
-            border: none;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .booking-submit-btn {
-            width: 100%;
-        }
-        
-        .rentals-container {
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px;
-            background: var(--surface-1);
-            max-height: 340px;
-            overflow-y: auto;
-            overflow-x: hidden;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .rental-category {
-            margin-top: 0;
-        }
-        
-        .rental-category:first-child {
-            margin-top: 0;
-        }
-        
-        .category-header {
-            background: var(--surface-2);
-            color: var(--text-color);
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-top: 16px;
-            border: 1px solid var(--border-color);
-            font-weight: 700;
-        }
-        
-        .category-header:first-child {
-            margin-top: 0;
-        }
-        
-        .category-header span {
-            font-size: 0.85em;
-            opacity: 0.8;
-            margin-left: 10px;
-            font-weight: 500;
-        }
-        
-        .rental-option {
-            display: grid;
-            grid-template-columns: auto minmax(0, 1fr) auto;
-            align-items: start;
-            gap: 10px;
-            padding: 10px;
-            margin: 8px 0;
-            border: 1px solid var(--border-color-light);
-            border-radius: 8px;
-            background: var(--surface-elevated);
-            transition: all 0.3s ease;
-            min-width: 0;
-        }
-        
-        .rental-option:hover {
-            border-color: var(--border-color);
-            box-shadow: var(--shadow-sm);
-        }
-        
-        .rental-option.selected {
-            border-color: color-mix(in srgb, var(--primary-color) 45%, transparent);
-            background: color-mix(in srgb, var(--primary-color) 10%, var(--surface-elevated));
-        }
-
-        .rental-option.unavailable {
-            opacity: 0.55;
-            background: var(--surface-2);
-            border-color: var(--border-color);
-        }
-
-        .rental-option.unavailable .rental-name::after {
-            content: ' (Unavailable)';
-            color: var(--danger-color);
-            font-weight: 600;
-            font-size: 12px;
-        }
-
-        .rental-option.unavailable .rental-checkbox {
-            cursor: not-allowed;
-            border-color: var(--border-color);
-            background: var(--surface-2);
-        }
-
-        .rental-option.base {
-            background: color-mix(in srgb, var(--info-color) 10%, var(--surface-elevated));
-            border-left: 4px solid var(--info-color);
-        }
-
-        .rental-option.child {
-            margin-left: 16px;
-        }
-        
-        .rental-meta {
-            margin: 0;
-            line-height: 1.35;
-            min-width: 0;
-        }
-        
-        .rental-name {
-            font-weight: 600;
-            color: var(--text-color);
-            margin-bottom: 3px;
-            overflow-wrap: anywhere;
-        }
-        
-        .rental-description {
-            font-size: 12px;
-            color: var(--text-color-light);
-            margin-bottom: 4px;
-            overflow-wrap: anywhere;
-        }
-        
-        .rental-price {
-            font-weight: 500;
-            color: var(--primary-color-dark);
-            font-size: 13px;
-            overflow-wrap: anywhere;
-        }
-        
-        .rental-qty {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            white-space: normal;
-            min-width: 0;
-        }
-
-        .quantity-info {
-            font-size: 12px;
-            color: var(--text-color-light);
-            padding: 5px;
-            white-space: normal;
-            overflow-wrap: anywhere;
-        }
-
-        .quantity-info.centered {
-            text-align: center;
-        }
-        
-        .quantity-controls {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .quantity-btn {
-            width: 30px;
-            height: 30px;
-            border: 1px solid color-mix(in srgb, var(--primary-color) 55%, transparent);
-            background: var(--surface-elevated);
-            color: var(--primary-color-dark);
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        
-        .quantity-btn:hover {
-            background: var(--primary-color-dark);
-            color: var(--text-inverse);
-        }
-        
-        .quantity-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .quantity-display {
-            min-width: 30px;
-            text-align: center;
-            font-weight: 600;
-        }
-        
-        .rental-checkbox {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 24px;
-            height: 24px;
-            min-width: 24px;
-            min-height: 24px;
-            border: 2px solid var(--primary-color);
-            border-radius: 4px;
-            cursor: pointer;
-            position: relative;
-            background: var(--surface-0);
-            box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color) 28%, transparent);
-            transition: all 0.3s ease;
-            flex: 0 0 auto;
-        }
-        
-        .rental-checkbox:checked {
-            background: var(--primary-color);
-            border-color: var(--primary-color-dark);
-        }
-        
-        .rental-checkbox:checked::after {
-            content: '✓';
-            position: absolute;
-            color: var(--text-inverse);
-            font-size: 15px;
-            font-weight: 700;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-
-        .rental-checkbox:focus-visible {
-            outline: none;
-            box-shadow: 0 0 0 3px var(--focus-ring);
-        }
-
-        @media (max-width: 900px) {
-            .main-content {
-                grid-template-columns: 1fr;
-                gap: 16px;
-            }
-
-            .section {
-                padding: 18px;
-            }
-
-            .booking-mode-switch {
-                grid-template-columns: 1fr;
-            }
-
-            .booking-mode-option {
-                align-items: flex-start;
-            }
-
-            .rental-option {
-                grid-template-columns: auto minmax(0, 1fr);
-            }
-
-            .rental-qty {
-                grid-column: 2;
-                justify-content: flex-start;
-                width: 100%;
-            }
-
-            .rental-option.child {
-                margin-left: 6px;
-            }
-        }
-        
-        .upi-section {
-            background: var(--surface-1);
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
-            text-align: center;
-            display: none;
-        }
-        
-        .upi-section.show { display: block; }
-        
-        .payment-methods {
-            display: grid;
-            gap: 15px;
-            margin: 20px 0;
-        }
-        
-        .payment-method {
-            background: var(--surface-elevated);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-            transition: all 0.3s ease;
-        }
-        
-        .payment-method:hover {
-            border-color: var(--primary-color);
-            box-shadow: var(--shadow-sm);
-        }
-        
-        .payment-btn {
-            width: 100%;
-            padding: 12px;
-            margin: 5px 0;
-            border: none;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .payment-btn.primary {
-            background: var(--primary-color);
-            color: var(--text-inverse);
-        }
-        
-        .payment-btn.primary:hover {
-            background: var(--primary-color-dark);
-        }
-        
-        .payment-btn.secondary {
-            background: var(--success-color);
-            color: var(--text-inverse);
-        }
-        
-        .payment-btn.secondary:hover {
-            background: color-mix(in srgb, var(--success-color) 82%, black);
-        }
-        
-        .payment-btn.copy {
-            background: var(--secondary-color);
-            color: var(--text-inverse);
-            font-size: 0.9em;
-        }
-        
-        .payment-btn.copy:hover {
-            background: color-mix(in srgb, var(--secondary-color) 85%, black);
-        }
-        
-        .payment-info {
-            background: color-mix(in srgb, var(--info-color) 10%, transparent);
-            border: 1px solid color-mix(in srgb, var(--info-color) 35%, transparent);
-            border-radius: 6px;
-            padding: 10px;
-            margin: 10px 0;
-            font-family: monospace;
-            word-break: break-all;
-        }
-
-        .payment-note-text {
-            color: var(--text-color-light);
-            display: block;
-            margin-top: 8px;
-        }
-
-        .payment-note-tight {
-            margin-top: 0;
-        }
-
-        .payment-close-btn {
-            margin-top: 20px;
-        }
-
-        .payment-guide-btn {
-            margin-top: 20px;
-            margin-left: 8px;
-        }
-        
-        .payment-divider {
-            margin: 20px 0;
-            text-align: center;
-            position: relative;
-        }
-        
-        .payment-divider::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: var(--border-color);
-        }
-        
-        .payment-divider span {
-            background: var(--surface-1);
-            padding: 0 15px;
-            color: var(--text-color-light);
-            font-size: 0.9em;
-            display: inline-block;
-            max-width: 100%;
-            overflow-wrap: anywhere;
-        }
-        
-        .qr-section {
-            margin-top: 15px;
-        }
-        
-        .qr-section img {
-            max-width: 200px;
-            margin: 10px auto;
-            display: block;
-        }
-        
-        .reference-view {
-            background: var(--surface-1);
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
-            border: 1px solid var(--border-color);
-            display: grid;
-            gap: 10px;
-        }
-
-        .reference-view-head {
-            display: grid;
-            gap: 4px;
-        }
-
-        .reference-view-title {
-            margin: 0;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--text-color);
-        }
-
-        .reference-view-subtitle {
-            margin: 0;
-            color: var(--text-color-light);
-            font-size: 0.78rem;
-            line-height: 1.35;
-        }
-
-        .reference-view-body {
-            background: var(--surface-elevated);
-            border: 1px dashed var(--border-color);
-            border-radius: 8px;
-            padding: 8px 10px;
-        }
-        
-        .timeline {
-            position: relative;
-            margin: 0;
-        }
-        
-        .timeline-item {
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 5px;
-            font-size: 0.9em;
-            overflow-wrap: anywhere;
-        }
-        
-        .timeline-item.booked {
-            background: color-mix(in srgb, var(--danger-color) 16%, transparent);
-            border-left: 4px solid var(--danger-color);
-        }
-
-        .timeline-item.booked.timeline-booking-pending {
-            background: color-mix(in srgb, var(--warning-color) 16%, transparent);
-            border-left-color: var(--warning-color);
-        }
-
-        .timeline-item.booked.timeline-booking-confirmed {
-            border-left-color: var(--danger-color);
-        }
-        
-        .timeline-item.blocked {
-            background: color-mix(in srgb, var(--secondary-color) 18%, transparent);
-            border-left: 4px solid var(--secondary-color);
-        }
-        
-        .timeline-item.available {
-            background: color-mix(in srgb, var(--success-color) 16%, transparent);
-            border-left: 4px solid var(--success-color);
-        }
-
-        .timeline-status-label {
-            font-weight: 500;
-            margin-left: 10px;
-        }
-
-        .timeline-status-confirmed {
-            color: var(--danger-color);
-        }
-
-        .timeline-status-pending {
-            color: var(--warning-color);
-        }
-
-        .timeline-status-unavailable {
-            color: var(--text-color-light);
-        }
-
-        .availability-all-clear {
-            color: var(--success-color);
-        }
-        
-        .bookings-list {
-            max-height: 600px;
-            overflow-y: auto;
-        }
-        
-        .booking-card {
-            background: var(--surface-elevated);
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            border-left: 5px solid var(--primary-color);
-            box-shadow: var(--shadow-sm);
-            transition: all 0.3s ease;
-        }
-        
-        .booking-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-        
-        .booking-card h4 {
-            font-size: 1.25em;
-            font-weight: 700;
-            color: var(--text-color);
-            margin-bottom: 15px;
-            letter-spacing: -0.01em;
-            overflow-wrap: anywhere;
-        }
-
-        .booking-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .booking-card-title {
-            margin: 0;
-        }
-
-        .booking-rentals-list {
-            margin: 5px 0 10px 20px;
-            color: var(--text-color-light);
-            overflow-wrap: anywhere;
-        }
-
-        .booking-actions-row {
-            margin-top: 15px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .booking-empty-message {
-            text-align: center;
-            color: var(--text-color-light);
-        }
-
-        .booking-empty-padded {
-            padding: 12px 0;
-        }
-        
-        .booking-card p {
-            margin-bottom: 8px;
-            color: var(--text-color-light);
-            line-height: 1.6;
-        }
-        
-        .booking-card.pending { border-left-color: var(--warning-color); }
-        .booking-card.confirmed { border-left-color: var(--success-color); }
-        .booking-card.rejected { border-left-color: var(--danger-color); }
-        .booking-card.cancelled { border-left-color: var(--secondary-color); }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-        
-        .status-pending {
-            background: color-mix(in srgb, var(--warning-color) 18%, transparent);
-            color: var(--text-color);
-        }
-        .status-confirmed {
-            background: color-mix(in srgb, var(--success-color) 18%, transparent);
-            color: var(--text-color);
-        }
-        .status-rejected {
-            background: color-mix(in srgb, var(--danger-color) 18%, transparent);
-            color: var(--text-color);
-        }
-        .status-cancelled {
-            background: color-mix(in srgb, var(--secondary-color) 20%, transparent);
-            color: var(--text-color);
-        }
-        
-        .loading-text {
-            text-align: center;
-            padding: 20px;
-            color: var(--text-color-light);
-        }
-
-        .booking-theme-status {
-            border-radius: 8px;
-            padding: 9px 10px;
-            font-size: 0.86rem;
-            line-height: 1.35;
-            border: 1px solid var(--border-color-light);
-            margin: 4px 0;
-        }
-
-        .booking-theme-status-success {
-            background: color-mix(in srgb, var(--success-color) 12%, var(--surface-elevated));
-            border-left: 4px solid var(--success-color);
-        }
-
-        .booking-theme-status-danger {
-            background: color-mix(in srgb, var(--danger-color) 12%, var(--surface-elevated));
-            border-left: 4px solid var(--danger-color);
-        }
-
-        .booking-theme-status-muted,
-        .booking-theme-status-loading {
-            background: color-mix(in srgb, var(--secondary-color) 10%, var(--surface-elevated));
-            border-left: 4px solid var(--secondary-color);
-            color: var(--text-color-light);
-        }
-
-        .timeline-loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            color: var(--text-color-light);
-            padding: 16px;
-        }
-        
-        /* Enhanced Loading Indicators */
-        .loader {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid color-mix(in srgb, var(--primary-color) 30%, transparent);
-            border-radius: 50%;
-            border-top-color: var(--primary-color);
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 10px;
-        }
-        
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            display: none;
-        }
-        
-        .loading-overlay.show {
-            display: flex;
-        }
-        
-        .loading-content {
-            text-align: center;
-            font-size: 1.2em;
-            color: var(--primary-color);
-        }
-        
-        .loading-content .loader {
-            width: 40px;
-            height: 40px;
-            margin-bottom: 20px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        /* Button Loading State */
-        .btn.loading {
-            position: relative;
-            pointer-events: none;
-            opacity: 0.7;
-        }
-        
-        .btn.loading::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 16px;
-            height: 16px;
-            border: 2px solid transparent;
-            border-top: 2px solid currentColor;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        /* Ultra-compact mobile density mode */
-        @media (max-width: 768px) {
-            .main-content {
-                gap: 8px;
-            }
-
-            .section,
-            .booking-flow-block,
-            .booking-theme-status,
-            .rentals-container,
-            .price-display,
-            .reference-view,
-            .booking-card,
-            .payment-method,
-            .payment-info,
-            .upi-section {
-                padding: 8px !important;
-                margin-bottom: 8px;
-            }
-
-            .form-group,
-            .selected-rentals,
-            .payment-methods,
-            .booking-actions-row,
-            .time-container {
-                gap: 8px;
-                margin-bottom: 8px;
-            }
-
-            .form-group {
-                margin-bottom: 8px;
-            }
-
-            label {
-                margin-bottom: 5px;
-            }
-
-            input,
-            select,
-            textarea {
-                padding: 8px;
-            }
-
-            .category-header {
-                padding: 8px;
-                margin-top: 8px;
-            }
-
-            .rental-option {
-                padding: 8px;
-                margin: 8px 0;
-            }
-
-            .quantity-btn {
-                width: 28px;
-                height: 28px;
-            }
-
-            .btn,
-            .payment-btn {
-                padding: 8px 10px;
-                margin: 0;
-                font-size: 0.84rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .booking-card h4 {
-                font-size: 1rem;
-            }
-
-            .rental-option.child {
-                margin-left: 0;
-            }
-
-            .perday-booked-item,
-            .selected-rentals .rental-item {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .payment-guide-btn,
-            .payment-close-btn {
-                display: block;
-                width: 100%;
-                margin-left: 0;
-                margin-top: 8px;
-            }
-        }
+
+.main-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 30px;
+    min-width: 0;
+}
+
+.section {
+    background: var(--surface-elevated);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    min-width: 0;
+}
+
+/* Form styles now in shared.css */
+
+.time-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 15px;
+}
+
+.booking-mode-switch {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+}
+
+.booking-mode-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    background: var(--surface-1);
+    font-weight: 600;
+    color: var(--text-color);
+    min-width: 0;
+}
+
+.booking-mode-option input[type="radio"] {
+    accent-color: var(--primary-color);
+    width: auto;
+    min-width: 20px;
+    max-width: 20px;
+    height: 20px;
+    margin: 0;
+    padding: 0;
+    flex: 0 0 auto;
+    align-self: start;
+}
+
+.booking-mode-option span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+}
+
+.booking-flow-block {
+    border: 1px solid var(--border-color-light);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+    background: var(--surface-1);
+    min-width: 0;
+}
+
+#bookingForm,
+#hourlyBookingBlock,
+#perdayBookingBlock,
+.form-group {
+    min-width: 0;
+}
+
+#bookingForm input,
+#bookingForm select,
+#bookingForm textarea {
+    max-width: 100%;
+    min-width: 0;
+}
+
+#bookingForm input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.booking-hidden-initial {
+    display: none;
+}
+
+.start-time-loading {
+    display: none;
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: var(--text-color-light);
+}
+
+.field-help {
+    color: var(--text-color-light);
+    font-size: 12px;
+    display: block;
+    margin-top: 6px;
+}
+
+.perday-booked-panel {
+    margin-top: 10px;
+    border: 1px solid color-mix(in srgb, var(--warning-color) 40%, transparent);
+    background: color-mix(in srgb, var(--warning-color) 14%, transparent);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: none;
+}
+
+.perday-booked-header {
+    font-size: 12px;
+    color: var(--text-color);
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.perday-booked-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+}
+
+.perday-booked-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    background: var(--surface-elevated);
+    border: 1px solid color-mix(in srgb, var(--warning-color) 28%, transparent);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+}
+
+.perday-booked-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.perday-booked-qty {
+    color: var(--warning-color);
+    font-weight: 600;
+}
+
+.perday-booked-empty {
+    font-size: 12px;
+    color: var(--text-color-light);
+}
+
+/* Note: Alert styles now handled by shared AlertManager */
+
+.price-display {
+    background: var(--surface-1);
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+    border: 1px solid var(--border-color);
+}
+
+.price-breakdown {
+    text-align: left;
+}
+
+.selected-rentals {
+    margin-bottom: 15px;
+}
+
+.selected-rentals .rental-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 0;
+    font-size: 0.95em;
+}
+
+.price-total .subtotal,
+.price-total .tax,
+.price-total .total {
+    display: flex;
+    justify-content: space-between;
+    margin: 8px 0;
+}
+
+.price-total .total {
+    font-size: 1.1em;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    color: var(--primary-color);
+}
+
+.price-break-divider {
+    margin: 15px 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+.booking-submit-btn {
+    width: 100%;
+}
+
+.rentals-container {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--surface-1);
+    max-height: 340px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.rental-category {
+    margin-top: 0;
+}
+
+.rental-category:first-child {
+    margin-top: 0;
+}
+
+.category-header {
+    background: var(--surface-2);
+    color: var(--text-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-top: 16px;
+    border: 1px solid var(--border-color);
+    font-weight: 700;
+}
+
+.category-header:first-child {
+    margin-top: 0;
+}
+
+.category-header span {
+    font-size: 0.85em;
+    opacity: 0.8;
+    margin-left: 10px;
+    font-weight: 500;
+}
+
+.rental-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+    padding: 10px;
+    margin: 8px 0;
+    border: 1px solid var(--border-color-light);
+    border-radius: 8px;
+    background: var(--surface-elevated);
+    transition: var(--transition-normal);
+    min-width: 0;
+}
+
+.rental-option:hover {
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.rental-option.selected {
+    border-color: color-mix(in srgb, var(--primary-color) 45%, transparent);
+    background: color-mix(in srgb, var(--primary-color) 10%, var(--surface-elevated));
+}
+
+.rental-option.unavailable {
+    opacity: 0.55;
+    background: var(--surface-2);
+    border-color: var(--border-color);
+}
+
+.rental-option.unavailable .rental-name::after {
+    content: ' (Unavailable)';
+    color: var(--danger-color);
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.rental-option.unavailable .rental-checkbox {
+    cursor: not-allowed;
+    border-color: var(--border-color);
+    background: var(--surface-2);
+}
+
+.rental-option.base {
+    background: color-mix(in srgb, var(--info-color) 10%, var(--surface-elevated));
+    border-left: 4px solid var(--info-color);
+}
+
+.rental-option.child {
+    margin-left: 16px;
+}
+
+.rental-meta {
+    margin: 0;
+    line-height: 1.35;
+    min-width: 0;
+}
+
+.rental-name {
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 3px;
+    overflow-wrap: anywhere;
+}
+
+.rental-description {
+    font-size: 12px;
+    color: var(--text-color-light);
+    margin-bottom: 4px;
+    overflow-wrap: anywhere;
+}
+
+.rental-price {
+    font-weight: 500;
+    color: var(--primary-color-dark);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.rental-qty {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: normal;
+    min-width: 0;
+}
+
+.quantity-info {
+    font-size: 12px;
+    color: var(--text-color-light);
+    padding: 5px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.quantity-info.centered {
+    text-align: center;
+}
+
+.quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.quantity-btn {
+    width: 30px;
+    height: 30px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 55%, transparent);
+    background: var(--surface-elevated);
+    color: var(--primary-color-dark);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    transition: var(--transition-normal);
+}
+
+.quantity-btn:hover {
+    background: var(--primary-color-dark);
+    color: var(--text-inverse);
+}
+
+.quantity-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.quantity-display {
+    min-width: 30px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.rental-checkbox {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    border: 2px solid var(--primary-color);
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    background: var(--surface-0);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color) 28%, transparent);
+    transition: var(--transition-normal);
+    flex: 0 0 auto;
+}
+
+.rental-checkbox:checked {
+    background: var(--primary-color);
+    border-color: var(--primary-color-dark);
+}
+
+.rental-checkbox:checked::after {
+    content: '✓';
+    position: absolute;
+    color: var(--text-inverse);
+    font-size: 15px;
+    font-weight: 700;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.rental-checkbox:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+@media (max-width: 900px) {
+    .main-content {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .section {
+        padding: 18px;
+    }
+
+    .booking-mode-switch {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-mode-option {
+        align-items: flex-start;
+    }
+
+    .time-container {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .rental-option {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .rental-qty {
+        grid-column: 2;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .rental-option.child {
+        margin-left: 6px;
+    }
+}
+
+.upi-section {
+    background: var(--surface-1);
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+    text-align: center;
+    display: none;
+}
+
+.upi-section.show { display: block; }
+
+.payment-methods {
+    display: grid;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.payment-method {
+    background: var(--surface-elevated);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    transition: var(--transition-normal);
+}
+
+.payment-method:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.payment-btn {
+    width: 100%;
+    padding: 12px;
+    margin: 5px 0;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-normal);
+}
+
+.payment-btn.primary {
+    background: var(--primary-color);
+    color: var(--text-inverse);
+}
+
+.payment-btn.primary:hover {
+    background: var(--primary-color-dark);
+}
+
+.payment-btn.secondary {
+    background: var(--success-color);
+    color: var(--text-inverse);
+}
+
+.payment-btn.secondary:hover {
+    background: color-mix(in srgb, var(--success-color) 82%, black);
+}
+
+.payment-btn.copy {
+    background: var(--secondary-color);
+    color: var(--text-inverse);
+    font-size: 0.9em;
+}
+
+.payment-btn.copy:hover {
+    background: color-mix(in srgb, var(--secondary-color) 85%, black);
+}
+
+.payment-info {
+    background: color-mix(in srgb, var(--info-color) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--info-color) 35%, transparent);
+    border-radius: 6px;
+    padding: 10px;
+    margin: 10px 0;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.payment-note-text {
+    color: var(--text-color-light);
+    display: block;
+    margin-top: 8px;
+}
+
+.payment-note-tight {
+    margin-top: 0;
+}
+
+.payment-close-btn {
+    margin-top: 20px;
+}
+
+.payment-guide-btn {
+    margin-top: 20px;
+    margin-left: 8px;
+}
+
+.payment-divider {
+    margin: 20px 0;
+    text-align: center;
+    position: relative;
+}
+
+.payment-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.payment-divider span {
+    background: var(--surface-1);
+    padding: 0 15px;
+    color: var(--text-color-light);
+    font-size: 0.9em;
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.qr-section {
+    margin-top: 15px;
+}
+
+.qr-section img {
+    max-width: 200px;
+    margin: 10px auto;
+    display: block;
+}
+
+.reference-view {
+    background: var(--surface-1);
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+    border: 1px solid var(--border-color);
+    display: grid;
+    gap: 10px;
+}
+
+.reference-view-head {
+    display: grid;
+    gap: 4px;
+}
+
+.reference-view-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.reference-view-subtitle {
+    margin: 0;
+    color: var(--text-color-light);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.reference-view-body {
+    background: var(--surface-elevated);
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.timeline {
+    position: relative;
+    margin: 0;
+}
+
+.timeline-item {
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 5px;
+    font-size: 0.9em;
+    overflow-wrap: anywhere;
+}
+
+.timeline-item.booked {
+    background: color-mix(in srgb, var(--danger-color) 16%, transparent);
+    border-left: 4px solid var(--danger-color);
+}
+
+.timeline-item.booked.timeline-booking-pending {
+    background: color-mix(in srgb, var(--warning-color) 16%, transparent);
+    border-left-color: var(--warning-color);
+}
+
+.timeline-item.booked.timeline-booking-confirmed {
+    border-left-color: var(--danger-color);
+}
+
+.timeline-item.blocked {
+    background: color-mix(in srgb, var(--secondary-color) 18%, transparent);
+    border-left: 4px solid var(--secondary-color);
+}
+
+.timeline-item.available {
+    background: color-mix(in srgb, var(--success-color) 16%, transparent);
+    border-left: 4px solid var(--success-color);
+}
+
+.timeline-status-label {
+    font-weight: 500;
+    margin-left: 10px;
+}
+
+.timeline-status-confirmed {
+    color: var(--danger-color);
+}
+
+.timeline-status-pending {
+    color: var(--warning-color);
+}
+
+.timeline-status-unavailable {
+    color: var(--text-color-light);
+}
+
+.availability-all-clear {
+    color: var(--success-color);
+}
+
+.bookings-list {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.booking-card {
+    background: var(--surface-elevated);
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    border-left: 5px solid var(--primary-color);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-normal);
+}
+
+.booking-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.booking-card h4 {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 15px;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+}
+
+.booking-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.booking-card-title {
+    margin: 0;
+}
+
+.booking-rentals-list {
+    margin: 5px 0 10px 20px;
+    color: var(--text-color-light);
+    overflow-wrap: anywhere;
+}
+
+.booking-actions-row {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.booking-empty-message {
+    text-align: center;
+    color: var(--text-color-light);
+}
+
+.booking-empty-padded {
+    padding: 12px 0;
+}
+
+.booking-card p {
+    margin-bottom: 8px;
+    color: var(--text-color-light);
+    line-height: 1.6;
+}
+
+.booking-card.pending { border-left-color: var(--warning-color); }
+.booking-card.confirmed { border-left-color: var(--success-color); }
+.booking-card.rejected { border-left-color: var(--danger-color); }
+.booking-card.cancelled { border-left-color: var(--secondary-color); }
+
+.status-badge {
+    display: inline-block;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.status-pending {
+    background: color-mix(in srgb, var(--warning-color) 18%, transparent);
+    color: var(--text-color);
+}
+.status-confirmed {
+    background: color-mix(in srgb, var(--success-color) 18%, transparent);
+    color: var(--text-color);
+}
+.status-rejected {
+    background: color-mix(in srgb, var(--danger-color) 18%, transparent);
+    color: var(--text-color);
+}
+.status-cancelled {
+    background: color-mix(in srgb, var(--secondary-color) 20%, transparent);
+    color: var(--text-color);
+}
+
+.loading-text {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-color-light);
+}
+
+.booking-theme-status {
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 0.86rem;
+    line-height: 1.35;
+    border: 1px solid var(--border-color-light);
+    margin: 4px 0;
+}
+
+.booking-theme-status-success {
+    background: color-mix(in srgb, var(--success-color) 12%, var(--surface-elevated));
+    border-left: 4px solid var(--success-color);
+}
+
+.booking-theme-status-danger {
+    background: color-mix(in srgb, var(--danger-color) 12%, var(--surface-elevated));
+    border-left: 4px solid var(--danger-color);
+}
+
+.booking-theme-status-muted,
+.booking-theme-status-loading {
+    background: color-mix(in srgb, var(--secondary-color) 10%, var(--surface-elevated));
+    border-left: 4px solid var(--secondary-color);
+    color: var(--text-color-light);
+}
+
+.timeline-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-color-light);
+    padding: 16px;
+}
+
+/* Enhanced Loading Indicators */
+/* .loader base handled by shared.css; booking needs margin-right for inline use */
+.timeline-loading .loader,
+.loading-text .loader {
+    margin-right: 10px;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    display: none;
+}
+
+.loading-overlay.show {
+    display: flex;
+}
+
+.loading-content {
+    text-align: center;
+    font-size: 1.2em;
+    color: var(--primary-color);
+}
+
+.loading-content .loader {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 20px;
+}
+
+/* Button Loading State */
+.btn.loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.btn.loading::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Ultra-compact mobile density mode */
+@media (max-width: 768px) {
+    .main-content {
+        gap: 8px;
+    }
+
+    .section,
+    .booking-flow-block,
+    .booking-theme-status,
+    .rentals-container,
+    .price-display,
+    .reference-view,
+    .booking-card,
+    .payment-method,
+    .payment-info,
+    .upi-section {
+        padding: 8px !important;
+        margin-bottom: 8px;
+    }
+
+    .form-group,
+    .selected-rentals,
+    .payment-methods,
+    .booking-actions-row,
+    .time-container {
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .form-group {
+        margin-bottom: 8px;
+    }
+
+    label {
+        margin-bottom: 5px;
+    }
+
+    input,
+    select,
+    textarea {
+        padding: 8px;
+    }
+
+    .category-header {
+        padding: 8px;
+        margin-top: 8px;
+    }
+
+    .rental-option {
+        padding: 8px;
+        margin: 8px 0;
+    }
+
+    .quantity-btn {
+        width: 28px;
+        height: 28px;
+    }
+
+    .btn,
+    .payment-btn {
+        padding: 8px 10px;
+        margin: 0;
+        font-size: 0.84rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .booking-card h4 {
+        font-size: 1rem;
+    }
+
+    .rental-option.child {
+        margin-left: 0;
+    }
+
+    .perday-booked-item,
+    .selected-rentals .rental-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .payment-guide-btn,
+    .payment-close-btn {
+        display: block;
+        width: 100%;
+        margin-left: 0;
+        margin-top: 8px;
+    }
+}
