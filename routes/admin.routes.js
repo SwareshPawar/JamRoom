@@ -9,8 +9,14 @@ const { protect } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/admin');
 const { sendEmail } = require('../utils/email');
 const { generateCalendarInvite } = require('../utils/calendar');
-const { generateBill, generateBillForDownload, generateBillFilename, generateBillForDownloadWithFilename } = require('../utils/billGenerator');
-const { generateQuotationPDF } = require('../utils/billGenerator');
+const {
+  generateBill,
+  generateBillForDownload,
+  generateBillFilename,
+  generateBillForDownloadWithFilename,
+  generateQuotationPDF,
+  buildQuotationPresentationData
+} = require('../utils/billGenerator');
 const { 
   sendBookingConfirmationNotifications, 
   sendBookingConfirmationWhatsApp,
@@ -3260,15 +3266,269 @@ const calculateQuotationTotals = ({ rentals, schedules }) => {
   };
 };
 
+const getQuotationRateKey = (category, name, rentalType) => {
+  return [
+    String(category || '').trim().toLowerCase(),
+    String(name || '').trim().toLowerCase(),
+    normalizeRentalTypeValue(rentalType)
+  ].join('|');
+};
+
+const buildQuotationRateIndex = (settings) => {
+  const index = new Map();
+  const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+
+  rentalTypes.forEach((category) => {
+    const categoryName = String(category?.name || '').trim();
+    if (!categoryName) return;
+
+    const categoryRentalType = normalizeRentalTypeValue(category?.rentalType);
+
+    if (categoryName === 'JamRoom' && Number(category?.basePrice || 0) > 0) {
+      index.set(
+        getQuotationRateKey(categoryName, `${categoryName} (Base)`, categoryRentalType),
+        Number(category.basePrice || 0)
+      );
+    }
+
+    const subItems = Array.isArray(category?.subItems) ? category.subItems : [];
+    subItems.forEach((subItem) => {
+      const itemName = String(subItem?.name || '').trim();
+      if (!itemName) return;
+
+      const mode = normalizeRentalTypeValue(subItem?.rentalType || categoryRentalType);
+      const resolvedPrice = mode === 'perday'
+        ? Number(subItem?.perdayPrice || 0)
+        : Number(subItem?.price || 0);
+
+      index.set(getQuotationRateKey(categoryName, itemName, mode), resolvedPrice);
+    });
+
+    if (subItems.length === 0 && Number(category?.basePrice || 0) > 0 && categoryName !== 'JamRoom') {
+      index.set(
+        getQuotationRateKey(categoryName, categoryName, categoryRentalType),
+        Number(category.basePrice || 0)
+      );
+    }
+  });
+
+  return index;
+};
+
+const sanitizeQuotationRentals = (rawRentals = [], settings = null) => {
+  const rateIndex = settings ? buildQuotationRateIndex(settings) : null;
+  const sanitizedRentals = [];
+
+  for (const rental of Array.isArray(rawRentals) ? rawRentals : []) {
+    const rentalName = String(rental?.name || '').trim();
+    const rentalCategory = String(rental?.category || '').trim();
+    const rentalDescription = String(rental?.description || '').trim();
+    const rentalType = normalizeRentalTypeValue(rental?.rentalType);
+    const rentalQuantity = Math.max(1, Number(rental?.quantity || 1));
+    const snapshotPrice = Number(rental?.priceSnapshot ?? rental?.price ?? 0);
+
+    if (!rentalName) {
+      throw new Error('Each quotation item must have a name');
+    }
+
+    if (!Number.isFinite(snapshotPrice) || snapshotPrice < 0) {
+      throw new Error(`Invalid price for quotation item: ${rentalName}`);
+    }
+
+    let resolvedPrice = snapshotPrice;
+    if (rateIndex) {
+      const key = getQuotationRateKey(rentalCategory, rentalName, rentalType);
+      if (rateIndex.has(key)) {
+        resolvedPrice = Number(rateIndex.get(key) || 0);
+      }
+    }
+
+    sanitizedRentals.push({
+      name: rentalName,
+      category: rentalCategory,
+      description: rentalDescription,
+      rentalType,
+      quantity: rentalQuantity,
+      price: resolvedPrice,
+      priceSnapshot: snapshotPrice
+    });
+  }
+
+  return sanitizedRentals;
+};
+
+const sanitizeQuotationPayload = (quotation = {}, settings = null) => {
+  const rentalTypeLabel = String(quotation?.rentalType || quotation?.rentalTypeLabel || '').trim();
+  const notes = String(quotation?.notes || '').trim();
+  const selectedTypes = Array.isArray(quotation?.selectedTypes)
+    ? quotation.selectedTypes.map((type) => normalizeRentalTypeValue(type))
+    : [];
+  const schedules = {
+    inhouse: {
+      date: String(quotation?.schedules?.inhouse?.date || '').trim(),
+      startTime: String(quotation?.schedules?.inhouse?.startTime || '').trim(),
+      endTime: String(quotation?.schedules?.inhouse?.endTime || '').trim()
+    },
+    perday: {
+      startDate: String(quotation?.schedules?.perday?.startDate || '').trim(),
+      endDate: String(quotation?.schedules?.perday?.endDate || '').trim(),
+      pickupTime: String(quotation?.schedules?.perday?.pickupTime || '').trim(),
+      returnTime: String(quotation?.schedules?.perday?.returnTime || '').trim()
+    }
+  };
+
+  const rentals = sanitizeQuotationRentals(quotation?.rentals || [], settings);
+  if (rentals.length === 0) {
+    throw new Error('Please include at least one rental item in quotation');
+  }
+
+  return {
+    rentalTypeLabel,
+    notes,
+    selectedTypes,
+    schedules,
+    rentals
+  };
+};
+
+const toSavedQuotationResponse = (savedQuotation, settings) => {
+  const sanitized = sanitizeQuotationPayload({
+    rentalType: savedQuotation?.rentalTypeLabel,
+    notes: savedQuotation?.notes,
+    selectedTypes: savedQuotation?.selectedTypes,
+    schedules: savedQuotation?.schedules,
+    rentals: savedQuotation?.rentals
+  }, settings);
+
+  return {
+    id: String(savedQuotation?._id || ''),
+    name: String(savedQuotation?.name || '').trim(),
+    rentalTypeLabel: sanitized.rentalTypeLabel,
+    selectedTypes: sanitized.selectedTypes,
+    schedules: sanitized.schedules,
+    notes: sanitized.notes,
+    rentals: sanitized.rentals,
+    createdAt: savedQuotation?.createdAt,
+    updatedAt: savedQuotation?.updatedAt
+  };
+};
+
+// @route   GET /api/admin/quotations/saved
+// @desc    List saved quotation templates
+// @access  Private/Admin
+router.get('/quotations/saved', protect, isAdmin, async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+    const savedQuotations = Array.isArray(settings?.savedQuotations)
+      ? settings.savedQuotations
+      : [];
+
+    const items = savedQuotations
+      .map((item) => toSavedQuotationResponse(item, settings))
+      .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+    res.json({
+      success: true,
+      count: items.length,
+      quotations: items
+    });
+  } catch (error) {
+    console.error('List saved quotations error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to load saved quotations' });
+  }
+});
+
+// @route   POST /api/admin/quotations/saved
+// @desc    Save quotation template for reuse
+// @access  Private/Admin
+router.post('/quotations/saved', protect, isAdmin, async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+    const templateName = String(req.body?.name || '').trim();
+    if (!templateName) {
+      return res.status(400).json({ success: false, message: 'Template name is required' });
+    }
+
+    const parsed = sanitizeQuotationPayload(req.body?.quotation || {}, settings);
+    const savedItem = {
+      name: templateName,
+      rentalTypeLabel: parsed.rentalTypeLabel,
+      selectedTypes: parsed.selectedTypes,
+      notes: parsed.notes,
+      schedules: parsed.schedules,
+      rentals: parsed.rentals.map((item) => ({
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        rentalType: item.rentalType,
+        quantity: item.quantity,
+        priceSnapshot: item.price
+      })),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    settings.savedQuotations = Array.isArray(settings.savedQuotations)
+      ? settings.savedQuotations
+      : [];
+    settings.savedQuotations.push(savedItem);
+    await settings.save();
+
+    const created = settings.savedQuotations[settings.savedQuotations.length - 1];
+    res.json({
+      success: true,
+      message: 'Quotation template saved',
+      quotation: toSavedQuotationResponse(created, settings)
+    });
+  } catch (error) {
+    console.error('Save quotation template error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to save quotation template' });
+  }
+});
+
+// @route   DELETE /api/admin/quotations/saved/:id
+// @desc    Delete saved quotation template
+// @access  Private/Admin
+router.delete('/quotations/saved/:id', protect, isAdmin, async (req, res) => {
+  try {
+    const templateId = String(req.params?.id || '').trim();
+    if (!templateId) {
+      return res.status(400).json({ success: false, message: 'Template id is required' });
+    }
+
+    const settings = await AdminSettings.getSettings();
+    const currentItems = Array.isArray(settings.savedQuotations) ? settings.savedQuotations : [];
+    const filtered = currentItems.filter((item) => String(item?._id) !== templateId);
+
+    if (filtered.length === currentItems.length) {
+      return res.status(404).json({ success: false, message: 'Saved quotation not found' });
+    }
+
+    settings.savedQuotations = filtered;
+    await settings.save();
+
+    res.json({ success: true, message: 'Saved quotation deleted' });
+  } catch (error) {
+    console.error('Delete quotation template error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to delete saved quotation' });
+  }
+});
+
 // @route   POST /api/admin/quotations/send
 // @desc    Generate and send quotation email (with PDF) to selected recipients
 // @access  Private/Admin
 router.post('/quotations/send', protect, isAdmin, async (req, res) => {
   try {
+    const settings = await AdminSettings.getSettings();
     const recipientUserId = String(req.body?.recipientUserId || '').trim();
     const includeSelectedUser = req.body?.includeSelectedUser !== false;
     const additionalEmails = parseOptionalEmailList(req.body?.additionalEmails);
+    const emailDeliveryMode = String(req.body?.emailDeliveryMode || 'single').trim().toLowerCase() === 'separate'
+      ? 'separate'
+      : 'single';
     const quotation = req.body?.quotation || {};
+    const shouldSaveTemplate = req.body?.saveTemplate === true;
+    const saveTemplateName = String(req.body?.templateName || '').trim();
 
     const invalidAdditionalEmails = additionalEmails.filter((email) => !isValidEmail(email));
     if (invalidAdditionalEmails.length > 0) {
@@ -3278,27 +3538,8 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
       });
     }
 
-    const rawRentals = Array.isArray(quotation?.rentals) ? quotation.rentals : [];
-    if (rawRentals.length === 0) {
-      return res.status(400).json({ success: false, message: 'Please include at least one rental item in quotation' });
-    }
-
-    const sanitizedRentals = [];
-    for (const rental of rawRentals) {
-      const rentalName = String(rental?.name || '').trim();
-      const rentalCategory = String(rental?.category || '').trim();
-      const rentalDescription = String(rental?.description || '').trim();
-      const rentalPrice = Number(rental?.price || 0);
-      const rentalQuantity = Math.max(1, Number(rental?.quantity || 1));
-      const rentalType = normalizeRentalTypeValue(rental?.rentalType);
-      if (!rentalName) {
-        return res.status(400).json({ success: false, message: 'Each quotation item must have a name' });
-      }
-      if (!Number.isFinite(rentalPrice) || rentalPrice < 0) {
-        return res.status(400).json({ success: false, message: `Invalid price for quotation item: ${rentalName}` });
-      }
-      sanitizedRentals.push({ name: rentalName, category: rentalCategory, description: rentalDescription, price: rentalPrice, quantity: rentalQuantity, rentalType });
-    }
+    const parsedQuotation = sanitizeQuotationPayload(quotation, settings);
+    const sanitizedRentals = parsedQuotation.rentals;
 
     let selectedUser = null;
     if (recipientUserId) {
@@ -3328,19 +3569,18 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
 
     const calculation = calculateQuotationTotals({
       rentals: sanitizedRentals,
-      schedules: quotation?.schedules || {}
+      schedules: parsedQuotation.schedules || {}
     });
 
-    const settings = await AdminSettings.getSettings();
     const gstEnabled = settings?.gstConfig?.enabled || false;
     const gstRate = gstEnabled ? (settings?.gstConfig?.rate || 0.18) : 0;
     const gstDisplayName = settings?.gstConfig?.displayName || 'GST';
     const taxAmount = gstEnabled ? Math.round(calculation.subtotal * gstRate) : 0;
     const totalAmount = calculation.subtotal + taxAmount;
 
-    const rentalTypeLabel = String(quotation?.rentalType || '').trim()
+    const rentalTypeLabel = String(parsedQuotation.rentalTypeLabel || '').trim()
       || deriveDynamicBookingLabel(sanitizedRentals, 'Quotation');
-    const quoteNotes = String(quotation?.notes || '').trim();
+    const quoteNotes = parsedQuotation.notes;
     const generatedAt = new Date();
 
     const selectedTypeLabels = [];
@@ -3348,73 +3588,99 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
     if (calculation.hasPerday) selectedTypeLabels.push('Per-day');
     if (calculation.hasPersession) selectedTypeLabels.push('Per-session');
 
-    const laymanTypeDescriptions = {
-      'In-house': 'In-studio equipment and room usage billed per hour — ideal for recording sessions, rehearsals, or practice.',
-      'Per-day': 'Equipment rented for full-day blocks — suitable for outdoor shoots, events, or productions away from the studio.',
-      'Per-session': 'Flat rate per project, concert, show, or event timeline — billed as a single session regardless of hours.'
-    };
-
-    const rowsHtml = sanitizedRentals.map((item) => {
-      const rentalType = normalizeRentalTypeValue(item.rentalType);
-      let itemTotal = 0;
-      let rateMeta = 'Per hour';
-      if (rentalType === 'persession') {
-        itemTotal = item.price * item.quantity;
-        rateMeta = 'Per session';
-      } else if (rentalType === 'perday') {
-        itemTotal = item.price * item.quantity * calculation.perdayDays;
-        rateMeta = `Per day x ${calculation.perdayDays} day(s)`;
-      } else {
-        itemTotal = item.price * item.quantity * calculation.inhouseDurationHours;
-        rateMeta = `Per hour x ${calculation.inhouseDurationHours} hr(s)`;
-      }
-      return `
-        <tr>
-          <td style="padding:10px;border-bottom:1px solid #ececec;">${item.name}${item.category ? ` <small style="color:#666;">(${item.category})</small>` : ''}</td>
-          <td style="padding:10px;border-bottom:1px solid #ececec;text-align:center;">${item.quantity}</td>
-          <td style="padding:10px;border-bottom:1px solid #ececec;text-align:right;">&#8377;${item.price.toFixed(2)}</td>
-          <td style="padding:10px;border-bottom:1px solid #ececec;text-align:center;">${rateMeta}</td>
-          <td style="padding:10px;border-bottom:1px solid #ececec;text-align:right;font-weight:600;">&#8377;${itemTotal.toFixed(2)}</td>
-        </tr>`;
-    }).join('');
+    const quotationPresentation = buildQuotationPresentationData({
+      rentalTypeLabel,
+      selectedTypeLabels,
+      calculation,
+      rentals: sanitizedRentals,
+      quoteNotes,
+      generatedAt,
+      gstEnabled,
+      gstRate,
+      gstDisplayName,
+      taxAmount,
+      totalAmount,
+      recipientName: selectedUser?.name || ''
+    }, settings);
 
     const subject = `Quotation from ${settings?.studioName || 'JamRoom'} - ${rentalTypeLabel}`;
-    const emailHtml = `
-      <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#222;">
-        <div style="background:#0f172a;color:#fff;padding:20px 24px;border-radius:10px 10px 0 0;">
-          <h2 style="margin:0;font-size:24px;">Quotation</h2>
-          <p style="margin:6px 0 0 0;opacity:0.9;">${settings?.studioName || 'JamRoom'}</p>
-        </div>
-        <div style="border:1px solid #e5e7eb;border-top:0;border-radius:0 0 10px 10px;padding:20px 24px;">
-          <p style="margin:0 0 10px 0;">Hello${selectedUser?.name ? ` ${selectedUser.name}` : ''},</p>
-          <p style="margin:0 0 14px 0;color:#4b5563;">Please find your requested quotation details below.</p>
-          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:14px;"><tbody>
-            <tr><td style="padding:6px 0;color:#4b5563;">Quotation Label</td><td style="padding:6px 0;text-align:right;font-weight:600;">${rentalTypeLabel}</td></tr>
-            <tr><td style="padding:6px 0;color:#4b5563;">Selected Types</td><td style="padding:6px 0;text-align:right;">${selectedTypeLabels.join(', ') || 'N/A'}</td></tr>
-            ${selectedTypeLabels.map((label) => `<tr><td style="padding:4px 0 4px 12px;color:#4b5563;font-size:12px;">&rarr; ${label}</td><td style="padding:4px 0;text-align:right;font-size:12px;color:#6b7280;">${laymanTypeDescriptions[label] || ''}</td></tr>`).join('')}
-            ${calculation.hasInhouse ? `<tr><td style="padding:6px 0;color:#4b5563;">In-house Schedule</td><td style="padding:6px 0;text-align:right;">${calculation.schedules.inhouse.date} | ${calculation.schedules.inhouse.startTime} - ${calculation.schedules.inhouse.endTime} (${calculation.inhouseDurationHours} hr)</td></tr>` : ''}
-            ${calculation.hasPerday ? `<tr><td style="padding:6px 0;color:#4b5563;">Per-day Range</td><td style="padding:6px 0;text-align:right;">${calculation.schedules.perday.startDate} ${calculation.schedules.perday.pickupTime} to ${calculation.schedules.perday.endDate} ${calculation.schedules.perday.returnTime} (${calculation.perdayDays} day(s))</td></tr>` : ''}
-            <tr><td style="padding:6px 0;color:#4b5563;">Generated On</td><td style="padding:6px 0;text-align:right;">${generatedAt.toLocaleString('en-IN')}</td></tr>
-          </tbody></table>
-          <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:16px;">
-            <thead><tr style="background:#f9fafb;">
-              <th style="text-align:left;padding:10px;border-bottom:1px solid #e5e7eb;">Item</th>
-              <th style="text-align:center;padding:10px;border-bottom:1px solid #e5e7eb;">Qty</th>
-              <th style="text-align:right;padding:10px;border-bottom:1px solid #e5e7eb;">Rate</th>
-              <th style="text-align:center;padding:10px;border-bottom:1px solid #e5e7eb;">Billing</th>
-              <th style="text-align:right;padding:10px;border-bottom:1px solid #e5e7eb;">Amount</th>
-            </tr></thead>
-            <tbody>${rowsHtml}</tbody>
-          </table>
-          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><tbody>
-            <tr><td style="padding:6px 0;color:#4b5563;">Subtotal</td><td style="padding:6px 0;text-align:right;">&#8377;${calculation.subtotal.toFixed(2)}</td></tr>
-            ${gstEnabled ? `<tr><td style="padding:6px 0;color:#4b5563;">${gstDisplayName} (${Math.round(gstRate * 100)}%)</td><td style="padding:6px 0;text-align:right;">&#8377;${taxAmount.toFixed(2)}</td></tr>` : ''}
-            <tr><td style="padding:8px 0;font-weight:700;">Total</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#0f172a;">&#8377;${totalAmount.toFixed(2)}</td></tr>
-          </tbody></table>
-          ${quoteNotes ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px;"><strong>Notes:</strong> ${quoteNotes}</div>` : ''}
-          <p style="margin:0;color:#4b5563;">For confirmation or changes, reply to this email.</p>
-        </div>
-      </div>`;
+    const buildQuotationEmailHtml = ({ recipientName = '', individualEmail = false } = {}) => {
+
+      return `
+        <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#1f2937;background:#eef2f7;padding:18px;">
+          <div style="background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #dbe5f0;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
+            <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:22px 24px;">
+              <div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-start;">
+                <div style="max-width:68%;">
+                  <h2 style="margin:0 0 8px 0;font-size:28px;">${quotationPresentation.studioName}</h2>
+                  ${quotationPresentation.studioAddress ? `<div style="font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88);"><strong>Address:</strong> ${quotationPresentation.studioAddress}</div>` : ''}
+                  <div style="font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88);"><strong>Phone / WhatsApp:</strong> ${quotationPresentation.studioPhone}</div>
+                  <div style="font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88);"><strong>Email:</strong> ${quotationPresentation.studioEmail}</div>
+                </div>
+                <div style="min-width:210px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:14px 16px;">
+                  <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#bfdbfe;font-weight:700;margin-bottom:8px;">Order Summary</div>
+                  <div style="font-size:13px;line-height:1.7;color:rgba(255,255,255,0.9);"><strong>Quotation For:</strong> ${quotationPresentation.serviceTypeLabel}</div>
+                  <div style="font-size:13px;line-height:1.7;color:rgba(255,255,255,0.9);"><strong>Generated On:</strong> ${quotationPresentation.generatedAtLabel}</div>
+                  ${quotationPresentation.selectedTypeLabels.length > 0 ? `<div style="font-size:13px;line-height:1.7;color:rgba(255,255,255,0.9);"><strong>Includes:</strong> ${quotationPresentation.selectedTypeLabels.join(', ')}</div>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div style="padding:22px 24px;">
+              <p style="margin:0 0 12px 0;font-size:15px;color:#0f172a;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
+              <p style="margin:0 0 10px 0;font-size:14px;line-height:1.7;color:#475569;">${quotationPresentation.introLine}</p>
+              <p style="margin:0 0 16px 0;font-size:14px;line-height:1.7;color:#475569;">The detailed quotation PDF is attached for review and sharing.</p>
+
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px 0;">
+                <tr>
+                  <td width="50%" valign="top" style="padding-right:7px;">
+                    <div style="background:#f8fafc;border:1px solid #dbe5f0;border-radius:14px;padding:16px 18px;height:126px;box-sizing:border-box;">
+                      <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:10px;">Service Overview</div>
+                      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:6px;">${quotationPresentation.serviceTypeLabel}</div>
+                      <div style="font-size:13px;color:#475569;">${quotationPresentation.selectedTypeLabels.length > 0 ? `Includes ${quotationPresentation.selectedTypeLabels.join(', ')}.` : ''}</div>
+                    </div>
+                  </td>
+                  <td width="50%" valign="top" style="padding-left:7px;">
+                    <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;height:126px;box-sizing:border-box;">
+                      <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#1d4ed8;font-weight:700;margin-bottom:10px;">Estimated Total</div>
+                      <div style="font-size:32px;font-weight:900;color:#1d4ed8;margin-bottom:8px;">${quotationPresentation.totalAmountLabel}</div>
+                      ${quotationPresentation.taxEnabled ? `<div style="font-size:12px;color:#475569;margin-bottom:2px;">Subtotal: <strong>${quotationPresentation.subtotalAmountLabel}</strong></div><div style="font-size:12px;color:#475569;">${quotationPresentation.gstDisplayLabel} (${quotationPresentation.gstRateLabel}): <strong>${quotationPresentation.taxAmountLabel}</strong></div>` : `<div style="font-size:12px;line-height:1.5;color:#475569;">See attached PDF for full breakdown.</div>`}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <div style="background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;margin:18px 0;">
+                <div style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:10px;">To confirm your booking</div>
+                <div style="font-size:14px;line-height:1.8;color:#0f172a;">
+                  <div>Reply with <strong>CONFIRM</strong>${individualEmail ? ' on this email' : ' on this email thread'}.</div>
+                  <div>${quotationPresentation.studioWhatsAppLink ? `Or WhatsApp us at <a href="${quotationPresentation.studioWhatsAppLink}" style="color:#1d4ed8;font-weight:700;text-decoration:none;">${quotationPresentation.studioPhone}</a>.` : `Or contact us at <strong>${quotationPresentation.studioPhone}</strong>.`}</div>
+                </div>
+              </div>
+
+              <div style="background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:14px;padding:16px 18px;margin:0 0 14px 0;">
+                <div style="font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:10px;">⚠ Booking Terms</div>
+                <ul style="margin:0;padding-left:18px;color:#7f1d1d;">
+                  ${quotationPresentation.bookingTerms.map((term) => `<li style="margin:0 0 8px 0;font-size:13px;line-height:1.6;">${term}</li>`).join('')}
+                </ul>
+              </div>
+
+              <div style="background:linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%);border:2px solid #f59e0b;border-radius:14px;padding:16px 18px;margin:0 0 18px 0;position:relative;">
+                <div style="display:inline-block;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:10px;">🎁 Special Offer</div>
+                <div style="font-size:13px;line-height:1.8;color:#78350f;font-weight:600;">${quotationPresentation.offerLine}</div>
+                <div style="font-size:13px;line-height:1.7;color:#92400e;margin-top:8px;">Reach out to us for special packages tailored to your project needs.</div>
+              </div>
+
+              ${quotationPresentation.quoteNotes ? `<div style="background:#ffffff;border:1px solid #dbe5f0;border-radius:14px;padding:16px 18px;margin:0 0 18px 0;"><div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:8px;">Additional Notes</div><div style="font-size:13px;line-height:1.7;color:#475569;">${quotationPresentation.quoteNotes}</div></div>` : ''}
+
+              <div style="font-size:12px;line-height:1.8;color:#64748b;border-top:1px solid #e5e7eb;padding-top:14px;">
+                <div style="margin:0 0 6px 0;">Visit JamRoom: <a href="${DEFAULT_APP_LOGIN_URL}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:none;">${DEFAULT_APP_LOGIN_URL}</a></div>
+                <div>All rights reserved. ${quotationPresentation.studioName}</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    };
 
     // Generate PDF attachment (non-fatal)
     let pdfBuffer = null;
@@ -3434,16 +3700,66 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
       ? [{ filename: pdfFilename, content: pdfBuffer, contentType: 'application/pdf' }]
       : [];
 
-    for (const recipient of recipientEmails) {
-      await sendEmail({ to: recipient, subject, html: emailHtml, attachments: emailAttachments });
+    if (emailDeliveryMode === 'separate') {
+      for (const recipientEmail of recipientEmails) {
+        const isSelectedUserRecipient = selectedUser?.email
+          && normalizeEmail(selectedUser.email) === recipientEmail;
+
+        await sendEmail({
+          to: recipientEmail,
+          subject,
+          html: buildQuotationEmailHtml({
+            recipientName: isSelectedUserRecipient ? (selectedUser?.name || '') : '',
+            individualEmail: true
+          }),
+          attachments: emailAttachments
+        });
+      }
+    } else {
+      await sendEmail({
+        to: recipientEmails.join(', '),
+        subject,
+        html: buildQuotationEmailHtml({
+          recipientName: selectedUser?.name || ''
+        }),
+        attachments: emailAttachments
+      });
     }
 
-    console.log(`Quotation sent to ${recipientEmails.length} recipient(s), PDF: ${pdfBuffer ? 'attached' : 'skipped'}`);
+    let savedQuotation = null;
+    if (shouldSaveTemplate) {
+      const templateName = saveTemplateName || rentalTypeLabel || `Quotation ${generatedAt.toLocaleDateString('en-IN')}`;
+      const templatePayload = {
+        name: templateName,
+        rentalTypeLabel,
+        selectedTypes: parsedQuotation.selectedTypes,
+        notes: quoteNotes,
+        schedules: parsedQuotation.schedules,
+        rentals: sanitizedRentals.map((item) => ({
+          name: item.name,
+          category: item.category,
+          description: item.description,
+          rentalType: item.rentalType,
+          quantity: item.quantity,
+          priceSnapshot: item.price
+        })),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      settings.savedQuotations = Array.isArray(settings.savedQuotations) ? settings.savedQuotations : [];
+      settings.savedQuotations.push(templatePayload);
+      await settings.save();
+      savedQuotation = toSavedQuotationResponse(settings.savedQuotations[settings.savedQuotations.length - 1], settings);
+    }
+
+    console.log(`Quotation sent ${emailDeliveryMode === 'separate' ? 'separately' : 'in one email'} to ${recipientEmails.length} recipient(s), PDF: ${pdfBuffer ? 'attached' : 'skipped'}`);
 
     res.json({
       success: true,
-      message: `Quotation sent to ${recipientEmails.length} recipient(s)${pdfBuffer ? ' with PDF attachment' : ''}`,
+      message: `Quotation sent ${emailDeliveryMode === 'separate' ? 'separately' : 'in one email'} to ${recipientEmails.length} recipient(s)${pdfBuffer ? ' with PDF attachment' : ''}`,
       recipients: recipientEmails,
+      emailDeliveryMode,
       pdfAttached: !!pdfBuffer,
       quotation: {
         rentalType: rentalTypeLabel,
@@ -3453,7 +3769,8 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
         subtotal: calculation.subtotal,
         taxAmount,
         totalAmount
-      }
+      },
+      savedQuotation
     });
   } catch (error) {
     console.error('Send quotation error:', error);

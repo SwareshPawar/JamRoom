@@ -1,0 +1,460 @@
+{
+  "exportedAt": "2026-04-30T07:31:55.369Z",
+  "rentalTypes": [
+    {
+      "name": "JamRoom",
+      "description": "Professional jam and rehearsal room. Fully soundproofed with PA system, monitoring, and core studio gear. Ideal for band rehearsals, acoustic sets, and live practice sessions.",
+      "rentalType": "inhouse",
+      "basePrice": 300,
+      "maxQuantity": 1,
+      "alwaysChargeBase": true,
+      "subItems": [
+        {
+          "name": "Microphone",
+          "description": "Shared use dynamic microphone (SM-58 type) during session.",
+          "price": 0,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 5,
+          "_id": "69f30327f3cb4b7c5f212f43"
+        },
+        {
+          "name": "Audio Jacks / DI Box",
+          "description": "Audio input/output jack connections and DI box for line-level instruments.",
+          "price": 0,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 3,
+          "_id": "69f30327f3cb4b7c5f212f44"
+        },
+        {
+          "name": "IEM (In-Ear Monitor)",
+          "description": "Personal in-ear monitor unit for stage-mix monitoring during session. Priced per unit.",
+          "price": 50,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 3,
+          "_id": "69f30327f3cb4b7c5f212f45"
+        },
+        {
+          "name": "Electric Guitar (Java)",
+          "description": "Java brand electric guitar. Reliable mid-range body suitable for rehearsal, recording, and production work.",
+          "price": 100,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f46"
+        },
+        {
+          "name": "PRS Acoustic Guitar",
+          "description": "PRS semi-acoustic guitar. Premium build quality, rich tone — great for recording sessions and rehearsals.",
+          "price": 200,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f47"
+        },
+        {
+          "name": "Bass Guitar (Yamaha TRBX174)",
+          "description": "Yamaha TRBX174 bass guitar in Blue. Balanced tone and low-action neck, ideal for rhythm sections and studio production.",
+          "price": 100,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f48"
+        },
+        {
+          "name": "KORG PA900 Arranger Keyboard",
+          "description": "KORG PA900 professional 76-key arranger keyboard. Full arranger mode, auto-styles, splits, and layering. Ideal for live performance, accompaniment, or production.",
+          "price": 200,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f49"
+        },
+        {
+          "name": "Harmonium",
+          "description": "Standard pedal harmonium (3.5-octave reed instrument). Widely used in classical, devotional, and Bollywood-style music.",
+          "price": 100,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f4a"
+        },
+        {
+          "name": "Sitar",
+          "description": "Full-size concert sitar. Suitable for classical raga practice, film scoring, and studio recording sessions.",
+          "price": 200,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f4b"
+        },
+        {
+          "name": "Sarangi",
+          "description": "Traditional north Indian bowed string instrument. Rich, expressive tone — used in classical, folk, and Bollywood recordings as melodic accompaniment.",
+          "price": 150,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f4c"
+        },
+        {
+          "name": "Mandolin",
+          "description": "Indian-style flat-back mandolin. Used in classical South Indian, folk, and light music. Great for melody lines and studio recordings.",
+          "price": 100,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f4d"
+        },
+        {
+          "name": "Bulbul Tarang",
+          "description": "Indian bulbul tarang (also known as Indian banjo). Folk and classical instrument with a distinctive plucked-string character, used in regional and traditional music styles.",
+          "price": 100,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f4e"
+        },
+        {
+          "name": "Drum Sticks",
+          "description": "Professional drum sticks for practice pad or kit use during your JamRoom session. Must be pre-booked.",
+          "price": 50,
+          "rentalType": "inhouse",
+          "perdayPrice": 0,
+          "maxQuantity": 2,
+          "_id": "69f30327f3cb4b7c5f212f4f"
+        }
+      ],
+      "_id": "69f30327f3cb4b7c5f212f42"
+    },
+    {
+      "name": "Per Day Rentals",
+      "description": "Instruments and equipment available for full-day rental. Ideal for outdoor shoots, concerts, events, TV/film productions, or use at other venues. Minimum 1 day (24 hours). Return must be in exact 24-hour blocks.",
+      "rentalType": "perday",
+      "basePrice": 0,
+      "maxQuantity": 5,
+      "alwaysChargeBase": true,
+      "subItems": [
+        {
+          "name": "IEM (In-Ear Monitor)",
+          "description": "Personal in-ear monitor unit for stage-mix monitoring during session. Priced per unit.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 400,
+          "maxQuantity": 3,
+          "_id": "69f30327f3cb4b7c5f212f51"
+        },
+        {
+          "name": "Electric Guitar (Java)",
+          "description": "Java brand electric guitar. Reliable mid-range body suitable for rehearsal, recording, and production work.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 800,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f52"
+        },
+        {
+          "name": "PRS Acoustic Guitar",
+          "description": "PRS Angelus semi-acoustic guitar. Full-day rental for outdoor shoots, stage performances, or recordings at another studio.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 1500,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f53"
+        },
+        {
+          "name": "Bass Guitar (Yamaha TRBX174)",
+          "description": "Yamaha TRBX174 bass guitar in Blue. Balanced tone and low-action neck, ideal for rhythm sections and studio production.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 1000,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f54"
+        },
+        {
+          "name": "KORG PA900 Arranger Keyboard",
+          "description": "KORG PA900 professional 76-key arranger keyboard. Full arranger mode, auto-styles, splits, and layering. Ideal for live performance, accompaniment, or production.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 2000,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f55"
+        },
+        {
+          "name": "Harmonium",
+          "description": "Standard pedal harmonium (3.5-octave reed instrument). Widely used in classical, devotional, and Bollywood-style music.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 800,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f56"
+        },
+        {
+          "name": "Sitar",
+          "description": "Full-size concert sitar. Suitable for classical raga practice, film scoring, and studio recording sessions.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 2000,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f57"
+        },
+        {
+          "name": "Sarangi",
+          "description": "Traditional north Indian bowed string instrument. Rich, expressive tone — used in classical, folk, and Bollywood recordings as melodic accompaniment.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 1500,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f58"
+        },
+        {
+          "name": "Mandolin",
+          "description": "Indian-style flat-back mandolin. Used in classical South Indian, folk, and light music. Great for melody lines and studio recordings.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 800,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f59"
+        },
+        {
+          "name": "Bulbul Tarang",
+          "description": "Indian bulbul tarang (also known as Indian banjo). Folk and classical instrument with a distinctive plucked-string character, used in regional and traditional music styles.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 800,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f5a"
+        },
+        {
+          "name": "Drum Sticks",
+          "description": "Professional drum sticks for practice pad or kit use during your JamRoom session. Must be pre-booked.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 400,
+          "maxQuantity": 2,
+          "_id": "69f30327f3cb4b7c5f212f5b"
+        },
+        {
+          "name": "KORG PA900 Keyboard",
+          "description": "KORG PA900 professional arranger keyboard. Full-day rental for concerts, events, recordings, or shoots outside the studio.",
+          "price": 0,
+          "rentalType": "perday",
+          "perdayPrice": 2000,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f5c"
+        }
+      ],
+      "_id": "69f30327f3cb4b7c5f212f50"
+    },
+    {
+      "name": "Recording Session",
+      "description": "Raw recording session in the studio. No mixing or mastering included. Dry WAV files delivered to your pen drive or shared via Google Drive or WeTransfer. Ideal for demos, reference takes, or tracks to be mixed elsewhere.",
+      "rentalType": "inhouse",
+      "basePrice": 500,
+      "maxQuantity": 1,
+      "alwaysChargeBase": true,
+      "subItems": [],
+      "_id": "69f30327f3cb4b7c5f212f5d"
+    },
+    {
+      "name": "Music Production",
+      "description": "Complete music production service. Base charge covers a standard acoustic track — guitar, keyboard, or strings — with digital arrangement and programming. No drums included in base. Additional services can be added per item below.",
+      "rentalType": "persession",
+      "basePrice": 4000,
+      "maxQuantity": 1,
+      "alwaysChargeBase": true,
+      "subItems": [
+        {
+          "name": "Live Instrument Recording",
+          "description": "Recording of one live instrument per session — violin, flute, guitar, sitar, or any other. Priced per instrument added.",
+          "price": 5000,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 4,
+          "_id": "69f30327f3cb4b7c5f212f5f"
+        },
+        {
+          "name": "Additional Digital Instrument / Production Layer",
+          "description": "Adding a single digital instrument or production layer — synth pad, sample track, orchestral section, or electronic element.",
+          "price": 2000,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 3,
+          "_id": "69f30327f3cb4b7c5f212f60"
+        },
+        {
+          "name": "Mixing & Mastering",
+          "description": "Professional mixing and mastering. Base price covers up to 3 tracks. Contact for larger projects or stem-based mastering.",
+          "price": 2000,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f61"
+        },
+        {
+          "name": "Vocal Recording",
+          "description": "Vocal recording — raw or processed. Includes mic, signal chain, and booth time. Priced per vocal track.",
+          "price": 1000,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 4,
+          "_id": "69f30327f3cb4b7c5f212f62"
+        }
+      ],
+      "_id": "69f30327f3cb4b7c5f212f5e"
+    },
+    {
+      "name": "Mix & Master",
+      "description": "Professional mixing and mastering service. Base charge covers up to 4 tracks. Additional tracks and stem mastering can be added below.",
+      "rentalType": "persession",
+      "basePrice": 4000,
+      "maxQuantity": 1,
+      "alwaysChargeBase": true,
+      "subItems": [
+        {
+          "name": "Additional Track Mixing",
+          "description": "One additional track beyond the base 4-track package. Priced per track.",
+          "price": 500,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 10,
+          "_id": "69f30327f3cb4b7c5f212f64"
+        },
+        {
+          "name": "Stem Mastering",
+          "description": "Stem-based mastering for greater control over the final mix. Includes multi-stem bounce and individual processing.",
+          "price": 1500,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f65"
+        }
+      ],
+      "_id": "69f30327f3cb4b7c5f212f63"
+    },
+    {
+      "name": "Background Music & Jingles",
+      "description": "Background music composition and production for short films, advertisements, YouTube content, documentaries, and corporate projects. Base charge includes digital instrument arrangement and programming.",
+      "rentalType": "persession",
+      "basePrice": 4000,
+      "maxQuantity": 1,
+      "alwaysChargeBase": true,
+      "subItems": [
+        {
+          "name": "Sound Design / Foley",
+          "description": "Custom sound design and foley creation for film, video, or interactive media. Priced per scene or project segment.",
+          "price": 4000,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 5,
+          "_id": "69f30327f3cb4b7c5f212f67"
+        },
+        {
+          "name": "Live Instrument Recording",
+          "description": "Recording a live instrument for the BGM or jingle track — guitar, keyboard, sitar, sarangi, or any other. Priced per instrument.",
+          "price": 5000,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 5,
+          "_id": "69f30327f3cb4b7c5f212f68"
+        },
+        {
+          "name": "Vocal Recording",
+          "description": "Jingle or narration vocal recording. Includes mic, signal chain, and booth time.",
+          "price": 500,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 5,
+          "_id": "69f30327f3cb4b7c5f212f69"
+        }
+      ],
+      "_id": "69f30327f3cb4b7c5f212f66"
+    },
+    {
+      "name": "Composition & Arrangement",
+      "description": "Composition and arrangement service for songs and projects. Includes melody design, harmonic arrangement, and instrument planning.",
+      "rentalType": "persession",
+      "basePrice": 4000,
+      "maxQuantity": 1,
+      "alwaysChargeBase": true,
+      "subItems": [
+        {
+          "name": "Melody Composition",
+          "description": "Main melody creation for a complete song or theme.",
+          "price": 2500,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f6b"
+        },
+        {
+          "name": "Arrangement Layering",
+          "description": "Instrument arrangement and production layering for one composition.",
+          "price": 3000,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f6c"
+        },
+        {
+          "name": "Song Structure Consultation",
+          "description": "Guidance for intro, verse, chorus, bridge, and final structure.",
+          "price": 1500,
+          "rentalType": "persession",
+          "perdayPrice": 0,
+          "maxQuantity": 1,
+          "_id": "69f30327f3cb4b7c5f212f6d"
+        }
+      ],
+      "_id": "69f30327f3cb4b7c5f212f6a"
+    }
+  ],
+  "bookingCategoryBindings": {
+    "pairs": [
+      {
+        "leftCategory": "JamRoom",
+        "rightCategory": "Recording Session",
+        "leftRentalType": "inhouse",
+        "rightRentalType": "inhouse",
+        "_id": "69f30327f3cb4b7c5f212f6e"
+      },
+      {
+        "leftCategory": "Music Production",
+        "rightCategory": "Mix & Master",
+        "leftRentalType": "persession",
+        "rightRentalType": "persession",
+        "_id": "69f30327f3cb4b7c5f212f6f"
+      },
+      {
+        "leftCategory": "Music Production",
+        "rightCategory": "Composition & Arrangement",
+        "leftRentalType": "persession",
+        "rightRentalType": "persession",
+        "_id": "69f30327f3cb4b7c5f212f70"
+      },
+      {
+        "leftCategory": "Background Music & Jingles",
+        "rightCategory": "Composition & Arrangement",
+        "leftRentalType": "persession",
+        "rightRentalType": "persession",
+        "_id": "69f30327f3cb4b7c5f212f71"
+      },
+      {
+        "leftCategory": "Composition & Arrangement",
+        "rightCategory": "Mix & Master",
+        "leftRentalType": "persession",
+        "rightRentalType": "persession",
+        "_id": "69f30327f3cb4b7c5f212f72"
+      },
+      {
+        "leftCategory": "Recording Session",
+        "rightCategory": "Mix & Master",
+        "leftRentalType": "inhouse",
+        "rightRentalType": "persession",
+        "_id": "69f30327f3cb4b7c5f212f73"
+      }
+    ]
+  }
+}

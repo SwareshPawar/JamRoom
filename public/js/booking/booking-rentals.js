@@ -827,8 +827,6 @@ const getBoundCategoryNames = (categoryName) => {
     getConfiguredBindingPairs().forEach((pair) => {
         if (pair.leftCategory === normalizedCategory) {
             bound.add(pair.rightCategory);
-        } else if (pair.rightCategory === normalizedCategory) {
-            bound.add(pair.leftCategory);
         }
     });
 
@@ -1000,14 +998,14 @@ const populateRentalTypes = () => {
     const hasAnyPerdayItems = categoriesToRender.some((categoryName) => getPerdayItemsForCategory(categoryName).length > 0);
 
     if (!hasAnyHourlyItems) {
-        hourlyContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No individual items configured for this category.</p>';
+        hourlyContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No catalog items configured for this category.</p>';
     } else {
         categoriesToRender.forEach((categoryName) => {
             const categoryItems = uniqueByKey(hourlyGroups.get(categoryName) || []);
             if (categoryItems.length === 0) return;
             renderRentalSection(
                 hourlyContainer,
-                `${categoryName} - Individual Items (Optional)`,
+                `${categoryName} Catalog Items`,
                 categoryItems,
                 'hourly',
                 { collapsedByDefault: true }
@@ -1016,14 +1014,14 @@ const populateRentalTypes = () => {
     }
 
     if (!hasAnyPerdayItems) {
-        perdayContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No individual items configured for this category.</p>';
+        perdayContainer.innerHTML = '<p class="booking-empty-message booking-empty-padded">No catalog items configured for this category.</p>';
     } else {
         categoriesToRender.forEach((categoryName) => {
             const categoryItems = uniqueByKey(getPerdayItemsForCategory(categoryName));
             if (categoryItems.length === 0) return;
             renderRentalSection(
                 perdayContainer,
-                `${categoryName} - Individual Items (Optional)`,
+                `${categoryName} Catalog Items`,
                 categoryItems,
                 'perday',
                 { collapsedByDefault: true }

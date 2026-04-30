@@ -65,6 +65,81 @@ const adminSettingsSchema = new mongoose.Schema({
       }
     }]
   }],
+  savedQuotations: [{
+    name: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    rentalTypeLabel: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    selectedTypes: [{
+      type: String,
+      enum: ['inhouse', 'perday', 'persession']
+    }],
+    rentals: [{
+      name: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      category: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      description: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      rentalType: {
+        type: String,
+        enum: ['inhouse', 'perday', 'persession'],
+        default: 'inhouse'
+      },
+      quantity: {
+        type: Number,
+        min: 1,
+        max: 100,
+        default: 1
+      },
+      priceSnapshot: {
+        type: Number,
+        min: 0,
+        default: 0
+      }
+    }],
+    schedules: {
+      inhouse: {
+        date: { type: String, default: '' },
+        startTime: { type: String, default: '' },
+        endTime: { type: String, default: '' }
+      },
+      perday: {
+        startDate: { type: String, default: '' },
+        endDate: { type: String, default: '' },
+        pickupTime: { type: String, default: '' },
+        returnTime: { type: String, default: '' }
+      }
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   bookingCategoryBindings: {
     pairs: [{
       leftCategory: {

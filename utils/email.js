@@ -1,5 +1,7 @@
 const nodemailer = require('nodemailer');
 
+const JAMROOM_SITE_URL = 'https://jam-room-mu.vercel.app/';
+
 // Create reusable transporter
 const createTransporter = () => {
   return nodemailer.createTransport({
@@ -24,12 +26,36 @@ const sendEmail = async (options) => {
   try {
     const transporter = createTransporter();
 
+    const normalizedHtml = String(options.html || '');
+    const normalizedText = String(options.text || '');
+
+    const htmlWithSiteLink = normalizedHtml
+      ? (() => {
+          if (normalizedHtml.includes(JAMROOM_SITE_URL)) {
+            return normalizedHtml;
+          }
+
+          const siteBlock = `<div style="margin-top:16px;color:#4b5563;font-size:13px;">Visit JamRoom: <a href="${JAMROOM_SITE_URL}" target="_blank" rel="noopener noreferrer">${JAMROOM_SITE_URL}</a></div>`;
+          if (/<\/body>/i.test(normalizedHtml)) {
+            return normalizedHtml.replace(/<\/body>/i, `${siteBlock}</body>`);
+          }
+
+          return `${normalizedHtml}${siteBlock}`;
+        })()
+      : normalizedHtml;
+
+    const textWithSiteLink = normalizedText
+      ? (normalizedText.includes(JAMROOM_SITE_URL)
+          ? normalizedText
+          : `${normalizedText}\n\nVisit JamRoom: ${JAMROOM_SITE_URL}`)
+      : normalizedText;
+
     const mailOptions = {
       from: `JamRoom <${process.env.EMAIL_USER}>`,
       to: options.to,
       subject: options.subject,
-      text: options.text,
-      html: options.html,
+      text: textWithSiteLink || undefined,
+      html: htmlWithSiteLink || undefined,
       attachments: options.attachments || []
     };
 

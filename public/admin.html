@@ -69,6 +69,7 @@
                 <button class="tab" onclick="switchTab('blocked', this)">🚫 Blocked Times</button>
                 <button class="tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
                 <button class="tab" onclick="switchTab('users', this)">👥 Users</button>
+                <button class="tab" onclick="switchTab('savedQuotations', this)">🧾 Saved Quotations</button>
             </div>
 
             <!-- Bookings Tab -->
@@ -257,16 +258,16 @@
 
                     <h3 class="settings-section-title">🔗 Category Bindings</h3>
                     <div class="settings-highlight-card">
-                        <p class="settings-help-text">Bind compatible categories so users can book them together. Allowed: same rental type, or either side is Per-session.</p>
+                        <p class="settings-help-text">Bind compatible categories in one direction (left to right). Selecting the left category on booking will also include the right category. Allowed: same rental type, or either side is Per-session.</p>
                         <div class="form-grid-3">
                             <div class="form-group">
-                                <label for="bindingCategoryA">Category A</label>
+                                <label for="bindingCategoryA">Primary Category</label>
                                 <select id="bindingCategoryA">
                                     <option value="">Select category</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="bindingCategoryB">Category B</label>
+                                <label for="bindingCategoryB">Included Category</label>
                                 <select id="bindingCategoryB">
                                     <option value="">Select category</option>
                                 </select>
@@ -334,6 +335,17 @@
                         <button type="submit" class="btn btn-warning">Grant Admin Access</button>
                     </form>
                 </div>
+            </div>
+
+            <div id="savedQuotationsTab" class="tab-content">
+                <h2>Saved Quotations</h2>
+                <p class="users-tab-intro">Reusable quotation templates. Templates always pick current catalog rates when reused or sent.</p>
+                <div id="savedQuotationAlert" class="alert"></div>
+                <div class="admin-toolbar">
+                    <button class="btn btn-secondary" onclick="loadSavedQuotations(true)">Refresh</button>
+                    <button class="btn btn-primary" onclick="showQuotationModal()">Create New Quotation</button>
+                </div>
+                <div id="savedQuotationsTable"></div>
             </div>
         </div>
     </div>
@@ -809,6 +821,20 @@
                     <small class="settings-help-text">Use comma, semicolon, space, or new line separated email addresses.</small>
                 </div>
                 <div class="form-group">
+                    <label>Email Delivery</label>
+                    <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+                        <label class="settings-checkbox-label">
+                            <input type="radio" name="quoteEmailDeliveryMode" class="settings-checkbox-input" value="single" checked>
+                            <span class="settings-checkbox-text">Send one email to all recipients in the same thread</span>
+                        </label>
+                        <label class="settings-checkbox-label">
+                            <input type="radio" name="quoteEmailDeliveryMode" class="settings-checkbox-input" value="separate">
+                            <span class="settings-checkbox-text">Send separate individual emails to each recipient</span>
+                        </label>
+                    </div>
+                    <small class="settings-help-text">Use single email when everyone should stay on one thread. Use separate emails when each recipient should receive an individual copy.</small>
+                </div>
+                <div class="form-group">
                     <label for="quoteBookingType">Quotation Label</label>
                     <input type="text" id="quoteBookingType" placeholder="Auto-derived from selected items if left empty">
                     <small class="settings-help-text">You can enter any custom label (for example, "Wedding Event Package"). This label is shown in the generated quotation PDF and sent quote details. If left blank, it is auto-derived from selected items.</small>
@@ -891,6 +917,14 @@
                     <label for="quoteNotes">Notes (optional)</label>
                     <textarea id="quoteNotes" rows="3" placeholder="Any quote notes..."></textarea>
                 </div>
+                <div class="form-group">
+                    <label class="settings-checkbox-label">
+                        <input type="checkbox" id="quoteSaveTemplate" class="settings-checkbox-input">
+                        <span class="settings-checkbox-text">Save this quotation as reusable template</span>
+                    </label>
+                    <input type="text" id="quoteTemplateName" placeholder="Template name (required when saving)" disabled>
+                    <small class="settings-help-text">Template will store selected items and quantities, and always use current catalog rates when reused.</small>
+                </div>
                 <div class="action-row-end">
                     <button type="button" onclick="hideQuotationModal()" class="btn btn-secondary">Cancel</button>
                     <button type="submit" class="btn btn-primary">Send Quotation</button>
@@ -906,6 +940,7 @@
         let currentUser = null;
         let usersManagementData = [];
         let usersManagementById = new Map();
+        let savedQuotationsData = [];
         let adminSettingsData = null;
         let categoryBindingPairs = [];
 
@@ -1214,6 +1249,7 @@
             if (tab === 'blocked') loadBlockedTimes();
             if (tab === 'settings') loadSettings();
             if (tab === 'users') loadUsersManagementList();
+            if (tab === 'savedQuotations') loadSavedQuotations();
         };
 
         // Load statistics
@@ -1254,6 +1290,128 @@
             } catch (error) {
                 tableContainer.innerHTML = `<div class="text-danger">${error.message}</div>`;
             }
+        };
+
+        const getQuotationTemplateItemKey = (item) => {
+            const category = String(item?.category || '').trim().toLowerCase();
+            const name = String(item?.name || '').trim().toLowerCase();
+            const rentalType = String(item?.rentalType || 'inhouse').trim().toLowerCase();
+            return `${category}|${name}|${rentalType}`;
+        };
+
+        const renderSavedQuotationsTable = (items = []) => {
+            const container = document.getElementById('savedQuotationsTable');
+            if (!container) return;
+
+            if (!Array.isArray(items) || items.length === 0) {
+                container.innerHTML = '<p class="text-muted">No saved quotations yet. Save one while sending a quotation.</p>';
+                return;
+            }
+
+            const rows = items.map((item, index) => {
+                const updatedAt = item.updatedAt ? new Date(item.updatedAt).toLocaleString('en-IN') : '-';
+                const itemCount = Array.isArray(item.rentals) ? item.rentals.length : 0;
+                const selectedTypes = Array.isArray(item.selectedTypes)
+                    ? item.selectedTypes.map((type) => String(type || '').toLowerCase()).join(', ')
+                    : '';
+                const labelText = item.rentalTypeLabel || '(Auto label)';
+
+                return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${escapeHtml(item.name || '')}</td>
+                        <td>${escapeHtml(labelText)}</td>
+                        <td>${itemCount}</td>
+                        <td>${escapeHtml(selectedTypes || '-')}</td>
+                        <td>${escapeHtml(updatedAt)}</td>
+                        <td>
+                            <div class="booking-table-actions">
+                                <button type="button" class="btn btn-primary btn-sm" onclick="useSavedQuotationTemplate('${item.id}')">Use</button>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="deleteSavedQuotationTemplate('${item.id}')">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Template Name</th>
+                                <th>Quotation Label</th>
+                                <th>Items</th>
+                                <th>Types</th>
+                                <th>Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        };
+
+        const loadSavedQuotations = async (showLoader = false) => {
+            const container = document.getElementById('savedQuotationsTable');
+            if (!container) return;
+
+            if (showLoader) {
+                container.innerHTML = window.JamRoomUtils?.getSectionLoaderMarkup
+                    ? window.JamRoomUtils.getSectionLoaderMarkup('Loading saved quotations...')
+                    : '<div class="text-muted">Loading saved quotations...</div>';
+            }
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/quotations/saved`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    throw new Error('Failed to load saved quotations');
+                }
+
+                const result = await res.json();
+                savedQuotationsData = Array.isArray(result.quotations) ? result.quotations : [];
+                renderSavedQuotationsTable(savedQuotationsData);
+            } catch (error) {
+                container.innerHTML = `<div class="text-danger">${escapeHtml(error.message)}</div>`;
+            }
+        };
+
+        window.deleteSavedQuotationTemplate = async (templateId) => {
+            const normalizedId = String(templateId || '').trim();
+            if (!normalizedId) return;
+
+            showConfirmationModal(
+                'Delete Saved Quotation',
+                'Are you sure you want to delete this saved quotation template?',
+                'Delete',
+                async () => {
+                    try {
+                        showLoading('Deleting saved quotation...');
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/quotations/saved/${encodeURIComponent(normalizedId)}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const result = await res.json();
+                        if (!res.ok || !result.success) {
+                            throw new Error(result.message || 'Failed to delete saved quotation');
+                        }
+
+                        showSuccessAlert('Saved quotation deleted successfully');
+                        await loadSavedQuotations();
+                    } catch (error) {
+                        showErrorAlert(error.message || 'Failed to delete saved quotation');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
         };
 
         const renderUsersManagementTable = (users) => {
@@ -2347,7 +2505,7 @@
                     <div class="rental-subitem-row">
                         <div>
                             <label class="rental-subitem-label">Binding</label>
-                            <input type="text" class="rental-subitem-input" readonly value="${pair.leftCategory} (${pair.leftRentalType}) ↔ ${pair.rightCategory} (${pair.rightRentalType})">
+                            <input type="text" class="rental-subitem-input" readonly value="${pair.leftCategory} (${pair.leftRentalType}) → ${pair.rightCategory} (${pair.rightRentalType})">
                         </div>
                         <button type="button" class="btn btn-danger btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index})">×</button>
                     </div>
@@ -3048,6 +3206,8 @@
             document.getElementById('quoteUserTypeahead').style.display = 'none';
             document.getElementById('quoteUserTypeahead').classList.add('admin-hidden');
             document.getElementById('quoteIncludeSelectedUser').checked = true;
+            const defaultDeliveryOption = document.querySelector('input[name="quoteEmailDeliveryMode"][value="single"]');
+            if (defaultDeliveryOption) defaultDeliveryOption.checked = true;
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('quoteInhouseDate').value = today;
             document.getElementById('quoteInhouseStartTime').value = '10:00';
@@ -3059,6 +3219,9 @@
             document.getElementById('quoteBookingType').value = '';
             document.getElementById('quoteAdditionalEmails').value = '';
             document.getElementById('quoteNotes').value = '';
+            document.getElementById('quoteSaveTemplate').checked = false;
+            document.getElementById('quoteTemplateName').value = '';
+            document.getElementById('quoteTemplateName').disabled = true;
             document.getElementById('quoteSubtotal').value = '0';
             document.getElementById('quoteTaxAmount').value = '0';
             document.getElementById('quoteTotalAmount').value = '0';
@@ -3071,6 +3234,67 @@
             const pds = document.getElementById('quotePerdayScheduleSection');
             if (inhs) inhs.style.display = '';
             if (pds) pds.style.display = '';
+        };
+
+        const applySavedQuotationTemplateToForm = (template) => {
+            if (!template) return;
+
+            document.getElementById('quoteBookingType').value = String(template.rentalTypeLabel || '').trim();
+            document.getElementById('quoteNotes').value = String(template.notes || '').trim();
+
+            const selectedTypes = Array.isArray(template.selectedTypes)
+                ? template.selectedTypes.map((type) => String(type || '').toLowerCase())
+                : [];
+            if (selectedTypes.length > 0) {
+                const hourly = document.getElementById('quoteTypeHourly');
+                const perday = document.getElementById('quoteTypePerday');
+                const session = document.getElementById('quoteTypeSession');
+                if (hourly) hourly.checked = selectedTypes.includes('inhouse');
+                if (perday) perday.checked = selectedTypes.includes('perday');
+                if (session) session.checked = selectedTypes.includes('persession');
+            }
+
+            const inhouse = template.schedules?.inhouse || {};
+            const perday = template.schedules?.perday || {};
+            document.getElementById('quoteInhouseDate').value = String(inhouse.date || '');
+            document.getElementById('quoteInhouseStartTime').value = String(inhouse.startTime || '');
+            document.getElementById('quoteInhouseEndTime').value = String(inhouse.endTime || '');
+            document.getElementById('quotePerdayStartDate').value = String(perday.startDate || '');
+            document.getElementById('quotePerdayEndDate').value = String(perday.endDate || '');
+            document.getElementById('quotePerdayPickupTime').value = String(perday.pickupTime || '10:00');
+            document.getElementById('quotePerdayReturnTime').value = String(perday.returnTime || '10:00');
+
+            const templateMap = new Map(
+                (Array.isArray(template.rentals) ? template.rentals : [])
+                    .map((item) => [getQuotationTemplateItemKey(item), item])
+            );
+
+            document.querySelectorAll('#quotationRentals input[name="quotationRental"]').forEach((inputEl) => {
+                const rentalData = JSON.parse(decodeURIComponent(inputEl.dataset.rental || '{}'));
+                const key = getQuotationTemplateItemKey(rentalData);
+                const matched = templateMap.get(key);
+
+                inputEl.checked = !!matched;
+
+                if (rentalData?.id) {
+                    const qtyInput = document.getElementById(getQuotationQtyInputId(rentalData.id));
+                    const qtyEnableInput = document.getElementById(getQuotationQtyEnableInputId(rentalData.id));
+                    const quantity = Math.max(1, Number(matched?.quantity || 1));
+
+                    if (qtyEnableInput) {
+                        qtyEnableInput.checked = !!matched && quantity > 1;
+                    }
+
+                    if (qtyInput) {
+                        qtyInput.value = String(quantity);
+                    }
+
+                    syncQuotationQuantityInputState(rentalData.id);
+                }
+            });
+
+            updateQuoteTypeFilter();
+            recalculateQuotationTotals();
         };
 
         const renderQuotationUserTypeahead = (users = []) => {
@@ -3490,6 +3714,18 @@
             }
         }
 
+        window.useSavedQuotationTemplate = async (templateId) => {
+            const selected = savedQuotationsData.find((item) => String(item?.id) === String(templateId));
+            if (!selected) {
+                showErrorAlert('Saved quotation template not found');
+                return;
+            }
+
+            await showQuotationModal();
+            applySavedQuotationTemplateToForm(selected);
+            showSuccessAlert(`Loaded template: ${selected.name || 'Saved quotation'}`);
+        };
+
         function hideQuotationModal() {
             closeModal('quotationModal');
             resetQuotationForm();
@@ -3500,6 +3736,9 @@
             try {
                 const includeSelectedUser = document.getElementById('quoteIncludeSelectedUser').checked;
                 const additionalEmails = parseQuoteEmailListInput(document.getElementById('quoteAdditionalEmails').value || '');
+                const emailDeliveryMode = document.querySelector('input[name="quoteEmailDeliveryMode"]:checked')?.value || 'single';
+                const saveTemplate = document.getElementById('quoteSaveTemplate')?.checked === true;
+                const templateName = String(document.getElementById('quoteTemplateName')?.value || '').trim();
                 const invalidEmails = additionalEmails.filter((email) => !isValidQuoteEmail(email));
                 if (invalidEmails.length > 0) throw new Error(`Invalid email address(es): ${invalidEmails.join(', ')}`);
                 if (includeSelectedUser && !selectedQuotationUser?.email) {
@@ -3507,6 +3746,9 @@
                 }
                 if (!includeSelectedUser && additionalEmails.length === 0) {
                     throw new Error('Provide at least one recipient email.');
+                }
+                if (saveTemplate && !templateName) {
+                    throw new Error('Template name is required when saving quotation template.');
                 }
                 const quoteData = collectQuotationSelectedRentals({ strict: true });
                 const rentalTypes = Array.isArray(createBookingSettings?.rentalTypes) ? createBookingSettings.rentalTypes : [];
@@ -3522,8 +3764,12 @@
                         recipientUserId: selectedQuotationUser?._id || '',
                         includeSelectedUser,
                         additionalEmails,
+                        emailDeliveryMode,
+                        saveTemplate,
+                        templateName,
                         quotation: {
                             rentalType: quoteLabel,
+                            selectedTypes: getSelectedQuoteTypes(),
                             rentals: quoteData.selectedRentals,
                             schedules: {
                                 inhouse: {
@@ -3546,10 +3792,16 @@
                 if (!res.ok || !result.success) throw new Error(result.message || 'Failed to send quotation');
                 hideQuotationModal();
                 const recipientLabel = (result.recipients || []).join(', ');
+                const sentModeLabel = result.emailDeliveryMode === 'separate'
+                    ? 'separately'
+                    : 'in a single email thread';
                 if (result.pdfAttached === false) {
-                    showWarningAlert(`Quotation sent to: ${recipientLabel}. PDF attachment could not be generated.`);
+                    showWarningAlert(`Quotation sent ${sentModeLabel} to: ${recipientLabel}. PDF attachment could not be generated.`);
                 } else {
-                    showSuccessAlert(`Quotation sent to: ${recipientLabel}${result.pdfAttached ? ' (PDF attached)' : ''}`);
+                    showSuccessAlert(`Quotation sent ${sentModeLabel} to: ${recipientLabel}${result.pdfAttached ? ' (PDF attached)' : ''}${result.savedQuotation ? '. Template saved.' : ''}`);
+                }
+                if (result.savedQuotation) {
+                    await loadSavedQuotations();
                 }
             } catch (error) {
                 showErrorAlert(error.message || 'Failed to send quotation');
@@ -4625,6 +4877,17 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
         document.querySelectorAll('.quote-type-checkbox').forEach((cb) => {
             cb.addEventListener('change', updateQuoteTypeFilter);
         });
+
+        const quoteSaveTemplateEl = document.getElementById('quoteSaveTemplate');
+        const quoteTemplateNameEl = document.getElementById('quoteTemplateName');
+        if (quoteSaveTemplateEl && quoteTemplateNameEl) {
+            quoteSaveTemplateEl.addEventListener('change', () => {
+                quoteTemplateNameEl.disabled = !quoteSaveTemplateEl.checked;
+                if (!quoteSaveTemplateEl.checked) {
+                    quoteTemplateNameEl.value = '';
+                }
+            });
+        }
 
         // Quotation schedule input listeners
         ['quoteInhouseDate','quoteInhouseStartTime','quoteInhouseEndTime',

@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "catalog:realign": "node realignBookingCatalog.js",
+    "catalog:realign:apply": "node realignBookingCatalog.js --apply",
     "cleanup:test-users": "node deleteTestUsers.js",
     "cleanup:test-users:apply": "node deleteTestUsers.js --apply"
   },
