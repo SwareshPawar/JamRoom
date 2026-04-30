@@ -3,6 +3,7 @@ const fsSync = require('fs');
 const path = require('path');
 const AdminSettings = require('../models/AdminSettings');
 const { generateUnifiedPDFHTML } = require('./pdfHTMLTemplate');
+const { buildServiceGroupSummary } = require('../public/js/shared/quotation-billing');
 
 // Check if we're in a serverless environment
 const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
@@ -324,192 +325,6 @@ const buildWhatsAppLink = (phoneNumber) => {
   return `https://wa.me/${digits}`;
 };
 
-const normalizeQuotationItemMeta = (item = {}) => {
-  const rawName = String(item?.name || '').trim();
-  const rawCategory = String(item?.category || '').trim();
-  const nameLower = rawName.toLowerCase();
-  const categoryLower = rawCategory.toLowerCase();
-  const searchText = `${nameLower} ${categoryLower}`;
-
-  // Only use 'JamRoom Studio' title when the item NAME itself is the room/studio base item
-  if (/jamroom|jam room/.test(nameLower) || /^studio$/.test(nameLower.trim())) {
-    return {
-      groupKey: 'studio',
-      title: rawName || 'JamRoom Studio',
-      description: 'Professional in-studio room usage with monitoring, setup support, and a comfortable recording environment.',
-      order: 10
-    };
-  }
-
-  if (/bass guitar/.test(searchText)) {
-    return {
-      groupKey: 'studio',
-      title: rawName || 'Bass Guitar',
-      description: 'Live bass instrument support for rehearsals, jams, and recording sessions.',
-      order: 20
-    };
-  }
-
-  if (/keyboard|piano/.test(searchText)) {
-    return {
-      groupKey: 'studio',
-      title: rawName || 'Keyboard',
-      description: 'Keyboard setup for composing, rehearsing, and recording melodic parts.',
-      order: 30
-    };
-  }
-
-  if (/guitar|amp|drum|mic|microphone|monitor|speaker|console|mixer/.test(searchText)) {
-    return {
-      groupKey: 'studio',
-      title: rawName || 'Studio Equipment',
-      description: 'Studio equipment support prepared for tracking, rehearsal, and live session needs.',
-      order: 40
-    };
-  }
-
-  // Items in a "studio" category that didn't match any specific instrument — still bucket into studio group
-  if (/studio/.test(categoryLower)) {
-    return {
-      groupKey: 'studio',
-      title: rawName || 'Studio Service',
-      description: rawCategory
-        ? `${rawCategory} support for your session.`
-        : 'In-studio support for tracking, rehearsal, and recording.',
-      order: 45
-    };
-  }
-
-  if (/composition/.test(searchText)) {
-    return {
-      groupKey: 'production',
-      title: rawName || 'Composition',
-      description: 'Original music composition crafted around your creative brief, mood, and structure.',
-      order: 50
-    };
-  }
-
-  if (/arrangement layering/.test(searchText)) {
-    return {
-      groupKey: 'production',
-      title: rawName || 'Arrangement Enhancement',
-      description: 'Enhancing the music with additional instrument layers and a fuller arrangement.',
-      order: 60
-    };
-  }
-
-  if (/arrangement/.test(searchText)) {
-    return {
-      groupKey: 'production',
-      title: rawName || 'Arrangement',
-      description: 'Structuring and refining the song so the production feels complete and performance-ready.',
-      order: 70
-    };
-  }
-
-  if (/recording|tracking|vocal|editing/.test(searchText)) {
-    return {
-      groupKey: 'production',
-      title: rawName || 'Production Service',
-      description: 'Hands-on recording and production support tailored to the session requirement.',
-      order: 80
-    };
-  }
-
-  if (/stem mastering/.test(searchText)) {
-    return {
-      groupKey: 'finishing',
-      title: rawName || 'Stem Mastering',
-      description: 'Mastering from grouped stems for better tonal control, polish, and release-ready output.',
-      order: 90
-    };
-  }
-
-  if (/mastering/.test(searchText)) {
-    return {
-      groupKey: 'finishing',
-      title: rawName || 'Mastering',
-      description: 'Final polish, loudness balance, and clarity tuning for a release-ready final version.',
-      order: 100
-    };
-  }
-
-  if (/mix/.test(searchText)) {
-    return {
-      groupKey: 'finishing',
-      title: rawName || 'Mixing',
-      description: 'Balancing vocals and instruments for clarity, space, punch, and a polished sound.',
-      order: 110
-    };
-  }
-
-  if (/foley|sound effect|sfx/.test(searchText)) {
-    return {
-      groupKey: 'sound-design',
-      title: rawName || 'Foley / Sound Design',
-      description: 'Custom sound effects and texture creation for scenes, visuals, or storytelling moments.',
-      order: 120
-    };
-  }
-
-  return {
-    groupKey: item?.rentalType === 'persession' ? 'production' : 'studio',
-    title: rawName || 'Custom Service',
-    description: rawCategory
-      ? `${rawCategory} support tailored to your quotation requirements.`
-      : 'Professional audio support tailored to your quotation requirements.',
-    order: 130
-  };
-};
-
-const getQuotationChargeMeta = (item, calculation = {}) => {
-  const rentalType = String(item?.rentalType || 'inhouse').toLowerCase();
-
-  if (rentalType === 'perday') {
-    const perdayDays = Number(calculation.perdayDays || 0);
-    return {
-      billingLabel: `Per Day x ${perdayDays || 1}`,
-      amount: Number(item.price || 0) * Number(item.quantity || 0) * (perdayDays || 1)
-    };
-  }
-
-  if (rentalType === 'persession') {
-    return {
-      billingLabel: 'Flat Session Rate',
-      amount: Number(item.price || 0) * Number(item.quantity || 0)
-    };
-  }
-
-  const inhouseHours = Number(calculation.inhouseDurationHours || 0);
-  return {
-    billingLabel: `Per Hour x ${inhouseHours || 1}`,
-    amount: Number(item.price || 0) * Number(item.quantity || 0) * (inhouseHours || 1)
-  };
-};
-
-const SERVICE_GROUP_META = {
-  studio: {
-    icon: '🎸',
-    title: 'Studio Usage',
-    subtitle: 'Room access, instruments, and in-studio equipment support'
-  },
-  production: {
-    icon: '🎧',
-    title: 'Production Services',
-    subtitle: 'Composition, arrangement, recording, and creative production support'
-  },
-  finishing: {
-    icon: '🎼',
-    title: 'Finishing & Delivery',
-    subtitle: 'Mixing, mastering, and final polish for release-ready output'
-  },
-  'sound-design': {
-    icon: '🎬',
-    title: 'Sound Design',
-    subtitle: 'Foley, textures, and custom effects for cinematic or visual work'
-  }
-};
-
 const buildQuotationPresentationData = (data, settings) => {
   const studioName = settings?.studioName || 'JamRoom';
   const studioEmail = getPrimaryStudioEmail(settings);
@@ -535,45 +350,22 @@ const buildQuotationPresentationData = (data, settings) => {
 
   const inhouseHourlyRate = Number(jamRoomBaseItem?.price || inhouseItems[0]?.price || 0);
 
-  const serviceGroupsMap = new Map();
-
-  (Array.isArray(data?.rentals) ? data.rentals : []).forEach((item) => {
-    const itemMeta = normalizeQuotationItemMeta(item);
-    const chargeMeta = getQuotationChargeMeta(item, data?.calculation || {});
-    const baseGroup = SERVICE_GROUP_META[itemMeta.groupKey] || SERVICE_GROUP_META.production;
-    const existingGroup = serviceGroupsMap.get(itemMeta.groupKey) || {
-      key: itemMeta.groupKey,
-      icon: baseGroup.icon,
-      title: baseGroup.title,
-      subtitle: baseGroup.subtitle,
-      subtotal: 0,
-      items: []
-    };
-
-    existingGroup.items.push({
-      title: itemMeta.title,
-      description: String(item?.description || '').trim() || itemMeta.description,
-      quantity: Number(item?.quantity || 0),
-      rateLabel: formatCurrency(Number(item?.price || 0)),
-      billingLabel: chargeMeta.billingLabel,
-      amountLabel: formatCurrency(chargeMeta.amount),
-      amountValue: chargeMeta.amount,
-      order: itemMeta.order
-    });
-    existingGroup.subtotal += chargeMeta.amount;
-    serviceGroupsMap.set(itemMeta.groupKey, existingGroup);
-  });
-
-  const serviceGroups = Object.keys(SERVICE_GROUP_META)
-    .map((key) => serviceGroupsMap.get(key))
-    .filter(Boolean)
-    .map((group) => ({
-      ...group,
-      subtotalLabel: formatCurrency(group.subtotal),
-      items: group.items
-        .sort((left, right) => left.order - right.order || left.title.localeCompare(right.title))
-        .map(({ order, ...item }) => item)
-    }));
+  const serviceGroups = buildServiceGroupSummary(
+    Array.isArray(data?.rentals) ? data.rentals : [],
+    data?.calculation || {}
+  ).map((group) => ({
+    ...group,
+    subtotalLabel: formatCurrency(group.subtotal),
+    items: group.items.map((item) => ({
+      title: item.title,
+      description: item.description,
+      quantity: item.quantity,
+      rateLabel: formatCurrency(item.rate),
+      billingLabel: item.billingLabel,
+      amountLabel: formatCurrency(item.amount),
+      amountValue: item.amount
+    }))
+  }));
 
   const bookingTerms = [
     '50% advance payment is required to confirm and block your booking slot.',

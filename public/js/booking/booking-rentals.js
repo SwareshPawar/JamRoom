@@ -107,6 +107,14 @@ const renderBookingModeOptions = () => {
 
 const getMapForMode = (mode) => mode === 'perday' ? perdaySelectedRentals : hourlySelectedRentals;
 
+const normalizeMaxQuantity = (value, fallback = 10) => {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+    return Math.min(100, parsed);
+};
+
+const getRentalMaxQuantity = (item, fallback = 10) => normalizeMaxQuantity(item?.maxQuantity, fallback);
+
 const setActiveSelectionMap = () => {
     selectedRentals = getMapForMode(currentBookingMode);
 };
@@ -118,7 +126,9 @@ const buildSelectedRentalEntry = (item, rentalKey, quantity = 1) => ({
     description: item.description,
     basePrice: item.price,
     price: item.price,
-    quantity,
+    quantity: Math.max(1, Math.min(getRentalMaxQuantity(item), Number(quantity) || 1)),
+    maxQuantity: getRentalMaxQuantity(item),
+    quantityEnabled: item.quantityEnabled === true,
     isRequired: !!item.isRequired,
     rentalType: item.rentalType,
     perdayPrice: item.rentalType === 'perday' ? item.price : 0
@@ -130,12 +140,7 @@ const normalizeDraftQuantityForItem = (item, rawQuantity) => {
         return 1;
     }
 
-    const maxLimits = {
-        'JamRoom__Microphone': 4,
-        'JamRoom__Audio Jacks': 4
-    };
-
-    const maxLimit = maxLimits[item.key] || 99;
+    const maxLimit = getRentalMaxQuantity(item);
     return Math.max(1, Math.min(maxLimit, baseQuantity));
 };
 
@@ -604,6 +609,15 @@ const setPerDayInputConstraints = () => {
 
     const today = getTodayDateString();
     startInput.min = today;
+
+    if (!startInput.value) {
+        startInput.value = today;
+    }
+
+    if (!endInput.value) {
+        endInput.value = startInput.value || today;
+    }
+
     endInput.min = startInput.value || today;
 
     if (endInput.value && startInput.value && endInput.value < startInput.value) {
@@ -671,6 +685,8 @@ const setPerDayInputConstraints = () => {
 };
 
 const isQuantityControlEnabled = (item) => {
+    if (item?.quantityEnabled === true) return true;
+    if (item?.quantityEnabled === false) return false;
     if (item.isRequired) return false;
     if (item.rentalType === 'perday') return true;
     if (item.rentalType === 'persession') return true;
@@ -878,7 +894,9 @@ const categorizeRentalItems = () => {
                 description: type.description || 'Base room booking',
                 price: toNumber(type.basePrice, 0),
                 rentalType: categoryRentalType,
-                isRequired: false
+                isRequired: false,
+                quantityEnabled: type.quantityEnabled === true,
+                maxQuantity: getRentalMaxQuantity(type)
             });
         }
 
@@ -891,7 +909,9 @@ const categorizeRentalItems = () => {
                     description: type.description || `${typeName} rental`,
                     price: toNumber(type.basePrice, 0),
                     rentalType: categoryRentalType,
-                    isRequired: false
+                    isRequired: false,
+                    quantityEnabled: type.quantityEnabled === true,
+                    maxQuantity: getRentalMaxQuantity(type)
                 });
             }
 
@@ -913,7 +933,9 @@ const categorizeRentalItems = () => {
                 description: subItem.description || type.description || '',
                 price,
                 rentalType: categoryRentalType,
-                isRequired: false
+                isRequired: false,
+                quantityEnabled: subItem.quantityEnabled === true,
+                maxQuantity: getRentalMaxQuantity(subItem, getRentalMaxQuantity(type))
             };
 
             if (categoryMode === 'perday') {
@@ -1095,7 +1117,12 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
 
 const updateQuantity = (rentalKey, change, mode = 'hourly') => {
     const selectedMap = getMapForMode(mode);
-    if (!selectedMap.has(rentalKey)) return;
+    if (!selectedMap.has(rentalKey)) {
+        const catalogItem = rentalCatalog[mode]?.get(rentalKey);
+        const itemName = catalogItem?.name || 'this item';
+        showAlert(`Please select ${itemName} before changing quantity.`, 'warning');
+        return;
+    }
 
     const rental = selectedMap.get(rentalKey);
     if (rental.isRequired) return;
@@ -1104,13 +1131,17 @@ const updateQuantity = (rentalKey, change, mode = 'hourly') => {
         return;
     }
 
-    const maxLimits = {
-        'JamRoom__Microphone': 4,
-        'JamRoom__Audio Jacks': 4
-    };
+    const maxLimit = getRentalMaxQuantity(rental);
+    const requestedQuantity = (Number(rental.quantity) || 1) + change;
+    if (change > 0 && requestedQuantity > maxLimit) {
+        showAlert(`Maximum quantity for ${rental.name} is ${maxLimit}.`, 'warning');
+    }
 
-    const maxLimit = maxLimits[rentalKey] || 99;
-    const newQuantity = Math.max(1, Math.min(maxLimit, rental.quantity + change));
+    const newQuantity = Math.max(1, Math.min(maxLimit, requestedQuantity));
+    if (newQuantity === rental.quantity) {
+        return;
+    }
+
     rental.quantity = newQuantity;
 
     const rentalDiv = document.querySelector(`[data-rental-id="${rentalKey}"][data-rental-mode="${mode}"]`);

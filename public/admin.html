@@ -15,6 +15,7 @@
     <script src="/js/shared/auth.js"></script>
     <script src="/js/shared/tabs.js"></script>
     <script src="/js/shared/data.js"></script>
+    <script src="/js/shared/quotation-billing.js"></script>
     <script src="/js/shared/navigation.js"></script>
     
     <!-- Client-side PDF Generation -->
@@ -846,7 +847,7 @@
                         </label>
                         <label class="settings-checkbox-label">
                             <input type="checkbox" id="quoteTypeSession" class="settings-checkbox-input quote-type-checkbox" value="persession" checked>
-                            <span class="settings-checkbox-text">🎯 <strong>Per Session / Event</strong><span style="color:#4b5563;font-weight:400;"> — Flat rate per project, concert, show, or event timeline</span></span>
+                            <span class="settings-checkbox-text">🎯 <strong>Per Event / Project</strong><span style="color:#4b5563;font-weight:400;"> — Flat rate per show, party, event, or project scope</span></span>
                         </label>
                     </div>
                     <small class="settings-help-text">Uncheck a type to hide those items and their schedule fields from this quotation.</small>
@@ -917,6 +918,11 @@
                         <span class="settings-checkbox-text">Save this quotation as reusable template</span>
                     </label>
                     <input type="text" id="quoteTemplateName" placeholder="Template name (required when saving)" disabled>
+                    <label class="settings-checkbox-label" style="margin-top:8px;">
+                        <input type="checkbox" id="quoteUpdateLoadedTemplate" class="settings-checkbox-input" disabled>
+                        <span class="settings-checkbox-text">Update loaded quotation template</span>
+                    </label>
+                    <small id="quoteLoadedTemplateInfo" class="settings-help-text" style="display:none;"></small>
                     <small class="settings-help-text">Template will store selected items and quantities, and always use current catalog rates when reused.</small>
                 </div>
                 <div class="action-row-end">
@@ -1991,7 +1997,7 @@
         document.getElementById('settingsForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const rentalTypes = getCurrentRentalTypes();
+            const rentalTypes = getCurrentRentalTypes({ strictValidation: true, showValidationAlert: true });
             
             // Check for validation errors
             if (rentalTypes === null) {
@@ -2363,6 +2369,13 @@
                             <input type="number" value="${normalizeSettingsMaxQuantity(sub.maxQuantity)}" data-rental="${index}" data-subitem="${subIndex}" data-field="maxQuantity"
                                    class="rental-subitem-input" min="1" max="100" placeholder="10">
                         </div>
+                        <div>
+                            <label class="rental-subitem-label">Allow Quantity</label>
+                            <label class="settings-checkbox-label" style="margin-top:6px;">
+                                <input type="checkbox" data-rental="${index}" data-subitem="${subIndex}" data-field="quantityEnabled" class="settings-checkbox-input" ${sub.quantityEnabled ? 'checked' : ''}>
+                                <span class="settings-checkbox-text">Enable Qty selector</span>
+                            </label>
+                        </div>
                         <button type="button" onclick="removeSubItem(${index}, ${subIndex})" class="btn btn-danger btn-sm rental-subitem-remove">×</button>
                     </div>
                     `;
@@ -2406,6 +2419,13 @@
                                     <label class="rental-type-label">Max Quantity</label>
                                     <input type="number" value="${normalizeSettingsMaxQuantity(rental.maxQuantity)}" data-field="categoryMaxQuantity" onchange="updateRentalType(${index}, 'maxQuantity', parseInt(this.value))"
                                            class="rental-type-input" min="1" max="100" placeholder="10">
+                                </div>
+                                <div>
+                                    <label class="rental-type-label">Allow Quantity</label>
+                                    <label class="settings-checkbox-label" style="margin-top:8px;">
+                                        <input type="checkbox" data-field="categoryQuantityEnabled" class="settings-checkbox-input" ${rental.quantityEnabled ? 'checked' : ''}>
+                                        <span class="settings-checkbox-text">Enable Qty selector</span>
+                                    </label>
                                 </div>
                                 <button type="button" onclick="removeRentalType(${index})" class="btn btn-danger rental-type-remove">Remove</button>
                             </div>
@@ -2631,7 +2651,8 @@
                 description: '',
                 price: 0,
                 perdayPrice: 0,
-                maxQuantity: 10
+                maxQuantity: 10,
+                quantityEnabled: false
             });
 
             loadRentalTypes(currentData);
@@ -2682,6 +2703,7 @@
                 basePrice: 0,
                 description: '',
                 maxQuantity: 10,
+                quantityEnabled: false,
                 subItems: []
             });
             loadRentalTypes(currentData);
@@ -2703,15 +2725,70 @@
         }
 
         function updateCategoryRentalType(index, value) {
-            const currentData = getCurrentRentalTypes();
-            if (!currentData[index]) return;
-            currentData[index].rentalType = value || 'inhouse';
-            loadRentalTypes(currentData);
+            const rentalCard = document.querySelector(`.rental-type-card[data-rental-index="${index}"]`);
+            if (!rentalCard) return;
+
+            const normalizedRentalType = String(value || 'inhouse').trim().toLowerCase();
+            const categoryRentalType = ['perday', 'persession'].includes(normalizedRentalType) ? normalizedRentalType : 'inhouse';
+
+            const categoryRentalTypeSelect = rentalCard.querySelector('select[data-field="categoryRentalType"]');
+            if (categoryRentalTypeSelect) {
+                categoryRentalTypeSelect.value = categoryRentalType;
+            }
+
+            // Keep current view intact: update sub-item fields without rebuilding the full list.
+            rentalCard.querySelectorAll('.rental-subitem-row').forEach((row) => {
+                const rentalTypeInput = row.querySelector('input[readonly].rental-subitem-input');
+                const hourlyPriceField = row.querySelector('.hourly-price-field');
+                const hourlyPriceInput = hourlyPriceField?.querySelector('input[data-field="price"]');
+                const hourlyPriceLabel = hourlyPriceField?.querySelector('.hourly-price-label');
+                const perdayPriceField = row.querySelector('.perday-price-field');
+                const perdayPriceInput = perdayPriceField?.querySelector('input[data-field="perdayPrice"]');
+
+                if (rentalTypeInput) {
+                    rentalTypeInput.value = categoryRentalType === 'perday'
+                        ? 'Per-day'
+                        : categoryRentalType === 'persession'
+                            ? 'Per-session'
+                            : 'In-house';
+                }
+
+                const isPerday = categoryRentalType === 'perday';
+
+                if (hourlyPriceInput) {
+                    hourlyPriceInput.classList.toggle('rental-subitem-input-muted', isPerday);
+                    hourlyPriceInput.placeholder = isPerday ? 'Not used' : '';
+                }
+
+                if (hourlyPriceLabel) {
+                    hourlyPriceLabel.innerHTML = categoryRentalType === 'persession'
+                        ? 'Price (₹/session) <span class="price-flag price-flag-active">(active)</span>'
+                        : isPerday
+                            ? 'Price (₹/hr) <span class="price-flag price-flag-inactive">(not used for per-day)</span>'
+                            : 'Price (₹/hr) <span class="price-flag price-flag-active">(active)</span>';
+                }
+
+                if (perdayPriceField) {
+                    perdayPriceField.classList.toggle('admin-hidden', !isPerday);
+                }
+
+                // Auto-seed per-day prices to avoid validation loops after switching to per-day.
+                if (isPerday && perdayPriceInput) {
+                    const currentPerday = parseInt(perdayPriceInput.value, 10) || 0;
+                    if (currentPerday <= 0) {
+                        const hourlyValue = parseInt(hourlyPriceInput?.value, 10) || 0;
+                        perdayPriceInput.value = String(Math.max(1, hourlyValue || 1));
+                    }
+                }
+            });
+
+            refreshBindingMenu();
         }
         
-        function getCurrentRentalTypes() {
+        function getCurrentRentalTypes({ strictValidation = false, showValidationAlert = false } = {}) {
             const container = document.getElementById('rentalTypesContainer');
             const rentalTypes = [];
+            let firstValidationError = '';
 
             const normalizeSettingsMaxQuantity = (value) => {
                 const parsed = parseInt(value, 10);
@@ -2724,12 +2801,14 @@
                 const nameInput = div.querySelector('input[data-field="categoryName"]');
                 const priceInput = div.querySelector('input[data-field="categoryBasePrice"]');
                 const maxQuantityInput = div.querySelector('input[data-field="categoryMaxQuantity"]');
+                const quantityEnabledInput = div.querySelector('input[data-field="categoryQuantityEnabled"]');
                 const descInput = div.querySelector('textarea[data-field="categoryDescription"]');
                 const categoryRentalTypeSelect = div.querySelector('select[data-field="categoryRentalType"]');
                 
                 const name = nameInput?.value?.trim();
                 const basePrice = parseInt(priceInput?.value) || 0;
                 const maxQuantity = normalizeSettingsMaxQuantity(maxQuantityInput?.value);
+                const quantityEnabled = quantityEnabledInput?.checked === true;
                 const description = descInput?.value?.trim();
                 const categoryRentalType = categoryRentalTypeSelect?.value || 'inhouse';
                 
@@ -2745,13 +2824,18 @@
                         const subPriceInput = subDiv.querySelector('input[data-field="price"]');
                         const subPerdayPriceInput = subDiv.querySelector('input[data-field="perdayPrice"]');
                         const subMaxQuantityInput = subDiv.querySelector('input[data-field="maxQuantity"]');
+                        const subQuantityEnabledInput = subDiv.querySelector('input[data-field="quantityEnabled"]');
                         
                         const subName = subNameInput?.value?.trim() || '';
                         const subDesc = subDescInput?.value?.trim() || '';
                         const subPrice = parseInt(subPriceInput?.value) || 0;
                         const subRentalType = categoryRentalType;
-                        const subPerdayPrice = parseInt(subPerdayPriceInput?.value) || 0;
+                        const rawPerdayPrice = parseInt(subPerdayPriceInput?.value) || 0;
                         const subMaxQuantity = normalizeSettingsMaxQuantity(subMaxQuantityInput?.value);
+                        const subQuantityEnabled = subQuantityEnabledInput?.checked === true;
+                        const subPerdayPrice = subRentalType === 'perday'
+                            ? Math.max(1, rawPerdayPrice || subPrice || 1)
+                            : rawPerdayPrice;
                         
                         // Only save sub-items that have at least a name
                         if (subName) {
@@ -2760,16 +2844,19 @@
                                 description: subDesc,
                                 price: subPrice,
                                 rentalType: subRentalType,
-                                maxQuantity: subMaxQuantity
+                                maxQuantity: subMaxQuantity,
+                                quantityEnabled: subQuantityEnabled
                             };
                             
                             // Add per-day price only for perday rentals
                             if (subRentalType === 'perday') {
                                 subItem.perdayPrice = subPerdayPrice;
                                 // Validate per-day price
-                                if (!subPerdayPrice || subPerdayPrice <= 0) {
-                                    alert(`⚠️ Per-day item "${subName}" must have a per-day price greater than 0`);
-                                    return null; // Stop form submission
+                                if (!Number.isFinite(subPerdayPrice) || subPerdayPrice <= 0) {
+                                    if (!firstValidationError) {
+                                        firstValidationError = `Per-day item "${subName}" must have a per-day price greater than 0`;
+                                    }
+                                    return;
                                 }
                             } else {
                                 // For in-house items, allow price of 0 (free items like mics, jacks)
@@ -2789,6 +2876,7 @@
                         name,
                         basePrice,
                         maxQuantity,
+                        quantityEnabled,
                         rentalType: categoryRentalType,
                         description: description || ''
                     };
@@ -2801,6 +2889,13 @@
                     rentalTypes.push(rental);
                 }
             });
+
+            if (strictValidation && firstValidationError) {
+                if (showValidationAlert) {
+                    alert(`⚠️ ${firstValidationError}`);
+                }
+                return null;
+            }
             
             return rentalTypes;
         }
@@ -2820,6 +2915,8 @@
         let quoteSearchDebounceTimer = null;
         let quoteSearchRequestSeq = 0;
         let quotationUserCache = [];
+        let activeQuotationTemplateId = '';
+        let activeQuotationTemplateName = '';
 
         const clearCreateBookingDraft = () => {
             if (createBookingDraftSaveTimer) {
@@ -2852,7 +2949,8 @@
                         if (!rentalId) return null;
 
                         const qtyEl = document.getElementById(getRentalInputId(rentalId));
-                        const quantity = Math.max(1, parseInt(qtyEl?.value, 10) || 1);
+                        const maxQuantity = normalizeConfiguredMaxQuantity(rentalData?.maxQuantity, 10);
+                        const quantity = Math.max(1, Math.min(maxQuantity, parseInt(qtyEl?.value, 10) || 1));
                         return { id: rentalId, quantity };
                     } catch (error) {
                         return null;
@@ -2940,7 +3038,8 @@
 
                     const qtyInput = document.getElementById(getRentalInputId(rentalId));
                     if (qtyInput && !qtyInput.disabled) {
-                        qtyInput.value = String(draftMap.get(rentalId));
+                        const maxQuantity = normalizeConfiguredMaxQuantity(rentalData?.maxQuantity, 10);
+                        qtyInput.value = String(Math.max(1, Math.min(maxQuantity, draftMap.get(rentalId))));
                     }
                 } catch (error) {
                     // Ignore malformed rental metadata during restore.
@@ -3085,6 +3184,12 @@
 
         const getRentalInputId = (rentalId) => `quantity_${String(rentalId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
+        const normalizeConfiguredMaxQuantity = (value, fallback = 10) => {
+            const parsed = parseInt(value, 10);
+            if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+            return Math.min(100, parsed);
+        };
+
         const buildAdminBookingTypeOptions = (rentalTypes = []) => {
             if (!window.JamRoomUtils || typeof window.JamRoomUtils.buildBookingLabelOptions !== 'function') {
                 return [];
@@ -3195,6 +3300,8 @@
             const form = document.getElementById('quotationForm');
             if (form) form.reset();
             selectedQuotationUsers = [];
+            activeQuotationTemplateId = '';
+            activeQuotationTemplateName = '';
             document.getElementById('quoteUserSearch').value = '';
             document.getElementById('quoteUserTypeahead').style.display = 'none';
             document.getElementById('quoteUserTypeahead').classList.add('admin-hidden');
@@ -3215,6 +3322,16 @@
             document.getElementById('quoteSaveTemplate').checked = false;
             document.getElementById('quoteTemplateName').value = '';
             document.getElementById('quoteTemplateName').disabled = true;
+            const updateLoadedTemplateEl = document.getElementById('quoteUpdateLoadedTemplate');
+            const loadedTemplateInfoEl = document.getElementById('quoteLoadedTemplateInfo');
+            if (updateLoadedTemplateEl) {
+                updateLoadedTemplateEl.checked = false;
+                updateLoadedTemplateEl.disabled = true;
+            }
+            if (loadedTemplateInfoEl) {
+                loadedTemplateInfoEl.style.display = 'none';
+                loadedTemplateInfoEl.textContent = '';
+            }
             document.getElementById('quoteSubtotal').value = '0';
             document.getElementById('quoteTaxAmount').value = '0';
             document.getElementById('quoteTotalAmount').value = '0';
@@ -3423,23 +3540,27 @@
                     const qtyInputId = getQuotationQtyInputId(baseId);
                     const maxQuantity = sanitizeQuotationMaxQuantity(type.maxQuantity);
                     const qtyEnableInputId = getQuotationQtyEnableInputId(baseId);
+                    const quantityEnabled = type.quantityEnabled === true;
                     const encodedBaseData = encodeURIComponent(JSON.stringify({
                         id: baseId, name: `${type.name} (Base)`, category: type.name,
                         price: type.basePrice, perdayPrice: 0, rentalType: categoryRentalType,
                         description: type.description || '', isRequired: false, isBase: true,
-                        maxQuantity
+                        maxQuantity, quantityEnabled
                     }));
                     const basePriceUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
                     html += `<div class="admin-rental-row base">
                         <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedBaseData}">
                         <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}${basePriceUnit}</label>
                         <div class="admin-rental-qty">
-                            <label class="settings-checkbox-label" style="margin-bottom:4px;">
-                                <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
-                                <span class="settings-checkbox-text">Enable Qty</span>
-                            </label>
-                            <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
-                            <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>
+                            ${quantityEnabled
+                                ? `<label class="settings-checkbox-label" style="margin-bottom:4px;">
+                                    <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
+                                    <span class="settings-checkbox-text">Enable Qty</span>
+                                  </label>
+                                  <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
+                                  <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>`
+                                : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
+                            }
                         </div>
                     </div>`;
                 }
@@ -3451,13 +3572,14 @@
                         const isPerday = categoryRentalType === 'perday';
                         const isPerSession = categoryRentalType === 'persession';
                         const maxQuantity = sanitizeQuotationMaxQuantity(subItem.maxQuantity ?? type.maxQuantity);
+                        const quantityEnabled = subItem.quantityEnabled === true;
                         const displayPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
                         const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
                         const encodedRentalData = encodeURIComponent(JSON.stringify({
                             id: itemId, name: subItem.name, category: type.name,
                             price: displayPrice, perdayPrice: subItem.perdayPrice || 0,
                             rentalType: categoryRentalType, description: subItem.description || '',
-                            isRequired: false, isBase: false, maxQuantity
+                            isRequired: false, isBase: false, maxQuantity, quantityEnabled
                         }));
                         html += `<div class="admin-rental-row child">
                             <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedRentalData}">
@@ -3465,12 +3587,15 @@
                                 ${isPerday ? '📅' : isPerSession ? '🎯' : '🔗'} ${escapeHtml(subItem.name)} - ${displayPrice === 0 ? 'FREE' : `₹${displayPrice}${priceUnit}`}
                             </label>
                             <div class="admin-rental-qty">
-                                <label class="settings-checkbox-label" style="margin-bottom:4px;">
-                                    <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
-                                    <span class="settings-checkbox-text">Enable Qty</span>
-                                </label>
-                                <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
-                                <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>
+                                ${quantityEnabled
+                                    ? `<label class="settings-checkbox-label" style="margin-bottom:4px;">
+                                        <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
+                                        <span class="settings-checkbox-text">Enable Qty</span>
+                                      </label>
+                                      <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
+                                      <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>`
+                                    : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
+                                }
                             </div>
                         </div>`;
                     });
@@ -3479,23 +3604,27 @@
                     const qtyInputId = getQuotationQtyInputId(itemId);
                     const qtyEnableInputId = getQuotationQtyEnableInputId(itemId);
                     const maxQuantity = sanitizeQuotationMaxQuantity(type.maxQuantity);
+                    const quantityEnabled = type.quantityEnabled === true;
                     const encodedRentalData = encodeURIComponent(JSON.stringify({
                         id: itemId, name: type.name, category: type.name, price: type.basePrice,
                         perdayPrice: 0, rentalType: categoryRentalType,
                         description: type.description || `${type.name} rental`, isRequired: false, isBase: false,
-                        maxQuantity
+                        maxQuantity, quantityEnabled
                     }));
                     const categoryUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
                     html += `<div class="admin-rental-row child">
                         <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedRentalData}">
                         <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">🔗 ${escapeHtml(type.name)} - ₹${type.basePrice}${categoryUnit}</label>
                         <div class="admin-rental-qty">
-                            <label class="settings-checkbox-label" style="margin-bottom:4px;">
-                                <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
-                                <span class="settings-checkbox-text">Enable Qty</span>
-                            </label>
-                            <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
-                            <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>
+                            ${quantityEnabled
+                                ? `<label class="settings-checkbox-label" style="margin-bottom:4px;">
+                                    <input type="checkbox" id="${qtyEnableInputId}" class="settings-checkbox-input quote-qty-enable" disabled>
+                                    <span class="settings-checkbox-text">Enable Qty</span>
+                                  </label>
+                                  <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1" disabled>
+                                  <small class="settings-help-text" style="display:block;">Max ${maxQuantity}</small>`
+                                : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
+                            }
                         </div>
                     </div>`;
                 }
@@ -3576,9 +3705,10 @@
                 const qtyInput = document.getElementById(getQuotationQtyInputId(rentalData.id));
                 const qtyEnableInput = document.getElementById(getQuotationQtyEnableInputId(rentalData.id));
                 const maxQuantity = sanitizeQuotationMaxQuantity(rentalData.maxQuantity);
+                const quantityEnabled = rentalData.quantityEnabled === true;
                 const qtyEnabled = qtyEnableInput?.checked === true;
                 const rawQty = Math.max(1, Number(qtyInput?.value || 1));
-                const quantity = qtyEnabled ? Math.min(maxQuantity, rawQty) : 1;
+                const quantity = quantityEnabled && qtyEnabled ? Math.min(maxQuantity, rawQty) : 1;
 
                 if (qtyInput) {
                     qtyInput.max = String(maxQuantity);
@@ -3587,7 +3717,7 @@
                 selectedRentals.push({
                     name: rentalData.name, category: rentalData.category || '',
                     description: rentalData.description || '', price: Number(rentalData.price || 0),
-                    quantity, rentalType
+                    quantity, rentalType, quantityEnabled
                 });
             });
             const hasInhouse = selectedRentals.some((item) => item.rentalType === 'inhouse');
@@ -3635,58 +3765,42 @@
 
             const buildRow = (r, billingLabel, itemTotal) => `<tr>
                 <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(r.name)}${r.category ? ` <small style="color:#6b7280;">(${escapeHtml(r.category)})</small>` : ''}</td>
-                <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${r.quantity}</td>
+                ${r.showQtyColumn ? `<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${r.quantity}</td>` : ''}
                 <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">₹${r.price.toFixed(2)}</td>
                 <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${billingLabel}</td>
                 <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">₹${itemTotal.toFixed(2)}</td>
             </tr>`;
 
-            const groupedConfigs = [
-                {
-                    rentalType: 'inhouse',
-                    title: 'Hourly Charges (In-studio, billed per hour)',
-                    getBillingLabel: () => {
-                        const ih = quoteData.inhouseSchedule;
-                        return ih && ih.isValid ? `Per hour x ${ih.durationHours}` : 'Per hour';
-                    },
-                    getItemTotal: (r) => {
-                        const ih = quoteData.inhouseSchedule;
-                        return ih && ih.isValid ? r.price * r.quantity * ih.durationHours : 0;
-                    }
-                },
-                {
-                    rentalType: 'perday',
-                    title: 'Per-Day Rental Charges (Equipment, billed per day)',
-                    getBillingLabel: () => {
-                        const pd = quoteData.perdaySchedule;
-                        return pd && pd.isValid ? `Per day x ${pd.days}` : 'Per day';
-                    },
-                    getItemTotal: (r) => {
-                        const pd = quoteData.perdaySchedule;
-                        return pd && pd.isValid ? r.price * r.quantity * pd.days : 0;
-                    }
-                },
-                {
-                    rentalType: 'persession',
-                    title: 'Per Session / Event Charges (Flat project rate)',
-                    getBillingLabel: () => 'Per session / event',
-                    getItemTotal: (r) => r.price * r.quantity
-                }
-            ];
+            const billingUtils = window.JamRoomQuotationBilling || {};
+            const calculation = {
+                inhouseDurationHours: quoteData.inhouseSchedule?.isValid ? Number(quoteData.inhouseSchedule?.durationHours || 0) : 0,
+                perdayDays: quoteData.perdaySchedule?.isValid ? Number(quoteData.perdaySchedule?.days || 0) : 0
+            };
 
-            const sectionHtml = groupedConfigs.map((group) => {
-                const items = quoteData.selectedRentals
-                    .filter((r) => r.rentalType === group.rentalType)
-                    .sort(sortByNameThenCategory);
+            const groupedServices = typeof billingUtils.buildServiceGroupSummary === 'function'
+                ? billingUtils.buildServiceGroupSummary(quoteData.selectedRentals, calculation)
+                : [];
+
+            const sectionHtml = groupedServices.map((group) => {
+                const items = group.items.slice().sort((a, b) => sortByNameThenCategory(
+                    { name: a.title, category: a.category },
+                    { name: b.title, category: b.category }
+                ));
+                const showQtyColumn = items.some((item) => item.quantityEnabled);
 
                 if (items.length === 0) {
                     return '';
                 }
 
                 const rows = items.map((r) => {
-                    const billingLabel = group.getBillingLabel(r);
-                    const itemTotal = group.getItemTotal(r);
-                    return buildRow(r, billingLabel, itemTotal);
+                    const rowData = {
+                        name: r.title,
+                        category: r.category,
+                        quantity: r.quantity,
+                        price: Number(r.rate || 0),
+                        showQtyColumn
+                    };
+                    return buildRow(rowData, r.billingLabel, Number(r.amount || 0));
                 }).join('');
 
                 return `<section class="quote-summary-group">
@@ -3694,7 +3808,7 @@
                     <table class="quote-summary-table" style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
                         <thead><tr style="background:#f9fafb;">
                             <th style="text-align:left;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Item</th>
-                            <th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Qty</th>
+                            ${showQtyColumn ? '<th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Qty</th>' : ''}
                             <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Rate</th>
                             <th style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Billing</th>
                             <th style="text-align:right;padding:6px 8px;border-bottom:1px solid #e5e7eb;">Amount</th>
@@ -3736,6 +3850,29 @@
 
             await showQuotationModal();
             applySavedQuotationTemplateToForm(selected);
+            activeQuotationTemplateId = String(selected.id || '');
+            activeQuotationTemplateName = String(selected.name || '').trim();
+
+            const updateLoadedTemplateEl = document.getElementById('quoteUpdateLoadedTemplate');
+            const loadedTemplateInfoEl = document.getElementById('quoteLoadedTemplateInfo');
+            const quoteSaveTemplateEl = document.getElementById('quoteSaveTemplate');
+            const quoteTemplateNameEl = document.getElementById('quoteTemplateName');
+
+            if (updateLoadedTemplateEl) {
+                updateLoadedTemplateEl.disabled = false;
+                updateLoadedTemplateEl.checked = true;
+            }
+            if (quoteSaveTemplateEl) {
+                quoteSaveTemplateEl.checked = true;
+            }
+            if (quoteTemplateNameEl) {
+                quoteTemplateNameEl.disabled = false;
+                quoteTemplateNameEl.value = activeQuotationTemplateName;
+            }
+            if (loadedTemplateInfoEl) {
+                loadedTemplateInfoEl.style.display = 'block';
+                loadedTemplateInfoEl.textContent = `Loaded template: ${activeQuotationTemplateName || 'Saved quotation'}. Keep \"Update loaded quotation template\" enabled to overwrite this template.`;
+            }
             showSuccessAlert(`Loaded template: ${selected.name || 'Saved quotation'}`);
         };
 
@@ -3750,13 +3887,17 @@
                 const additionalEmails = parseQuoteEmailListInput(document.getElementById('quoteAdditionalEmails').value || '');
                 const emailDeliveryMode = document.querySelector('input[name="quoteEmailDeliveryMode"]:checked')?.value || 'single';
                 const saveTemplate = document.getElementById('quoteSaveTemplate')?.checked === true;
+                const updateLoadedTemplate = document.getElementById('quoteUpdateLoadedTemplate')?.checked === true;
                 const templateName = String(document.getElementById('quoteTemplateName')?.value || '').trim();
                 const invalidEmails = additionalEmails.filter((email) => !isValidQuoteEmail(email));
                 if (invalidEmails.length > 0) throw new Error(`Invalid email address(es): ${invalidEmails.join(', ')}`);
                 if (selectedQuotationUsers.length === 0 && additionalEmails.length === 0) {
                     throw new Error('Add at least one recipient — search and select a user above, or enter email addresses below.');
                 }
-                if (saveTemplate && !templateName) {
+                if (updateLoadedTemplate && !activeQuotationTemplateId) {
+                    throw new Error('No loaded template selected to update.');
+                }
+                if ((saveTemplate || updateLoadedTemplate) && !templateName) {
                     throw new Error('Template name is required when saving quotation template.');
                 }
                 const quoteData = collectQuotationSelectedRentals({ strict: true });
@@ -3773,8 +3914,9 @@
                         recipientUserIds: selectedQuotationUsers.map((u) => String(u._id)),
                         additionalEmails,
                         emailDeliveryMode,
-                        saveTemplate,
+                        saveTemplate: saveTemplate || updateLoadedTemplate,
                         templateName,
+                        updateTemplateId: updateLoadedTemplate ? activeQuotationTemplateId : '',
                         quotation: {
                             rentalType: quoteLabel,
                             selectedTypes: getSelectedQuoteTypes(),
@@ -4320,6 +4462,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                     const baseId = `${type.name}_base`;
                     const qtyInputId = getRentalInputId(baseId);
                     const isJamRoomBase = type.name === 'JamRoom';
+                    const baseMaxQuantity = normalizeConfiguredMaxQuantity(type.maxQuantity, 10);
                     const encodedBaseData = encodeURIComponent(JSON.stringify({
                         id: baseId,
                         name: `${type.name} (Base)`,
@@ -4329,7 +4472,9 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                         rentalType: categoryRentalType,
                         description: type.description || '',
                         isRequired: false,
-                        isBase: true
+                        isBase: true,
+                        quantityEnabled: type.quantityEnabled === true,
+                        maxQuantity: baseMaxQuantity
                     }));
 
                     const basePriceUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
@@ -4344,8 +4489,10 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                                 <span class="admin-rental-subtext">Base item</span>
                             </label>
                             <div class="admin-rental-qty">
-                                <label for="${qtyInputId}">Qty</label>
-                                <input type="number" id="${qtyInputId}" min="1" max="10" value="1" ${isJamRoomBase ? 'disabled' : ''}>
+                                ${type.quantityEnabled === true
+                                    ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="${baseMaxQuantity}" value="1" ${isJamRoomBase ? 'disabled' : ''}>`
+                                    : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
+                                }
                             </div>
                         </div>
                     `;
@@ -4360,7 +4507,8 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                         const displayPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
                         const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
                         const isFree = displayPrice === 0;
-                        const showQuantityControls = isPerday || isPerSession || isFree || (subItem.name || '').includes('IEM');
+                        const showQuantityControls = subItem.quantityEnabled === true;
+                        const maxQuantity = normalizeConfiguredMaxQuantity(subItem.maxQuantity, normalizeConfiguredMaxQuantity(type.maxQuantity, 10));
 
                         const encodedRentalData = encodeURIComponent(JSON.stringify({
                             id: itemId,
@@ -4371,7 +4519,9 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                             rentalType: categoryRentalType,
                             description: subItem.description || '',
                             isRequired: false,
-                            isBase: false
+                            isBase: false,
+                            quantityEnabled: subItem.quantityEnabled === true,
+                            maxQuantity
                         }));
 
                         const icon = isFree ? '🆓' : (isPerday ? '📅' : isPerSession ? '🎯' : '🔗');
@@ -4393,7 +4543,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                                 </label>
                                 <div class="admin-rental-qty">
                                     ${showQuantityControls
-                                        ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="10" value="1">`
+                                        ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1">`
                                         : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
                                     }
                                 </div>
@@ -4412,7 +4562,8 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                         rentalType: categoryRentalType,
                         description: type.description || `${type.name} rental`,
                         isRequired: false,
-                        isBase: false
+                        isBase: false,
+                        quantityEnabled: type.quantityEnabled === true
                     }));
 
                     const categoryUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
@@ -4450,16 +4601,14 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental));
                 const quantityElement = document.getElementById(getRentalInputId(rentalData.id));
                 const rawQuantity = parseInt(quantityElement?.value, 10) || 1;
-                const isPerday = rentalData.rentalType === 'perday';
-                const isPerSession = rentalData.rentalType === 'persession';
-                const isFree = (isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0)) === 0;
-                const isIem = (rentalData.name || '').includes('IEM');
-                const isBase = rentalData.isRequired || String(rentalData.id).includes('_base');
-
-                let effectiveQuantity = rawQuantity;
-                if (!isPerday && !isPerSession && !isFree && !isIem && !isBase) {
-                    effectiveQuantity = 1;
+                const maxQuantity = normalizeConfiguredMaxQuantity(rentalData.maxQuantity, 10);
+                const clampedQuantity = Math.max(1, Math.min(maxQuantity, rawQuantity));
+                if (quantityElement && quantityElement.value !== String(clampedQuantity)) {
+                    quantityElement.value = String(clampedQuantity);
                 }
+                const quantityEnabled = rentalData.quantityEnabled === true;
+                const effectiveQuantity = quantityEnabled ? clampedQuantity : 1;
+                const isPerday = rentalData.rentalType === 'perday';
 
                 const unitPrice = isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0);
 
@@ -4472,7 +4621,9 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                     rentalType: rentalData.rentalType || 'inhouse',
                     description: rentalData.description || '',
                     isRequired: !!rentalData.isRequired,
-                    fullId: rentalData.id
+                    fullId: rentalData.id,
+                    quantityEnabled,
+                    maxQuantity
                 });
             });
 
@@ -4501,6 +4652,43 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 selectedRentals,
                 calculatedSubtotal
             };
+        };
+
+        const enforceCreateRentalQuantityLimits = ({ showFeedback = false } = {}) => {
+            const rentalInputs = document.querySelectorAll('#createBookingRentals input[name="rental"]');
+            let exceededItem = null;
+
+            rentalInputs.forEach((input) => {
+                try {
+                    const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental || ''));
+                    const rentalId = String(rentalData?.id || '').trim();
+                    if (!rentalId) return;
+
+                    const qtyInput = document.getElementById(getRentalInputId(rentalId));
+                    if (!qtyInput || qtyInput.type !== 'number' || qtyInput.disabled) return;
+
+                    const maxQuantity = normalizeConfiguredMaxQuantity(rentalData?.maxQuantity, 10);
+                    qtyInput.max = String(maxQuantity);
+
+                    const parsedValue = parseInt(qtyInput.value, 10);
+                    const normalizedValue = Math.max(1, Math.min(maxQuantity, Number.isFinite(parsedValue) ? parsedValue : 1));
+                    if (String(normalizedValue) !== String(qtyInput.value)) {
+                        qtyInput.value = String(normalizedValue);
+                        if (!exceededItem && Number.isFinite(parsedValue) && parsedValue > maxQuantity) {
+                            exceededItem = {
+                                name: rentalData?.name || 'item',
+                                maxQuantity
+                            };
+                        }
+                    }
+                } catch (error) {
+                    // Ignore malformed rental metadata.
+                }
+            });
+
+            if (showFeedback && exceededItem) {
+                showAlert('', `Maximum quantity for ${exceededItem.name} is ${exceededItem.maxQuantity}.`, 'warning');
+            }
         };
 
         const recalculateCreateBookingTotals = () => {
@@ -4749,11 +4937,13 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
         document.getElementById('createBookingType').addEventListener('change', scheduleCreateBookingDraftSave);
         document.getElementById('createNotes').addEventListener('input', scheduleCreateBookingDraftSave);
         document.getElementById('createBookingRentals').addEventListener('change', () => {
+            enforceCreateRentalQuantityLimits({ showFeedback: false });
             refreshCreateBookingTypeSelect();
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });
         document.getElementById('createBookingRentals').addEventListener('input', () => {
+            enforceCreateRentalQuantityLimits({ showFeedback: true });
             refreshCreateBookingTypeSelect();
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
@@ -4888,8 +5078,29 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
 
         const quoteSaveTemplateEl = document.getElementById('quoteSaveTemplate');
         const quoteTemplateNameEl = document.getElementById('quoteTemplateName');
+        const quoteUpdateLoadedTemplateEl = document.getElementById('quoteUpdateLoadedTemplate');
         if (quoteSaveTemplateEl && quoteTemplateNameEl) {
             quoteSaveTemplateEl.addEventListener('change', () => {
+                const shouldEnableTemplateName = quoteSaveTemplateEl.checked || (quoteUpdateLoadedTemplateEl?.checked === true);
+                quoteTemplateNameEl.disabled = !shouldEnableTemplateName;
+                if (!quoteSaveTemplateEl.checked) {
+                    if (quoteUpdateLoadedTemplateEl?.checked !== true) {
+                        quoteTemplateNameEl.value = '';
+                    }
+                }
+            });
+        }
+        if (quoteUpdateLoadedTemplateEl && quoteSaveTemplateEl && quoteTemplateNameEl) {
+            quoteUpdateLoadedTemplateEl.addEventListener('change', () => {
+                if (quoteUpdateLoadedTemplateEl.checked) {
+                    quoteSaveTemplateEl.checked = true;
+                    quoteTemplateNameEl.disabled = false;
+                    if (!quoteTemplateNameEl.value.trim() && activeQuotationTemplateName) {
+                        quoteTemplateNameEl.value = activeQuotationTemplateName;
+                    }
+                    return;
+                }
+
                 quoteTemplateNameEl.disabled = !quoteSaveTemplateEl.checked;
                 if (!quoteSaveTemplateEl.checked) {
                     quoteTemplateNameEl.value = '';

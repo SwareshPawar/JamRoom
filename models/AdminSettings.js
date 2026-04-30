@@ -26,6 +26,10 @@ const adminSettingsSchema = new mongoose.Schema({
       max: 100,
       default: 10
     },
+    quantityEnabled: {
+      type: Boolean,
+      default: false
+    },
     // Indicates if base price is always charged when category is selected
     alwaysChargeBase: {
       type: Boolean,
@@ -62,6 +66,10 @@ const adminSettingsSchema = new mongoose.Schema({
         min: 1,
         max: 100,
         default: 10
+      },
+      quantityEnabled: {
+        type: Boolean,
+        default: false
       }
     }]
   }],

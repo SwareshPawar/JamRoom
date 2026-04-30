@@ -2136,7 +2136,8 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
           perdayPrice: rentalTypeValue === 'perday' ? rentalPrice : (Number(rental?.perdayPrice) || 0),
           quantity: rentalQuantity,
           rentalType: rentalTypeValue,
-          description: rentalDescription
+          description: rentalDescription,
+          quantityEnabled: rental?.quantityEnabled === true
         });
       }
 
@@ -3349,6 +3350,7 @@ const sanitizeQuotationRentals = (rawRentals = [], settings = null) => {
       description: rentalDescription,
       rentalType,
       quantity: rentalQuantity,
+      quantityEnabled: rental?.quantityEnabled === true,
       price: resolvedPrice,
       priceSnapshot: snapshotPrice
     });
@@ -3531,6 +3533,7 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
     const quotation = req.body?.quotation || {};
     const shouldSaveTemplate = req.body?.saveTemplate === true;
     const saveTemplateName = String(req.body?.templateName || '').trim();
+    const updateTemplateId = String(req.body?.updateTemplateId || '').trim();
 
     const invalidAdditionalEmails = additionalEmails.filter((email) => !isValidEmail(email));
     if (invalidAdditionalEmails.length > 0) {
@@ -3586,7 +3589,7 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
     const selectedTypeLabels = [];
     if (calculation.hasInhouse) selectedTypeLabels.push('In-house');
     if (calculation.hasPerday) selectedTypeLabels.push('Per-day');
-    if (calculation.hasPersession) selectedTypeLabels.push('Per-session');
+    if (calculation.hasPersession) selectedTypeLabels.push('Per-event');
 
     const quotationPresentation = buildQuotationPresentationData({
       rentalTypeLabel,
@@ -3829,9 +3832,27 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
       };
 
       settings.savedQuotations = Array.isArray(settings.savedQuotations) ? settings.savedQuotations : [];
-      settings.savedQuotations.push(templatePayload);
+      if (updateTemplateId) {
+        const targetIndex = settings.savedQuotations.findIndex((item) => String(item?._id) === updateTemplateId);
+        if (targetIndex === -1) {
+          return res.status(404).json({ success: false, message: 'Loaded quotation template not found for update' });
+        }
+
+        const existingTemplate = settings.savedQuotations[targetIndex];
+        settings.savedQuotations[targetIndex] = {
+          ...templatePayload,
+          _id: existingTemplate?._id,
+          createdAt: existingTemplate?.createdAt || templatePayload.createdAt,
+          updatedAt: new Date()
+        };
+      } else {
+        settings.savedQuotations.push(templatePayload);
+      }
       await settings.save();
-      savedQuotation = toSavedQuotationResponse(settings.savedQuotations[settings.savedQuotations.length - 1], settings);
+      const savedTemplate = updateTemplateId
+        ? settings.savedQuotations.find((item) => String(item?._id) === updateTemplateId)
+        : settings.savedQuotations[settings.savedQuotations.length - 1];
+      savedQuotation = toSavedQuotationResponse(savedTemplate, settings);
     }
 
     console.log(`Quotation sent ${emailDeliveryMode === 'separate' ? 'separately' : 'in one email'} to ${recipientEmails.length} recipient(s), PDF: ${pdfBuffer ? 'attached' : 'skipped'}`);

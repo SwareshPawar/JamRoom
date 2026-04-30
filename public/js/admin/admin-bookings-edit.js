@@ -11,6 +11,12 @@
 
     const getEditRentalInputId = (rentalId, deps) => `edit_${deps.getRentalInputId(rentalId)}`;
 
+    const normalizeConfiguredMaxQuantity = (value, fallback = 10) => {
+        const parsed = parseInt(value, 10);
+        if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+        return Math.min(100, parsed);
+    };
+
     const getRentalMatchKey = (name, rentalType = 'inhouse') => {
         return `${String(name || '').trim().toLowerCase()}::${String(rentalType || 'inhouse').trim().toLowerCase()}`;
     };
@@ -52,13 +58,14 @@
                 const isJamRoomBase = type.name === 'JamRoom';
                 const baseKey = getRentalMatchKey(`${type.name} (Base)`, 'inhouse');
                 const matchedBase = existingMap.get(baseKey);
+                const baseMaxQuantity = normalizeConfiguredMaxQuantity(type.maxQuantity, 10);
 
                 if (matchedBase) {
                     usedExistingKeys.add(baseKey);
                 }
 
                 const basePrice = matchedBase ? Number(matchedBase.price || type.basePrice) : type.basePrice;
-                const baseQuantity = Math.max(parseInt(matchedBase?.quantity, 10) || 1, 1);
+                const baseQuantity = Math.max(1, Math.min(baseMaxQuantity, parseInt(matchedBase?.quantity, 10) || 1));
 
                 const encodedBaseData = encodeURIComponent(JSON.stringify({
                     id: baseId,
@@ -69,7 +76,8 @@
                     rentalType: 'inhouse',
                     description: matchedBase?.description || type.description || '',
                     isRequired: false,
-                    isBase: true
+                    isBase: true,
+                    maxQuantity: baseMaxQuantity
                 }));
 
                 const shouldCheckBase = !!matchedBase;
@@ -83,7 +91,7 @@
                         </label>
                         <div class="admin-rental-qty">
                             <label for="${qtyInputId}">Qty</label>
-                            <input type="number" id="${qtyInputId}" min="1" max="10" value="${baseQuantity}" ${isJamRoomBase ? 'disabled' : ''}>
+                            <input type="number" id="${qtyInputId}" min="1" max="${baseMaxQuantity}" value="${baseQuantity}" ${isJamRoomBase ? 'disabled' : ''}>
                         </div>
                     </div>
                 `;
@@ -108,8 +116,10 @@
                     const effectivePrice = matchedRental ? Number(matchedRental.price || defaultPrice) : defaultPrice;
                     const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
                     const isFree = effectivePrice === 0;
-                    const showQuantityControls = isPerday || isPerSession || isFree || (subItem.name || '').includes('IEM');
-                    const quantityValue = Math.max(parseInt(matchedRental?.quantity, 10) || 1, 1);
+                    const quantityEnabled = matchedRental?.quantityEnabled === true || subItem.quantityEnabled === true;
+                    const showQuantityControls = quantityEnabled || isPerday || isPerSession || isFree || (subItem.name || '').includes('IEM');
+                    const maxQuantity = normalizeConfiguredMaxQuantity(subItem.maxQuantity, normalizeConfiguredMaxQuantity(type.maxQuantity, 10));
+                    const quantityValue = Math.max(1, Math.min(maxQuantity, parseInt(matchedRental?.quantity, 10) || 1));
 
                     const encodedRentalData = encodeURIComponent(JSON.stringify({
                         id: itemId,
@@ -121,7 +131,9 @@
                         description: matchedRental?.description || subItem.description || '',
                         isRequired: false,
                         isBase: false,
-                        allowCustomQuantity: isPerday || isFree || (subItem.name || '').includes('IEM')
+                        quantityEnabled,
+                        allowCustomQuantity: isPerday || isFree || (subItem.name || '').includes('IEM'),
+                        maxQuantity
                     }));
 
                     const icon = isFree ? '🆓' : (isPerday ? '📅' : isPerSession ? '🎯' : '🔗');
@@ -143,7 +155,7 @@
                             </label>
                             <div class="admin-rental-qty">
                                 ${showQuantityControls
-                                    ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="10" value="${quantityValue}">`
+                                    ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="${quantityValue}">`
                                     : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
                                 }
                             </div>
@@ -171,6 +183,7 @@
                     description: matchedRental?.description || type.description || '',
                     isRequired: false,
                     isBase: false,
+                    quantityEnabled: matchedRental?.quantityEnabled === true || type.quantityEnabled === true,
                     allowCustomQuantity: false
                 }));
 
@@ -207,7 +220,8 @@
                 const isPerday = String(rental?.rentalType || '').toLowerCase() === 'perday';
                 const effectivePrice = Number(rental?.price || 0);
                 const priceUnit = isPerday ? '/day' : '/hr';
-                const quantityValue = Math.max(parseInt(rental?.quantity, 10) || 1, 1);
+                const maxQuantity = normalizeConfiguredMaxQuantity(rental?.maxQuantity, 100);
+                const quantityValue = Math.max(1, Math.min(maxQuantity, parseInt(rental?.quantity, 10) || 1));
 
                 const encodedRentalData = encodeURIComponent(JSON.stringify({
                     id: itemId,
@@ -219,7 +233,9 @@
                     description: rental?.description || '',
                     isRequired: false,
                     isBase: false,
-                    allowCustomQuantity: true
+                    quantityEnabled: rental?.quantityEnabled === true,
+                    allowCustomQuantity: true,
+                    maxQuantity
                 }));
 
                 html += `
@@ -231,7 +247,7 @@
                         </label>
                         <div class="admin-rental-qty">
                             <label for="${qtyInputId}">Qty</label>
-                            <input type="number" id="${qtyInputId}" min="1" max="10" value="${quantityValue}">
+                            <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="${quantityValue}">
                         </div>
                     </div>
                 `;
@@ -255,14 +271,20 @@
             const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental));
             const quantityElement = document.getElementById(getEditRentalInputId(rentalData.id, deps));
             const rawQuantity = parseInt(quantityElement?.value, 10) || 1;
+            const maxQuantity = normalizeConfiguredMaxQuantity(rentalData.maxQuantity, 10);
+            const clampedQuantity = Math.max(1, Math.min(maxQuantity, rawQuantity));
+            if (quantityElement && quantityElement.value !== String(clampedQuantity)) {
+                quantityElement.value = String(clampedQuantity);
+            }
             const isPerday = rentalData.rentalType === 'perday';
             const isPerSession = rentalData.rentalType === 'persession';
             const isFree = (isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0)) === 0;
             const isIem = (rentalData.name || '').includes('IEM');
             const isBase = rentalData.isRequired || String(rentalData.id).includes('_base');
+            const quantityEnabled = rentalData.quantityEnabled === true;
 
-            let effectiveQuantity = rawQuantity;
-            if (!isPerday && !isPerSession && !isFree && !isIem && !isBase && !rentalData.allowCustomQuantity) {
+            let effectiveQuantity = clampedQuantity;
+            if (!quantityEnabled && !isPerday && !isPerSession && !isFree && !isIem && !isBase && !rentalData.allowCustomQuantity) {
                 effectiveQuantity = 1;
             }
 
@@ -277,6 +299,7 @@
                 rentalType: rentalData.rentalType || 'inhouse',
                 description: rentalData.description || '',
                 isRequired: !!rentalData.isRequired,
+                quantityEnabled,
                 fullId: rentalData.id
             });
         });

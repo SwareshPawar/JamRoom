@@ -3,6 +3,8 @@
  * This generates consistent HTML for both server-side (puppeteer) and client-side (html2pdf) PDF generation
  */
 
+const { buildServiceGroupSummary } = require('../public/js/shared/quotation-billing');
+
 /**
  * Format time from 24-hour to 12-hour format
  * @param {string} time24 - Time in 24-hour format (e.g., "14:30")
@@ -105,36 +107,53 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const { subtotal, taxAmount, adjustmentValue, adjustmentLabel, adjustmentNote, totalAmount } = calculatePricing(booking, settings);
     const safeDuration = Math.max(1, Number(booking.duration) || 1);
 
-    const itemRows = (booking.rentals && booking.rentals.length > 0)
-        ? booking.rentals.map((rental) => {
-            const rentalType = String(rental.rentalType || 'inhouse').toLowerCase();
-            const itemIsPerday = isPerday || rentalType === 'perday';
-            const itemDays = itemIsPerday ? perDayDays : 1;
-            const itemDurationLabel = itemIsPerday ? `${itemDays} day(s)` : `${safeDuration} hr(s)`;
-            const itemRateLabel = itemIsPerday ? `₹${rental.price}/day` : `₹${rental.price}/hr`;
-            const itemAmount = itemIsPerday
-                ? (rental.price * rental.quantity * itemDays)
-                : (rental.price * rental.quantity * safeDuration);
-            const bookingMeta = itemIsPerday
-                ? `${perDayStartLabel} ${formatTime12Hour(booking.startTime)} to ${perDayEndLabel} ${formatTime12Hour(booking.endTime)}`
-                : `${bookingDate.toLocaleDateString('en-IN')} (${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)})`;
+    const billingCalculation = {
+        inhouseDurationHours: isPerday ? 0 : safeDuration,
+        perdayDays: perDayDays
+    };
 
-            return `
-                <tr>
-                    <td>
-                        <strong>${rental.name}</strong>
-                        <br>
-                        <small style="color: #666;">
-                            ${rental.description || 'Studio rental service'}
-                            <br>Booking: ${bookingMeta}
-                        </small>
-                    </td>
-                    <td style="text-align: center;">${rental.quantity}</td>
-                    <td style="text-align: center;">${itemDurationLabel}</td>
-                    <td class="amount-cell">${itemRateLabel}</td>
-                    <td class="amount-cell">₹${itemAmount.toFixed(2)}</td>
-                </tr>
-            `;
+    const groupedServices = (booking.rentals && booking.rentals.length > 0)
+        ? buildServiceGroupSummary(booking.rentals, billingCalculation)
+        : [];
+    const showQtyColumn = groupedServices.some((group) =>
+        Array.isArray(group.items) && group.items.some((item) => item.quantityEnabled === true)
+    );
+
+    const itemRows = (booking.rentals && booking.rentals.length > 0)
+        ? groupedServices.map((group) => {
+            const groupHeader = `
+                <tr class="group-row">
+                    <td colspan="${showQtyColumn ? '5' : '4'}"><strong>${group.title}</strong></td>
+                </tr>`;
+
+            const rows = group.items.map((item) => {
+                const rentalType = String(item.rentalType || 'inhouse').toLowerCase();
+                const bookingMeta = rentalType === 'perday'
+                    ? `${perDayStartLabel} ${formatTime12Hour(booking.startTime)} to ${perDayEndLabel} ${formatTime12Hour(booking.endTime)}`
+                    : `${bookingDate.toLocaleDateString('en-IN')} (${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)})`;
+                const itemRateLabel = rentalType === 'perday'
+                    ? `₹${item.rate}/day`
+                    : (rentalType === 'persession' ? `₹${item.rate}/event` : `₹${item.rate}/hr`);
+
+                return `
+                    <tr>
+                        <td>
+                            <strong>${item.title}</strong>
+                            <br>
+                            <small style="color: #666;">
+                                ${item.description || 'Studio rental service'}
+                                <br>Booking: ${bookingMeta}
+                            </small>
+                        </td>
+                        ${showQtyColumn ? `<td style="text-align: center;">${item.quantity}</td>` : ''}
+                        <td style="text-align: center;">${item.billingLabel}</td>
+                        <td class="amount-cell">${itemRateLabel}</td>
+                        <td class="amount-cell">₹${Number(item.amount || 0).toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            return `${groupHeader}${rows}`;
         }).join('')
         : `
             <tr>
@@ -147,8 +166,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                     </small>
                     ${booking.notes ? `<br><small style="color: #888; font-style: italic;">Note: ${booking.notes}</small>` : ''}
                 </td>
-                <td style="text-align: center;">1</td>
-                <td style="text-align: center;">${safeDuration} hr(s)</td>
+                ${showQtyColumn ? '<td style="text-align: center;">1</td>' : ''}
+                <td style="text-align: center;">Per hour x ${safeDuration}</td>
                 <td class="amount-cell">₹${(booking.price / safeDuration).toFixed(2)}/hr</td>
                 <td class="amount-cell">₹${booking.price.toFixed(2)}</td>
             </tr>
@@ -157,7 +176,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const notesRow = booking.notes && booking.rentals && booking.rentals.length > 0
         ? `
             <tr>
-                <td colspan="5" style="padding-top: 20px; border-top: 1px solid #eee;">
+                <td colspan="${showQtyColumn ? '5' : '4'}" style="padding-top: 20px; border-top: 1px solid #eee;">
                     <strong>Additional Notes:</strong><br>
                     <span style="color: #666; font-style: italic;">${booking.notes}</span>
                 </td>
@@ -434,6 +453,15 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .items-table tbody tr:hover {
             background: var(--bg-accent);
         }
+
+        .items-table .group-row td {
+            background: #eef2ff;
+            color: var(--text-primary);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: 1px solid var(--border-color);
+        }
         
         .amount-cell {
             text-align: right;
@@ -590,8 +618,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
             <thead>
                 <tr>
                     <th>Service Description</th>
-                    <th style="width: 80px; text-align: center;">Qty</th>
-                    <th style="width: 100px; text-align: center;">Duration</th>
+                    ${showQtyColumn ? '<th style="width: 80px; text-align: center;">Qty</th>' : ''}
+                    <th style="width: 120px; text-align: center;">Billing</th>
                     <th style="width: 120px; text-align: right;">Rate</th>
                     <th style="width: 120px; text-align: right;">Amount</th>
                 </tr>

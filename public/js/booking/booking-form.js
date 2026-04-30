@@ -192,14 +192,16 @@ const restoreBookingFormDraft = async () => {
             }
         }
 
+        const today = getTodayDateString();
+
         const perdayStartDateEl = document.getElementById('perdayStartDate');
-        if (perdayStartDateEl && parsedDraft.perdayStartDate) {
-            perdayStartDateEl.value = parsedDraft.perdayStartDate;
+        if (perdayStartDateEl) {
+            perdayStartDateEl.value = today;
         }
 
         const perdayEndDateEl = document.getElementById('perdayEndDate');
-        if (perdayEndDateEl && parsedDraft.perdayEndDate) {
-            perdayEndDateEl.value = parsedDraft.perdayEndDate;
+        if (perdayEndDateEl) {
+            perdayEndDateEl.value = today;
         }
 
         const perdayPickupTimeEl = document.getElementById('perdayPickupTime');
@@ -220,12 +222,12 @@ const restoreBookingFormDraft = async () => {
 
         if (selectedMode === 'hourly') {
             const bookingDateEl = document.getElementById('bookingDate');
-            const selectedDate = String(parsedDraft.bookingDate || '').trim();
-            if (bookingDateEl && selectedDate) {
+            const selectedDate = today;
+            if (bookingDateEl) {
                 bookingDateEl.value = selectedDate;
             }
 
-            if (selectedDate && typeof loadAvailability === 'function') {
+            if (typeof loadAvailability === 'function') {
                 await loadAvailability(selectedDate);
             }
 
@@ -419,9 +421,28 @@ const buildBookingFormPayload = () => {
 const resetBookingFormState = () => {
     const form = document.getElementById('bookingForm');
     const priceDisplay = document.getElementById('priceDisplay');
+    const today = getTodayDateString();
 
     if (form) {
         form.reset();
+    }
+
+    const bookingDateEl = document.getElementById('bookingDate');
+    if (bookingDateEl) {
+        bookingDateEl.value = today;
+        bookingDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    const perdayStartDateEl = document.getElementById('perdayStartDate');
+    if (perdayStartDateEl) {
+        perdayStartDateEl.value = today;
+        perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    const perdayEndDateEl = document.getElementById('perdayEndDate');
+    if (perdayEndDateEl) {
+        perdayEndDateEl.value = today;
+        perdayEndDateEl.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     if (priceDisplay) {
@@ -532,9 +553,9 @@ const bindBookingDateChange = (bookingDateEl) => {
     bookingDateEl.addEventListener('input', onDateChange);
 
     // Some mobile browsers restore form values without firing input/change.
-    if (bookingDateEl.value) {
-        handleDateSelection(bookingDateEl.value.trim());
-    }
+    const initialDate = bookingDateEl.value ? bookingDateEl.value.trim() : getTodayDateString();
+    bookingDateEl.value = initialDate;
+    handleDateSelection(initialDate);
 };
 
 const initBookingFormHandlers = () => {
@@ -574,9 +595,21 @@ const initBookingFormHandlers = () => {
     const bookingDateEl = document.getElementById('bookingDate');
     bindBookingDateChange(bookingDateEl);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDateString();
     if (bookingDateEl) {
         bookingDateEl.setAttribute('min', today);
+        if (!bookingDateEl.value) {
+            bookingDateEl.value = today;
+        }
+    }
+
+    const perdayStartDateEl = document.getElementById('perdayStartDate');
+    const perdayEndDateEl = document.getElementById('perdayEndDate');
+    if (perdayStartDateEl && !perdayStartDateEl.value) {
+        perdayStartDateEl.value = today;
+    }
+    if (perdayEndDateEl && !perdayEndDateEl.value) {
+        perdayEndDateEl.value = today;
     }
 
     refreshBookingTypeOptions();

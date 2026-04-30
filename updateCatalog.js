@@ -30,7 +30,7 @@ const label = (key, val) => `  ${key.padEnd(22)} ${val}`;
 const billingLabel = {
     inhouse:    'Per Hour (in-studio)',
     perday:     'Per Day (rental)',
-    persession: 'Per Session / Event'
+    persession: 'Per Event / Project'
 };
 
 const inrFormat = (n) => n === 0 ? 'FREE' : `₹${n}`;
@@ -301,7 +301,92 @@ const NEW_CATALOG = [
         ],
     },
 
-    // ── 7. Music Production (Per Session) ───────────────────────────────────
+    // ── 7. Sound Equipment Rentals (Per Day) ───────────────────────────────
+    {
+        name:              'Sound Equipment Rentals',
+        description:       'Sound reinforcement equipment available for full-day rental. Ideal for gigs, rehearsals, events, shoots, and off-site productions.',
+        rentalType:        'perday',
+        basePrice:         0,
+        maxQuantity:       12,
+        quantityEnabled:   true,
+        alwaysChargeBase:  false,
+        subItems: [
+            {
+                name:            'Zoom LiveTrak L-12 Digital Mixer',
+                description:     '12-channel digital mixer/recorder for live sound, rehearsal, and production.',
+                price:           0,
+                rentalType:      'perday',
+                perdayPrice:     0,
+                maxQuantity:     1,
+                quantityEnabled: true,
+            },
+            {
+                name:            'QSC CP8 Speaker',
+                description:     'Powered PA speaker suitable for small to medium venue reinforcement.',
+                price:           0,
+                rentalType:      'perday',
+                perdayPrice:     0,
+                maxQuantity:     2,
+                quantityEnabled: true,
+            },
+            {
+                name:            'Microphone',
+                description:     'General-purpose stage/vocal microphone.',
+                price:           0,
+                rentalType:      'perday',
+                perdayPrice:     0,
+                maxQuantity:     5,
+                quantityEnabled: true,
+            },
+            {
+                name:            'Microphone Stand',
+                description:     'Adjustable microphone stand.',
+                price:           0,
+                rentalType:      'perday',
+                perdayPrice:     0,
+                maxQuantity:     2,
+                quantityEnabled: true,
+            },
+            {
+                name:            'Notation Stand',
+                description:     'Music notation/sheet stand.',
+                price:           0,
+                rentalType:      'perday',
+                perdayPrice:     0,
+                maxQuantity:     1,
+                quantityEnabled: true,
+            },
+            {
+                name:            'Speaker Stand',
+                description:     'Tripod speaker stand for PA speakers.',
+                price:           0,
+                rentalType:      'perday',
+                perdayPrice:     0,
+                maxQuantity:     2,
+                quantityEnabled: true,
+            },
+            {
+                name:            'XLR Cable',
+                description:     'Balanced XLR cable for microphones and mixer connections.',
+                price:           0,
+                rentalType:      'perday',
+                perdayPrice:     0,
+                maxQuantity:     12,
+                quantityEnabled: true,
+            },
+            {
+                name:            'Audio Jack / Instrument Cable',
+                description:     'Instrument/audio jack cable for line-level connections.',
+                price:           0,
+                rentalType:      'perday',
+                perdayPrice:     0,
+                maxQuantity:     12,
+                quantityEnabled: true,
+            },
+        ],
+    },
+
+    // ── 8. Music Production (Per Session) ───────────────────────────────────
     {
         name:              'Music Production',
         description:       'Complete music production service. Base charge covers a standard acoustic track — guitar, keyboard, or strings — with digital arrangement and programming. No drums included in base. Additional services can be added per item below.',

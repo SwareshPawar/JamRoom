@@ -8,6 +8,8 @@
     "dev": "nodemon server.js",
     "catalog:realign": "node realignBookingCatalog.js",
     "catalog:realign:apply": "node realignBookingCatalog.js --apply",
+    "catalog:sound:preview": "node applySoundEquipmentCatalog.js",
+    "catalog:sound:apply": "node applySoundEquipmentCatalog.js --apply",
     "cleanup:test-users": "node deleteTestUsers.js",
     "cleanup:test-users:apply": "node deleteTestUsers.js --apply"
   },
