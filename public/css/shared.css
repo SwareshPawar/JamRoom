@@ -206,6 +206,41 @@ body {
     overflow-wrap: anywhere;
 }
 
+.app-brand-address {
+    margin: 0;
+    color: color-mix(in srgb, var(--text-inverse) 96%, transparent);
+    font-size: 0.86rem;
+    font-weight: 500;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.app-header-links {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.84rem;
+    font-weight: 600;
+    width: 100%;
+}
+
+.app-header-links a {
+    color: var(--text-inverse);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+
+.app-header-links a:hover {
+    opacity: 0.9;
+}
+
+.app-header-links span {
+    opacity: 0.85;
+}
+
 .app-greeting {
     margin: 2px 0 0;
     color: color-mix(in srgb, var(--text-inverse) 95%, transparent);
@@ -216,15 +251,23 @@ body {
 
 .app-header-actions {
     display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+}
+
+.app-header-actions-primary {
+    display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
     flex-wrap: wrap;
-    min-width: 0;
 }
 
-.app-header-actions .btn,
-.app-header-actions a {
+.app-header-actions-primary .btn,
+.app-header-actions-primary a {
     margin: 0;
 }
 
@@ -1274,6 +1317,10 @@ textarea:disabled {
         gap: 5px;
     }
 
+    .app-brand-address {
+        font-size: 0.8rem;
+    }
+
     .app-subtitle {
         font-size: 0.82rem;
     }
@@ -1284,14 +1331,21 @@ textarea:disabled {
 
     .app-header-actions {
         width: 100%;
-        justify-content: stretch;
+        align-items: stretch;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .app-header-actions-primary {
+        width: 100%;
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
     }
 
-    .app-header-actions .btn,
-    .app-header-actions a {
+    .app-header-actions-primary .btn,
+    .app-header-actions-primary a {
         width: 100%;
         text-align: center;
         padding: 10px 12px;
@@ -1300,6 +1354,12 @@ textarea:disabled {
         min-width: 0;
         white-space: normal;
         overflow-wrap: anywhere;
+    }
+
+    .app-header-links {
+        justify-content: center;
+        font-size: 0.82rem;
+        gap: 6px;
     }
 
     .main-nav {

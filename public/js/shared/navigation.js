@@ -249,6 +249,10 @@ class NavigationManager {
         const displayName = this.isAuthenticated
             ? this.escapeHtml(this.user?.name || this.user?.email || 'User')
             : '';
+        const showHomeAddress = this.currentPage === 'home';
+        const homeAddressHtml = showHomeAddress
+            ? '<p class="app-brand-address">Zen Business Center, Bhumkar Chowk Rd, Wakad, Pune</p>'
+            : '';
         const greetingHtml = this.isAuthenticated
             ? `<p class="app-greeting">Hi, ${displayName}</p>`
             : '';
@@ -274,10 +278,13 @@ class NavigationManager {
             <div class="app-header">
                 <div class="app-brand">
                     <h1>🎸Swar JamRoom & Music Studio</h1>
+                    ${homeAddressHtml}
                     ${greetingHtml}
                 </div>
                 <div class="app-header-actions">
-                    ${headerActionsHTML}
+                    <div class="app-header-actions-primary">
+                        ${headerActionsHTML}
+                    </div>
                 </div>
             </div>
             <div class="main-nav" role="navigation" aria-label="Primary navigation">

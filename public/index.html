@@ -33,31 +33,16 @@
             <div class="hero">
                 <h2>Book Your Perfect Jam Session</h2>
                 <p>Professional equipment, soundproof rooms, and flexible booking options</p>
+                <div class="hero-quick-links" aria-label="Location and reviews">
+                    <a href="https://www.google.com/maps?um=1&ie=UTF-8&fb=1&gl=in&sa=X&geocode=KQcHWSfEucI7MSXW6zBFUZ9O&daddr=Zen+Business+Center+-+202,+Bhumkar+Chowk+Rd,+above+Cafe+Coffee+Day,+Shankar+Kalat+Nagar,+Wakad,+Pune,+Pimpri-Chinchwad,+Maharashtra+411057" target="_blank" rel="noopener noreferrer">Get Directions</a>
+                    <span aria-hidden="true">|</span>
+                    <a href="https://g.page/r/CSXW6zBFUZ9OEBM/review" target="_blank" rel="noopener noreferrer">Review on Google</a>
+                </div>
             </div>
 
-            <section class="instagram-showcase">
+            <section class="instagram-showcase" id="instagramShowcase" style="display:none;">
                 <h3 class="instagram-title">Studio Instagram Highlights</h3>
-                <div class="instagram-grid">
-                    <div class="instagram-embed-card">
-                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
-                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DH7-xoRNGUa/" data-instgrm-version="14"></blockquote>
-                    </div>
-                    <div class="instagram-embed-card">
-                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
-                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/C4AvvnIvTho/" data-instgrm-version="14"></blockquote>
-                    </div>
-                    <div class="instagram-embed-card">
-                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
-                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DCeQLCmOu7L/" data-instgrm-version="14"></blockquote>
-                    </div>
-                    <div class="instagram-embed-card">
-                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
-                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DNXomqytoXd/" data-instgrm-version="14"></blockquote>
-                    </div>
-                    <div class="instagram-embed-card">
-                        <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
-                        <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/p/DUada26Cfwz/" data-instgrm-version="14"></blockquote>
-                    </div>
+                <div class="instagram-grid" id="instagramGrid">
                 </div>
             </section>
 
@@ -103,6 +88,36 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
+            let hasRequestedInstagramProcess = false;
+
+            // Fetch and render Instagram embeds from admin settings
+            async function loadInstagramEmbeds() {
+                try {
+                    const res = await fetch('/api/bookings/instagram-embeds');
+                    const data = await res.json();
+                    const embeds = Array.isArray(data?.embeds) ? data.embeds : [];
+                    if (!embeds.length) return;
+
+                    const grid = document.getElementById('instagramGrid');
+                    const showcase = document.getElementById('instagramShowcase');
+                    if (!grid || !showcase) return;
+
+                    grid.innerHTML = embeds.map(embed => {
+                        const url = (embed.url || '').trim();
+                        if (!url) return '';
+                        return `<div class="instagram-embed-card">
+                            <div class="instagram-loader"><span class="instagram-loader-spinner"></span><span class="instagram-loader-text">Loading post...</span></div>
+                            <blockquote class="instagram-media" data-instgrm-permalink="${url}" data-instgrm-version="14"></blockquote>
+                        </div>`;
+                    }).join('');
+
+                    showcase.style.display = '';
+                    setupInstagramLoaders();
+                } catch (err) {
+                    console.error('Failed to load Instagram embeds:', err);
+                }
+            }
+
             const setupInstagramLoaders = () => {
                 const embedCards = Array.from(document.querySelectorAll('.instagram-embed-card'));
                 if (!embedCards.length) {
@@ -117,14 +132,26 @@
                     return false;
                 };
 
-                if (!triggerInstagramRender()) {
-                    const processTimer = setInterval(() => {
-                        if (triggerInstagramRender()) {
-                            clearInterval(processTimer);
+                if (!hasRequestedInstagramProcess) {
+                    if (triggerInstagramRender()) {
+                        hasRequestedInstagramProcess = true;
+                    } else {
+                        const embedScript = document.querySelector('script[src*="instagram.com/embed.js"]');
+                        if (embedScript) {
+                            embedScript.addEventListener('load', () => {
+                                if (!hasRequestedInstagramProcess && triggerInstagramRender()) {
+                                    hasRequestedInstagramProcess = true;
+                                }
+                            }, { once: true });
                         }
-                    }, 300);
 
-                    setTimeout(() => clearInterval(processTimer), 5000);
+                        // Single delayed retry to avoid noisy repeated processing calls.
+                        setTimeout(() => {
+                            if (!hasRequestedInstagramProcess && triggerInstagramRender()) {
+                                hasRequestedInstagramProcess = true;
+                            }
+                        }, 900);
+                    }
                 }
 
                 const isEmbedRendered = (card, embed) => {
@@ -212,7 +239,7 @@
                 }, 9000);
             };
 
-            setupInstagramLoaders();
+            loadInstagramEmbeds();
 
             try {
                 const user = await getCurrentUser();

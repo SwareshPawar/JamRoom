@@ -1905,7 +1905,8 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
       slotDuration,
       studioName,
       studioAddress,
-      gstConfig
+      gstConfig,
+      instagramEmbeds
     } = req.body;
 
     let settings = await AdminSettings.findOne();
@@ -1923,6 +1924,7 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
       if (studioName) settings.studioName = studioName;
       if (studioAddress) settings.studioAddress = studioAddress;
       if (gstConfig) settings.gstConfig = gstConfig;
+      if (instagramEmbeds !== undefined) settings.instagramEmbeds = instagramEmbeds;
       
       await settings.save();
     }

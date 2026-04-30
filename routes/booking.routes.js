@@ -901,6 +901,21 @@ router.get('/settings', async (req, res) => {
   }
 });
 
+// @route   GET /api/bookings/instagram-embeds
+// @desc    Get Instagram embed URLs for homepage
+// @access  Public (no auth required)
+router.get('/instagram-embeds', async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+    const embeds = Array.isArray(settings?.instagramEmbeds) ? settings.instagramEmbeds : [];
+    const sorted = [...embeds].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    res.json({ success: true, embeds: sorted });
+  } catch (error) {
+    console.error('Get instagram embeds error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching embeds' });
+  }
+});
+
 // @route   GET /api/bookings/payment-info
 // @desc    Get public payment information (UPI details)
 // @access  Public (no auth required)

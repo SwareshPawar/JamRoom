@@ -170,6 +170,22 @@ const adminSettingsSchema = new mongoose.Schema({
       }
     }]
   },
+  instagramEmbeds: [{
+    url: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    caption: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    order: {
+      type: Number,
+      default: 0
+    }
+  }],
   upiId: {
     type: String,
     default: 'swareshpawar@okicici'

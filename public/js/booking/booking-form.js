@@ -23,7 +23,7 @@ const BOOKING_DRAFT_STORAGE_KEY = 'jamroom_booking_form_draft_v1';
 const BOOKING_DRAFT_MAX_AGE_MS = 1000 * 60 * 60 * 24;
 let bookingDraftSaveTimer = null;
 let isRestoringBookingDraft = false;
-let hasBeforeUnloadDraftBinding = false;
+let hasDraftLifecycleBinding = false;
 
 const parseDraftJSON = (rawValue) => {
     if (!rawValue) return null;
@@ -627,9 +627,14 @@ const initBookingFormHandlers = () => {
         });
     }
 
-    if (!hasBeforeUnloadDraftBinding) {
-        window.addEventListener('beforeunload', saveBookingFormDraft);
-        hasBeforeUnloadDraftBinding = true;
+    if (!hasDraftLifecycleBinding) {
+        window.addEventListener('pagehide', saveBookingFormDraft);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                saveBookingFormDraft();
+            }
+        });
+        hasDraftLifecycleBinding = true;
     }
 };
 

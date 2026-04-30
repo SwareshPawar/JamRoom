@@ -281,6 +281,16 @@
                         <div id="bindingPairsList" class="rental-type-subitems-section"></div>
                     </div>
                     
+                    <!-- Instagram Embeds Section -->
+                    <h3 class="settings-section-title">📸 Homepage Instagram Highlights</h3>
+                    <div class="settings-highlight-card">
+                        <p class="settings-help-text">Add Instagram post/reel URLs to display on the homepage. Paste the post URL (e.g. <code>https://www.instagram.com/p/XXXXXX/</code>). There is no limit on the number of embeds.</p>
+                        <div id="instagramEmbedsContainer">
+                            <!-- embed rows injected here -->
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="addInstagramEmbed()">+ Add Instagram Post</button>
+                    </div>
+
                     <button type="submit" class="btn btn-success">Save Settings</button>
                 </form>
             </div>
@@ -1988,6 +1998,10 @@
                     : [];
 
                 refreshBindingMenu();
+
+                // Load Instagram embeds
+                loadInstagramEmbedsUI(Array.isArray(settings.instagramEmbeds) ? settings.instagramEmbeds : []);
+
             } catch (error) {
                 showAlert('settingsAlert', 'Failed to load settings', 'error');
             }
@@ -2019,7 +2033,8 @@
                     enabled: document.getElementById('gstEnabled').checked,
                     rate: parseFloat(document.getElementById('gstRate').value) / 100 || 0.18, // Convert percentage to decimal
                     displayName: document.getElementById('gstDisplayName').value || 'GST'
-                }
+                },
+                instagramEmbeds: collectInstagramEmbeds()
             };
 
             try {
@@ -2046,6 +2061,57 @@
             const gstDetails = document.getElementById('gstDetails');
             gstDetails.style.display = this.checked ? 'block' : 'none';
         });
+
+        // ── Instagram Embeds Management ──────────────────────────────────────
+        function loadInstagramEmbedsUI(embeds) {
+            const container = document.getElementById('instagramEmbedsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+            const sorted = [...embeds].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+            sorted.forEach((embed, idx) => {
+                container.appendChild(createInstagramEmbedRow(embed.url || '', embed.caption || '', idx));
+            });
+        }
+
+        function createInstagramEmbedRow(url, caption, idx) {
+            const row = document.createElement('div');
+            row.className = 'instagram-embed-row';
+            row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;';
+            row.innerHTML = `
+                <div style="flex:2;min-width:200px;">
+                    <input type="url" class="ig-url" placeholder="https://www.instagram.com/p/..." value="${escapeHtml(url)}"
+                        style="width:100%;padding:6px 10px;border:1px solid var(--border-color,#ddd);border-radius:6px;">
+                </div>
+                <div style="flex:1;min-width:120px;">
+                    <input type="text" class="ig-caption" placeholder="Caption (optional)" value="${escapeHtml(caption)}"
+                        style="width:100%;padding:6px 10px;border:1px solid var(--border-color,#ddd);border-radius:6px;">
+                </div>
+                <button type="button" class="btn btn-sm" style="background:#dc3545;color:#fff;padding:6px 10px;flex-shrink:0;"
+                    onclick="this.closest('.instagram-embed-row').remove()">✕</button>
+            `;
+            return row;
+        }
+
+        function addInstagramEmbed() {
+            const container = document.getElementById('instagramEmbedsContainer');
+            if (!container) return;
+            const rows = container.querySelectorAll('.instagram-embed-row');
+            container.appendChild(createInstagramEmbedRow('', '', rows.length));
+        }
+
+        function collectInstagramEmbeds() {
+            const container = document.getElementById('instagramEmbedsContainer');
+            if (!container) return [];
+            const rows = container.querySelectorAll('.instagram-embed-row');
+            const result = [];
+            rows.forEach((row, idx) => {
+                const url = (row.querySelector('.ig-url')?.value || '').trim();
+                const caption = (row.querySelector('.ig-caption')?.value || '').trim();
+                if (url) result.push({ url, caption, order: idx });
+            });
+            return result;
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         let usersTabDraftSaveTimer = null;
         let registerUserDraftSaveTimer = null;

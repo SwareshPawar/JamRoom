@@ -24,6 +24,27 @@
             line-height: 1.7;
         }
 
+        .hero-quick-links {
+            margin-top: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 0.98rem;
+            font-weight: 600;
+        }
+
+        .hero-quick-links a {
+            color: var(--primary-color-dark);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .hero-quick-links span {
+            color: var(--text-secondary);
+        }
+
         /* Navigation styles are now in shared.css */
         .instagram-showcase {
             margin-bottom: 50px;
@@ -95,6 +116,12 @@
             
             .hero p {
                 font-size: 1em;
+            }
+
+            .hero-quick-links {
+                margin-top: 12px;
+                font-size: 0.9rem;
+                gap: 6px;
             }
             
             .instagram-grid {
