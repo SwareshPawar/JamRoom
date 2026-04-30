@@ -78,12 +78,14 @@
 
 | Script | Purpose | Command |
 |--------|---------|---------|
-| `createEnvFile.js` | Interactive environment setup | `node createEnvFile.js` |
-| `clearDatabase.js` | Clear booking data (or `--all` for complete wipe) | `node clearDatabase.js` |
-| `createTestUsers.js` | Create test accounts | `node createTestUsers.js` |
-| `createAdmin.js` | Create admin account | `node createAdmin.js` |
-| `makeAdmin.js` | Grant admin privileges | `node makeAdmin.js` |
-| `checkDatabase.js` | Verify database status | `node checkDatabase.js` |
+| `scripts/setup/createEnvFile.js` | Interactive environment setup | `node scripts/setup/createEnvFile.js` |
+| `scripts/db/clearDatabase.js` | Clear booking data (or `--all` for complete wipe) | `node scripts/db/clearDatabase.js` |
+| `scripts/setup/createTestUsers.js` | Create test accounts | `node scripts/setup/createTestUsers.js` |
+| `scripts/setup/createAdmin.js` | Create admin account | `node scripts/setup/createAdmin.js` |
+| Admin panel (Users tab) | Grant admin privileges to existing user | `POST /api/admin/make-admin` |
+| `scripts/db/checkDatabase.js` | Verify database status | `node scripts/db/checkDatabase.js` |
+| `scripts/catalog/exportAdminSettingsCatalog.js` | Export current catalog/settings snapshot | `npm run catalog:backup` |
+| `scripts/catalog/restoreAdminSettingsCatalog.js` | Preview or restore catalog snapshot | `npm run catalog:restore:preview` |
 
 ### 🧪 Testing Tools
 - **`/test.html`** - Comprehensive API test suite
@@ -105,11 +107,12 @@ jamroom-booking/
 
 ## 📚 Complete Documentation
 
-📖 **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Step-by-step setup with troubleshooting  
-🚀 **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide  
-📊 **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API reference  
-🏗️ **[SYSTEM_DOCUMENTATION.md](SYSTEM_DOCUMENTATION.md)** - Technical architecture  
-✅ **[TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)** - QA testing procedures
+📖 **[docs/guides/SETUP_GUIDE.md](docs/guides/SETUP_GUIDE.md)** - Step-by-step setup with troubleshooting  
+🚀 **[docs/guides/DEPLOYMENT.md](docs/guides/DEPLOYMENT.md)** - Production deployment guide  
+📊 **[docs/reference/API_DOCUMENTATION.md](docs/reference/API_DOCUMENTATION.md)** - Complete API reference  
+🏗️ **[docs/reference/SYSTEM_DOCUMENTATION.md](docs/reference/SYSTEM_DOCUMENTATION.md)** - Technical architecture  
+✅ **[docs/reference/TESTING_CHECKLIST.md](docs/reference/TESTING_CHECKLIST.md)** - QA testing procedures  
+🗂️ **[docs/operations/CATALOG_BACKUP_WORKFLOW.md](docs/operations/CATALOG_BACKUP_WORKFLOW.md)** - Catalog backup/export/restore workflow
 
 ## 🚦 Quick Start (3 Steps)
 
@@ -121,7 +124,7 @@ jamroom-booking/
 1. **Install & Configure**
    ```bash
    npm install
-   node createEnvFile.js  # Interactive environment setup
+   node scripts/setup/createEnvFile.js  # Interactive environment setup
    ```
 
 2. **Start Server**
@@ -135,8 +138,8 @@ jamroom-booking/
    - **Admin Panel**: http://localhost:5000/admin.html  
    - **Login**: `admin@jamroom.com` / `Admin@123` ⚠️ *Change immediately!*
 
-📖 **Need help?** See [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed instructions  
-🚀 **Ready to deploy?** Check [DEPLOYMENT.md](DEPLOYMENT.md) for production setup
+📖 **Need help?** See [docs/guides/SETUP_GUIDE.md](docs/guides/SETUP_GUIDE.md) for detailed instructions  
+🚀 **Ready to deploy?** Check [docs/guides/DEPLOYMENT.md](docs/guides/DEPLOYMENT.md) for production setup
 
 ## 📊 Complete User Journey
 
@@ -159,12 +162,12 @@ jamroom-booking/
 
 | Script | Purpose | Command |
 |--------|---------|---------|
-| `createEnvFile.js` | Interactive environment setup | `node createEnvFile.js` |
-| `clearDatabase.js` | Clear booking data (or `--all` for complete wipe) | `node clearDatabase.js` |
-| `createTestUsers.js` | Create test accounts | `node createTestUsers.js` |
-| `createAdmin.js` | Create admin account | `node createAdmin.js` |
-| `makeAdmin.js` | Grant admin privileges | `node makeAdmin.js` |
-| `checkDatabase.js` | Verify database status | `node checkDatabase.js` |
+| `scripts/setup/createEnvFile.js` | Interactive environment setup | `node scripts/setup/createEnvFile.js` |
+| `scripts/db/clearDatabase.js` | Clear booking data (or `--all` for complete wipe) | `node scripts/db/clearDatabase.js` |
+| `scripts/setup/createTestUsers.js` | Create test accounts | `node scripts/setup/createTestUsers.js` |
+| `scripts/setup/createAdmin.js` | Create admin account | `node scripts/setup/createAdmin.js` |
+| Admin panel (Users tab) | Grant admin privileges to existing user | `POST /api/admin/make-admin` |
+| `scripts/db/checkDatabase.js` | Verify database status | `node scripts/db/checkDatabase.js` |
 
 ### 🧪 Testing Tools
 - **`/test.html`** - Comprehensive API test suite
@@ -173,11 +176,11 @@ jamroom-booking/
 
 ## 📚 Complete Documentation
 
-📖 **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Step-by-step setup with troubleshooting  
-🚀 **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide  
-📊 **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API reference  
-🏗️ **[SYSTEM_DOCUMENTATION.md](SYSTEM_DOCUMENTATION.md)** - Technical architecture  
-✅ **[TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)** - QA testing procedures
+📖 **[docs/guides/SETUP_GUIDE.md](docs/guides/SETUP_GUIDE.md)** - Step-by-step setup with troubleshooting  
+🚀 **[docs/guides/DEPLOYMENT.md](docs/guides/DEPLOYMENT.md)** - Production deployment guide  
+📊 **[docs/reference/API_DOCUMENTATION.md](docs/reference/API_DOCUMENTATION.md)** - Complete API reference  
+🏗️ **[docs/reference/SYSTEM_DOCUMENTATION.md](docs/reference/SYSTEM_DOCUMENTATION.md)** - Technical architecture  
+✅ **[docs/reference/TESTING_CHECKLIST.md](docs/reference/TESTING_CHECKLIST.md)** - QA testing procedures
 
 ---
 

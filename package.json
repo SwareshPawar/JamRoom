@@ -6,12 +6,15 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "catalog:realign": "node realignBookingCatalog.js",
-    "catalog:realign:apply": "node realignBookingCatalog.js --apply",
-    "catalog:sound:preview": "node applySoundEquipmentCatalog.js",
-    "catalog:sound:apply": "node applySoundEquipmentCatalog.js --apply",
-    "cleanup:test-users": "node deleteTestUsers.js",
-    "cleanup:test-users:apply": "node deleteTestUsers.js --apply"
+    "catalog:realign": "node scripts/catalog/realignBookingCatalog.js",
+    "catalog:realign:apply": "node scripts/catalog/realignBookingCatalog.js --apply",
+    "catalog:sound:preview": "node scripts/catalog/applySoundEquipmentCatalog.js",
+    "catalog:sound:apply": "node scripts/catalog/applySoundEquipmentCatalog.js --apply",
+    "catalog:backup": "node scripts/catalog/exportAdminSettingsCatalog.js",
+    "catalog:restore:preview": "node scripts/catalog/restoreAdminSettingsCatalog.js",
+    "catalog:restore:apply": "node scripts/catalog/restoreAdminSettingsCatalog.js --apply",
+    "cleanup:test-users": "node scripts/setup/deleteTestUsers.js",
+    "cleanup:test-users:apply": "node scripts/setup/deleteTestUsers.js --apply"
   },
   "keywords": [
     "jamroom",

@@ -25,7 +25,7 @@ Results:
 Notes:
 - First forced-status test attempt failed due an already-occupied slot in the chosen time range.
 - Re-ran with unique user/date/time and confirmed forced status behavior passes.
-- Script used: `admin_booking_smoke_test.ps1`
+- Script used: `scripts/tests/admin_booking_smoke_test.ps1`
 
 Pending manual UI verification:
 - [x] Typeahead user picker behavior in Create Booking modal
@@ -539,9 +539,9 @@ JamRoom (1h) + Keyboard Per-day + 3 IEMs
 ## 📝 Documentation Tests
 
 - [ ] README.md complete
-- [ ] SETUP_GUIDE.md clear
-- [ ] DEPLOYMENT.md accurate
-- [ ] API_DOCUMENTATION.md complete
+- [ ] docs/guides/SETUP_GUIDE.md clear
+- [ ] docs/guides/DEPLOYMENT.md accurate
+- [ ] docs/reference/API_DOCUMENTATION.md complete
 - [ ] Code comments present
 - [ ] .env.example up to date
 

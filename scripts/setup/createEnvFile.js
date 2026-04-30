@@ -13,11 +13,11 @@ const createEnvFile = async () => {
   console.log('🔧 JamRoom Environment Setup');
   console.log('============================\n');
 
-  const envPath = path.join(__dirname, '.env');
-  const backendEnvPath = path.join(__dirname, 'backend', '.env');
+  const projectRoot = path.resolve(__dirname, '..', '..');
+  const envPath = path.join(projectRoot, '.env');
 
   // Check if .env already exists
-  if (fs.existsSync(envPath) || fs.existsSync(backendEnvPath)) {
+  if (fs.existsSync(envPath)) {
     console.log('⚠️  .env file already exists!');
     const overwrite = await question('Do you want to overwrite it? (y/N): ');
     if (overwrite.toLowerCase() !== 'y' && overwrite.toLowerCase() !== 'yes') {
@@ -101,21 +101,10 @@ NODE_ENV=${envVars.NODE_ENV}
 # - JWT_SECRET: Keep this secure and random (min 64 characters)
 `;
 
-  // Write to both locations (root and backend)
+  // Write to the project root only
   try {
-    // Write to root directory
     fs.writeFileSync(envPath, envContent);
     console.log(`\n✅ Created .env file: ${envPath}`);
-
-    // Create backend directory if it doesn't exist
-    const backendDir = path.join(__dirname, 'backend');
-    if (!fs.existsSync(backendDir)) {
-      fs.mkdirSync(backendDir, { recursive: true });
-    }
-
-    // Write to backend directory
-    fs.writeFileSync(backendEnvPath, envContent);
-    console.log(`✅ Created .env file: ${backendEnvPath}`);
 
     console.log('\n🎯 ENVIRONMENT SETUP COMPLETE!');
     console.log('────────────────────────────');
@@ -155,7 +144,7 @@ NODE_ENV=${envVars.NODE_ENV}
 
 // Store environment template for reference
 const createEnvTemplate = () => {
-  const templatePath = path.join(__dirname, '.env.example');
+  const templatePath = path.join(path.resolve(__dirname, '..', '..'), '.env.example');
   const templateContent = `# 🎸 JamRoom Environment Variables Template
 # Copy this file to .env and fill in your values
 
@@ -197,9 +186,9 @@ if (args.includes('--template') || args.includes('-t')) {
   console.log('🔧 JamRoom Environment Setup Script');
   console.log('');
   console.log('Usage:');
-  console.log('  node createEnvFile.js          # Interactive setup');
-  console.log('  node createEnvFile.js -t       # Create .env.example template');
-  console.log('  node createEnvFile.js --help   # Show this help');
+  console.log('  node scripts/setup/createEnvFile.js          # Interactive setup');
+  console.log('  node scripts/setup/createEnvFile.js -t       # Create .env.example template');
+  console.log('  node scripts/setup/createEnvFile.js --help   # Show this help');
   console.log('');
   console.log('This script creates the .env file needed for JamRoom to run.');
   console.log('It will ask you for configuration values or use secure defaults.');

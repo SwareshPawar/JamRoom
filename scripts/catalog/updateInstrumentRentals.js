@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const AdminSettings = require('./models/AdminSettings');
+require('dotenv').config();
+const AdminSettings = require('../../models/AdminSettings');
 
 async function updateInstrumentRentals() {
     try {

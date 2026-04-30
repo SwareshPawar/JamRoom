@@ -36,7 +36,7 @@ mongodb://localhost:27017/jamroom
 ### Option A: Interactive Setup (Recommended)
 
 ```bash
-node createEnvFile.js
+node scripts/setup/createEnvFile.js
 ```
 
 This interactive script will:
@@ -238,7 +238,7 @@ The project includes several utility scripts for database management and testing
 
 **1. Environment Setup (NEW!)**
 ```bash
-node createEnvFile.js
+node scripts/setup/createEnvFile.js
 ```
 - Interactive environment variable setup
 - Generates secure JWT secrets automatically
@@ -247,7 +247,7 @@ node createEnvFile.js
 
 **2. Environment Template**
 ```bash
-node createEnvFile.js --template
+node scripts/setup/createEnvFile.js --template
 ```
 - Creates `.env.example` template file
 - Use for reference or manual setup
@@ -256,7 +256,7 @@ node createEnvFile.js --template
 
 **1. Clear Database (Selective)**
 ```bash
-node clearDatabase.js
+node scripts/db/clearDatabase.js
 ```
 - Clears only booking data (bookings, slots, blockedtimes)
 - Preserves users and admin settings
@@ -264,7 +264,7 @@ node clearDatabase.js
 
 **2. Clear All Data (Complete Reset)**
 ```bash
-node clearDatabase.js --all
+node scripts/db/clearDatabase.js --all
 ```
 - Wipes entire database
 - Use for complete fresh installation
@@ -272,7 +272,7 @@ node clearDatabase.js --all
 
 **3. Check Database Status**
 ```bash
-node checkDatabase.js
+node scripts/db/checkDatabase.js
 ```
 - Shows all collections and document counts
 - Verifies database connectivity
@@ -282,7 +282,7 @@ node checkDatabase.js
 
 **4. Create Test Users**
 ```bash
-node createTestUsers.js
+node scripts/setup/createTestUsers.js
 ```
 - Creates pre-configured test accounts:
   - Test User: `testuser@jamroom.com` / `TestUser@123`
@@ -291,25 +291,22 @@ node createTestUsers.js
 
 **5. Create Admin Account**
 ```bash
-node createAdmin.js
+node scripts/setup/createAdmin.js
 ```
 - Creates default admin: `admin@jamroom.com` / `Admin@123`
 - Run after fresh database setup
 - Interactive script with prompts
 
 **6. Grant Admin Rights**
-```bash
-node makeAdmin.js
-```
-- Converts existing user to admin
-- Interactive script - prompts for email
-- Useful for promoting users
+- Use Admin panel -> Users tab to promote an existing user
+- Backend endpoint: `POST /api/admin/make-admin`
+- Requires an authenticated admin session
 
 #### **System Enhancement Scripts**
 
 **7. Update Rental System**
 ```bash
-node updateInstrumentRentals.js
+node scripts/catalog/updateInstrumentRentals.js
 ```
 - Upgrades database for enhanced rental system
 - Creates hierarchical categories
@@ -321,35 +318,35 @@ node updateInstrumentRentals.js
 **For Fresh Setup:**
 ```bash
 # 0. Setup environment variables first!
-node createEnvFile.js
+node scripts/setup/createEnvFile.js
 
 # 1. Clear everything
-node clearDatabase.js --all
+node scripts/db/clearDatabase.js --all
 
 # 2. Start server (creates default settings)
 npm start
 # Stop server (Ctrl+C)
 
 # 3. Create admin account
-node createAdmin.js
+node scripts/setup/createAdmin.js
 
 # 4. Create test users (for testing)
-node createTestUsers.js
+node scripts/setup/createTestUsers.js
 
 # 5. Update to enhanced rental system
-node updateInstrumentRentals.js
+node scripts/catalog/updateInstrumentRentals.js
 
 # 6. Check everything is setup correctly
-node checkDatabase.js
+node scripts/db/checkDatabase.js
 ```
 
 **For Testing/Development:**
 ```bash
 # Clear booking data only (keeps config)
-node clearDatabase.js
+node scripts/db/clearDatabase.js
 
 # Verify clean state
-node checkDatabase.js
+node scripts/db/checkDatabase.js
 
 # Run tests
 # Visit /test.html or /test-modules.html
@@ -358,13 +355,13 @@ node checkDatabase.js
 **For Production Maintenance:**
 ```bash
 # Check database health
-node checkDatabase.js
+node scripts/db/checkDatabase.js
 
 # Clear old bookings if needed
-node clearDatabase.js
+node scripts/db/clearDatabase.js
 
 # Grant admin to new user
-node makeAdmin.js
+# Use Admin panel -> Users tab
 ```
 
 ## 🧪 Testing Tools

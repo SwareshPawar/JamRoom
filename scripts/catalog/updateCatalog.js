@@ -3,8 +3,8 @@
  * JamRoom & Music Studio — Rental Catalog Manager
  *
  * Usage:
- *   node updateCatalog.js           → Preview current catalog + proposed new catalog (no changes)
- *   node updateCatalog.js --apply   → Apply the new catalog to the database
+ *   node scripts/catalog/updateCatalog.js           → Preview current catalog + proposed new catalog (no changes)
+ *   node scripts/catalog/updateCatalog.js --apply   → Apply the new catalog to the database
  *
  * ──────────────────────────────────────────────────────────────
  * REVIEW PRICING BEFORE RUNNING WITH --apply
@@ -17,7 +17,7 @@
 
 const mongoose = require('mongoose');
 require('dotenv').config();
-const AdminSettings = require('./models/AdminSettings');
+const AdminSettings = require('../../models/AdminSettings');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -517,7 +517,7 @@ async function run() {
 
         const settings = await AdminSettings.findOne();
         if (!settings) {
-            console.error('✗ No AdminSettings document found. Run createAdmin.js first.');
+            console.error('✗ No AdminSettings document found. Run node scripts/setup/createAdmin.js first.');
             process.exit(1);
         }
 
@@ -563,7 +563,7 @@ async function run() {
         if (!APPLY) {
             console.log(head('HOW TO APPLY'));
             console.log('  Run with --apply to save the new catalog to the database:');
-            console.log('  node updateCatalog.js --apply\n');
+            console.log('  node scripts/catalog/updateCatalog.js --apply\n');
             console.log('  ⚠  This will REPLACE the existing rentalTypes array.');
             console.log('  ⚠  Review all prices above (especially new instruments)');
             console.log('     before applying.\n');

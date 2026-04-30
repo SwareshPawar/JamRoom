@@ -1,6 +1,6 @@
 # 🧑‍💻 Developer Reference Guide - JamRoom Booking System
 
-> **📌 PURPOSE**: This document serves as the **single source of truth** for naming conventions, architecture patterns, and development standards. **ALWAYS REFERENCE THIS BEFORE ADDING NEW FEATURES** to maintain consistency. For UI phase/progress status, use `DESIGN_UNIFICATION_TRACKER.md` as the canonical tracker.
+> **📌 PURPOSE**: This document serves as the **single source of truth** for naming conventions, architecture patterns, and development standards. **ALWAYS REFERENCE THIS BEFORE ADDING NEW FEATURES** to maintain consistency. For UI phase/progress status, use `docs/plans/DESIGN_UNIFICATION_TRACKER.md` as the canonical tracker.
 
 ---
 
@@ -372,7 +372,7 @@ async function apiCall(endpoint, method = 'GET', data = null) {
 2. **Add middleware** (`protect` for auth, `isAdmin` for admin)
 3. **Use consistent error handling**
 4. **Test with `/test.html`**
-5. **Update API_DOCUMENTATION.md**
+5. **Update docs/reference/API_DOCUMENTATION.md**
 
 #### **Template for New Endpoints**
 ```javascript
@@ -1888,7 +1888,7 @@ const setFormLoading = (formId, loading = true) => {
 
 | Task | Primary File | Secondary Files |
 |------|-------------|----------------|
-| Add new API endpoint | `/routes/[module].routes.js` | Update `/API_DOCUMENTATION.md` |
+| Add new API endpoint | `/routes/[module].routes.js` | Update `docs/reference/API_DOCUMENTATION.md` |
 | Modify database schema | `/models/[Model].js` | Update this reference guide |
 | Add frontend functionality | `/public/[page].html` | Test in `/public/test.html` |
 | Email templates | `/utils/email.js` | `/utils/calendar.js` for invites |

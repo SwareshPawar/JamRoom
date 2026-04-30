@@ -51,13 +51,13 @@
             <div class="info-card info-card-success">
                 <p class="info-text">
                     <strong>✅ Pre-configured:</strong> Test user and admin accounts are set up for automated testing.
-                    <br><small class="info-small">Run <code>node createTestUsers.js</code> to reset test accounts if needed.</small>
+                    <br><small class="info-small">Run <code>node scripts/setup/createTestUsers.js</code> to reset test accounts if needed.</small>
                 </p>
             </div>
             <div class="info-card info-card-warning">
                 <p class="info-text">
                     <strong>⚙️ Environment Setup:</strong> Missing .env file or configuration issues?
-                    <br><small class="info-small">Run <code>node createEnvFile.js</code> for interactive environment setup with secure defaults.</small>
+                    <br><small class="info-small">Run <code>node scripts/setup/createEnvFile.js</code> for interactive environment setup with secure defaults.</small>
                 </p>
             </div>
             <div class="token-status-wrap">
@@ -506,7 +506,7 @@
             showResponse(data);
             
             if (!res.ok) {
-                throw new Error(`Login failed: ${data.message}. Run 'node createTestUsers.js' to create test users.`);
+                throw new Error(`Login failed: ${data.message}. Run 'node scripts/setup/createTestUsers.js' to create test users.`);
             }
             
             userToken = data.token;
@@ -548,11 +548,11 @@
             showResponse(data);
             
             if (!res.ok) {
-                throw new Error(`Admin login failed: ${data.message}. Run 'node createTestUsers.js' to create test users.`);
+                throw new Error(`Admin login failed: ${data.message}. Run 'node scripts/setup/createTestUsers.js' to create test users.`);
             }
             
             if (data.user.role !== 'admin') {
-                throw new Error('User is not an admin - run createTestUsers.js to fix');
+                throw new Error('User is not an admin - run scripts/setup/createTestUsers.js to fix');
             }
             
             adminToken = data.token;

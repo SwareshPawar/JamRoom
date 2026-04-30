@@ -291,7 +291,11 @@
                         <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="addInstagramEmbed()">+ Add Instagram Post</button>
                     </div>
 
-                    <button type="submit" class="btn btn-success">Save Settings</button>
+                    <div class="modal-actions-row">
+                        <button type="submit" class="btn btn-success btn-flex">Save Settings</button>
+                        <button type="button" class="btn btn-secondary btn-flex" onclick="exportCatalogBackupFromAdmin()">Export Catalog Backup</button>
+                    </div>
+                    <small class="settings-help-text">Exports the current settings catalog to <code>backups/catalog/latest-admin-settings-catalog.json</code> plus a timestamped archive file, so you can commit the snapshot when catalog data changes.</small>
                 </form>
             </div>
 
@@ -2055,6 +2059,32 @@
                 showAlert('settingsAlert', error.message, 'error');
             }
         });
+
+        const exportCatalogBackupFromAdmin = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/settings/export-catalog`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to export catalog backup');
+                }
+
+                showAlert(
+                    'settingsAlert',
+                    `Catalog backup exported. Latest: ${data.files.latest}`,
+                    'success'
+                );
+            } catch (error) {
+                showAlert('settingsAlert', error.message, 'error');
+            }
+        };
 
         // GST Configuration Toggle
         document.getElementById('gstEnabled').addEventListener('change', function() {

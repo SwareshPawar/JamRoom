@@ -5,7 +5,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-const AdminSettings = require('./models/AdminSettings');
+const AdminSettings = require('../../models/AdminSettings');
 
 const APPLY = process.argv.includes('--apply');
 const WRITE_BACKUP = APPLY || process.argv.includes('--backup');
@@ -360,7 +360,7 @@ const run = async () => {
 
     if (!APPLY) {
         console.log('\nPreview mode only. No database changes applied.');
-        console.log('Run: node realignBookingCatalog.js --apply');
+        console.log('Run: node scripts/catalog/realignBookingCatalog.js --apply');
         await mongoose.disconnect();
         return;
     }

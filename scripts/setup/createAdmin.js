@@ -1,10 +1,10 @@
-require('dotenv').config({ path: __dirname + '/backend/.env' });
+require('dotenv').config();
 const mongoose = require('mongoose');
-const User = require('./models/User');
+const User = require('../../models/User');
 
 const createAdminUser = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI;
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
     
     if (!mongoUri) {
       console.error('❌ MONGODB_URI not found in environment variables');

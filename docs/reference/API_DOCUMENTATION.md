@@ -25,9 +25,9 @@ Authorization: Bearer <your_jwt_token>
 ### Utility Scripts
 ```bash
 # Setup test environment
-node createTestUsers.js    # Creates test accounts
-node clearDatabase.js      # Clear booking data only
-node checkDatabase.js      # Verify database state
+node scripts/setup/createTestUsers.js    # Creates test accounts
+node scripts/db/clearDatabase.js         # Clear booking data only
+node scripts/db/checkDatabase.js         # Verify database state
 
 # Test credentials (auto-created):
 # User: testuser@jamroom.com / TestUser@123
@@ -1191,4 +1191,4 @@ All endpoints return consistent error responses:
 
 ---
 
-**Need help?** Check the main README.md or SETUP_GUIDE.md
+**Need help?** Check the main README.md or docs/guides/SETUP_GUIDE.md

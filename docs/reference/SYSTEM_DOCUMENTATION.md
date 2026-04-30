@@ -483,13 +483,26 @@ JamRoom/
 ├── 📄 server.js                 # Main app entry
 ├── 📄 package.json             # Dependencies
 ├── 📄 vercel.json              # Vercel config
-├── 📄 SYSTEM_DOCUMENTATION.md  # This file
 ├── 📄 README.md                # Project overview
-├── 📄 API_DOCUMENTATION.md     # API docs
-├── 📄 PROJECT_SUMMARY.md       # Project summary
-├── 📄 SETUP_GUIDE.md           # Setup instructions
-├── 📄 TESTING_CHECKLIST.md     # Testing guide
-├── 📄 DEPLOYMENT.md            # Deployment guide
+├── 📁 docs/
+│   ├── 📁 guides/
+│   │   ├── DEPLOYMENT.md       # Deployment guide
+│   │   ├── SETUP_GUIDE.md      # Setup instructions
+│   │   └── WHATSAPP_SETUP.md   # WhatsApp setup
+│   ├── 📁 operations/
+│   │   └── CATALOG_BACKUP_WORKFLOW.md
+│   ├── 📁 plans/
+│   │   ├── CSS_MIGRATION_PLAN.md
+│   │   ├── DESIGN_UNIFICATION_TRACKER.md
+│   │   ├── NEXT_GEN_JAMROOM_MIGRATION_PLAN.md
+│   │   └── RESTRUCTURING_PLAN.md
+│   ├── 📁 reference/
+│   │   ├── API_DOCUMENTATION.md
+│   │   ├── DEVELOPER_REFERENCE.md
+│   │   ├── SYSTEM_DOCUMENTATION.md
+│   │   └── TESTING_CHECKLIST.md
+│   └── 📁 reports/
+│       └── PDF_FIXES_SUMMARY.md
 │
 ├── 📁 config/
 │   └── db.js                   # MongoDB connection
@@ -514,7 +527,8 @@ JamRoom/
 ├── 📁 utils/
 │   ├── email.js                # Email sending
 │   ├── calendar.js             # Calendar generation
-│   └── upi.js                  # UPI utilities
+│   ├── upi.js                  # UPI utilities
+│   └── catalogBackup.js        # Catalog backup helper
 │
 ├── 📁 public/                  # Frontend files
 │   ├── index.html              # Landing page
@@ -526,11 +540,24 @@ JamRoom/
 │   ├── manifest.webmanifest    # PWA manifest
 │   ├── sw-booking.js           # Service worker for booking assets
 │   └── icons/                  # PWA app icons
-│
-└── 📁 backend/                 # Legacy/backup files
-    ├── api.js                  # Basic API structure
-    ├── index.js                # Alternative entry
-    └── package.json            # Separate backend deps
+├── 📁 scripts/
+│   ├── 📁 assets/
+│   │   └── generateIcons.js
+│   ├── 📁 catalog/
+│   │   ├── exportAdminSettingsCatalog.js
+│   │   └── restoreAdminSettingsCatalog.js
+│   ├── 📁 db/
+│   │   ├── clearDatabase.js
+│   │   └── checkDatabase.js
+│   ├── 📁 setup/
+│   │   ├── createAdmin.js
+│   │   ├── createEnvFile.js
+│   │   └── createTestUsers.js
+│   └── 📁 tests/
+│       └── admin_booking_smoke_test.ps1
+└── 📁 backups/
+  └── 📁 catalog/
+    └── latest-admin-settings-catalog.json
 ```
 
 ---
@@ -579,8 +606,8 @@ EMAIL_REPLY_TO=support@jamroom.com
 
 #### 0. UI Tracking Single Source Clarification
 **Updated**:
-- UI unification phase status/checklist tracking is maintained in `DESIGN_UNIFICATION_TRACKER.md`.
-- `SYSTEM_DOCUMENTATION.md` remains canonical for architecture, APIs, models, and system behavior.
+- UI unification phase status/checklist tracking is maintained in `docs/plans/DESIGN_UNIFICATION_TRACKER.md`.
+- `docs/reference/SYSTEM_DOCUMENTATION.md` remains canonical for architecture, APIs, models, and system behavior.
 
 #### 1. Multi-Recipient eBill Delivery
 **Added**:
@@ -876,24 +903,24 @@ function calculatePrice(item, quantity, duration) {
 **User Management**:
 - `createAdmin.js` - Default admin account creation
 - `createTestUsers.js` - Test account generation for automated testing
-- `makeAdmin.js` - User privilege elevation
+- Admin Users tab (`POST /api/admin/make-admin`) - User privilege elevation
 
 **Usage Patterns**:
 ```bash
 # First-time setup
-node createEnvFile.js          # Setup environment variables
-node clearDatabase.js --all    # Complete reset
-node createAdmin.js            # Setup admin
-node updateInstrumentRentals.js  # Apply enhancements
+node scripts/setup/createEnvFile.js            # Setup environment variables
+node scripts/db/clearDatabase.js --all         # Complete reset
+node scripts/setup/createAdmin.js              # Setup admin
+node scripts/catalog/updateInstrumentRentals.js  # Apply enhancements
 
 # Development cycle
-node clearDatabase.js          # Clear bookings only
-node checkDatabase.js          # Verify clean state
+node scripts/db/clearDatabase.js              # Clear bookings only
+node scripts/db/checkDatabase.js              # Verify clean state
 # Run tests and development
-node updateInstrumentRentals.js  # Apply enhancements
+node scripts/catalog/updateInstrumentRentals.js  # Apply enhancements
 
 # Testing preparation
-node createTestUsers.js      # Create test accounts
+node scripts/setup/createTestUsers.js         # Create test accounts
 # Access test pages: /test.html, /test-modules.html
 ```
 
@@ -901,11 +928,11 @@ node createTestUsers.js      # Create test accounts
 
 ### Documentation Files
 - `README.md` - Project overview and quick start
-- `API_DOCUMENTATION.md` - Detailed API reference
-- `SETUP_GUIDE.md` - Environment setup instructions
-- `TESTING_CHECKLIST.md` - Testing procedures
-- `DEPLOYMENT.md` - Deployment instructions
-- `DESIGN_UNIFICATION_TRACKER.md` - Canonical UI design-unification phase and progress tracker
+- `docs/reference/API_DOCUMENTATION.md` - Detailed API reference
+- `docs/guides/SETUP_GUIDE.md` - Environment setup instructions
+- `docs/reference/TESTING_CHECKLIST.md` - Testing procedures
+- `docs/guides/DEPLOYMENT.md` - Deployment instructions
+- `docs/plans/DESIGN_UNIFICATION_TRACKER.md` - Canonical UI design-unification phase and progress tracker
 
 ### External Dependencies
 - **FullCalendar.js**: Calendar UI in admin panel
@@ -941,9 +968,9 @@ node createTestUsers.js      # Create test accounts
    - Files modified
 
 **Single source ownership:**
-- `SYSTEM_DOCUMENTATION.md`: Architecture, APIs, models, and runtime behavior.
-- `DEVELOPER_REFERENCE.md`: Coding standards, naming conventions, and implementation patterns.
-- `DESIGN_UNIFICATION_TRACKER.md`: UI unification progress, phases, and checklist status.
+- `docs/reference/SYSTEM_DOCUMENTATION.md`: Architecture, APIs, models, and runtime behavior.
+- `docs/reference/DEVELOPER_REFERENCE.md`: Coding standards, naming conventions, and implementation patterns.
+- `docs/plans/DESIGN_UNIFICATION_TRACKER.md`: UI unification progress, phases, and checklist status.
 
 ---
 

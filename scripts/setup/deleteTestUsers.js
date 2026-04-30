@@ -2,11 +2,10 @@ const path = require('path');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 
-const User = require('./models/User');
-const Booking = require('./models/Booking');
+const User = require('../../models/User');
+const Booking = require('../../models/Booking');
 
 dotenv.config();
-dotenv.config({ path: path.join(__dirname, 'backend', '.env') });
 
 const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 const shouldApply = process.argv.includes('--apply');
