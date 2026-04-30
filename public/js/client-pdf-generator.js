@@ -174,6 +174,15 @@ function generateBillHTML(booking, settings) {
         taxAmount = gstEnabled ? Math.round(subtotal * taxRate) : 0;
         totalAmount = subtotal + taxAmount + adjustmentValue;
     }
+
+    const paymentStatus = String(booking?.paymentStatus || 'PENDING').toUpperCase();
+    const amountPaidRaw = Math.max(0, Number(booking?.amountPaid) || 0);
+    const amountReceived = paymentStatus === 'PAID'
+        ? Math.max(0, Number(totalAmount) || 0)
+        : paymentStatus === 'PARTIAL'
+            ? Math.min(Math.max(0, Number(totalAmount) || 0), amountPaidRaw)
+            : 0;
+    const outstandingAmount = Math.max(0, Number(totalAmount || 0) - amountReceived);
     
     return `
 <!DOCTYPE html>
@@ -648,6 +657,21 @@ function generateBillHTML(booking, settings) {
             background: #fff3cd;
             color: #856404;
         }
+
+        .status-paid {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-partial {
+            background: #fff4d6;
+            color: #8a5700;
+        }
+
+        .status-refunded {
+            background: #e2e3e5;
+            color: #383d41;
+        }
         
         /* PDF-specific optimizations for client-side rendering */
         .invoice {
@@ -845,10 +869,18 @@ function generateBillHTML(booking, settings) {
         <!-- Payment Information -->
         <div class="payment-info">
             <h3>💳 Payment Information</h3>
-            <p><strong>Payment Status:</strong> <span class="status-badge status-${booking.paymentStatus?.toLowerCase() || 'pending'}">${booking.paymentStatus || 'Pending'}</span></p>
+            <p><strong>Payment Status:</strong> <span class="status-badge status-${paymentStatus.toLowerCase()}">${paymentStatus}</span></p>
+            <p><strong>Amount Received:</strong> ₹${amountReceived.toFixed(2)}</p>
+            <p><strong>Outstanding Amount:</strong> ₹${outstandingAmount.toFixed(2)}</p>
             ${booking.paymentReference ? `<p><strong>Payment Reference:</strong> ${booking.paymentReference}</p>` : ''}
+            ${booking.paymentNote ? `<p><strong>Payment Note:</strong> ${booking.paymentNote}</p>` : ''}
             <p><strong>Payment Method:</strong> UPI / Bank Transfer</p>
-            <p style="font-style: italic; margin-top: 12px; color: var(--text-muted);">Please make payment before your booking slot to confirm your reservation.</p>
+            ${paymentStatus === 'PAID'
+                ? '<p style="font-style: italic; margin-top: 12px; color: #14532d;">Payment has been received in full. Thank you.</p>'
+                : paymentStatus === 'PARTIAL'
+                    ? '<p style="font-style: italic; margin-top: 12px; color: #8a5700;">Partial payment is recorded. Kindly settle the remaining balance before the booking slot.</p>'
+                    : '<p style="font-style: italic; margin-top: 12px; color: var(--text-muted);">Booking is confirmed and payment is pending. Kindly complete the JamRoom payment before the booking slot.</p>'
+            }
         </div>
         
         <!-- Footer -->

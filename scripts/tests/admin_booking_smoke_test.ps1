@@ -135,13 +135,13 @@ if ($newUserId) {
 
     $bookingResp = Invoke-RestMethod -Method Post -Uri "$base/api/admin/bookings" -Headers $headers -ContentType 'application/json' -Body $bookingPayload
 
-    if ($bookingResp.booking.paymentStatus -eq 'PAID' -and $bookingResp.booking.bookingStatus -eq 'CONFIRMED') {
-      Add-Result 'Admin booking forced PAID+CONFIRMED' 'PASS' "Booking=$($bookingResp.booking._id)"
+    if ($bookingResp.booking.paymentStatus -eq 'PENDING' -and $bookingResp.booking.bookingStatus -eq 'CONFIRMED') {
+      Add-Result 'Admin booking default PENDING+CONFIRMED' 'PASS' "Booking=$($bookingResp.booking._id)"
     } else {
-      Add-Result 'Admin booking forced PAID+CONFIRMED' 'FAIL' "Got status=$($bookingResp.booking.bookingStatus)/$($bookingResp.booking.paymentStatus)"
+      Add-Result 'Admin booking default PENDING+CONFIRMED' 'FAIL' "Got status=$($bookingResp.booking.bookingStatus)/$($bookingResp.booking.paymentStatus)"
     }
   } catch {
-    Add-Result 'Admin booking forced PAID+CONFIRMED' 'FAIL' $_.Exception.Message
+    Add-Result 'Admin booking default PENDING+CONFIRMED' 'FAIL' $_.Exception.Message
   }
 
   try {

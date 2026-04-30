@@ -469,6 +469,10 @@
             const editAdjustmentType = document.getElementById('editPriceAdjustmentType');
             const editAdjustmentAmount = document.getElementById('editPriceAdjustmentAmount');
             const editAdjustmentNote = document.getElementById('editPriceAdjustmentNote');
+            const editPaymentStatus = document.getElementById('editPaymentStatus');
+            const editAmountPaid = document.getElementById('editAmountPaid');
+            const editPaymentReference = document.getElementById('editPaymentReference');
+            const editPaymentNote = document.getElementById('editPaymentNote');
 
             const fallbackAdjustmentType = Number(booking?.priceAdjustmentValue || 0) < 0
                 ? 'discount'
@@ -485,6 +489,18 @@
             if (editAdjustmentType) editAdjustmentType.value = resolvedAdjustmentType;
             if (editAdjustmentAmount) editAdjustmentAmount.value = Math.max(0, resolvedAdjustmentAmount).toFixed(2);
             if (editAdjustmentNote) editAdjustmentNote.value = booking?.priceAdjustmentNote || '';
+
+            const resolvedPaymentStatus = ['PENDING', 'PARTIAL', 'PAID'].includes(String(booking?.paymentStatus || '').toUpperCase())
+                ? String(booking.paymentStatus).toUpperCase()
+                : 'PENDING';
+            const resolvedAmountPaid = Number.isFinite(Number(booking?.amountPaid))
+                ? Number(booking.amountPaid)
+                : (resolvedPaymentStatus === 'PAID' ? Number(booking?.price || 0) : 0);
+
+            if (editPaymentStatus) editPaymentStatus.value = resolvedPaymentStatus;
+            if (editAmountPaid) editAmountPaid.value = Math.max(0, resolvedAmountPaid).toFixed(2);
+            if (editPaymentReference) editPaymentReference.value = booking?.paymentReference || '';
+            if (editPaymentNote) editPaymentNote.value = booking?.paymentNote || '';
 
             if (editRentals) {
                 editRentals.innerHTML = '<div class="loading-inline-muted">Loading rental options...</div>';
@@ -551,8 +567,18 @@
                 priceAdjustmentType: adjustment.type,
                 priceAdjustmentAmount: adjustment.amount,
                 priceAdjustmentNote: document.getElementById('editPriceAdjustmentNote')?.value || '',
+                paymentStatus: (document.getElementById('editPaymentStatus')?.value || 'PENDING').toUpperCase(),
+                amountPaid: Number(document.getElementById('editAmountPaid')?.value || 0),
+                paymentReference: (document.getElementById('editPaymentReference')?.value || '').trim(),
+                paymentNote: (document.getElementById('editPaymentNote')?.value || '').trim(),
                 notes: document.getElementById('editNotes')?.value
             };
+
+            if (formData.paymentStatus === 'PARTIAL') {
+                if (!(formData.amountPaid > 0 && formData.amountPaid < pricing.totalAmount)) {
+                    throw new Error('For partial payment, amount received must be greater than 0 and less than final total.');
+                }
+            }
 
             const [hours, minutes] = String(formData.startTime || '00:00').split(':').map(Number);
             const totalMinutes = hours * 60 + minutes + Math.round(formData.duration * 60);

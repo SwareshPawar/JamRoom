@@ -66,6 +66,20 @@
         return String(booking?.rentalType || 'N/A');
     };
 
+    const getCollectedAmount = (booking) => {
+        if (Number.isFinite(Number(booking?.collectedAmount))) {
+            return toNumber(booking.collectedAmount);
+        }
+
+        const total = toNumber(booking?.price);
+        const status = String(booking?.paymentStatus || '').toUpperCase();
+        const amountPaid = toNumber(booking?.amountPaid);
+
+        if (status === 'PAID') return total;
+        if (status === 'PARTIAL') return Math.min(total, amountPaid);
+        return 0;
+    };
+
     const refreshRevenueSelectionUi = () => {
         const selectedCountEl = document.getElementById('revenueSelectedCount');
         const exportButton = document.getElementById('exportRevenueCsvBtn');
@@ -109,7 +123,10 @@
             'Adjustment Type',
             'Adjustment Value',
             'Adjustment Note',
-            'Final Revenue'
+            'Collected Revenue',
+            'Outstanding Amount',
+            'Payment Status',
+            'Amount Received'
         ];
 
         const rows = selectedRows.map((booking) => {
@@ -129,7 +146,10 @@
                 adjustment.type,
                 adjustment.signedValue.toFixed(2),
                 adjustment.note,
-                toNumber(booking.price).toFixed(2)
+                getCollectedAmount(booking).toFixed(2),
+                Math.max(0, toNumber(booking.price) - getCollectedAmount(booking)).toFixed(2),
+                String(booking.paymentStatus || 'PENDING').toUpperCase(),
+                toNumber(booking.amountPaid).toFixed(2)
             ];
         });
 
@@ -291,7 +311,8 @@
                             </td>
                             <td>${booking.bandName || 'N/A'}</td>
                             <td>
-                                <strong>₹${booking.price}</strong>
+                                <strong>₹${getCollectedAmount(booking)} collected</strong>
+                                <br><small>Due: ₹${Math.max(0, toNumber(booking.price) - getCollectedAmount(booking))}</small>
                                 ${booking.subtotal !== undefined && booking.taxAmount !== undefined
                                     ? `<br><small>Subtotal: ₹${booking.subtotal}<br>Tax: ₹${booking.taxAmount}</small>`
                                     : ''}

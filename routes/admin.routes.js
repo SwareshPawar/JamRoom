@@ -310,6 +310,96 @@ const normalizePriceAdjustmentInput = (
   };
 };
 
+const normalizePaymentStatusInput = (value, fallback = 'PENDING') => {
+  const allowedStatuses = new Set(['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']);
+  const requestedStatus = String(value || fallback || 'PENDING').trim().toUpperCase();
+  return allowedStatuses.has(requestedStatus) ? requestedStatus : 'PENDING';
+};
+
+const computeCollectedAmount = ({ totalAmount, paymentStatus, amountPaid }) => {
+  const safeTotalAmount = Math.max(0, Number(totalAmount) || 0);
+  const safeStatus = normalizePaymentStatusInput(paymentStatus);
+  const safeAmountPaid = Math.max(0, Number(amountPaid) || 0);
+
+  if (safeStatus === 'PAID') {
+    return safeTotalAmount;
+  }
+
+  if (safeStatus === 'PARTIAL') {
+    return Math.min(safeTotalAmount, safeAmountPaid);
+  }
+
+  return 0;
+};
+
+const normalizePaymentTracking = ({
+  paymentStatusRaw,
+  amountPaidRaw,
+  totalAmount,
+  fallbackStatus = 'PENDING',
+  fallbackAmountPaid = 0
+}) => {
+  const safeTotalAmount = Number(totalAmount);
+
+  if (!Number.isFinite(safeTotalAmount) || safeTotalAmount < 0) {
+    return {
+      error: 'Total amount must be a non-negative number'
+    };
+  }
+
+  const paymentStatus = normalizePaymentStatusInput(paymentStatusRaw, fallbackStatus);
+  const amountSource = amountPaidRaw === undefined || amountPaidRaw === null || amountPaidRaw === ''
+    ? fallbackAmountPaid
+    : amountPaidRaw;
+  const parsedAmount = Number(amountSource);
+
+  if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+    return {
+      error: 'Paid amount must be a non-negative number'
+    };
+  }
+
+  if (paymentStatus === 'PAID') {
+    return {
+      paymentStatus: 'PAID',
+      amountPaid: safeTotalAmount,
+      collectedAmount: safeTotalAmount,
+      dueAmount: 0
+    };
+  }
+
+  if (paymentStatus === 'PENDING' || paymentStatus === 'REFUNDED') {
+    return {
+      paymentStatus,
+      amountPaid: 0,
+      collectedAmount: 0,
+      dueAmount: safeTotalAmount
+    };
+  }
+
+  if (parsedAmount <= 0) {
+    return {
+      error: 'Paid amount must be greater than 0 when payment status is PARTIAL'
+    };
+  }
+
+  if (parsedAmount >= safeTotalAmount) {
+    return {
+      paymentStatus: 'PAID',
+      amountPaid: safeTotalAmount,
+      collectedAmount: safeTotalAmount,
+      dueAmount: 0
+    };
+  }
+
+  return {
+    paymentStatus: 'PARTIAL',
+    amountPaid: parsedAmount,
+    collectedAmount: parsedAmount,
+    dueAmount: Math.max(0, safeTotalAmount - parsedAmount)
+  };
+};
+
 const resolveAdminNotificationEmails = async (settings = null) => {
   const recipients = new Set();
 
@@ -398,6 +488,38 @@ const sendUnifiedBookingConfirmationEmails = async ({
   const displayDate = formatBookingDisplayDate(booking.date);
   const studioName = settings.studioName || 'Swar JamRoom';
   const studioLabel = settings.studioName || 'Swar JamRoom Studio';
+  const collectedAmount = computeCollectedAmount({
+    totalAmount: booking.price,
+    paymentStatus: booking.paymentStatus,
+    amountPaid: booking.amountPaid
+  });
+  const dueAmount = Math.max(0, Number(booking.price || 0) - collectedAmount);
+
+  const paymentMessageByStatus = (() => {
+    if (booking.paymentStatus === 'PAID') {
+      return `
+        <p style="margin-top: 10px; color: #14532d;">
+          We are pleased to confirm that your payment has been fully received. Thank you for your prompt settlement.
+        </p>
+      `;
+    }
+
+    if (booking.paymentStatus === 'PARTIAL') {
+      return `
+        <p style="margin-top: 10px; color: #7c2d12;">
+          We have recorded a partial payment of <strong>₹${collectedAmount.toFixed(2)}</strong>. The outstanding balance is
+          <strong>₹${dueAmount.toFixed(2)}</strong>. We kindly request you to complete the balance before your session.
+        </p>
+      `;
+    }
+
+    return `
+      <p style="margin-top: 10px; color: #7c2d12;">
+        Your booking is confirmed. As payment is currently pending, we kindly request you to complete the JamRoom payment
+        of <strong>₹${Number(booking.price || 0).toFixed(2)}</strong> before the scheduled slot.
+      </p>
+    `;
+  })();
 
   // Send confirmation email to customer.
   try {
@@ -405,9 +527,9 @@ const sendUnifiedBookingConfirmationEmails = async ({
       to: booking.userEmail,
       subject: `Booking Confirmed - ${studioName}`,
       html: `
-        <h2>🎉 Booking Confirmed!</h2>
+        <h2>🎉 Booking Confirmed</h2>
         <p>Hi ${booking.userName},</p>
-        <p>Great news! Your booking has been confirmed.</p>
+        <p>Your booking request has been successfully confirmed by our team.</p>
         <h3>Booking Details:</h3>
         <ul>
           <li><strong>Date:</strong> ${displayDate}</li>
@@ -415,9 +537,13 @@ const sendUnifiedBookingConfirmationEmails = async ({
           <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
           <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
           <li><strong>Price:</strong> ₹${booking.price}</li>
+          <li><strong>Payment Status:</strong> ${booking.paymentStatus || 'PENDING'}</li>
+          <li><strong>Amount Received:</strong> ₹${collectedAmount.toFixed(2)}</li>
+          <li><strong>Outstanding:</strong> ₹${dueAmount.toFixed(2)}</li>
           ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
         </ul>
         <p>A calendar invite is attached to this email.</p>
+        ${paymentMessageByStatus}
         <p>Looking forward to seeing you at ${studioLabel}!</p>
         ${customerExtraHtml}
       `,
@@ -542,7 +668,7 @@ router.get('/debug-settings', protect, isAdmin, async (req, res) => {
 router.get('/revenue', protect, isAdmin, async (req, res) => {
   try {
     const { filter, startDate, endDate, year, month, week } = req.query;
-    let query = { bookingStatus: 'CONFIRMED', paymentStatus: 'PAID' };
+    let query = { bookingStatus: 'CONFIRMED', paymentStatus: { $in: ['PAID', 'PARTIAL'] } };
     let dateRange = {};
 
     const now = new Date();
@@ -621,7 +747,13 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
       .sort({ date: -1, startTime: -1 });
 
     // Calculate revenue analytics
-    const totalRevenue = bookings.reduce((sum, booking) => sum + booking.price, 0);
+    const totalRevenue = bookings.reduce((sum, booking) => {
+      return sum + computeCollectedAmount({
+        totalAmount: booking.price,
+        paymentStatus: booking.paymentStatus,
+        amountPaid: booking.amountPaid
+      });
+    }, 0);
     const totalBookings = bookings.length;
     const avgBookingValue = totalBookings > 0 ? totalRevenue / totalBookings : 0;
 
@@ -633,7 +765,11 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
         revenueByType[booking.rentalType] = 0;
         bookingsByType[booking.rentalType] = 0;
       }
-      revenueByType[booking.rentalType] += booking.price;
+      revenueByType[booking.rentalType] += computeCollectedAmount({
+        totalAmount: booking.price,
+        paymentStatus: booking.paymentStatus,
+        amountPaid: booking.amountPaid
+      });
       bookingsByType[booking.rentalType] += 1;
     });
 
@@ -644,7 +780,11 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
       if (!revenueByDate[dateKey]) {
         revenueByDate[dateKey] = 0;
       }
-      revenueByDate[dateKey] += booking.price;
+      revenueByDate[dateKey] += computeCollectedAmount({
+        totalAmount: booking.price,
+        paymentStatus: booking.paymentStatus,
+        amountPaid: booking.amountPaid
+      });
     });
 
     res.json({
@@ -674,6 +814,21 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
         priceAdjustmentValue: booking.priceAdjustmentValue,
         priceAdjustmentNote: booking.priceAdjustmentNote,
         price: booking.price,
+        paymentStatus: booking.paymentStatus,
+        amountPaid: booking.amountPaid,
+        collectedAmount: computeCollectedAmount({
+          totalAmount: booking.price,
+          paymentStatus: booking.paymentStatus,
+          amountPaid: booking.amountPaid
+        }),
+        outstandingAmount: Math.max(
+          0,
+          Number(booking.price || 0) - computeCollectedAmount({
+            totalAmount: booking.price,
+            paymentStatus: booking.paymentStatus,
+            amountPaid: booking.amountPaid
+          })
+        ),
         bandName: booking.bandName,
         notes: booking.notes,
         createdAt: booking.createdAt
@@ -935,7 +1090,6 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
     }
 
     booking.bookingStatus = 'CONFIRMED';
-    booking.paymentStatus = 'PAID';
     await booking.save();
 
     // After confirming this booking, reject overlapping pending bookings
@@ -1204,118 +1358,213 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
       : computedTotalAmount;
     const adjustmentLabel = signedAdjustment < 0 ? 'Discount' : 'Surcharge';
     const adjustmentDisplayAmount = Math.abs(signedAdjustment);
+    const collectedAmount = computeCollectedAmount({
+      totalAmount,
+      paymentStatus: booking.paymentStatus,
+      amountPaid: booking.amountPaid
+    });
+    const outstandingAmount = Math.max(0, totalAmount - collectedAmount);
+    const bookingStatusLabel = String(booking.bookingStatus || 'CONFIRMED').toUpperCase();
+    const paymentStatusLabel = normalizePaymentStatusInput(booking.paymentStatus, 'PENDING');
+    const paymentStatusColor = paymentStatusLabel === 'PAID'
+      ? '#155724'
+      : paymentStatusLabel === 'PARTIAL'
+        ? '#8a5700'
+        : '#856404';
+    const paymentStatusBackground = paymentStatusLabel === 'PAID'
+      ? '#d4edda'
+      : paymentStatusLabel === 'PARTIAL'
+        ? '#fff4d6'
+        : '#fff3cd';
+    const paymentStatusBorder = paymentStatusLabel === 'PAID'
+      ? '#c3e6cb'
+      : paymentStatusLabel === 'PARTIAL'
+        ? '#ffd166'
+        : '#ffeaa7';
+    const paymentNarrative = paymentStatusLabel === 'PAID'
+      ? `
+        <p style="color: #155724; line-height: 1.7; margin: 0;">
+          Thank you for completing the payment in full. We have successfully received <strong>₹${collectedAmount.toFixed(2)}</strong>, and your booking account is fully settled.
+        </p>
+      `
+      : paymentStatusLabel === 'PARTIAL'
+        ? `
+          <p style="color: #8a5700; line-height: 1.7; margin: 0;">
+            We have received a partial payment of <strong>₹${collectedAmount.toFixed(2)}</strong>. The remaining balance is <strong>₹${outstandingAmount.toFixed(2)}</strong>.
+            Kindly clear the outstanding amount before your scheduled studio slot.
+          </p>
+        `
+        : `
+          <p style="color: #856404; line-height: 1.7; margin: 0;">
+            Payment for this booking is currently pending. Kindly clear the due amount of <strong>₹${outstandingAmount.toFixed(2)}</strong>
+            before your scheduled studio slot to keep records up to date.
+          </p>
+        `;
 
     // Send email with PDF attachment
     const emailSubject = `Invoice for Your ${settings?.studioName || 'JamRoom'} Booking - ${displayDate}`;
-    const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
-            <h1 style="margin: 0; font-size: 24px;">Invoice - ${settings?.studioName || 'JamRoom'} Booking</h1>
-          </div>
-          
-          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
-            <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
-              Dear ${booking.userName},
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              Thank you for booking with ${settings?.studioName || 'JamRoom'}! Please find your electronic invoice attached to this email.
-            </p>
-            
-            <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-              <h3 style="color: #667eea; margin-top: 0;">Booking Summary</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Date:</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${displayDate}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Time:</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${formatTimeRange12Hour(booking.startTime, booking.endTime)}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Service:</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${booking.rentalType}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Duration:</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">${booking.duration} hour(s)</td>
-                </tr>
-                ${gstEnabled ? `
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">Subtotal:</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">₹${subtotal.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">${gstDisplayName} (${Math.round(gstRate * 100)}%):</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #666;">₹${taxAmount.toFixed(2)}</td>
-                </tr>
-                ` : ''}
-                ${signedAdjustment !== 0 ? `
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; color: #333;">${adjustmentLabel}:</td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: ${signedAdjustment < 0 ? '#d63384' : '#0c63e7'};">${signedAdjustment < 0 ? '-' : '+'}₹${adjustmentDisplayAmount.toFixed(2)}</td>
-                </tr>
-                ` : ''}
-                <tr style="font-weight: bold; font-size: 16px; color: #667eea;">
-                  <td style="padding: 12px 0; border-top: 2px solid #667eea;">Total Amount:</td>
-                  <td style="padding: 12px 0; border-top: 2px solid #667eea;">₹${totalAmount.toFixed(2)}</td>
-                </tr>
-              </table>
+    const emailHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;padding:0;background:#eef2f7;font-family:Arial,sans-serif;color:#1f2937}
+  .eq{max-width:760px;margin:0 auto;padding:12px}
+  .card{background:#fff;border-radius:16px;overflow:hidden;border:1px solid #dbe5f0}
+  .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:20px}
+  .hdr-table{width:100%;border-collapse:collapse}
+  .hdr-left{vertical-align:top;padding-right:14px}
+  .hdr-right{vertical-align:top;width:220px}
+  .hdr h2{margin:0 0 8px 0;font-size:24px;color:#fff}
+  .hdr .cl{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88)}
+  .order-box{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:12px 14px}
+  .order-kicker{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#bfdbfe;font-weight:700;margin-bottom:8px}
+  .order-line{font-size:12px;line-height:1.7;color:rgba(255,255,255,0.9)}
+  .body{padding:20px}
+  .intro{margin:0 0 14px 0;font-size:13px;line-height:1.7;color:#475569}
+  .summary-grid{width:100%;border-collapse:collapse;margin:0 0 14px 0}
+  .summary-grid td{vertical-align:top}
+  .col-left{padding-right:6px}
+  .col-right{padding-left:6px}
+  .sc{background:#f8fafc;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px}
+  .sc-kicker{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:8px}
+  .sc-title{font-size:17px;font-weight:800;color:#0f172a;margin-bottom:4px}
+  .sc-sub{font-size:12px;line-height:1.6;color:#475569}
+  .booking-card{background:#fff;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .booking-card h3{color:#1d4ed8;margin:0 0 10px 0;font-size:16px}
+  .detail-table{width:100%;border-collapse:collapse}
+  .detail-table td{padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:13px}
+  .detail-table td:first-child{font-weight:700;color:#1f2937;width:42%}
+  .detail-table td:last-child{color:#475569}
+  .status-pill{display:inline-block;padding:4px 12px;border-radius:14px;border:1px solid ${paymentStatusBorder};background:${paymentStatusBackground};color:${paymentStatusColor};font-weight:700}
+  .confirm-pill{display:inline-block;padding:4px 12px;border-radius:14px;border:1px solid #86efac;background:#dcfce7;color:#166534;font-weight:700}
+  .totals-card{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
+  .totals-card h3{margin:0 0 8px 0;font-size:14px;color:#1d4ed8;text-transform:uppercase;letter-spacing:1px}
+  .totals-line{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:#0f172a;padding:5px 0}
+  .totals-line strong{font-weight:800}
+  .totals-line.grand{margin-top:6px;padding-top:8px;border-top:1px solid #bfdbfe;font-size:15px}
+  .payment-card{background:${paymentStatusBackground};border:1px solid ${paymentStatusBorder};border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
+  .payment-card h3{margin:0 0 8px 0;font-size:15px;color:${paymentStatusColor}}
+  .cta{background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
+  .cta h3{margin:0 0 8px 0;font-size:15px;color:#0f172a}
+  .cta p{margin:0;font-size:13px;line-height:1.7;color:#475569}
+  .attach{border-radius:12px;padding:12px 14px;margin:0 0 14px 0;font-size:13px;line-height:1.6}
+  .attach.ok{background:#e8f5e8;border:1px solid #4caf50;color:#2e7d32}
+  .attach.warn{background:#fff3e0;border:1px solid #ffcc02;color:#92400e}
+  .footer{font-size:11px;line-height:1.8;color:#64748b;border-top:1px solid #e5e7eb;padding-top:12px}
+  @media only screen and (max-width:520px){
+    .eq{padding:8px}
+    .hdr{padding:16px}
+    .hdr-left,.hdr-right{display:block;width:100% !important;padding:0}
+    .hdr-right{margin-top:12px}
+    .hdr h2{font-size:20px}
+    .body{padding:14px}
+    .summary-grid,.summary-grid tbody,.summary-grid tr{display:block}
+    .summary-grid td{display:block;width:100% !important;padding:0 0 10px 0}
+    .col-left,.col-right{padding:0 0 10px 0}
+  }
+</style>
+</head>
+<body>
+<div class="eq">
+  <div class="card">
+    <div class="hdr">
+      <table class="hdr-table" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="hdr-left">
+            <h2>${settings?.studioName || 'JamRoom'}</h2>
+            <div class="cl"><strong>Invoice Date:</strong> ${displayDate}</div>
+            ${settings?.studioAddress ? `<div class="cl"><strong>Address:</strong> ${settings.studioAddress}</div>` : ''}
+            ${settings?.studioPhone ? `<div class="cl"><strong>Phone / WhatsApp:</strong> ${settings.studioPhone}</div>` : ''}
+            <div class="cl"><strong>Email:</strong> ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</div>
+          </td>
+          <td class="hdr-right">
+            <div class="order-box">
+              <div class="order-kicker">Invoice Summary</div>
+              <div class="order-line"><strong>Customer:</strong> ${booking.userName}</div>
+              <div class="order-line"><strong>Service:</strong> ${booking.rentalType}</div>
+              <div class="order-line"><strong>Total Amount:</strong> ₹${totalAmount.toFixed(2)}</div>
             </div>
-            
-            ${booking.paymentStatus === 'PENDING' ? `
-              <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin: 20px 0;">
-                <h4 style="color: #856404; margin-top: 0;">Payment Pending</h4>
-                <p style="color: #856404; margin: 0;">
-                  Please make the payment before your booking slot to confirm your reservation.
-                </p>
-              </div>
-            ` : `
-              <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; margin: 20px 0;">
-                <h4 style="color: #155724; margin-top: 0;">Payment Confirmed</h4>
-                <p style="color: #155724; margin: 0;">
-                  Your payment has been received and your booking is confirmed!
-                </p>
-              </div>
-            `}
-            
-            <p style="color: #666; line-height: 1.6; margin-top: 20px;">
-              If you have any questions about your booking or this invoice, please don't hesitate to contact us.
-            </p>
-            
-            <div style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 30px; text-align: center; color: #888; font-size: 14px;">
-              <p><strong>${settings?.studioName || 'JamRoom Studio'}</strong></p>
-              <p>${settings?.studioAddress || 'Studio Address'}</p>
-              <p>Email: ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</p>
-              ${settings?.studioPhone ? `<p>Phone: ${settings.studioPhone}</p>` : ''}
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="body">
+      <p style="margin:0 0 8px 0;font-size:15px;color:#0f172a;">Dear ${booking.userName},</p>
+      <p class="intro">Thank you for choosing ${settings?.studioName || 'JamRoom'}. Please find your electronic invoice attached for your records. This invoice includes your booking confirmation and payment progress details.</p>
+
+      <table class="summary-grid" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="col-left" width="50%">
+            <div class="sc">
+              <div class="sc-kicker">Booking Status</div>
+              <div class="sc-title"><span class="confirm-pill">${bookingStatusLabel}</span></div>
+              <div class="sc-sub">Your booking slot is confirmed and reserved.</div>
             </div>
-            
-            ${!pdfBuffer ? `
-              <div style="background: #fff3e0; border: 1px solid #ffcc02; border-radius: 8px; padding: 15px; margin: 20px auto; max-width: 500px;">
-                <p style="color: #e65100; margin: 0; font-size: 14px; text-align: center; margin-bottom: 12px;">
-                  ⚠️ PDF invoice could not be attached due to technical issues.
-                </p>
-                <div style="text-align: center;">
-                  <a href="${process.env.FRONTEND_URL || 'https://jamroom.vercel.app'}/booking.html" 
-                     style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
-                    📄 Download Your Invoice PDF
-                  </a>
-                </div>
-                <p style="color: #666; margin: 8px 0 0 0; font-size: 12px; text-align: center;">
-                  Login to your account and download your detailed invoice PDF
-                </p>
+          </td>
+          <td class="col-right" width="50%">
+            <div class="sc">
+              <div class="sc-kicker">Payment Status</div>
+              <div class="sc-title"><span class="status-pill">${paymentStatusLabel}</span></div>
+              <div class="sc-sub" style="font-size:13px;margin-top:6px;">
+                ${paymentStatusLabel === 'PAID'
+                  ? `<span style="color:#166534;font-weight:700;">₹${collectedAmount.toFixed(2)} received — fully settled ✓</span>`
+                  : paymentStatusLabel === 'PARTIAL'
+                  ? `₹${collectedAmount.toFixed(2)} received &nbsp;·&nbsp; <strong style="color:#8a5700;">₹${outstandingAmount.toFixed(2)} outstanding</strong>`
+                  : `<strong style="color:#856404;">₹${outstandingAmount.toFixed(2)} outstanding</strong>`}
               </div>
-            ` : `
-              <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 15px; margin: 20px auto; max-width: 500px;">
-                <p style="color: #2e7d32; margin: 0; font-size: 14px; text-align: center;">
-                  📎 Your detailed invoice PDF is attached to this email.
-                </p>
-              </div>
-            `}
-          </div>
-        </div>
-      `;
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <div class="booking-card">
+        <h3>Booking Summary</h3>
+        <table class="detail-table">
+          <tr><td>Date</td><td>${displayDate}</td></tr>
+          <tr><td>Time</td><td>${formatTimeRange12Hour(booking.startTime, booking.endTime)}</td></tr>
+          <tr><td>Service</td><td>${booking.rentalType}</td></tr>
+          <tr><td>Duration</td><td>${booking.duration} hour(s)</td></tr>
+          ${booking.paymentReference ? `<tr><td>Payment Reference</td><td>${booking.paymentReference}</td></tr>` : ''}
+          ${booking.paymentNote ? `<tr><td>Payment Note</td><td>${booking.paymentNote}</td></tr>` : ''}
+        </table>
+      </div>
+
+      <div class="totals-card">
+        <h3>Amount Summary</h3>
+        <div class="totals-line"><span>Subtotal</span><strong>₹${subtotal.toFixed(2)}</strong></div>
+        ${gstEnabled ? `<div class="totals-line"><span>${gstDisplayName} (${Math.round(gstRate * 100)}%)</span><strong>₹${taxAmount.toFixed(2)}</strong></div>` : ''}
+        ${signedAdjustment !== 0 ? `<div class="totals-line"><span>${adjustmentLabel}</span><strong>${signedAdjustment < 0 ? '-' : '+'}₹${adjustmentDisplayAmount.toFixed(2)}</strong></div>` : ''}
+        <div class="totals-line grand"><span>Total Amount</span><strong>₹${totalAmount.toFixed(2)}</strong></div>
+        <div class="totals-line" style="margin-top:6px;padding-top:8px;border-top:1px solid #bfdbfe;"><span style="color:#166534;font-weight:600;">Amount Received</span><strong style="color:#166534;">₹${collectedAmount.toFixed(2)}</strong></div>
+        <div class="totals-line" style="${outstandingAmount > 0 ? 'background:rgba(220,38,38,0.06);border-radius:6px;padding:6px 8px;margin-top:4px;' : ''}"><span style="${outstandingAmount > 0 ? 'color:#dc2626;font-weight:700;' : 'color:#166534;'}">Outstanding Amount</span><strong style="${outstandingAmount > 0 ? 'color:#dc2626;font-size:15px;' : 'color:#166534;'}">₹${outstandingAmount.toFixed(2)}</strong></div>
+      </div>
+
+      <div class="payment-card">
+        <h3>Payment Update: ${paymentStatusLabel}</h3>
+        ${paymentNarrative}
+      </div>
+
+      <div class="cta">
+        <h3>Need assistance with payment or booking?</h3>
+        <p>If you need help with payment confirmation, receipt details, or booking updates, please reply to this email and our team will assist you promptly.</p>
+      </div>
+
+      ${!pdfBuffer
+        ? `<div class="attach warn">PDF invoice could not be attached due to a technical issue. You can download your invoice from <a href="${process.env.FRONTEND_URL || 'https://jamroom.vercel.app'}/booking.html" style="color:#1d4ed8;font-weight:700;text-decoration:none;">your JamRoom account</a>.</div>`
+        : '<div class="attach ok">Your detailed invoice PDF is attached to this email.</div>'}
+
+      <div class="footer">
+        <div>Visit JamRoom: <a href="${DEFAULT_APP_LOGIN_URL}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:none;">${DEFAULT_APP_LOGIN_URL}</a></div>
+        <div>${settings?.studioName || 'JamRoom Studio'} | ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
 
     const attachments = [];
 
@@ -1493,10 +1742,26 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
     const totalBookings = await Booking.countDocuments();
     const pendingBookings = await Booking.countDocuments({ bookingStatus: 'PENDING' });
     const confirmedBookings = await Booking.countDocuments({ bookingStatus: 'CONFIRMED' });
-    const totalRevenue = await Booking.aggregate([
-      { $match: { bookingStatus: 'CONFIRMED', paymentStatus: 'PAID' } },
-      { $group: { _id: null, total: { $sum: '$price' } } }
-    ]);
+    const confirmedPaymentBookings = await Booking.find({ bookingStatus: 'CONFIRMED' }).select('price paymentStatus amountPaid');
+
+    const statsTotals = confirmedPaymentBookings.reduce((acc, booking) => {
+      const collected = computeCollectedAmount({
+        totalAmount: booking.price,
+        paymentStatus: booking.paymentStatus,
+        amountPaid: booking.amountPaid
+      });
+      const due = Math.max(0, Number(booking.price || 0) - collected);
+
+      acc.totalRevenue += collected;
+      if (due > 0) {
+        acc.totalUnpaidAmount += due;
+      }
+
+      return acc;
+    }, {
+      totalRevenue: 0,
+      totalUnpaidAmount: 0
+    });
 
     const recentBookings = await Booking.find()
       .populate('userId', 'name email')
@@ -1509,7 +1774,8 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
         totalBookings,
         pendingBookings,
         confirmedBookings,
-        totalRevenue: totalRevenue[0]?.total || 0,
+        totalRevenue: statsTotals.totalRevenue,
+        totalUnpaidAmount: statsTotals.totalUnpaidAmount,
         recentBookings
       }
     });
@@ -2053,7 +2319,11 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       totalAmount,
       priceAdjustmentType,
       priceAdjustmentAmount,
-      priceAdjustmentNote
+      priceAdjustmentNote,
+      paymentStatus,
+      amountPaid,
+      paymentReference,
+      paymentNote
     } = req.body;
     
     const booking = await Booking.findById(req.params.id);
@@ -2267,6 +2537,32 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       booking.priceAdjustmentNote = normalizedAdjustment.note;
     }
     
+    const normalizedPaymentTracking = normalizePaymentTracking({
+      paymentStatusRaw: paymentStatus,
+      amountPaidRaw: amountPaid,
+      totalAmount: booking.price,
+      fallbackStatus: booking.paymentStatus,
+      fallbackAmountPaid: booking.amountPaid
+    });
+
+    if (normalizedPaymentTracking.error) {
+      return res.status(400).json({
+        success: false,
+        message: normalizedPaymentTracking.error
+      });
+    }
+
+    booking.paymentStatus = normalizedPaymentTracking.paymentStatus;
+    booking.amountPaid = normalizedPaymentTracking.amountPaid;
+
+    if (paymentReference !== undefined) {
+      booking.paymentReference = String(paymentReference || '').trim();
+    }
+
+    if (paymentNote !== undefined) {
+      booking.paymentNote = String(paymentNote || '').trim();
+    }
+
     await booking.save();
 
     const displayDate = booking.date.toLocaleDateString('en-IN', {
@@ -2588,12 +2884,19 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       overrideDateTime,
       priceAdjustmentType,
       priceAdjustmentAmount,
-      priceAdjustmentNote
+      priceAdjustmentNote,
+      paymentStatus,
+      amountPaid,
+      paymentReference,
+      paymentNote
     } = req.body;
 
     const shouldOverrideDateTime = overrideDateTime === true || String(overrideDateTime).toLowerCase() === 'true';
 
-    const enforcedPaymentStatus = 'PAID';
+    const requestedPaymentStatus = paymentStatus;
+    const requestedAmountPaid = amountPaid;
+    const normalizedPaymentReference = String(paymentReference || '').trim();
+    const normalizedPaymentNote = String(paymentNote || '').trim();
     const enforcedBookingStatus = 'CONFIRMED';
 
     console.log('🔍 Extracted fields:', {
@@ -2607,7 +2910,8 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       bandName,
       notes,
       overrideDateTime: shouldOverrideDateTime,
-      enforcedPaymentStatus,
+      requestedPaymentStatus,
+      requestedAmountPaid,
       enforcedBookingStatus
     });
 
@@ -2739,6 +3043,21 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         message: 'Discount cannot make final total negative'
       });
     }
+    const normalizedPaymentTracking = normalizePaymentTracking({
+      paymentStatusRaw: requestedPaymentStatus,
+      amountPaidRaw: requestedAmountPaid,
+      totalAmount: calculatedTotalAmount,
+      fallbackStatus: 'PENDING',
+      fallbackAmountPaid: 0
+    });
+
+    if (normalizedPaymentTracking.error) {
+      return res.status(400).json({
+        success: false,
+        message: normalizedPaymentTracking.error
+      });
+    }
+
     const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
 
     // Create rental type summary for backward compatibility
@@ -2767,7 +3086,10 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       notes: shouldOverrideDateTime
         ? `${notes ? `${notes}\n` : ''}[Admin Override] Date/time checks bypassed for historical booking entry.`
         : notes,
-      paymentStatus: enforcedPaymentStatus,
+      paymentStatus: normalizedPaymentTracking.paymentStatus,
+      amountPaid: normalizedPaymentTracking.amountPaid,
+      paymentReference: normalizedPaymentReference,
+      paymentNote: normalizedPaymentNote,
       bookingStatus: enforcedBookingStatus
     });
 
@@ -2839,7 +3161,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
           totalAmount: calculatedTotalAmount,
           rentals: rentalsWhatsAppSummary,
           status: enforcedBookingStatus,
-          paymentStatus: enforcedPaymentStatus
+          paymentStatus: normalizedPaymentTracking.paymentStatus
         });
       } catch (whatsappError) {
         console.log('Customer WhatsApp failed:', whatsappError.message);
@@ -2858,7 +3180,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         totalAmount: calculatedTotalAmount,
         bookingId: booking._id,
         bandName,
-        paymentStatus: enforcedPaymentStatus
+        paymentStatus: normalizedPaymentTracking.paymentStatus
       }, settings.whatsappNotifications);
     } catch (whatsappError) {
       console.log('WhatsApp notifications failed:', whatsappError.message);
@@ -2874,7 +3196,9 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       date: populatedBooking.date,
       startTime: populatedBooking.startTime,
       endTime: populatedBooking.endTime,
-      bookingStatus: populatedBooking.bookingStatus
+      bookingStatus: populatedBooking.bookingStatus,
+      paymentStatus: populatedBooking.paymentStatus,
+      amountPaid: populatedBooking.amountPaid
     });
 
     res.status(201).json({
@@ -2900,6 +3224,9 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         bandName: populatedBooking.bandName,
         notes: populatedBooking.notes,
         paymentStatus: populatedBooking.paymentStatus,
+        amountPaid: populatedBooking.amountPaid,
+        paymentReference: populatedBooking.paymentReference,
+        paymentNote: populatedBooking.paymentNote,
         bookingStatus: populatedBooking.bookingStatus,
         createdAt: populatedBooking.createdAt
       }

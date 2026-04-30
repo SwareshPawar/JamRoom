@@ -69,6 +69,16 @@
         };
     };
 
+    const getCollectedAmount = (booking) => {
+        const total = Number(booking?.price || 0);
+        const status = String(booking?.paymentStatus || '').toUpperCase();
+        const amountPaid = Number(booking?.amountPaid || 0);
+
+        if (status === 'PAID') return Math.max(0, total);
+        if (status === 'PARTIAL') return Math.max(0, Math.min(total, amountPaid));
+        return 0;
+    };
+
     const state = {
         bookingsById: new Map(),
         allBookings: [],
@@ -218,6 +228,8 @@
         const adjustment = getBookingAdjustment(booking);
         const adjustmentLabel = adjustment.signedValue < 0 ? 'Discount' : 'Surcharge';
         const adjustmentColorClass = adjustment.signedValue < 0 ? 'text-danger' : 'text-info';
+        const collectedAmount = getCollectedAmount(booking);
+        const outstandingAmount = Math.max(0, Number(booking?.price || 0) - collectedAmount);
 
         return `
             <div class="booking-expand-body booking-modal-body">
@@ -234,7 +246,10 @@
                             <p><strong>Updated:</strong> ${formatDateTime(booking.updatedAt)}</p>
                             <p><strong>Booking Status:</strong> ${escapeHtml(booking.bookingStatus || 'N/A')}</p>
                             <p><strong>Payment Status:</strong> ${escapeHtml(booking.paymentStatus || 'N/A')}</p>
+                            <p><strong>Amount Received:</strong> ${formatCurrency(collectedAmount)}</p>
+                            <p><strong>Outstanding:</strong> ${formatCurrency(outstandingAmount)}</p>
                             <p><strong>Payment Ref:</strong> ${escapeHtml(booking.paymentReference || 'N/A')}</p>
+                            <p><strong>Payment Note:</strong> ${escapeHtml(booking.paymentNote || 'N/A')}</p>
                         </div>
                     </section>
 
@@ -448,7 +463,7 @@
             return;
         }
 
-        html += '<div class="table-container"><table><thead><tr><th>#</th><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+        html += '<div class="table-container"><table><thead><tr><th>#</th><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status/Payment</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
 
         let serialNo = ((Math.max(1, state.currentPage) - 1) * Math.max(1, state.pageSize)) + 1;
         visible.forEach((booking) => {
@@ -465,6 +480,7 @@
                 : `${booking.duration} hour(s)`;
 
             const statusClass = String(booking.bookingStatus || '').toLowerCase();
+            const paymentStatusClass = String(booking.paymentStatus || 'pending').toLowerCase();
             const userName = booking.userId?.name || booking.userName || 'N/A';
             const userEmail = booking.userId?.email || booking.userEmail || 'N/A';
             const createdDate = booking.createdAt ? formatDateTime(booking.createdAt) : 'N/A';
@@ -491,7 +507,11 @@
                             ? `<br><small>Subtotal: ${formatCurrency(booking.subtotal)}<br>Tax: ${formatCurrency(booking.taxAmount)}${adjustmentLine}</small>`
                             : ''}
                     </td>
-                    <td><span class="status-badge status-${statusClass}">${escapeHtml(booking.bookingStatus)}</span></td>
+                    <td>
+                        <span class="status-badge status-${statusClass}">${escapeHtml(booking.bookingStatus || 'N/A')}</span>
+                        /
+                        <span class="status-badge status-${paymentStatusClass}">${escapeHtml(booking.paymentStatus || 'PENDING')}</span>
+                    </td>
                     <td><small>${escapeHtml(createdDate)}</small></td>
                     <td>${buildBookingActionsMarkup(booking, { context: 'table', includeView: true })}</td>
                 </tr>

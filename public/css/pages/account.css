@@ -295,6 +295,16 @@ input[type='checkbox'] {
     color: var(--text-color);
 }
 
+.status-partial {
+    background: color-mix(in srgb, var(--warning-color) 24%, transparent);
+    color: var(--text-color);
+}
+
+.status-refunded {
+    background: color-mix(in srgb, var(--secondary-color) 24%, transparent);
+    color: var(--text-color);
+}
+
 .status-rejected {
     background: color-mix(in srgb, var(--danger-color) 22%, transparent);
     color: var(--text-color);

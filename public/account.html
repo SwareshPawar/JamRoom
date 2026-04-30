@@ -263,8 +263,21 @@
                 const data = await response.json();
 
                 if (data.success) {
+                    const getCollectedAmount = (booking) => {
+                        const total = Number(booking.price || 0);
+                        const status = String(booking.paymentStatus || '').toUpperCase();
+                        const paid = Number(booking.amountPaid || 0);
+
+                        if (status === 'PAID') return Math.max(0, total);
+                        if (status === 'PARTIAL') return Math.max(0, Math.min(total, paid));
+                        return 0;
+                    };
+
                     const bookingsHtml = data.bookings.length > 0 ? 
-                        data.bookings.map(booking => `
+                        data.bookings.map(booking => {
+                            const collected = getCollectedAmount(booking);
+                            const outstanding = Math.max(0, Number(booking.price || 0) - collected);
+                            return `
                             <div class="booking-card">
                                 <div class="booking-header">
                                     <strong>${new Date(booking.date).toLocaleDateString('en-IN')} - ${booking.startTime} to ${booking.endTime}</strong>
@@ -275,12 +288,16 @@
                                 </div>
                                 <p><strong>Duration:</strong> ${booking.duration} hour(s)</p>
                                 <p><strong>Amount:</strong> ₹${booking.price}</p>
+                                <p><strong>Amount Received:</strong> ₹${collected}</p>
+                                <p><strong>Outstanding:</strong> ₹${outstanding}</p>
+                                ${booking.paymentStatus !== 'PAID' ? '<p><strong>Payment Note:</strong> Please clear the pending JamRoom payment before your session.</p>' : ''}
                                 ${booking.bandName ? `<p><strong>Band:</strong> ${booking.bandName}</p>` : ''}
                                 ${booking.rentals && booking.rentals.length > 0 ? 
                                     `<p><strong>Rentals:</strong> ${booking.rentals.map(r => r.name).join(', ')}</p>` : ''}
                                 <p><strong>Booked:</strong> ${new Date(booking.createdAt).toLocaleDateString('en-IN')}</p>
                             </div>
-                        `).join('') : 
+                        `;
+                        }).join('') : 
                         '<p>No bookings found. <a href="/booking.html">Create your first booking!</a></p>';
 
                     document.getElementById('bookingsList').innerHTML = bookingsHtml;

@@ -1436,6 +1436,21 @@ table td small {
     color: var(--text-color);
 }
 
+.status-paid {
+    background: color-mix(in srgb, var(--info-color) 22%, transparent);
+    color: var(--text-color);
+}
+
+.status-partial {
+    background: color-mix(in srgb, var(--warning-color) 22%, transparent);
+    color: var(--text-color);
+}
+
+.status-refunded {
+    background: color-mix(in srgb, var(--secondary-color) 25%, transparent);
+    color: var(--text-color);
+}
+
 .bookings-expand-list {
     display: grid;
     gap: 12px;
