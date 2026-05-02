@@ -114,6 +114,18 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
           };
         }
         break;
+      case 'last_month': {
+        const lmStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lmEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+        dateRange = { $gte: lmStart, $lt: lmEnd };
+        break;
+      }
+      case 'last_3_months': {
+        const l3Start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        const l3End = new Date(now.getFullYear(), now.getMonth(), 1);
+        dateRange = { $gte: l3Start, $lt: l3End };
+        break;
+      }
       case 'year':
         if (year) {
           dateRange = {
