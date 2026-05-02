@@ -31,7 +31,8 @@
 
         <main>
             <div class="hero">
-                <h2>Book Your Perfect Jam Session</h2>
+                <div id="homeHeroUserBar" class="hero-user-bar" aria-live="polite"></div>
+                <h2><a href="/booking.html" class="hero-book-link">Book Your Perfect Jam Session</a></h2>
                 <p>Professional equipment, soundproof rooms, and flexible booking options</p>
                 <div class="hero-quick-links" aria-label="Location and reviews">
                     <div class="hero-google-links" role="group" aria-label="Google actions">
@@ -96,6 +97,29 @@
 
         document.addEventListener('DOMContentLoaded', async function() {
             let hasRequestedInstagramProcess = false;
+
+            const renderHomeHeroUserBar = (user) => {
+                const bar = document.getElementById('homeHeroUserBar');
+                if (!bar) return;
+
+                if (user) {
+                    const displayName = String(user?.name || user?.email || 'User');
+                    bar.innerHTML = `<a href="/account.html" class="hero-user-pill hero-user-link" title="Open My Account">Hi, ${displayName}</a>`;
+                    return;
+                }
+
+                bar.innerHTML = `
+                    <div class="hero-auth-actions" role="group" aria-label="Authentication actions">
+                        <a href="/login.html" class="btn btn-primary btn-sm">Login</a>
+                        <a href="/register.html" class="btn btn-secondary btn-sm">Sign Up</a>
+                    </div>
+                `;
+            };
+
+            // Render guest navigation immediately, then upgrade auth state in the background.
+            window.NavigationManager.init(null);
+            window.NavigationManager.render('navigationContainer');
+            renderHomeHeroUserBar(null);
 
             // Fetch and render Instagram embeds from admin settings
             async function loadInstagramEmbeds() {
@@ -250,15 +274,12 @@
 
             try {
                 const user = await getCurrentUser();
-                window.NavigationManager.init(user || null);
                 if (user) {
-                    window.NavigationManager.updateAuth(user);
+                    window.NavigationManager.updateAuth(user, 'navigationContainer');
+                    renderHomeHeroUserBar(user);
                 }
-                window.NavigationManager.render('navigationContainer');
             } catch (error) {
                 console.error('Home initialization failed:', error);
-                window.NavigationManager.init(null);
-                window.NavigationManager.render('navigationContainer');
             }
         });
     </script>

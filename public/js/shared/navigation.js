@@ -253,8 +253,8 @@ class NavigationManager {
         const homeAddressHtml = showHomeAddress
             ? '<p class="app-brand-address">Zen Business Center, Bhumkar Chowk Rd, Wakad, Pune</p>'
             : '';
-        const greetingHtml = this.isAuthenticated
-            ? `<p class="app-greeting">Hi, ${displayName}</p>`
+        const greetingHtml = this.isAuthenticated && this.currentPage !== 'home'
+            ? `<p class="app-header-greeting">Hi, ${displayName}</p>`
             : '';
 
         // Generate main links HTML
@@ -279,9 +279,9 @@ class NavigationManager {
                 <div class="app-brand">
                     <h1>🎸Swar JamRoom & Music Studio</h1>
                     ${homeAddressHtml}
-                    ${greetingHtml}
                 </div>
                 <div class="app-header-actions">
+                    ${greetingHtml}
                     <div class="app-header-actions-primary">
                         ${headerActionsHTML}
                     </div>
