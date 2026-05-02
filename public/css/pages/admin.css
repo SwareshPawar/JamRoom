@@ -1596,8 +1596,34 @@ table td small {
     scrollbar-width: thin;
 }
 
+.booking-quick-payment-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.booking-quick-payment-grid .form-group {
+    margin-bottom: 0;
+}
+
+.booking-quick-payment-actions {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.booking-quick-payment-actions small {
+    color: var(--text-color-light);
+}
+
 @media (max-width: 768px) {
     .bookings-table-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-quick-payment-grid {
         grid-template-columns: 1fr;
     }
 
@@ -2323,4 +2349,29 @@ textarea:focus {
     .bookings-page-meta {
         min-width: 0;
     }
+}
+
+/* Quick Payment Modal — payment mode chip toggles */
+.qp-mode-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border: 1.5px solid var(--border-color, #ccc);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    user-select: none;
+    color: var(--text-secondary, #555);
+    background: transparent;
+}
+.qp-mode-chip:hover {
+    border-color: var(--primary, #007bff);
+    color: var(--primary, #007bff);
+}
+.qp-mode-chip.active {
+    background: var(--primary, #007bff);
+    border-color: var(--primary, #007bff);
+    color: #fff;
 }

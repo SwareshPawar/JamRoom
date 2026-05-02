@@ -188,13 +188,13 @@
         const serializedBooking = JSON.stringify(booking || {}).replace(/"/g, '&quot;');
         const stopOrClose = context === 'modal'
             ? "closeModal('bookingActionModal'); "
-            : 'event.stopPropagation(); ';
+            : `event.stopPropagation(); `;
         const actionClass = context === 'modal' ? 'booking-expand-actions' : 'booking-table-actions';
 
         return `
             <div class="${actionClass}">
                 ${includeView
-                    ? `<button onclick="event.stopPropagation(); openBookingDetailsModal('${booking._id}')" class="btn btn-primary btn-sm">View</button>`
+                    ? `<button onclick="openBookingPaymentDetails('${booking._id}', event)" class="btn btn-primary btn-sm">Payment</button>`
                     : ''}
                 ${status === 'PENDING'
                     ? `<button onclick="${stopOrClose}approveBooking('${booking._id}')" class="btn btn-success btn-sm">Approve</button>
@@ -228,6 +228,13 @@
         const adjustment = getBookingAdjustment(booking);
         const adjustmentLabel = adjustment.signedValue < 0 ? 'Discount' : 'Surcharge';
         const adjustmentColorClass = adjustment.signedValue < 0 ? 'text-danger' : 'text-info';
+        const normalizedPaymentStatus = ['PENDING', 'PARTIAL', 'PAID'].includes(String(booking?.paymentStatus || '').toUpperCase())
+            ? String(booking.paymentStatus).toUpperCase()
+            : 'PENDING';
+        const totalAmount = Math.max(0, Number(booking?.price || 0));
+        const amountPaidFromBooking = Number.isFinite(Number(booking?.amountPaid))
+            ? Number(booking.amountPaid)
+            : (normalizedPaymentStatus === 'PAID' ? totalAmount : 0);
         const collectedAmount = getCollectedAmount(booking);
         const outstandingAmount = Math.max(0, Number(booking?.price || 0) - collectedAmount);
 
@@ -687,6 +694,115 @@
         );
     };
 
+    const openBookingPaymentDetails = (bookingId, event) => {
+        if (event && typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+
+        const booking = state.bookingsById.get(String(bookingId || ''));
+        if (!booking) return;
+
+        const totalAmount = Math.max(0, Number(booking?.price || 0));
+        const normalizedPaymentStatus = ['PENDING', 'PARTIAL', 'PAID'].includes(String(booking?.paymentStatus || '').toUpperCase())
+            ? String(booking.paymentStatus).toUpperCase()
+            : 'PENDING';
+        const amountPaidFromBooking = Number.isFinite(Number(booking?.amountPaid))
+            ? Number(booking.amountPaid)
+            : (normalizedPaymentStatus === 'PAID' ? totalAmount : 0);
+
+        const bookingIdEl = document.getElementById('qpBookingId');
+        const statusEl = document.getElementById('qpStatus');
+        const amountEl = document.getElementById('qpAmountPaid');
+        const refEl = document.getElementById('qpReference');
+        const noteEl = document.getElementById('qpNote');
+        const totalEl = document.getElementById('qpTotalAmount');
+        const summaryEl = document.getElementById('qpSummary');
+        const chipsEl = document.getElementById('qpPartialChips');
+
+        if (bookingIdEl) bookingIdEl.value = bookingId;
+        if (statusEl) statusEl.value = normalizedPaymentStatus;
+        if (amountEl) amountEl.value = Math.max(0, amountPaidFromBooking).toFixed(2);
+        if (refEl) refEl.value = booking.paymentReference || '';
+        if (noteEl) noteEl.value = booking.paymentNote || '';
+        if (totalEl) totalEl.value = totalAmount.toFixed(2);
+
+        // Show/hide partial chips
+        if (chipsEl) {
+            chipsEl.classList.toggle('admin-hidden', normalizedPaymentStatus !== 'PARTIAL');
+        }
+
+        // Update fixed chip labels relative to total
+        const chip500El = document.getElementById('qpChip500');
+        const chip1000El = document.getElementById('qpChip1000');
+        if (chip500El) chip500El.style.display = totalAmount > 500 ? '' : 'none';
+        if (chip1000El) chip1000El.style.display = totalAmount > 1000 ? '' : 'none';
+
+        // Set payment mode chip
+        const existingMode = String(booking.paymentMode || '').toUpperCase();
+        document.querySelectorAll('.qp-mode-chip').forEach((chip) => {
+            const isActive = chip.dataset.mode === existingMode;
+            chip.classList.toggle('active', isActive);
+            const radio = chip.querySelector('input[type="radio"]');
+            if (radio) radio.checked = isActive;
+        });
+
+        // Build summary card
+        if (summaryEl) {
+            const customerName = escapeHtml(booking.userId?.name || booking.userName || booking.customerName || 'Customer');
+            const isPerday = booking.bookingMode === 'perday';
+            const modeLabel = isPerday ? 'Per-day' : 'Hourly';
+            const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
+            const durationLabel = isPerday ? `${perDayDays} day(s)` : `${booking.duration || 0} hr(s)`;
+
+            const formatDateFriendly = (rawDate) => {
+                if (!rawDate) return '';
+                try {
+                    return new Date(rawDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                } catch { return String(rawDate); }
+            };
+            const formatTimeFriendly = (t) => {
+                if (!t) return '';
+                const [hStr, mStr] = String(t).split(':');
+                const h = parseInt(hStr, 10);
+                const m = String(mStr || '00').padStart(2, '0');
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                const h12 = ((h % 12) || 12);
+                return `${h12}:${m} ${ampm}`;
+            };
+
+            let dateTimeStr;
+            if (isPerday && booking.perDayStartDate && booking.perDayEndDate) {
+                dateTimeStr = `${formatDateFriendly(booking.perDayStartDate)} &ndash; ${formatDateFriendly(booking.perDayEndDate)}`;
+            } else {
+                const d = formatDateFriendly(booking.date);
+                const t = (booking.startTime && booking.endTime)
+                    ? `${formatTimeFriendly(booking.startTime)} &ndash; ${formatTimeFriendly(booking.endTime)}`
+                    : '';
+                dateTimeStr = [d, t].filter(Boolean).join(', ');
+            }
+
+            const outstanding = Math.max(0, totalAmount - amountPaidFromBooking);
+            summaryEl.innerHTML = `
+                <div style="display:flex; flex-wrap:wrap; gap:0.25rem 1.25rem;">
+                    <span><strong>Customer:</strong> ${customerName}</span>
+                    <span><strong>Type:</strong> ${modeLabel} &mdash; ${durationLabel}</span>
+                    ${dateTimeStr ? `<span><strong>Date/Time:</strong> ${dateTimeStr}</span>` : ''}
+                    <span><strong>Total:</strong> &#8377;${totalAmount.toFixed(2)}</span>
+                    <span><strong>Received:</strong> &#8377;${amountPaidFromBooking.toFixed(2)}</span>
+                    <span><strong>Outstanding:</strong> &#8377;${outstanding.toFixed(2)}</span>
+                </div>
+            `;
+        }
+
+        const modal = document.getElementById('quickPaymentModal');
+        if (modal) modal.classList.add('show');
+
+        setTimeout(() => {
+            const statusInput = document.getElementById('qpStatus');
+            if (statusInput) statusInput.focus();
+        }, 0);
+    };
+
     const rejectBooking = async (bookingId, deps) => {
         const {
             apiUrl,
@@ -737,10 +853,143 @@
         );
     };
 
+    const syncQuickPaymentForBookingModal = () => {
+        const statusEl = document.getElementById('qpStatus');
+        const amountEl = document.getElementById('qpAmountPaid');
+        const totalEl = document.getElementById('qpTotalAmount');
+        const chipsEl = document.getElementById('qpPartialChips');
+        if (!statusEl || !amountEl) return;
+
+        const status = String(statusEl.value || 'PENDING').toUpperCase();
+        const total = Math.max(0, Number(totalEl?.value || 0));
+
+        if (chipsEl) chipsEl.classList.toggle('admin-hidden', status !== 'PARTIAL');
+
+        if (status === 'PAID') {
+            amountEl.value = total.toFixed(2);
+            return;
+        }
+
+        if (status === 'PENDING') {
+            amountEl.value = '0.00';
+        }
+    };
+
+    const quickUpdateBookingPayment = async (bookingId, deps) => {
+        const {
+            apiUrl,
+            showLoading,
+            hideLoading,
+            showAlert,
+            refreshStats,
+            refreshBookings
+        } = deps;
+
+        const booking = state.bookingsById.get(String(bookingId || ''));
+        if (!booking) {
+            showAlert('bookingAlert', 'Booking not found. Please refresh and try again.', 'error');
+            return;
+        }
+
+        const paymentStatusEl = document.getElementById('qpStatus');
+        const amountPaidEl = document.getElementById('qpAmountPaid');
+        const paymentReferenceEl = document.getElementById('qpReference');
+        const paymentNoteEl = document.getElementById('qpNote');
+
+        if (!paymentStatusEl || !amountPaidEl) {
+            showAlert('bookingAlert', 'Payment controls are not available in this view.', 'error');
+            return;
+        }
+
+        const paymentStatus = String(paymentStatusEl.value || 'PENDING').toUpperCase();
+        const totalAmount = Math.max(0, Number(booking.price || 0));
+        const requestedAmount = Number(amountPaidEl.value || 0);
+
+        if (!['PENDING', 'PARTIAL', 'PAID'].includes(paymentStatus)) {
+            showAlert('bookingAlert', 'Invalid payment status selected.', 'error');
+            return;
+        }
+
+        if (!Number.isFinite(requestedAmount) || requestedAmount < 0) {
+            showAlert('bookingAlert', 'Amount received must be a non-negative number.', 'error');
+            return;
+        }
+
+        if (paymentStatus === 'PARTIAL' && !(requestedAmount > 0 && requestedAmount < totalAmount)) {
+            showAlert('bookingAlert', 'For partial payment, amount received must be greater than 0 and less than total amount.', 'warning');
+            return;
+        }
+
+        const normalizedAmount = paymentStatus === 'PAID'
+            ? totalAmount
+            : paymentStatus === 'PENDING'
+                ? 0
+                : requestedAmount;
+
+        const activeMode = document.querySelector('.qp-mode-chip.active')?.dataset?.mode || '';
+
+        const payload = {
+            paymentStatus,
+            amountPaid: normalizedAmount,
+            paymentReference: String(paymentReferenceEl.value || '').trim(),
+            paymentNote: String(paymentNoteEl.value || '').trim(),
+            paymentMode: activeMode
+        };
+
+        try {
+            showLoading('Updating payment details...');
+
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${apiUrl}/api/admin/bookings/${bookingId}/edit`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await res.json();
+            if (!res.ok) {
+                throw new Error(result.message || 'Failed to update payment details');
+            }
+
+            const updatedBooking = result?.booking
+                ? result.booking
+                : {
+                    ...booking,
+                    paymentStatus,
+                    amountPaid: normalizedAmount,
+                    paymentReference: payload.paymentReference,
+                    paymentNote: payload.paymentNote
+                };
+
+            state.bookingsById.set(String(bookingId), updatedBooking);
+            state.allBookings = (state.allBookings || []).map((item) => (
+                String(item?._id) === String(bookingId) ? updatedBooking : item
+            ));
+
+            showAlert('bookingAlert', 'Payment details updated successfully!', 'success');
+            await refreshStats();
+            await refreshBookings();
+            const qpModal = document.getElementById('quickPaymentModal');
+            if (qpModal) qpModal.classList.remove('show');
+        } catch (error) {
+            showAlert('bookingAlert', error.message || 'Unable to update payment details', 'error');
+        } finally {
+            hideLoading();
+        }
+    };
+
     window.AdminBookings = window.AdminBookings || {};
     window.AdminBookings.loadBookings = loadBookings;
     window.AdminBookings.approveBooking = approveBooking;
     window.AdminBookings.rejectBooking = rejectBooking;
+    window.AdminBookings.syncQuickPaymentForBookingModal = syncQuickPaymentForBookingModal;
+    window.AdminBookings.quickUpdateBookingPayment = quickUpdateBookingPayment;
     window.AdminBookings.openBookingDetailsModal = openBookingDetailsModal;
+    window.AdminBookings.openBookingPaymentDetails = openBookingPaymentDetails;
+    window.syncQuickPaymentForBookingModal = syncQuickPaymentForBookingModal;
+    window.openBookingPaymentDetails = openBookingPaymentDetails;
     window.openBookingDetailsModal = openBookingDetailsModal;
 })();

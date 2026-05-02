@@ -111,6 +111,7 @@ const cancelBooking = async (bookingId) => {
     if (!confirm('Are you sure you want to cancel this booking?')) return;
 
     try {
+        showLoadingOverlay('Cancelling booking...');
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/api/bookings/${bookingId}/cancel`, {
             method: 'PUT',
@@ -123,6 +124,8 @@ const cancelBooking = async (bookingId) => {
         await loadMyBookings();
     } catch (error) {
         showAlert(error.message, 'error');
+    } finally {
+        hideLoadingOverlay();
     }
 };
 

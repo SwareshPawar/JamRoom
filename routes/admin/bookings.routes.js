@@ -938,7 +938,8 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       paymentStatus,
       amountPaid,
       paymentReference,
-      paymentNote
+      paymentNote,
+      paymentMode
     } = req.body;
 
     const booking = await Booking.findById(req.params.id);
@@ -1139,6 +1140,11 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
 
     if (paymentNote !== undefined) {
       booking.paymentNote = String(paymentNote || '').trim();
+    }
+
+    if (paymentMode !== undefined) {
+      const normalizedMode = String(paymentMode || '').toUpperCase().trim();
+      booking.paymentMode = ['UPI', 'CASH', 'OTHER'].includes(normalizedMode) ? normalizedMode : '';
     }
 
     await booking.save();

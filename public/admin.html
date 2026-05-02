@@ -504,6 +504,78 @@
         </div>
     </div>
 
+    <!-- Quick Payment Update Modal -->
+    <div id="quickPaymentModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Update Payment</h2>
+                <span class="close" onclick="closeModal('quickPaymentModal')">&times;</span>
+            </div>
+
+            <input type="hidden" id="qpBookingId">
+            <input type="hidden" id="qpTotalAmount" value="0">
+
+            <!-- Booking summary card -->
+            <div id="qpSummary" class="admin-theme-info-card" style="margin: 1rem 0 1.25rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; line-height: 1.6;"></div>
+
+            <div class="form-group">
+                <label for="qpStatus">Payment Status</label>
+                <select id="qpStatus" onchange="syncQuickPaymentForBookingModal()">
+                    <option value="PENDING">Unpaid (Pending)</option>
+                    <option value="PARTIAL">Partial</option>
+                    <option value="PAID">Paid in Full</option>
+                </select>
+            </div>
+
+            <!-- Partial quick-pick chips (shown only when Partial selected) -->
+            <div id="qpPartialChips" class="admin-hidden" style="margin: -0.25rem 0 0.75rem;">
+                <div style="font-size: 0.78rem; color: var(--text-muted, #888); margin-bottom: 0.4rem;">Quick select amount:</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyPartialChip(0.25)">25%</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyPartialChip(0.5)">50%</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyPartialChip(0.75)">75%</button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="qpChip500" onclick="applyPartialChipFixed(500)">&#8377;500</button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="qpChip1000" onclick="applyPartialChipFixed(1000)">&#8377;1000</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="qpAmountPaid">Amount Received (&#8377;)</label>
+                <input type="number" id="qpAmountPaid" min="0" step="10" placeholder="0.00">
+            </div>
+
+            <div class="form-group">
+                <label for="qpPaymentMode">Payment Mode</label>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;" id="qpPaymentModeGroup">
+                    <label class="qp-mode-chip" data-mode="UPI">
+                        <input type="radio" name="qpPaymentMode" value="UPI" style="display:none;"> UPI
+                    </label>
+                    <label class="qp-mode-chip" data-mode="CASH">
+                        <input type="radio" name="qpPaymentMode" value="CASH" style="display:none;"> Cash
+                    </label>
+                    <label class="qp-mode-chip" data-mode="OTHER">
+                        <input type="radio" name="qpPaymentMode" value="OTHER" style="display:none;"> Other
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="qpReference">Payment Reference</label>
+                <input type="text" id="qpReference" placeholder="Txn ID / UPI Ref">
+            </div>
+
+            <div class="form-group">
+                <label for="qpNote">Payment Note</label>
+                <input type="text" id="qpNote" placeholder="Optional note">
+            </div>
+
+            <div class="modal-actions-row">
+                <button onclick="quickUpdateBookingPayment()" class="btn btn-primary btn-flex">Save Payment</button>
+                <button onclick="closeModal('quickPaymentModal')" class="btn btn-secondary btn-flex">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Booking Modal -->
     <div id="editBookingModal" class="modal">
         <div class="modal-content">
@@ -1789,6 +1861,57 @@
                 refreshBookings: loadBookings
             });
         };
+
+        const quickUpdateBookingPayment = async () => {
+            if (!window.AdminBookings || typeof window.AdminBookings.quickUpdateBookingPayment !== 'function') {
+                console.error('AdminBookings module is not available.');
+                return;
+            }
+
+            const bookingId = document.getElementById('qpBookingId')?.value;
+            if (!bookingId) return;
+
+            await window.AdminBookings.quickUpdateBookingPayment(bookingId, {
+                apiUrl: API_URL,
+                showLoading,
+                hideLoading,
+                showAlert,
+                refreshStats: loadStats,
+                refreshBookings: loadBookings
+            });
+        };
+        window.quickUpdateBookingPayment = quickUpdateBookingPayment;
+
+        // Partial payment quick-pick chips
+        const applyPartialChip = (fraction) => {
+            const total = Math.max(0, Number(document.getElementById('qpTotalAmount')?.value || 0));
+            const amountEl = document.getElementById('qpAmountPaid');
+            if (amountEl) amountEl.value = (total * fraction).toFixed(2);
+        };
+        window.applyPartialChip = applyPartialChip;
+
+        const applyPartialChipFixed = (fixed) => {
+            const amountEl = document.getElementById('qpAmountPaid');
+            if (amountEl) amountEl.value = fixed.toFixed(2);
+        };
+        window.applyPartialChipFixed = applyPartialChipFixed;
+
+        // Payment mode chip toggle
+        document.addEventListener('click', (e) => {
+            const chip = e.target.closest('.qp-mode-chip');
+            if (!chip) return;
+            const alreadyActive = chip.classList.contains('active');
+            document.querySelectorAll('.qp-mode-chip').forEach((c) => {
+                c.classList.remove('active');
+                const r = c.querySelector('input[type="radio"]');
+                if (r) r.checked = false;
+            });
+            if (!alreadyActive) {
+                chip.classList.add('active');
+                const radio = chip.querySelector('input[type="radio"]');
+                if (radio) radio.checked = true;
+            }
+        });
         // Edit booking
         const buildEditBookingModuleDeps = () => ({
             apiUrl: API_URL,
@@ -1973,6 +2096,7 @@
             };
 
             try {
+                showLoading('Blocking selected time...');
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${API_URL}/api/admin/block-time`, {
                     method: 'POST',
@@ -1994,6 +2118,8 @@
                 await loadBlockedTimes();
             } catch (error) {
                 showAlert('blockedAlert', error.message, 'error');
+            } finally {
+                hideLoading();
             }
         });
 
@@ -2002,6 +2128,7 @@
             if (!confirm('Remove this blocked time?')) return;
 
             try {
+                showLoading('Removing blocked time...');
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${API_URL}/api/admin/blocked-times/${blockedId}`, {
                     method: 'DELETE',
@@ -2014,6 +2141,8 @@
                 await loadBlockedTimes();
             } catch (error) {
                 showAlert('blockedAlert', error.message, 'error');
+            } finally {
+                hideLoading();
             }
         };
 

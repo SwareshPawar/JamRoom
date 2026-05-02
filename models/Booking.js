@@ -114,6 +114,11 @@ const bookingSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  paymentMode: {
+    type: String,
+    enum: ['UPI', 'CASH', 'OTHER', ''],
+    default: ''
+  },
   paymentNote: {
     type: String,
     trim: true,

@@ -520,7 +520,11 @@ class JamRoomUtils {
         this.hideLoading(container); // Remove any existing loader
         
         const loader = this.createElement('div', {
-            className: 'loading-overlay utils-loading-overlay'
+            // Use a dedicated class so page-level `.loading-overlay` rules cannot break positioning.
+            className: 'jr-global-loading-overlay utils-loading-overlay',
+            role: 'status',
+            'aria-live': 'polite',
+            style: 'position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:20px !important;box-sizing:border-box !important;background:rgba(6, 16, 38, 0.62) !important;backdrop-filter:blur(8px) !important;-webkit-backdrop-filter:blur(8px) !important;z-index:2147483647 !important;'
         }, `
             <div class="utils-loading-content">
                 <div class="utils-loading-spinner"></div>
@@ -537,10 +541,9 @@ class JamRoomUtils {
             container = document.body;
         }
 
-        const loader = container.querySelector('.loading-overlay');
-        if (loader) {
-            loader.remove();
-        }
+        const loader = container.querySelector('.jr-global-loading-overlay')
+            || container.querySelector('.utils-loading-overlay');
+        if (loader) loader.remove();
     }
 
     static showButtonLoading(buttonId, originalText = '') {

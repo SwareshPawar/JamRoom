@@ -1264,10 +1264,19 @@ textarea:disabled {
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 100vw;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
     z-index: 9999;
 }
 
 .utils-loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
     text-align: center;
 }
 
@@ -1278,7 +1287,7 @@ textarea:disabled {
     border-top: 3px solid var(--primary-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin: 0 auto 15px;
+    margin: 0;
 }
 
 .utils-loading-message {
