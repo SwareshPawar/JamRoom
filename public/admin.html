@@ -75,6 +75,7 @@
                 <button class="tab" onclick="switchTab('settings', this)">⚙️ Settings</button>
                 <button class="tab" onclick="switchTab('users', this)">👥 Users</button>
                 <button class="tab" onclick="switchTab('savedQuotations', this)">🧾 Saved Quotations</button>
+                <button class="tab" onclick="switchTab('deletedRecords', this)">🗑️ Deleted Records</button>
             </div>
 
             <!-- Bookings Tab -->
@@ -191,6 +192,11 @@
             <div id="blockedTab" class="tab-content">
                 <h2>Blocked Time Slots</h2>
                 <button class="btn btn-primary" onclick="showBlockTimeModal()">+ Block New Time</button>
+                <select id="blockedDeletedFilter" class="users-search-input" style="max-width: 170px; margin-left: 10px;">
+                    <option value="active" selected>Active Blocks</option>
+                    <option value="deleted">Deleted Blocks</option>
+                    <option value="all">All Blocks</option>
+                </select>
                 <div id="blockedAlert" class="alert"></div>
                 <div id="blockedLoading" class="loading">Loading blocked times...</div>
                 <div id="blockedList"></div>
@@ -199,6 +205,11 @@
             <!-- Settings Tab -->
             <div id="settingsTab" class="tab-content">
                 <h2>Admin Settings</h2>
+                <select id="settingsDeletedFilter" class="users-search-input" style="max-width: 220px; margin-bottom: 10px;">
+                    <option value="active" selected>Active Catalog Items</option>
+                    <option value="deleted">Deleted Catalog Items</option>
+                    <option value="all">All Catalog Items</option>
+                </select>
                 <div id="settingsAlert" class="alert"></div>
                 <form id="settingsForm">
                     <div class="form-group">
@@ -337,6 +348,11 @@
                             <h3>Registered Users</h3>
                             <div class="users-table-controls">
                                 <input type="text" id="usersSearchInput" class="users-search-input" placeholder="Search by name, email, mobile">
+                                <select id="usersDeletedFilter" class="users-search-input" style="max-width: 170px;">
+                                    <option value="active" selected>Active Users</option>
+                                    <option value="deleted">Deleted Users</option>
+                                    <option value="all">All Users</option>
+                                </select>
                                 <button type="button" class="btn btn-secondary" onclick="loadUsersManagementList()">Refresh</button>
                             </div>
                         </div>
@@ -361,10 +377,25 @@
                 <p class="users-tab-intro">Reusable quotation templates. Templates always pick current catalog rates when reused or sent.</p>
                 <div id="savedQuotationAlert" class="alert"></div>
                 <div class="admin-toolbar">
+                    <select id="savedQuotationsDeletedFilter" class="users-search-input" style="max-width: 220px;">
+                        <option value="active" selected>Active Templates</option>
+                        <option value="deleted">Deleted Templates</option>
+                        <option value="all">All Templates</option>
+                    </select>
                     <button class="btn btn-secondary" onclick="loadSavedQuotations(true)">Refresh</button>
                     <button class="btn btn-primary" onclick="showQuotationModal()">Create New Quotation</button>
                 </div>
                 <div id="savedQuotationsTable"></div>
+            </div>
+
+            <div id="deletedRecordsTab" class="tab-content">
+                <div class="admin-toolbar">
+                    <h2>Deleted Records</h2>
+                    <button class="btn btn-secondary" onclick="loadDeletedRecords(true)">Refresh</button>
+                </div>
+                <p class="users-tab-intro">Manage deleted bookings, users, blocked times, rentals, rental sub-items, bindings, highlights, and quotation templates.</p>
+                <div id="deletedRecordsAlert" class="alert"></div>
+                <div id="deletedRecordsContainer"></div>
             </div>
         </div>
     </div>
@@ -1082,6 +1113,11 @@
         let currentUser = null;
         let usersManagementData = [];
         let usersManagementById = new Map();
+        let usersDeletedFilter = 'active';
+        let blockedDeletedFilter = 'active';
+        let settingsDeletedFilter = 'active';
+        let savedQuotationsDeletedFilter = 'active';
+        let deletedRecordsActiveTab = 'bookings';
         let savedQuotationsData = [];
         let adminSettingsData = null;
         let categoryBindingPairs = [];
@@ -1123,7 +1159,13 @@
         const showConfirmationModal = (title, message, confirmText, onConfirm, showReason = false) => {
             document.getElementById('confirmationTitle').textContent = title;
             document.getElementById('confirmationMessage').textContent = message;
-            document.getElementById('confirmButton').textContent = confirmText;
+            const confirmButton = document.getElementById('confirmButton');
+            confirmButton.textContent = confirmText;
+
+            const dangerTokens = ['permanent', 'delete', 'remove'];
+            const dangerSource = `${title || ''} ${confirmText || ''}`.toLowerCase();
+            const isDestructive = dangerTokens.some((token) => dangerSource.includes(token));
+            confirmButton.className = `btn ${isDestructive ? 'btn-danger' : 'btn-primary'} btn-flex`;
             
             const reasonGroup = document.getElementById('reasonGroup');
             const rejectionReason = document.getElementById('rejectionReason');
@@ -1138,7 +1180,6 @@
             document.getElementById('confirmationModal').classList.add('show');
             
             // Remove any existing listeners and add new one
-            const confirmButton = document.getElementById('confirmButton');
             const newButton = confirmButton.cloneNode(true);
             confirmButton.parentNode.replaceChild(newButton, confirmButton);
             
@@ -1392,6 +1433,7 @@
             if (tab === 'settings') loadSettings();
             if (tab === 'users') loadUsersManagementList();
             if (tab === 'savedQuotations') loadSavedQuotations();
+            if (tab === 'deletedRecords') loadDeletedRecords(true);
         };
 
         // Load statistics
@@ -1412,10 +1454,11 @@
                 ? window.JamRoomUtils.getSectionLoaderMarkup('Loading users...')
                 : '<div class="text-muted">Loading users...</div>';
             const query = (document.getElementById('usersSearchInput')?.value || '').trim();
+            usersDeletedFilter = document.getElementById('usersDeletedFilter')?.value || 'active';
 
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/users?q=${encodeURIComponent(query)}&limit=300`, {
+                const res = await fetch(`${API_URL}/api/admin/users?q=${encodeURIComponent(query)}&limit=300&deleted=${encodeURIComponent(usersDeletedFilter)}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -1469,7 +1512,10 @@
                         <td>
                             <div class="booking-table-actions">
                                 <button type="button" class="btn btn-primary btn-sm" onclick="useSavedQuotationTemplate('${item.id}')">Use</button>
-                                <button type="button" class="btn btn-danger btn-sm" onclick="deleteSavedQuotationTemplate('${item.id}')">Delete</button>
+                                ${item.deletedAt
+                                    ? `<button type="button" class="btn btn-success btn-sm" onclick="restoreSavedQuotationTemplate('${item.id}')">Restore</button>`
+                                    : ''}
+                                <button type="button" class="btn btn-danger btn-sm" onclick="deleteSavedQuotationTemplate('${item.id}', ${item.deletedAt ? 'true' : 'false'})">${item.deletedAt ? 'Permanent Delete' : 'Delete'}</button>
                             </div>
                         </td>
                     </tr>
@@ -1500,6 +1546,8 @@
             const container = document.getElementById('savedQuotationsTable');
             if (!container) return;
 
+            savedQuotationsDeletedFilter = document.getElementById('savedQuotationsDeletedFilter')?.value || 'active';
+
             if (showLoader) {
                 container.innerHTML = window.JamRoomUtils?.getSectionLoaderMarkup
                     ? window.JamRoomUtils.getSectionLoaderMarkup('Loading saved quotations...')
@@ -1508,7 +1556,7 @@
 
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/quotations/saved`, {
+                const res = await fetch(`${API_URL}/api/admin/quotations/saved?deleted=${encodeURIComponent(savedQuotationsDeletedFilter)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) {
@@ -1523,19 +1571,24 @@
             }
         };
 
-        window.deleteSavedQuotationTemplate = async (templateId) => {
+        window.deleteSavedQuotationTemplate = async (templateId, isDeleted = false) => {
             const normalizedId = String(templateId || '').trim();
             if (!normalizedId) return;
 
             showConfirmationModal(
-                'Delete Saved Quotation',
-                'Are you sure you want to delete this saved quotation template?',
-                'Delete',
+                isDeleted ? 'Permanent Delete Saved Quotation' : 'Delete Saved Quotation',
+                isDeleted
+                    ? 'Permanently delete this saved quotation template? This cannot be undone.'
+                    : 'Move this saved quotation template to deleted records?',
+                isDeleted ? 'Permanently Delete' : 'Delete',
                 async () => {
                     try {
-                        showLoading('Deleting saved quotation...');
+                        showLoading(isDeleted ? 'Permanently deleting saved quotation...' : 'Deleting saved quotation...');
                         const token = localStorage.getItem('token');
-                        const res = await fetch(`${API_URL}/api/admin/quotations/saved/${encodeURIComponent(normalizedId)}`, {
+                        const endpoint = isDeleted
+                            ? `${API_URL}/api/admin/quotations/saved/${encodeURIComponent(normalizedId)}/permanent`
+                            : `${API_URL}/api/admin/quotations/saved/${encodeURIComponent(normalizedId)}`;
+                        const res = await fetch(endpoint, {
                             method: 'DELETE',
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
@@ -1545,7 +1598,7 @@
                             throw new Error(result.message || 'Failed to delete saved quotation');
                         }
 
-                        showSuccessAlert('Saved quotation deleted successfully');
+                        showSuccessAlert(result.message || 'Saved quotation updated successfully');
                         await loadSavedQuotations();
                     } catch (error) {
                         showErrorAlert(error.message || 'Failed to delete saved quotation');
@@ -1555,6 +1608,520 @@
                 }
             );
         };
+
+        window.restoreSavedQuotationTemplate = async (templateId) => {
+            const normalizedId = String(templateId || '').trim();
+            if (!normalizedId) return;
+
+            showConfirmationModal(
+                'Restore Saved Quotation',
+                'Restore this saved quotation template from deleted records?',
+                'Restore',
+                async () => {
+                    try {
+                        showLoading('Restoring saved quotation...');
+                        const token = localStorage.getItem('token');
+                        const endpoint = `${API_URL}/api/admin/quotations/saved/${encodeURIComponent(normalizedId)}/restore`;
+                        const res = await fetch(endpoint, {
+                            method: 'PUT',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const result = await res.json();
+                        if (!res.ok || !result.success) {
+                            throw new Error(result.message || 'Failed to restore saved quotation');
+                        }
+
+                        showSuccessAlert(result.message || 'Saved quotation restored successfully');
+                        await loadSavedQuotations();
+                    } catch (error) {
+                        showErrorAlert(error.message || 'Failed to restore saved quotation');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
+        };
+
+        const renderDeletedTable = (title, columns, rows, emptyText = 'No deleted records found.') => {
+            if (!Array.isArray(rows) || rows.length === 0) {
+                return `
+                    <div class="section">
+                        <h3>${escapeHtml(title)}</h3>
+                        <p class="text-muted">${escapeHtml(emptyText)}</p>
+                    </div>
+                `;
+            }
+
+            const header = columns.map((col) => `<th>${escapeHtml(col)}</th>`).join('');
+            return `
+                <div class="section">
+                    <h3>${escapeHtml(title)}</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr>${header}</tr></thead>
+                            <tbody>${rows.join('')}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        };
+
+        const deletedRecordsAction = async ({
+            title,
+            message,
+            confirmText,
+            loadingText,
+            endpoint,
+            method,
+            successMessage
+        }) => {
+            showConfirmationModal(title, message, confirmText, async () => {
+                try {
+                    showLoading(loadingText);
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(endpoint, {
+                        method,
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok || data.success === false) {
+                        throw new Error(data.message || 'Action failed');
+                    }
+
+                    showSuccessAlert(data.message || successMessage);
+                    await loadDeletedRecords();
+                } catch (error) {
+                    showErrorAlert(error.message || 'Action failed');
+                } finally {
+                    hideLoading();
+                }
+            });
+        };
+
+        const renderDeletedRecordsTabs = (sections = []) => {
+            const validSections = Array.isArray(sections) ? sections : [];
+            if (validSections.length === 0) {
+                return '<p class="text-muted">No deleted records found.</p>';
+            }
+
+            const availableKeys = new Set(validSections.map((section) => section.key));
+            if (!availableKeys.has(deletedRecordsActiveTab)) {
+                deletedRecordsActiveTab = validSections[0].key;
+            }
+
+            const tabsHtml = validSections.map((section) => {
+                const isActive = section.key === deletedRecordsActiveTab;
+                return `
+                    <button
+                        type="button"
+                        class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm deleted-records-tab-btn"
+                        data-deleted-tab="${section.key}"
+                        onclick="switchDeletedRecordsTab('${section.key}')"
+                    >
+                        ${escapeHtml(section.label)} (${Number(section.count || 0)})
+                    </button>
+                `;
+            }).join('');
+
+            const panelsHtml = validSections.map((section) => {
+                const isActive = section.key === deletedRecordsActiveTab;
+                return `
+                    <div class="deleted-records-panel ${isActive ? '' : 'admin-hidden'}" data-deleted-panel="${section.key}">
+                        ${section.content || ''}
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="deleted-records-tabs">
+                    ${tabsHtml}
+                </div>
+                <div class="deleted-records-panels">${panelsHtml}</div>
+            `;
+        };
+
+        window.switchDeletedRecordsTab = (tabKey) => {
+            const normalized = String(tabKey || '').trim();
+            if (!normalized) return;
+
+            deletedRecordsActiveTab = normalized;
+
+            document.querySelectorAll('.deleted-records-tab-btn').forEach((button) => {
+                const isActive = button.getAttribute('data-deleted-tab') === normalized;
+                button.classList.toggle('btn-primary', isActive);
+                button.classList.toggle('btn-secondary', !isActive);
+            });
+
+            document.querySelectorAll('.deleted-records-panel').forEach((panel) => {
+                const isActive = panel.getAttribute('data-deleted-panel') === normalized;
+                panel.classList.toggle('admin-hidden', !isActive);
+            });
+        };
+
+        window.restoreDeletedRecordBooking = async (bookingId) => deletedRecordsAction({
+            title: 'Restore Booking',
+            message: 'Restore this booking from deleted records?',
+            confirmText: 'Restore',
+            loadingText: 'Restoring booking...',
+            endpoint: `${API_URL}/api/admin/bookings/${encodeURIComponent(bookingId)}/restore`,
+            method: 'PUT',
+            successMessage: 'Booking restored successfully'
+        });
+
+        window.permanentlyDeleteDeletedRecordBooking = async (bookingId) => deletedRecordsAction({
+            title: 'Permanent Delete Booking',
+            message: 'Permanently delete this booking? This cannot be undone.',
+            confirmText: 'Permanently Delete',
+            loadingText: 'Permanently deleting booking...',
+            endpoint: `${API_URL}/api/admin/bookings/${encodeURIComponent(bookingId)}/permanent`,
+            method: 'DELETE',
+            successMessage: 'Booking permanently deleted'
+        });
+
+        window.restoreDeletedRecordUser = async (userId, name, email) => deletedRecordsAction({
+            title: 'Restore User',
+            message: `Restore user ${name} (${email}) and their deleted bookings?`,
+            confirmText: 'Restore',
+            loadingText: 'Restoring user...',
+            endpoint: `${API_URL}/api/admin/users/${encodeURIComponent(userId)}/restore`,
+            method: 'PUT',
+            successMessage: 'User restored successfully'
+        });
+
+        window.permanentlyDeleteDeletedRecordUser = async (userId, name, email) => deletedRecordsAction({
+            title: 'Permanent Delete User',
+            message: `Permanently delete user ${name} (${email})? This cannot be undone.`,
+            confirmText: 'Permanently Delete',
+            loadingText: 'Permanently deleting user...',
+            endpoint: `${API_URL}/api/admin/users/${encodeURIComponent(userId)}/permanent`,
+            method: 'DELETE',
+            successMessage: 'User permanently deleted'
+        });
+
+        window.restoreDeletedRecordBlocked = async (blockedId) => deletedRecordsAction({
+            title: 'Restore Blocked Time',
+            message: 'Restore this blocked time from deleted records?',
+            confirmText: 'Restore',
+            loadingText: 'Restoring blocked time...',
+            endpoint: `${API_URL}/api/admin/blocked-times/${encodeURIComponent(blockedId)}/restore`,
+            method: 'PUT',
+            successMessage: 'Blocked time restored successfully'
+        });
+
+        window.permanentlyDeleteDeletedRecordBlocked = async (blockedId) => deletedRecordsAction({
+            title: 'Permanent Delete Blocked Time',
+            message: 'Permanently delete this blocked time? This cannot be undone.',
+            confirmText: 'Permanently Delete',
+            loadingText: 'Permanently deleting blocked time...',
+            endpoint: `${API_URL}/api/admin/blocked-times/${encodeURIComponent(blockedId)}/permanent`,
+            method: 'DELETE',
+            successMessage: 'Blocked time permanently deleted'
+        });
+
+        window.restoreDeletedRecordRental = async (rentalId) => deletedRecordsAction({
+            title: 'Restore Rental Category',
+            message: 'Restore this rental category from deleted records?',
+            confirmText: 'Restore',
+            loadingText: 'Restoring rental category...',
+            endpoint: `${API_URL}/api/admin/settings/rental-types/${encodeURIComponent(rentalId)}/restore`,
+            method: 'PUT',
+            successMessage: 'Rental category restored successfully'
+        });
+
+        window.permanentlyDeleteDeletedRecordRental = async (rentalId) => deletedRecordsAction({
+            title: 'Permanent Delete Rental Category',
+            message: 'Permanently delete this rental category? This cannot be undone.',
+            confirmText: 'Permanently Delete',
+            loadingText: 'Permanently deleting rental category...',
+            endpoint: `${API_URL}/api/admin/settings/rental-types/${encodeURIComponent(rentalId)}/permanent`,
+            method: 'DELETE',
+            successMessage: 'Rental category permanently deleted'
+        });
+
+        window.restoreDeletedRecordSubItem = async (rentalId, subItemId) => deletedRecordsAction({
+            title: 'Restore Rental Sub-item',
+            message: 'Restore this rental sub-item from deleted records?',
+            confirmText: 'Restore',
+            loadingText: 'Restoring rental sub-item...',
+            endpoint: `${API_URL}/api/admin/settings/rental-types/${encodeURIComponent(rentalId)}/sub-items/${encodeURIComponent(subItemId)}/restore`,
+            method: 'PUT',
+            successMessage: 'Rental sub-item restored successfully'
+        });
+
+        window.permanentlyDeleteDeletedRecordSubItem = async (rentalId, subItemId) => deletedRecordsAction({
+            title: 'Permanent Delete Rental Sub-item',
+            message: 'Permanently delete this rental sub-item? This cannot be undone.',
+            confirmText: 'Permanently Delete',
+            loadingText: 'Permanently deleting rental sub-item...',
+            endpoint: `${API_URL}/api/admin/settings/rental-types/${encodeURIComponent(rentalId)}/sub-items/${encodeURIComponent(subItemId)}/permanent`,
+            method: 'DELETE',
+            successMessage: 'Rental sub-item permanently deleted'
+        });
+
+        window.restoreDeletedRecordBinding = async (bindingId) => deletedRecordsAction({
+            title: 'Restore Binding',
+            message: 'Restore this binding from deleted records?',
+            confirmText: 'Restore',
+            loadingText: 'Restoring binding...',
+            endpoint: `${API_URL}/api/admin/settings/bindings/${encodeURIComponent(bindingId)}/restore`,
+            method: 'PUT',
+            successMessage: 'Binding restored successfully'
+        });
+
+        window.permanentlyDeleteDeletedRecordBinding = async (bindingId) => deletedRecordsAction({
+            title: 'Permanent Delete Binding',
+            message: 'Permanently delete this binding? This cannot be undone.',
+            confirmText: 'Permanently Delete',
+            loadingText: 'Permanently deleting binding...',
+            endpoint: `${API_URL}/api/admin/settings/bindings/${encodeURIComponent(bindingId)}/permanent`,
+            method: 'DELETE',
+            successMessage: 'Binding permanently deleted'
+        });
+
+        window.restoreDeletedRecordHighlight = async (highlightId) => deletedRecordsAction({
+            title: 'Restore Highlight',
+            message: 'Restore this Instagram highlight from deleted records?',
+            confirmText: 'Restore',
+            loadingText: 'Restoring highlight...',
+            endpoint: `${API_URL}/api/admin/settings/instagram-embeds/${encodeURIComponent(highlightId)}/restore`,
+            method: 'PUT',
+            successMessage: 'Highlight restored successfully'
+        });
+
+        window.permanentlyDeleteDeletedRecordHighlight = async (highlightId) => deletedRecordsAction({
+            title: 'Permanent Delete Highlight',
+            message: 'Permanently delete this highlight? This cannot be undone.',
+            confirmText: 'Permanently Delete',
+            loadingText: 'Permanently deleting highlight...',
+            endpoint: `${API_URL}/api/admin/settings/instagram-embeds/${encodeURIComponent(highlightId)}/permanent`,
+            method: 'DELETE',
+            successMessage: 'Highlight permanently deleted'
+        });
+
+        window.restoreDeletedRecordQuotation = async (quotationId) => deletedRecordsAction({
+            title: 'Restore Saved Quotation',
+            message: 'Restore this saved quotation template from deleted records?',
+            confirmText: 'Restore',
+            loadingText: 'Restoring saved quotation...',
+            endpoint: `${API_URL}/api/admin/quotations/saved/${encodeURIComponent(quotationId)}/restore`,
+            method: 'PUT',
+            successMessage: 'Saved quotation restored successfully'
+        });
+
+        window.permanentlyDeleteDeletedRecordQuotation = async (quotationId) => deletedRecordsAction({
+            title: 'Permanent Delete Saved Quotation',
+            message: 'Permanently delete this saved quotation template? This cannot be undone.',
+            confirmText: 'Permanently Delete',
+            loadingText: 'Permanently deleting saved quotation...',
+            endpoint: `${API_URL}/api/admin/quotations/saved/${encodeURIComponent(quotationId)}/permanent`,
+            method: 'DELETE',
+            successMessage: 'Saved quotation permanently deleted'
+        });
+
+        const loadDeletedRecords = async (showLoader = false) => {
+            const container = document.getElementById('deletedRecordsContainer');
+            if (!container) return;
+
+            if (showLoader) {
+                container.innerHTML = window.JamRoomUtils?.getSectionLoaderMarkup
+                    ? window.JamRoomUtils.getSectionLoaderMarkup('Loading deleted records...')
+                    : '<div class="text-muted">Loading deleted records...</div>';
+            }
+
+            try {
+                const token = localStorage.getItem('token');
+                const headers = { 'Authorization': `Bearer ${token}` };
+                const [bookingsRes, usersRes, blockedRes, settingsRes, quotationsRes] = await Promise.all([
+                    fetch(`${API_URL}/api/admin/bookings?deleted=deleted`, { headers }),
+                    fetch(`${API_URL}/api/admin/users?deleted=deleted&limit=300`, { headers }),
+                    fetch(`${API_URL}/api/admin/blocked-times?deleted=deleted`, { headers }),
+                    fetch(`${API_URL}/api/admin/settings/deleted-summary`, { headers }),
+                    fetch(`${API_URL}/api/admin/quotations/saved?deleted=deleted`, { headers })
+                ]);
+
+                if (!bookingsRes.ok || !usersRes.ok || !blockedRes.ok || !settingsRes.ok || !quotationsRes.ok) {
+                    throw new Error('Failed to load deleted records');
+                }
+
+                const bookingsData = await bookingsRes.json();
+                const usersData = await usersRes.json();
+                const blockedData = await blockedRes.json();
+                const settingsData = await settingsRes.json();
+                const quotationsData = await quotationsRes.json();
+
+                const deletedBookings = Array.isArray(bookingsData.bookings) ? bookingsData.bookings : [];
+                const deletedUsers = Array.isArray(usersData.users) ? usersData.users : [];
+                const deletedBlocked = Array.isArray(blockedData.blockedTimes) ? blockedData.blockedTimes : [];
+                const deletedSettings = settingsData?.deleted || {};
+                const deletedRentals = Array.isArray(deletedSettings.rentalTypes) ? deletedSettings.rentalTypes : [];
+                const deletedSubItems = Array.isArray(deletedSettings.rentalSubItems) ? deletedSettings.rentalSubItems : [];
+                const deletedBindings = Array.isArray(deletedSettings.bindings) ? deletedSettings.bindings : [];
+                const deletedHighlights = Array.isArray(deletedSettings.highlights) ? deletedSettings.highlights : [];
+                const deletedQuotations = Array.isArray(quotationsData.quotations)
+                    ? quotationsData.quotations
+                    : (Array.isArray(deletedSettings.quotations) ? deletedSettings.quotations : []);
+
+                const sections = [];
+
+                sections.push(renderDeletedTable(
+                    'Bookings',
+                    ['Customer', 'Date', 'Deleted At', 'Actions'],
+                    deletedBookings.map((booking) => `
+                        <tr>
+                            <td>${escapeHtml(booking?.userId?.name || booking?.userName || '-')}</td>
+                            <td>${escapeHtml(formatDate(booking?.date || booking?.perDayStartDate || booking?.createdAt || '-'))}</td>
+                            <td>${escapeHtml(booking?.deletedAt ? new Date(booking.deletedAt).toLocaleString('en-IN') : '-')}</td>
+                            <td>
+                                <div class="booking-table-actions">
+                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordBooking('${booking._id}')">Restore</button>
+                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordBooking('${booking._id}')">Permanent Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `)
+                ));
+
+                sections.push(renderDeletedTable(
+                    'Users',
+                    ['Name', 'Email', 'Deleted At', 'Actions'],
+                    deletedUsers.map((user) => `
+                        <tr>
+                            <td>${escapeHtml(user?.name || '-')}</td>
+                            <td>${escapeHtml(user?.email || '-')}</td>
+                            <td>${escapeHtml(user?.deletedAt ? new Date(user.deletedAt).toLocaleString('en-IN') : '-')}</td>
+                            <td>
+                                <div class="booking-table-actions">
+                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordUser('${user._id}', '${escapeHtml(user?.name || '')}', '${escapeHtml(user?.email || '')}')">Restore</button>
+                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordUser('${user._id}', '${escapeHtml(user?.name || '')}', '${escapeHtml(user?.email || '')}')">Permanent Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `)
+                ));
+
+                sections.push(renderDeletedTable(
+                    'Blocked Times',
+                    ['Date', 'Time', 'Deleted At', 'Actions'],
+                    deletedBlocked.map((blocked) => `
+                        <tr>
+                            <td>${escapeHtml(formatDate(blocked?.date || '-'))}</td>
+                            <td>${escapeHtml(`${formatTime(blocked?.startTime || '')} - ${formatTime(blocked?.endTime || '')}`)}</td>
+                            <td>${escapeHtml(blocked?.deletedAt ? new Date(blocked.deletedAt).toLocaleString('en-IN') : '-')}</td>
+                            <td>
+                                <div class="booking-table-actions">
+                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordBlocked('${blocked._id}')">Restore</button>
+                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordBlocked('${blocked._id}')">Permanent Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `)
+                ));
+
+                sections.push(renderDeletedTable(
+                    'Rental Categories',
+                    ['Category', 'Deleted At', 'Actions'],
+                    deletedRentals.map((rental) => `
+                        <tr>
+                            <td>${escapeHtml(rental?.name || '-')}</td>
+                            <td>${escapeHtml(rental?.deletedAt ? new Date(rental.deletedAt).toLocaleString('en-IN') : '-')}</td>
+                            <td>
+                                <div class="booking-table-actions">
+                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordRental('${rental._id}')">Restore</button>
+                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordRental('${rental._id}')">Permanent Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `)
+                ));
+
+                sections.push(renderDeletedTable(
+                    'Rental Sub-items',
+                    ['Item', 'Category', 'Deleted At', 'Actions'],
+                    deletedSubItems.map((item) => `
+                        <tr>
+                            <td>${escapeHtml(item?.name || '-')}</td>
+                            <td>${escapeHtml(item?.categoryName || '-')}</td>
+                            <td>${escapeHtml(item?.deletedAt ? new Date(item.deletedAt).toLocaleString('en-IN') : '-')}</td>
+                            <td>
+                                <div class="booking-table-actions">
+                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordSubItem('${item.categoryId}', '${item._id}')">Restore</button>
+                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordSubItem('${item.categoryId}', '${item._id}')">Permanent Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `)
+                ));
+
+                sections.push(renderDeletedTable(
+                    'Category Bindings',
+                    ['Binding', 'Deleted At', 'Actions'],
+                    deletedBindings.map((binding) => `
+                        <tr>
+                            <td>${escapeHtml(`${binding?.leftCategory || '-'} (${binding?.leftRentalType || '-'}) → ${binding?.rightCategory || '-'} (${binding?.rightRentalType || '-'})`)}</td>
+                            <td>${escapeHtml(binding?.deletedAt ? new Date(binding.deletedAt).toLocaleString('en-IN') : '-')}</td>
+                            <td>
+                                <div class="booking-table-actions">
+                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordBinding('${binding._id}')">Restore</button>
+                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordBinding('${binding._id}')">Permanent Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `)
+                ));
+
+                sections.push(renderDeletedTable(
+                    'Instagram Highlights',
+                    ['URL', 'Deleted At', 'Actions'],
+                    deletedHighlights.map((highlight) => `
+                        <tr>
+                            <td>${escapeHtml(highlight?.url || '-')}</td>
+                            <td>${escapeHtml(highlight?.deletedAt ? new Date(highlight.deletedAt).toLocaleString('en-IN') : '-')}</td>
+                            <td>
+                                <div class="booking-table-actions">
+                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordHighlight('${highlight._id}')">Restore</button>
+                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordHighlight('${highlight._id}')">Permanent Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `)
+                ));
+
+                sections.push(renderDeletedTable(
+                    'Saved Quotations',
+                    ['Template', 'Updated', 'Actions'],
+                    deletedQuotations.map((quotation) => `
+                        <tr>
+                            <td>${escapeHtml(quotation?.name || '-')}</td>
+                            <td>${escapeHtml(quotation?.updatedAt ? new Date(quotation.updatedAt).toLocaleString('en-IN') : '-')}</td>
+                            <td>
+                                <div class="booking-table-actions">
+                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordQuotation('${quotation.id || quotation._id}')">Restore</button>
+                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordQuotation('${quotation.id || quotation._id}')">Permanent Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `)
+                ));
+
+                const tabSections = [
+                    { key: 'bookings', label: 'Bookings', count: deletedBookings.length, content: sections[0] || '' },
+                    { key: 'users', label: 'Users', count: deletedUsers.length, content: sections[1] || '' },
+                    { key: 'blocked', label: 'Blocked Times', count: deletedBlocked.length, content: sections[2] || '' },
+                    { key: 'rentals', label: 'Rental Categories', count: deletedRentals.length, content: sections[3] || '' },
+                    { key: 'subitems', label: 'Rental Sub-items', count: deletedSubItems.length, content: sections[4] || '' },
+                    { key: 'bindings', label: 'Bindings', count: deletedBindings.length, content: sections[5] || '' },
+                    { key: 'highlights', label: 'Highlights', count: deletedHighlights.length, content: sections[6] || '' },
+                    { key: 'quotations', label: 'Saved Quotations', count: deletedQuotations.length, content: sections[7] || '' }
+                ];
+
+                container.innerHTML = renderDeletedRecordsTabs(tabSections);
+            } catch (error) {
+                container.innerHTML = `<div class="text-danger">${escapeHtml(error.message || 'Failed to load deleted records')}</div>`;
+            }
+        };
+        window.loadDeletedRecords = loadDeletedRecords;
 
         const renderUsersManagementTable = (users) => {
             const tableContainer = document.getElementById('usersManagementTable');
@@ -1573,8 +2140,9 @@
                 const isOwnerAdmin = currentUserEmail === 'swareshpawar@gmail.com';
                 const isCurrentUser = currentUserId && user._id === currentUserId;
                 const isAdminRow = role === 'admin';
+                const isDeletedRow = user.isDeleted === true;
                 const showDelete = !isCurrentUser && (!isAdminRow || isOwnerAdmin);
-                const showReset = !isCurrentUser;
+                const showReset = !isCurrentUser && !isDeletedRow;
                 const missingDetails = !(user.name && user.email && user.mobile);
                 const editLabel = missingDetails ? 'Add Details' : 'Edit';
 
@@ -1590,10 +2158,16 @@
                         </td>
                         <td>${escapeHtml(createdAt)}</td>
                         <td>
-                            <button class="btn btn-primary btn-sm" onclick="openRegisteredUserEditor('${user._id}')">${editLabel}</button>
+                            ${isDeletedRow ? '<span class="text-muted-xs">Deleted record</span>' : `<button class="btn btn-primary btn-sm" onclick="openRegisteredUserEditor('${user._id}')">${editLabel}</button>`}
                             ${isCurrentUser ? '<span class="text-muted-xs text-gap-left">Current user</span>' : `
                                 ${showReset ? `<button class="btn btn-secondary btn-sm" onclick="resetUserPasswordToDefault('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Reset Password</button>` : ''}
-                                ${showDelete ? `<button class="btn btn-danger btn-sm" onclick="deleteRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Delete</button>` : '<span class="text-muted-xs text-gap-left">Admin delete restricted</span>'}
+                                ${showDelete
+                                    ? isDeletedRow
+                                        ? `<button class="btn btn-success btn-sm" onclick="restoreRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Restore</button>
+                                           <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Permanent Delete</button>`
+                                        : `<button class="btn btn-danger btn-sm" onclick="deleteRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Delete</button>`
+                                    : '<span class="text-muted-xs text-gap-left">Admin delete restricted</span>'}
+                                ${isDeletedRow ? '<span class="text-muted-xs text-gap-left">Deleted</span>' : ''}
                             `}
                         </td>
                     </tr>
@@ -1730,33 +2304,105 @@
         };
 
         const deleteRegisteredUser = async (userId, name, email) => {
-            const confirmed = confirm(`Delete user ${name} (${email})?\nThis will also delete all bookings for this user.`);
-            if (!confirmed) return;
+            showConfirmationModal(
+                'Delete User',
+                `Move user ${name} (${email}) to deleted records? Their bookings will also be moved to deleted records.`,
+                'Delete',
+                async () => {
+                    try {
+                        showLoading('Moving user to deleted records...');
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
 
-            try {
-                showLoading('Deleting user...');
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
+                        const data = await res.json();
+                        if (!res.ok) {
+                            throw new Error(data.message || 'Failed to delete user');
+                        }
+
+                        showAlert('userAlert', `Moved ${name} to deleted records. Moved bookings: ${data.deletedBookings || 0}`, 'success');
+                        await loadUsersManagementList();
+                        await loadStats();
+                        await loadBookings();
+                    } catch (error) {
+                        showAlert('userAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
                     }
-                });
-
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error(data.message || 'Failed to delete user');
                 }
+            );
+        };
 
-                showAlert('userAlert', `Deleted ${name}. Removed bookings: ${data.deletedBookings || 0}`, 'success');
-                await loadUsersManagementList();
-                await loadStats();
-                await loadBookings();
-            } catch (error) {
-                showAlert('userAlert', error.message, 'error');
-            } finally {
-                hideLoading();
-            }
+        const restoreRegisteredUser = async (userId, name, email) => {
+            showConfirmationModal(
+                'Restore User',
+                `Restore user ${name} (${email}) and their deleted bookings?`,
+                'Restore',
+                async () => {
+                    try {
+                        showLoading('Restoring user...');
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/users/${userId}/restore`, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok) {
+                            throw new Error(data.message || 'Failed to restore user');
+                        }
+
+                        showAlert('userAlert', data.message || `Restored ${name}`, 'success');
+                        await loadUsersManagementList();
+                        await loadStats();
+                        await loadBookings();
+                    } catch (error) {
+                        showAlert('userAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
+        };
+
+        const permanentlyDeleteRegisteredUser = async (userId, name, email) => {
+            showConfirmationModal(
+                'Permanent Delete User',
+                `Permanently delete user ${name} (${email})? This cannot be undone.`,
+                'Permanently Delete',
+                async () => {
+                    try {
+                        showLoading('Permanently deleting user...');
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/users/${userId}/permanent`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok) {
+                            throw new Error(data.message || 'Failed to permanently delete user');
+                        }
+
+                        showAlert('userAlert', `Permanently deleted ${name}. Removed bookings: ${data.deletedBookings || 0}`, 'success');
+                        await loadUsersManagementList();
+                        await loadStats();
+                        await loadBookings();
+                    } catch (error) {
+                        showAlert('userAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
         };
 
         // Calendar functionality
@@ -1965,6 +2611,42 @@
             });
         };
 
+        const permanentlyDeleteBooking = (bookingId) => {
+            if (!window.AdminBookingActions || typeof window.AdminBookingActions.permanentlyDeleteBooking !== 'function') {
+                console.error('AdminBookingActions module is not available.');
+                return;
+            }
+
+            window.AdminBookingActions.permanentlyDeleteBooking(bookingId, {
+                apiUrl: API_URL,
+                showConfirmationModal,
+                showLoading,
+                hideLoading,
+                showAlert,
+                refreshStats: loadStats,
+                refreshBookings: loadBookings
+            });
+        };
+        window.permanentlyDeleteBooking = permanentlyDeleteBooking;
+
+        const restoreBooking = (bookingId) => {
+            if (!window.AdminBookingActions || typeof window.AdminBookingActions.restoreBooking !== 'function') {
+                console.error('AdminBookingActions module is not available.');
+                return;
+            }
+
+            window.AdminBookingActions.restoreBooking(bookingId, {
+                apiUrl: API_URL,
+                showConfirmationModal,
+                showLoading,
+                hideLoading,
+                showAlert,
+                refreshStats: loadStats,
+                refreshBookings: loadBookings
+            });
+        };
+        window.restoreBooking = restoreBooking;
+
         // Open eBill recipient modal
         const sendEBill = (bookingId) => {
             if (!window.AdminBookingActions || typeof window.AdminBookingActions.openSendEBillModal !== 'function') {
@@ -2009,8 +2691,9 @@
         // Load blocked times
         const loadBlockedTimes = async () => {
             try {
+                blockedDeletedFilter = document.getElementById('blockedDeletedFilter')?.value || 'active';
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/blocked-times`, {
+                const res = await fetch(`${API_URL}/api/admin/blocked-times?deleted=${encodeURIComponent(blockedDeletedFilter)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -2028,6 +2711,7 @@
 
                 let html = '';
                 data.blockedTimes.forEach(blocked => {
+                    const isDeletedBlock = blocked.isDeleted === true;
                     html += `
                         <div class="blocked-item">
                             <div class="blocked-item-row">
@@ -2035,9 +2719,12 @@
                                     <h4>${formatDate(blocked.date)}</h4>
                                     <p><strong>Time:</strong> ${formatTime(blocked.startTime)} - ${formatTime(blocked.endTime)}</p>
                                     <p><strong>Reason:</strong> ${blocked.reason}</p>
-                                    <small>Blocked by: ${blocked.blockedBy.name}</small>
+                                    ${isDeletedBlock ? '<p><strong>Status:</strong> Deleted</p>' : ''}
+                                    <small>Blocked by: ${blocked.blockedBy?.name || 'N/A'}</small>
                                 </div>
-                                <button onclick="unblockTime('${blocked._id}')" class="btn btn-danger btn-sm">Unblock</button>
+                                ${isDeletedBlock
+                                    ? `<div class="booking-table-actions"><button onclick="restoreBlockedTime('${blocked._id}')" class="btn btn-success btn-sm">Restore</button><button onclick="permanentlyDeleteBlockedTime('${blocked._id}')" class="btn btn-danger btn-sm">Permanent Delete</button></div>`
+                                    : `<button onclick="unblockTime('${blocked._id}')" class="btn btn-danger btn-sm">Unblock</button>`}
                             </div>
                         </div>
                     `;
@@ -2125,32 +2812,94 @@
 
         // Unblock time
         const unblockTime = async (blockedId) => {
-            if (!confirm('Remove this blocked time?')) return;
+            showConfirmationModal(
+                'Delete Blocked Time',
+                'Move this blocked time to deleted records?',
+                'Delete',
+                async () => {
+                    try {
+                        showLoading('Moving blocked time to deleted records...');
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/blocked-times/${blockedId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
 
-            try {
-                showLoading('Removing blocked time...');
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/blocked-times/${blockedId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                        if (!res.ok) throw new Error('Failed to unblock time');
 
-                if (!res.ok) throw new Error('Failed to unblock time');
+                        showAlert('blockedAlert', 'Blocked time moved to deleted records', 'success');
+                        await loadBlockedTimes();
+                    } catch (error) {
+                        showAlert('blockedAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
+        };
 
-                showAlert('blockedAlert', 'Time unblocked successfully!', 'success');
-                await loadBlockedTimes();
-            } catch (error) {
-                showAlert('blockedAlert', error.message, 'error');
-            } finally {
-                hideLoading();
-            }
+        const restoreBlockedTime = async (blockedId) => {
+            showConfirmationModal(
+                'Restore Blocked Time',
+                'Restore this blocked time from deleted records?',
+                'Restore',
+                async () => {
+                    try {
+                        showLoading('Restoring blocked time...');
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/blocked-times/${blockedId}/restore`, {
+                            method: 'PUT',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message || 'Failed to restore blocked time');
+
+                        showAlert('blockedAlert', data.message || 'Blocked time restored', 'success');
+                        await loadBlockedTimes();
+                    } catch (error) {
+                        showAlert('blockedAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
+        };
+
+        const permanentlyDeleteBlockedTime = async (blockedId) => {
+            showConfirmationModal(
+                'Permanent Delete Blocked Time',
+                'Permanently delete this blocked time record? This cannot be undone.',
+                'Permanently Delete',
+                async () => {
+                    try {
+                        showLoading('Permanently deleting blocked time...');
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`${API_URL}/api/admin/blocked-times/${blockedId}/permanent`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message || 'Failed to permanently delete blocked time');
+
+                        showAlert('blockedAlert', 'Blocked time permanently deleted', 'success');
+                        await loadBlockedTimes();
+                    } catch (error) {
+                        showAlert('blockedAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
         };
 
         // Load settings
         const loadSettings = async () => {
             try {
+                settingsDeletedFilter = document.getElementById('settingsDeletedFilter')?.value || 'active';
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/settings`, {
+                const res = await fetch(`${API_URL}/api/admin/settings?deleted=${encodeURIComponent(settingsDeletedFilter)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -2194,10 +2943,12 @@
 
                 categoryBindingPairs = Array.isArray(settings?.bookingCategoryBindings?.pairs)
                     ? settings.bookingCategoryBindings.pairs.map((pair) => ({
+                        _id: pair?._id || null,
                         leftCategory: String(pair?.leftCategory || '').trim(),
                         rightCategory: String(pair?.rightCategory || '').trim(),
                         leftRentalType: normalizeBindingRentalType(pair?.leftRentalType || 'inhouse'),
-                        rightRentalType: normalizeBindingRentalType(pair?.rightRentalType || 'inhouse')
+                        rightRentalType: normalizeBindingRentalType(pair?.rightRentalType || 'inhouse'),
+                        deletedAt: pair?.deletedAt || null
                     })).filter((pair) => pair.leftCategory && pair.rightCategory)
                     : [];
 
@@ -2214,6 +2965,11 @@
         // Save settings
         document.getElementById('settingsForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            if (settingsDeletedFilter !== 'active') {
+                showAlert('settingsAlert', 'Switch catalog filter to "Active Catalog Items" before saving settings.', 'warning');
+                return;
+            }
 
             const rentalTypes = getCurrentRentalTypes({ strictValidation: true, showValidationAlert: true });
             
@@ -2299,13 +3055,16 @@
             container.innerHTML = '';
             const sorted = [...embeds].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
             sorted.forEach((embed, idx) => {
-                container.appendChild(createInstagramEmbedRow(embed.url || '', embed.caption || '', idx));
+                container.appendChild(createInstagramEmbedRow(embed.url || '', embed.caption || '', idx, embed._id || null, Boolean(embed?.deletedAt)));
             });
         }
 
-        function createInstagramEmbedRow(url, caption, idx) {
+        function createInstagramEmbedRow(url, caption, idx, embedId = null, isDeleted = false) {
             const row = document.createElement('div');
             row.className = 'instagram-embed-row';
+            if (embedId) {
+                row.setAttribute('data-embed-id', String(embedId));
+            }
             row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;';
             row.innerHTML = `
                 <div style="flex:2;min-width:200px;">
@@ -2316,10 +3075,73 @@
                     <input type="text" class="ig-caption" placeholder="Caption (optional)" value="${escapeHtml(caption)}"
                         style="width:100%;padding:6px 10px;border:1px solid var(--border-color,#ddd);border-radius:6px;">
                 </div>
-                <button type="button" class="btn btn-sm" style="background:#dc3545;color:#fff;padding:6px 10px;flex-shrink:0;"
-                    onclick="this.closest('.instagram-embed-row').remove()">✕</button>
+                ${settingsDeletedFilter === 'deleted' && isDeleted
+                    ? `<button type="button" class="btn btn-success btn-sm" style="padding:6px 10px;flex-shrink:0;" onclick="removeInstagramEmbedRow(this, 'restore')">Restore</button>
+                       <button type="button" class="btn btn-danger btn-sm" style="padding:6px 10px;flex-shrink:0;" onclick="removeInstagramEmbedRow(this, 'permanent')">Permanent Delete</button>`
+                    : `<button type="button" class="btn btn-danger btn-sm" style="padding:6px 10px;flex-shrink:0;" onclick="removeInstagramEmbedRow(this, 'delete')">✕</button>`}
             `;
             return row;
+        }
+
+        async function removeInstagramEmbedRow(buttonEl, action = 'delete') {
+            const row = buttonEl?.closest('.instagram-embed-row');
+            if (!row) return;
+
+            const embedId = row.getAttribute('data-embed-id');
+            if (!embedId) {
+                row.remove();
+                return;
+            }
+
+            const normalizedAction = ['delete', 'restore', 'permanent'].includes(action) ? action : 'delete';
+            const title = normalizedAction === 'restore'
+                ? 'Restore Highlight'
+                : normalizedAction === 'permanent'
+                    ? 'Permanent Delete Highlight'
+                    : 'Delete Highlight';
+            const message = normalizedAction === 'restore'
+                ? 'Restore this Instagram highlight from deleted records?'
+                : normalizedAction === 'permanent'
+                    ? 'Permanently delete this Instagram highlight? This cannot be undone.'
+                    : 'Move this Instagram highlight to deleted records?';
+
+            showConfirmationModal(
+                title,
+                message,
+                normalizedAction === 'restore' ? 'Restore' : normalizedAction === 'permanent' ? 'Permanently Delete' : 'Delete',
+                async () => {
+                    try {
+                        showLoading(
+                            normalizedAction === 'restore'
+                                ? 'Restoring Instagram highlight...'
+                                : normalizedAction === 'permanent'
+                                    ? 'Permanently deleting Instagram highlight...'
+                                    : 'Deleting Instagram highlight...'
+                        );
+                        const token = localStorage.getItem('token');
+                        const url = normalizedAction === 'restore'
+                            ? `${API_URL}/api/admin/settings/instagram-embeds/${embedId}/restore`
+                            : normalizedAction === 'permanent'
+                                ? `${API_URL}/api/admin/settings/instagram-embeds/${embedId}/permanent`
+                                : `${API_URL}/api/admin/settings/instagram-embeds/${embedId}`;
+                        const method = normalizedAction === 'restore' ? 'PUT' : 'DELETE';
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message || 'Failed to update Instagram highlight');
+
+                        showAlert('settingsAlert', data.message || 'Instagram highlight updated', 'success');
+                        await loadSettings();
+                    } catch (error) {
+                        showAlert('settingsAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
         }
 
         function addInstagramEmbed() {
@@ -2505,6 +3327,26 @@
             }
         });
 
+        document.getElementById('usersDeletedFilter').addEventListener('change', () => {
+            usersDeletedFilter = document.getElementById('usersDeletedFilter')?.value || 'active';
+            loadUsersManagementList();
+        });
+
+        document.getElementById('blockedDeletedFilter').addEventListener('change', () => {
+            blockedDeletedFilter = document.getElementById('blockedDeletedFilter')?.value || 'active';
+            loadBlockedTimes();
+        });
+
+        document.getElementById('settingsDeletedFilter').addEventListener('change', () => {
+            settingsDeletedFilter = document.getElementById('settingsDeletedFilter')?.value || 'active';
+            loadSettings();
+        });
+
+        document.getElementById('savedQuotationsDeletedFilter').addEventListener('change', () => {
+            savedQuotationsDeletedFilter = document.getElementById('savedQuotationsDeletedFilter')?.value || 'active';
+            loadSavedQuotations(true);
+        });
+
         document.getElementById('editRegisteredUserForm').addEventListener('submit', submitRegisteredUserEdit);
 
         ['usersTabUserMobile', 'registerUserMobile', 'editRegisteredUserMobile'].forEach((fieldId) => {
@@ -2626,11 +3468,13 @@
                 const hasSubItems = rental.subItems && rental.subItems.length > 0;
                 const categoryTitle = (rental.name || '').trim() || `Category ${index + 1}`;
                 const categoryRentalType = (rental.rentalType || 'inhouse');
+                const rentalId = rental?._id ? String(rental._id) : '';
                 const subItemsHTML = hasSubItems ? rental.subItems.map((sub, subIndex) => {
                     const isPerday = categoryRentalType === 'perday';
                     const isPerSession = categoryRentalType === 'persession';
+                    const subItemId = sub?._id ? String(sub._id) : '';
                     return `
-                    <div class="rental-subitem-row" data-rental="${index}">
+                    <div class="rental-subitem-row" data-rental="${index}" ${subItemId ? `data-subitem-id="${subItemId}"` : ''}>
                         <div>
                             <label class="rental-subitem-label">Item Name</label>
                             <input type="text" value="${sub.name || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="name"
@@ -2672,7 +3516,10 @@
                                 <span class="settings-checkbox-text">Enable Qty selector</span>
                             </label>
                         </div>
-                        <button type="button" onclick="removeSubItem(${index}, ${subIndex})" class="btn btn-danger btn-sm rental-subitem-remove">×</button>
+                        ${settingsDeletedFilter === 'deleted'
+                            ? `<button type="button" onclick="removeSubItem(${index}, ${subIndex}, '${rentalId}', '${subItemId}', 'restore')" class="btn btn-success btn-sm rental-subitem-remove">Restore</button>
+                               <button type="button" onclick="removeSubItem(${index}, ${subIndex}, '${rentalId}', '${subItemId}', 'permanent')" class="btn btn-danger btn-sm rental-subitem-remove">Permanent Delete</button>`
+                            : `<button type="button" onclick="removeSubItem(${index}, ${subIndex}, '${rentalId}', '${subItemId}', 'delete')" class="btn btn-danger btn-sm rental-subitem-remove">×</button>`}
                     </div>
                     `;
                 }).join('') : '';
@@ -2680,6 +3527,9 @@
                 const rentalDiv = document.createElement('div');
                 rentalDiv.className = 'rental-type-card';
                 rentalDiv.dataset.rentalIndex = index;
+                if (rentalId) {
+                    rentalDiv.dataset.rentalId = rentalId;
+                }
                 rentalDiv.innerHTML = `
                     <details class="rental-type-collapse" ${index === 0 ? 'open' : ''}>
                         <summary class="rental-type-summary">
@@ -2723,7 +3573,10 @@
                                         <span class="settings-checkbox-text">Enable Qty selector</span>
                                     </label>
                                 </div>
-                                <button type="button" onclick="removeRentalType(${index})" class="btn btn-danger rental-type-remove">Remove</button>
+                                ${settingsDeletedFilter === 'deleted'
+                                    ? `<button type="button" onclick="removeRentalType(${index}, '${rentalId}', 'restore')" class="btn btn-success rental-type-remove">Restore</button>
+                                       <button type="button" onclick="removeRentalType(${index}, '${rentalId}', 'permanent')" class="btn btn-danger rental-type-remove">Permanent Delete</button>`
+                                    : `<button type="button" onclick="removeRentalType(${index}, '${rentalId}', 'delete')" class="btn btn-danger rental-type-remove">Remove</button>`}
                             </div>
                             <div class="rental-type-description-wrap">
                                 <label class="rental-type-label">Description</label>
@@ -2817,7 +3670,10 @@
                             <label class="rental-subitem-label">Binding</label>
                             <input type="text" class="rental-subitem-input" readonly value="${pair.leftCategory} (${pair.leftRentalType}) → ${pair.rightCategory} (${pair.rightRentalType})">
                         </div>
-                        <button type="button" class="btn btn-danger btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index})">×</button>
+                        ${settingsDeletedFilter === 'deleted'
+                            ? `<button type="button" class="btn btn-success btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'restore')">Restore</button>
+                               <button type="button" class="btn btn-danger btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'permanent')">Permanent Delete</button>`
+                            : `<button type="button" class="btn btn-danger btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'delete')">×</button>`}
                     </div>
                 `)
                 .join('');
@@ -2876,6 +3732,7 @@
             }
 
             categoryBindingPairs.push({
+                _id: null,
                 leftCategory,
                 rightCategory,
                 leftRentalType,
@@ -2887,14 +3744,61 @@
             secondSelect.value = '';
         }
 
-        function removeCategoryBindingPair(index) {
+        async function removeCategoryBindingPair(index, pairId = '', action = 'delete') {
             const numericIndex = Number(index);
             if (!Number.isInteger(numericIndex) || numericIndex < 0 || numericIndex >= categoryBindingPairs.length) {
                 return;
             }
 
-            categoryBindingPairs.splice(numericIndex, 1);
-            renderBindingPairs();
+            const normalizedId = String(pairId || '').trim();
+            if (!normalizedId) {
+                categoryBindingPairs.splice(numericIndex, 1);
+                renderBindingPairs();
+                return;
+            }
+
+            const normalizedAction = ['delete', 'restore', 'permanent'].includes(action) ? action : 'delete';
+            showConfirmationModal(
+                normalizedAction === 'restore' ? 'Restore Binding' : normalizedAction === 'permanent' ? 'Permanent Delete Binding' : 'Delete Binding',
+                normalizedAction === 'restore'
+                    ? 'Restore this binding from deleted records?'
+                    : normalizedAction === 'permanent'
+                        ? 'Permanently delete this binding? This cannot be undone.'
+                        : 'Move this binding to deleted records?',
+                normalizedAction === 'restore' ? 'Restore' : normalizedAction === 'permanent' ? 'Permanently Delete' : 'Delete',
+                async () => {
+                    try {
+                        showLoading(
+                            normalizedAction === 'restore'
+                                ? 'Restoring binding...'
+                                : normalizedAction === 'permanent'
+                                    ? 'Permanently deleting binding...'
+                                    : 'Deleting binding...'
+                        );
+                        const token = localStorage.getItem('token');
+                        const url = normalizedAction === 'restore'
+                            ? `${API_URL}/api/admin/settings/bindings/${normalizedId}/restore`
+                            : normalizedAction === 'permanent'
+                                ? `${API_URL}/api/admin/settings/bindings/${normalizedId}/permanent`
+                                : `${API_URL}/api/admin/settings/bindings/${normalizedId}`;
+                        const method = normalizedAction === 'restore' ? 'PUT' : 'DELETE';
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message || 'Failed to update binding');
+
+                        showAlert('settingsAlert', data.message || 'Binding updated', 'success');
+                        await loadSettings();
+                    } catch (error) {
+                        showAlert('settingsAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
         }
 
         const collectCategoryBindingPairs = () => {
@@ -2958,13 +3862,73 @@
             if (collapse) collapse.open = true;
         }
         
-        function removeSubItem(rentalIndex, subItemIndex) {
-            // Instead of re-rendering everything, just remove the specific sub-item and re-index
+        async function removeSubItem(rentalIndex, subItemIndex, rentalId = '', subItemId = '', action = 'delete') {
             const currentData = getCurrentRentalTypes();
-            if (currentData[rentalIndex].subItems) {
-                currentData[rentalIndex].subItems.splice(subItemIndex, 1);
+            if (!currentData[rentalIndex]) return;
+
+            const normalizedRentalId = String(rentalId || '').trim();
+            const normalizedSubItemId = String(subItemId || '').trim();
+            const normalizedAction = ['delete', 'restore', 'permanent'].includes(action) ? action : 'delete';
+
+            if (!normalizedRentalId || !normalizedSubItemId) {
+                if (currentData[rentalIndex].subItems) {
+                    currentData[rentalIndex].subItems.splice(subItemIndex, 1);
+                }
+                loadRentalTypes(currentData);
+                return;
             }
-            loadRentalTypes(currentData);
+
+            const title = normalizedAction === 'restore'
+                ? 'Restore Rental Item'
+                : normalizedAction === 'permanent'
+                    ? 'Permanent Delete Rental Item'
+                    : 'Delete Rental Item';
+            const message = normalizedAction === 'restore'
+                ? 'Restore this rental sub-item from deleted records?'
+                : normalizedAction === 'permanent'
+                    ? 'Permanently delete this rental sub-item? This cannot be undone.'
+                    : 'Move this rental sub-item to deleted records?';
+
+            showConfirmationModal(
+                title,
+                message,
+                normalizedAction === 'restore' ? 'Restore' : normalizedAction === 'permanent' ? 'Permanently Delete' : 'Delete',
+                async () => {
+                    try {
+                        showLoading(
+                            normalizedAction === 'restore'
+                                ? 'Restoring rental sub-item...'
+                                : normalizedAction === 'permanent'
+                                    ? 'Permanently deleting rental sub-item...'
+                                    : 'Deleting rental sub-item...'
+                        );
+
+                        const token = localStorage.getItem('token');
+                        const base = `${API_URL}/api/admin/settings/rental-types/${encodeURIComponent(normalizedRentalId)}/sub-items/${encodeURIComponent(normalizedSubItemId)}`;
+                        const url = normalizedAction === 'restore'
+                            ? `${base}/restore`
+                            : normalizedAction === 'permanent'
+                                ? `${base}/permanent`
+                                : base;
+                        const method = normalizedAction === 'restore' ? 'PUT' : 'DELETE';
+
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message || 'Failed to update rental sub-item');
+
+                        showAlert('settingsAlert', data.message || 'Rental sub-item updated', 'success');
+                        await loadSettings();
+                    } catch (error) {
+                        showAlert('settingsAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
         }
         
         function togglePerdayPrice(rentalIndex, subItemIndex) {
@@ -3005,14 +3969,67 @@
             loadRentalTypes(currentData);
         }
         
-        function removeRentalType(index) {
-            const container = document.getElementById('rentalTypesContainer');
-            if (container.children[index]) {
-                container.removeChild(container.children[index]);
-                // Refresh the display to update indices
-                const currentData = getCurrentRentalTypes();
-                loadRentalTypes(currentData);
+        async function removeRentalType(index, rentalId = '', action = 'delete') {
+            const normalizedId = String(rentalId || '').trim();
+            if (!normalizedId) {
+                const container = document.getElementById('rentalTypesContainer');
+                if (container.children[index]) {
+                    container.removeChild(container.children[index]);
+                    const currentData = getCurrentRentalTypes();
+                    loadRentalTypes(currentData);
+                }
+                return;
             }
+
+            const normalizedAction = ['delete', 'restore', 'permanent'].includes(action) ? action : 'delete';
+            const title = normalizedAction === 'restore'
+                ? 'Restore Rental Category'
+                : normalizedAction === 'permanent'
+                    ? 'Permanent Delete Rental Category'
+                    : 'Delete Rental Category';
+            const message = normalizedAction === 'restore'
+                ? 'Restore this rental category from deleted records?'
+                : normalizedAction === 'permanent'
+                    ? 'Permanently delete this rental category? This cannot be undone.'
+                    : 'Move this rental category to deleted records?';
+
+            showConfirmationModal(
+                title,
+                message,
+                normalizedAction === 'restore' ? 'Restore' : normalizedAction === 'permanent' ? 'Permanently Delete' : 'Delete',
+                async () => {
+                    try {
+                        showLoading(
+                            normalizedAction === 'restore'
+                                ? 'Restoring rental category...'
+                                : normalizedAction === 'permanent'
+                                    ? 'Permanently deleting rental category...'
+                                    : 'Deleting rental category...'
+                        );
+                        const token = localStorage.getItem('token');
+                        const url = normalizedAction === 'restore'
+                            ? `${API_URL}/api/admin/settings/rental-types/${normalizedId}/restore`
+                            : normalizedAction === 'permanent'
+                                ? `${API_URL}/api/admin/settings/rental-types/${normalizedId}/permanent`
+                                : `${API_URL}/api/admin/settings/rental-types/${normalizedId}`;
+                        const method = normalizedAction === 'restore' ? 'PUT' : 'DELETE';
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message || 'Failed to update rental category');
+
+                        showAlert('settingsAlert', data.message || 'Rental category updated', 'success');
+                        await loadSettings();
+                    } catch (error) {
+                        showAlert('settingsAlert', error.message, 'error');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
         }
         
         function updateRentalType(index, field, value) {

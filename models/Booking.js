@@ -153,6 +153,19 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -170,6 +183,27 @@ bookingSchema.index({ bookingStatus: 1 });
 bookingSchema.index({ paymentStatus: 1 });
 bookingSchema.index({ date: 1, bookingStatus: 1 });
 bookingSchema.index({ bookingMode: 1, perDayStartDate: 1, perDayEndDate: 1 });
+bookingSchema.index({ isDeleted: 1, deletedAt: -1 });
+
+const shouldIncludeDeleted = (query) => {
+  const options = query?.getOptions ? query.getOptions() : (query?.options || {});
+  const mongooseOptions = query?.mongooseOptions ? query.mongooseOptions() : {};
+  return Boolean(options?.includeDeleted || mongooseOptions?.includeDeleted || query?.options?.includeDeleted);
+};
+
+bookingSchema.pre(/^find/, function(next) {
+  if (!shouldIncludeDeleted(this)) {
+    this.where({ isDeleted: { $ne: true } });
+  }
+  next();
+});
+
+bookingSchema.pre('countDocuments', function(next) {
+  if (!shouldIncludeDeleted(this)) {
+    this.where({ isDeleted: { $ne: true } });
+  }
+  next();
+});
 
 // Update updatedAt on save
 bookingSchema.pre('save', function(next) {

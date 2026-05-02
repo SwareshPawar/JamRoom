@@ -11,6 +11,13 @@ const { protect } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/admin');
 const { buildHourlySlotModeFilter } = require('../../utils/adminHelpers');
 
+const resolveDeletedFilterMode = (value) => {
+  const normalized = String(value || 'active').trim().toLowerCase();
+  if (normalized === 'deleted') return 'deleted';
+  if (normalized === 'all') return 'all';
+  return 'active';
+};
+
 // @route   POST /api/admin/block-time
 // @desc    Block a time range
 // @access  Private/Admin
@@ -79,9 +86,15 @@ router.post('/block-time', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.get('/blocked-times', protect, isAdmin, async (req, res) => {
   try {
-    const { date, startDate, endDate } = req.query;
+    const { date, startDate, endDate, deleted } = req.query;
+    const deletedFilterMode = resolveDeletedFilterMode(deleted);
+    const includeDeleted = deletedFilterMode !== 'active';
 
     let query = {};
+
+    if (deletedFilterMode === 'deleted') {
+      query.isDeleted = true;
+    }
 
     if (date) {
       const queryDate = new Date(date);
@@ -96,6 +109,7 @@ router.get('/blocked-times', protect, isAdmin, async (req, res) => {
     }
 
     const blockedTimes = await BlockedTime.find(query)
+      .setOptions({ includeDeleted })
       .populate('blockedBy', 'name email')
       .sort({ date: 1, startTime: 1 });
 
@@ -114,11 +128,11 @@ router.get('/blocked-times', protect, isAdmin, async (req, res) => {
 });
 
 // @route   DELETE /api/admin/blocked-times/:id
-// @desc    Remove a blocked time
+// @desc    Soft delete a blocked time
 // @access  Private/Admin
 router.delete('/blocked-times/:id', protect, isAdmin, async (req, res) => {
   try {
-    const blockedTime = await BlockedTime.findById(req.params.id);
+    const blockedTime = await BlockedTime.findById(req.params.id).setOptions({ includeDeleted: true });
 
     if (!blockedTime) {
       return res.status(404).json({
@@ -127,17 +141,101 @@ router.delete('/blocked-times/:id', protect, isAdmin, async (req, res) => {
       });
     }
 
-    await blockedTime.deleteOne();
+    if (blockedTime.isDeleted === true) {
+      return res.status(400).json({
+        success: false,
+        message: 'Blocked time is already deleted'
+      });
+    }
+
+    blockedTime.isDeleted = true;
+    blockedTime.deletedAt = new Date();
+    blockedTime.deletedBy = req.user?._id || null;
+    await blockedTime.save();
 
     res.json({
       success: true,
-      message: 'Blocked time removed successfully'
+      message: 'Blocked time moved to deleted records'
     });
   } catch (error) {
     console.error('Delete blocked time error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error removing blocked time'
+    });
+  }
+});
+
+// @route   DELETE /api/admin/blocked-times/:id/permanent
+// @desc    Permanently delete a soft-deleted blocked time
+// @access  Private/Admin
+router.delete('/blocked-times/:id/permanent', protect, isAdmin, async (req, res) => {
+  try {
+    const blockedTime = await BlockedTime.findOne({
+      _id: req.params.id,
+      isDeleted: true
+    }).setOptions({ includeDeleted: true });
+
+    if (!blockedTime) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deleted blocked time not found'
+      });
+    }
+
+    const removal = await BlockedTime.deleteOne({ _id: blockedTime._id });
+    if ((removal?.deletedCount || 0) < 1) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to permanently delete blocked time'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Blocked time permanently deleted'
+    });
+  } catch (error) {
+    console.error('Permanent delete blocked time error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error permanently removing blocked time'
+    });
+  }
+});
+
+// @route   PUT /api/admin/blocked-times/:id/restore
+// @desc    Restore a soft-deleted blocked time
+// @access  Private/Admin
+router.put('/blocked-times/:id/restore', protect, isAdmin, async (req, res) => {
+  try {
+    const blockedTime = await BlockedTime.findOne({
+      _id: req.params.id,
+      isDeleted: true
+    }).setOptions({ includeDeleted: true });
+
+    if (!blockedTime) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deleted blocked time not found'
+      });
+    }
+
+    blockedTime.isDeleted = false;
+    blockedTime.deletedAt = null;
+    blockedTime.deletedBy = null;
+    await blockedTime.save();
+
+    res.json({
+      success: true,
+      message: 'Blocked time restored successfully',
+      blockedTime
+    });
+  } catch (error) {
+    console.error('Restore blocked time error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error restoring blocked time'
     });
   }
 });

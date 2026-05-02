@@ -297,8 +297,23 @@ router.delete('/', protect, async (req, res) => {
       });
     }
 
-    // Delete user account
-    await User.findByIdAndDelete(userId);
+    // Soft delete user account and related bookings
+    const deletedAt = new Date();
+    await Booking.updateMany(
+      { userId: userId, isDeleted: { $ne: true } },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt,
+          deletedBy: userId
+        }
+      }
+    );
+
+    user.isDeleted = true;
+    user.deletedAt = deletedAt;
+    user.deletedBy = userId;
+    await user.save();
 
     res.json({
       success: true,

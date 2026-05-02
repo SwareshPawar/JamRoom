@@ -1325,6 +1325,21 @@
     display: block;
 }
 
+.deleted-records-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.deleted-records-tab-btn {
+    white-space: nowrap;
+}
+
+.deleted-records-panels .section {
+    margin-bottom: 0;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;
@@ -1335,6 +1350,39 @@ table {
 @media (max-width: 768px) {
     table {
         font-size: 0.9em;
+    }
+
+    .deleted-records-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+    }
+
+    .deleted-records-tab-btn {
+        flex: 0 0 auto;
+    }
+
+    #deletedRecordsTab .admin-toolbar {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    #deletedRecordsTab .booking-table-actions {
+        flex-wrap: wrap;
+        overflow: visible;
+    }
+
+    #deletedRecordsTab .booking-table-actions .btn {
+        flex: 1 1 auto;
+        min-width: 120px;
+        text-align: center;
+    }
+
+    #settingsTab .rental-subitem-remove,
+    #settingsTab .rental-type-remove {
+        width: 100%;
     }
 
     table th,
@@ -1355,6 +1403,10 @@ table {
 @media (max-width: 480px) {
     table {
         font-size: 0.85em;
+    }
+
+    #deletedRecordsTab .booking-table-actions .btn {
+        min-width: 100%;
     }
 
     table th,

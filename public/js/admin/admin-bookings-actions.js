@@ -186,11 +186,11 @@
 
         showConfirmationModal(
             'Delete Booking',
-            'Are you sure you want to delete this booking? This action cannot be undone and will notify the customer.',
+            'Move this booking to deleted records? You can permanently delete it later from Deleted view.',
             'Delete',
             async () => {
                 try {
-                    showLoading('Deleting booking...');
+                    showLoading('Moving booking to deleted records...');
 
                     const token = localStorage.getItem('token');
                     const res = await fetch(`${apiUrl}/api/admin/bookings/${bookingId}`, {
@@ -202,7 +202,91 @@
                         throw new Error('Failed to delete booking');
                     }
 
-                    showAlert('bookingAlert', 'Booking deleted successfully', 'success');
+                    showAlert('bookingAlert', 'Booking moved to deleted records', 'success');
+                    await refreshStats();
+                    await refreshBookings();
+                } catch (error) {
+                    showAlert('bookingAlert', error.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            }
+        );
+    };
+
+    const permanentlyDeleteBooking = async (bookingId, deps) => {
+        const {
+            apiUrl,
+            showConfirmationModal,
+            showLoading,
+            hideLoading,
+            showAlert,
+            refreshStats,
+            refreshBookings
+        } = deps;
+
+        showConfirmationModal(
+            'Permanent Delete Booking',
+            'This permanently removes the booking record. This cannot be undone. Continue?',
+            'Permanently Delete',
+            async () => {
+                try {
+                    showLoading('Permanently deleting booking...');
+
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${apiUrl}/api/admin/bookings/${bookingId}/permanent`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) {
+                        throw new Error(data.message || 'Failed to permanently delete booking');
+                    }
+
+                    showAlert('bookingAlert', 'Booking permanently deleted', 'success');
+                    await refreshStats();
+                    await refreshBookings();
+                } catch (error) {
+                    showAlert('bookingAlert', error.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            }
+        );
+    };
+
+    const restoreBooking = async (bookingId, deps) => {
+        const {
+            apiUrl,
+            showConfirmationModal,
+            showLoading,
+            hideLoading,
+            showAlert,
+            refreshStats,
+            refreshBookings
+        } = deps;
+
+        showConfirmationModal(
+            'Restore Booking',
+            'Restore this booking from deleted records?',
+            'Restore',
+            async () => {
+                try {
+                    showLoading('Restoring booking...');
+
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${apiUrl}/api/admin/bookings/${bookingId}/restore`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) {
+                        throw new Error(data.message || 'Failed to restore booking');
+                    }
+
+                    showAlert('bookingAlert', data.message || 'Booking restored successfully', 'success');
                     await refreshStats();
                     await refreshBookings();
                 } catch (error) {
@@ -377,6 +461,8 @@
 
     window.AdminBookingActions = window.AdminBookingActions || {};
     window.AdminBookingActions.deleteBooking = deleteBooking;
+    window.AdminBookingActions.permanentlyDeleteBooking = permanentlyDeleteBooking;
+    window.AdminBookingActions.restoreBooking = restoreBooking;
     window.AdminBookingActions.openSendEBillModal = openSendEBillModal;
     window.AdminBookingActions.submitSendEBill = submitSendEBill;
     window.AdminBookingActions.downloadPDF = downloadPDF;

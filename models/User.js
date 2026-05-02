@@ -52,6 +52,19 @@ const userSchema = new mongoose.Schema({
     type: Date,
     select: false
   },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -60,6 +73,27 @@ const userSchema = new mongoose.Schema({
 
 // Index for faster queries
 userSchema.index({ email: 1 });
+userSchema.index({ isDeleted: 1, deletedAt: -1 });
+
+const shouldIncludeDeleted = (query) => {
+  const options = query?.getOptions ? query.getOptions() : (query?.options || {});
+  const mongooseOptions = query?.mongooseOptions ? query.mongooseOptions() : {};
+  return Boolean(options?.includeDeleted || mongooseOptions?.includeDeleted || query?.options?.includeDeleted);
+};
+
+userSchema.pre(/^find/, function(next) {
+  if (!shouldIncludeDeleted(this)) {
+    this.where({ isDeleted: { $ne: true } });
+  }
+  next();
+});
+
+userSchema.pre('countDocuments', function(next) {
+  if (!shouldIncludeDeleted(this)) {
+    this.where({ isDeleted: { $ne: true } });
+  }
+  next();
+});
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

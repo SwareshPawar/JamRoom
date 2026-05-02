@@ -30,6 +30,10 @@ const adminSettingsSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    deletedAt: {
+      type: Date,
+      default: null
+    },
     // Indicates if base price is always charged when category is selected
     alwaysChargeBase: {
       type: Boolean,
@@ -70,6 +74,10 @@ const adminSettingsSchema = new mongoose.Schema({
       quantityEnabled: {
         type: Boolean,
         default: false
+      },
+      deletedAt: {
+        type: Date,
+        default: null
       }
     }]
   }],
@@ -146,6 +154,10 @@ const adminSettingsSchema = new mongoose.Schema({
     updatedAt: {
       type: Date,
       default: Date.now
+    },
+    deletedAt: {
+      type: Date,
+      default: null
     }
   }],
   bookingCategoryBindings: {
@@ -167,6 +179,10 @@ const adminSettingsSchema = new mongoose.Schema({
         type: String,
         enum: ['inhouse', 'perday', 'persession'],
         default: 'inhouse'
+      },
+      deletedAt: {
+        type: Date,
+        default: null
       }
     }]
   },
@@ -184,6 +200,10 @@ const adminSettingsSchema = new mongoose.Schema({
     order: {
       type: Number,
       default: 0
+    },
+    deletedAt: {
+      type: Date,
+      default: null
     }
   }],
   upiId: {

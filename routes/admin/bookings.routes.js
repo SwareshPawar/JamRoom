@@ -52,6 +52,13 @@ const {
   normalizeIndianMobile
 } = require('../../utils/adminHelpers');
 
+const resolveDeletedFilterMode = (value) => {
+  const normalized = String(value || 'active').trim().toLowerCase();
+  if (normalized === 'deleted') return 'deleted';
+  if (normalized === 'all') return 'all';
+  return 'active';
+};
+
 // @route   GET /api/admin/bookings/calendar
 // @desc    Get bookings formatted for calendar view
 // @access  Private/Admin
@@ -158,7 +165,9 @@ router.get('/availability/:date', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.get('/bookings', protect, isAdmin, async (req, res) => {
   try {
-    const { status, date, startDate, endDate, q, sortBy } = req.query;
+    const { status, date, startDate, endDate, q, sortBy, deleted } = req.query;
+    const deletedFilterMode = resolveDeletedFilterMode(deleted);
+    const includeDeleted = deletedFilterMode !== 'active';
 
     const parsedPage = Number.parseInt(req.query.page, 10);
     const parsedLimit = Number.parseInt(req.query.limit, 10);
@@ -166,6 +175,10 @@ router.get('/bookings', protect, isAdmin, async (req, res) => {
     const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 5;
 
     let query = {};
+
+    if (deletedFilterMode === 'deleted') {
+      query.isDeleted = true;
+    }
 
     if (status) {
       query.bookingStatus = status;
@@ -191,7 +204,9 @@ router.get('/bookings', protect, isAdmin, async (req, res) => {
           { name: regex },
           { email: regex }
         ]
-      }).select('_id');
+      })
+        .setOptions({ includeDeleted })
+        .select('_id');
       const matchedUserIds = matchedUsers.map((user) => user._id);
 
       const searchClauses = [
@@ -231,12 +246,13 @@ router.get('/bookings', protect, isAdmin, async (req, res) => {
 
     const sort = sortMap[sortBy] || sortMap.created_desc;
 
-    const totalCount = await Booking.countDocuments(query);
+    const totalCount = await Booking.countDocuments(query).setOptions({ includeDeleted });
     const totalPages = totalCount > 0 ? Math.ceil(totalCount / limit) : 0;
     const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
     const skip = (safePage - 1) * limit;
 
     const bookings = await Booking.find(query)
+      .setOptions({ includeDeleted })
       .populate('userId', 'name email')
       .sort(sort)
       .skip(skip)
@@ -855,16 +871,23 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
 });
 
 // @route   DELETE /api/admin/bookings/:id
-// @desc    Delete a booking
+// @desc    Soft delete a booking
 // @access  Private/Admin
 router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id).setOptions({ includeDeleted: true });
 
     if (!booking) {
       return res.status(404).json({
         success: false,
         message: 'Booking not found'
+      });
+    }
+
+    if (booking.isDeleted === true) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking is already deleted'
       });
     }
 
@@ -900,17 +923,94 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
       console.log('Deletion notification email failed:', emailError.message);
     }
 
-    await Booking.findByIdAndDelete(req.params.id);
+    booking.isDeleted = true;
+    booking.deletedAt = new Date();
+    booking.deletedBy = req.user?._id || null;
+    await booking.save();
 
     res.json({
       success: true,
-      message: 'Booking deleted successfully'
+      message: 'Booking moved to deleted records'
     });
   } catch (error) {
     console.error('Delete booking error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error deleting booking'
+    });
+  }
+});
+
+// @route   DELETE /api/admin/bookings/:id/permanent
+// @desc    Permanently delete a soft-deleted booking
+// @access  Private/Admin
+router.delete('/bookings/:id/permanent', protect, isAdmin, async (req, res) => {
+  try {
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      isDeleted: true
+    }).setOptions({ includeDeleted: true });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deleted booking not found'
+      });
+    }
+
+    const removal = await Booking.deleteOne({ _id: booking._id });
+    if ((removal?.deletedCount || 0) < 1) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to permanently delete booking'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Booking permanently deleted'
+    });
+  } catch (error) {
+    console.error('Permanent delete booking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error permanently deleting booking'
+    });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/restore
+// @desc    Restore a soft-deleted booking
+// @access  Private/Admin
+router.put('/bookings/:id/restore', protect, isAdmin, async (req, res) => {
+  try {
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      isDeleted: true
+    }).setOptions({ includeDeleted: true });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deleted booking not found'
+      });
+    }
+
+    booking.isDeleted = false;
+    booking.deletedAt = null;
+    booking.deletedBy = null;
+    await booking.save();
+
+    res.json({
+      success: true,
+      message: 'Booking restored successfully',
+      booking
+    });
+  } catch (error) {
+    console.error('Restore booking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error restoring booking'
     });
   }
 });

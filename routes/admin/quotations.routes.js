@@ -270,7 +270,8 @@ const toSavedQuotationResponse = (savedQuotation, settings) => {
     notes: sanitized.notes,
     rentals: sanitized.rentals,
     createdAt: savedQuotation?.createdAt,
-    updatedAt: savedQuotation?.updatedAt
+    updatedAt: savedQuotation?.updatedAt,
+    deletedAt: savedQuotation?.deletedAt || null
   };
 };
 
@@ -281,12 +282,20 @@ const toSavedQuotationResponse = (savedQuotation, settings) => {
 // @access  Private/Admin
 router.get('/quotations/saved', protect, isAdmin, async (req, res) => {
   try {
+    const deletedFilter = String(req.query?.deleted || 'active').trim().toLowerCase();
+    const includeDeleted = deletedFilter === 'all' || deletedFilter === 'deleted';
     const settings = await AdminSettings.getSettings();
     const savedQuotations = Array.isArray(settings?.savedQuotations)
       ? settings.savedQuotations
       : [];
 
     const items = savedQuotations
+      .filter((item) => {
+        const isDeleted = Boolean(item?.deletedAt);
+        if (!includeDeleted) return !isDeleted;
+        if (deletedFilter === 'deleted') return isDeleted;
+        return true;
+      })
       .map((item) => toSavedQuotationResponse(item, settings))
       .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
 
@@ -328,7 +337,8 @@ router.post('/quotations/saved', protect, isAdmin, async (req, res) => {
         priceSnapshot: item.price
       })),
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      deletedAt: null
     };
 
     settings.savedQuotations = Array.isArray(settings.savedQuotations)
@@ -350,7 +360,7 @@ router.post('/quotations/saved', protect, isAdmin, async (req, res) => {
 });
 
 // @route   DELETE /api/admin/quotations/saved/:id
-// @desc    Delete saved quotation template
+// @desc    Soft delete saved quotation template
 // @access  Private/Admin
 router.delete('/quotations/saved/:id', protect, isAdmin, async (req, res) => {
   try {
@@ -361,19 +371,86 @@ router.delete('/quotations/saved/:id', protect, isAdmin, async (req, res) => {
 
     const settings = await AdminSettings.getSettings();
     const currentItems = Array.isArray(settings.savedQuotations) ? settings.savedQuotations : [];
-    const filtered = currentItems.filter((item) => String(item?._id) !== templateId);
+    const target = currentItems.find((item) => String(item?._id) === templateId);
 
-    if (filtered.length === currentItems.length) {
+    if (!target) {
       return res.status(404).json({ success: false, message: 'Saved quotation not found' });
     }
 
-    settings.savedQuotations = filtered;
+    if (target.deletedAt) {
+      return res.status(400).json({ success: false, message: 'Saved quotation is already deleted' });
+    }
+
+    target.deletedAt = new Date();
+    target.updatedAt = new Date();
+
     await settings.save();
 
-    res.json({ success: true, message: 'Saved quotation deleted' });
+    res.json({ success: true, message: 'Saved quotation moved to deleted records' });
   } catch (error) {
     console.error('Delete quotation template error:', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to delete saved quotation' });
+  }
+});
+
+// @route   DELETE /api/admin/quotations/saved/:id/permanent
+// @desc    Permanently delete a soft-deleted saved quotation template
+// @access  Private/Admin
+router.delete('/quotations/saved/:id/permanent', protect, isAdmin, async (req, res) => {
+  try {
+    const templateId = String(req.params?.id || '').trim();
+    if (!templateId) {
+      return res.status(400).json({ success: false, message: 'Template id is required' });
+    }
+
+    const settings = await AdminSettings.getSettings();
+    const currentItems = Array.isArray(settings.savedQuotations) ? settings.savedQuotations : [];
+    const target = currentItems.find((item) => String(item?._id) === templateId);
+
+    if (!target || !target.deletedAt) {
+      return res.status(404).json({ success: false, message: 'Deleted saved quotation not found' });
+    }
+
+    settings.savedQuotations = currentItems.filter((item) => String(item?._id) !== templateId);
+    await settings.save();
+
+    res.json({ success: true, message: 'Saved quotation permanently deleted' });
+  } catch (error) {
+    console.error('Permanent delete quotation template error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to permanently delete saved quotation' });
+  }
+});
+
+// @route   PUT /api/admin/quotations/saved/:id/restore
+// @desc    Restore a soft-deleted saved quotation template
+// @access  Private/Admin
+router.put('/quotations/saved/:id/restore', protect, isAdmin, async (req, res) => {
+  try {
+    const templateId = String(req.params?.id || '').trim();
+    if (!templateId) {
+      return res.status(400).json({ success: false, message: 'Template id is required' });
+    }
+
+    const settings = await AdminSettings.getSettings();
+    const currentItems = Array.isArray(settings.savedQuotations) ? settings.savedQuotations : [];
+    const target = currentItems.find((item) => String(item?._id) === templateId);
+
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'Saved quotation not found' });
+    }
+
+    if (!target.deletedAt) {
+      return res.status(400).json({ success: false, message: 'Saved quotation is not deleted' });
+    }
+
+    target.deletedAt = null;
+    target.updatedAt = new Date();
+    await settings.save();
+
+    res.json({ success: true, message: 'Saved quotation restored successfully' });
+  } catch (error) {
+    console.error('Restore quotation template error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to restore saved quotation' });
   }
 });
 

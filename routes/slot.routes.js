@@ -150,16 +150,23 @@ router.put('/:id', protect, isAdmin, async (req, res) => {
 });
 
 // @route   DELETE /api/slots/:id
-// @desc    Delete slot (admin only)
+// @desc    Soft delete slot (admin only)
 // @access  Private/Admin
 router.delete('/:id', protect, isAdmin, async (req, res) => {
   try {
-    const slot = await Slot.findById(req.params.id);
+    const slot = await Slot.findById(req.params.id).setOptions({ includeDeleted: true });
 
     if (!slot) {
       return res.status(404).json({
         success: false,
         message: 'Slot not found'
+      });
+    }
+
+    if (slot.isDeleted === true) {
+      return res.status(400).json({
+        success: false,
+        message: 'Slot is already deleted'
       });
     }
 
@@ -176,17 +183,94 @@ router.delete('/:id', protect, isAdmin, async (req, res) => {
       });
     }
 
-    await Slot.findByIdAndDelete(req.params.id);
+    slot.isDeleted = true;
+    slot.deletedAt = new Date();
+    slot.deletedBy = req.user?._id || null;
+    await slot.save();
 
     res.json({
       success: true,
-      message: 'Slot deleted successfully'
+      message: 'Slot moved to deleted records'
     });
   } catch (error) {
     console.error('Delete slot error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error deleting slot'
+    });
+  }
+});
+
+// @route   DELETE /api/slots/:id/permanent
+// @desc    Permanently delete a soft-deleted slot (admin only)
+// @access  Private/Admin
+router.delete('/:id/permanent', protect, isAdmin, async (req, res) => {
+  try {
+    const slot = await Slot.findOne({
+      _id: req.params.id,
+      isDeleted: true
+    }).setOptions({ includeDeleted: true });
+
+    if (!slot) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deleted slot not found'
+      });
+    }
+
+    const removal = await Slot.deleteOne({ _id: slot._id });
+    if ((removal?.deletedCount || 0) < 1) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to permanently delete slot'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Slot permanently deleted'
+    });
+  } catch (error) {
+    console.error('Permanent delete slot error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error permanently deleting slot'
+    });
+  }
+});
+
+// @route   PUT /api/slots/:id/restore
+// @desc    Restore a soft-deleted slot (admin only)
+// @access  Private/Admin
+router.put('/:id/restore', protect, isAdmin, async (req, res) => {
+  try {
+    const slot = await Slot.findOne({
+      _id: req.params.id,
+      isDeleted: true
+    }).setOptions({ includeDeleted: true });
+
+    if (!slot) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deleted slot not found'
+      });
+    }
+
+    slot.isDeleted = false;
+    slot.deletedAt = null;
+    slot.deletedBy = null;
+    await slot.save();
+
+    res.json({
+      success: true,
+      message: 'Slot restored successfully',
+      slot
+    });
+  } catch (error) {
+    console.error('Restore slot error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error restoring slot'
     });
   }
 });

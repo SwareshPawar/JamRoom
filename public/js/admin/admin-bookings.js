@@ -86,6 +86,7 @@
         formatTime: null,
         searchTerm: '',
         sortBy: 'created_desc',
+        deletedFilter: 'active',
         pageSize: 5,
         currentPage: 1,
         totalPages: 0,
@@ -190,6 +191,16 @@
             ? "closeModal('bookingActionModal'); "
             : `event.stopPropagation(); `;
         const actionClass = context === 'modal' ? 'booking-expand-actions' : 'booking-table-actions';
+        const isDeleted = booking?.isDeleted === true;
+
+        if (isDeleted) {
+            return `
+                <div class="${actionClass}">
+                    <button onclick="${stopOrClose}restoreBooking('${booking._id}')" class="btn btn-success btn-sm">Restore</button>
+                    <button onclick="${stopOrClose}permanentlyDeleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Permanent Delete</button>
+                </div>
+            `;
+        }
 
         return `
             <div class="${actionClass}">
@@ -373,6 +384,11 @@
                     <option value="price_asc" ${state.sortBy === 'price_asc' ? 'selected' : ''}>Price: Low to High</option>
                     <option value="status_asc" ${state.sortBy === 'status_asc' ? 'selected' : ''}>Status: A to Z</option>
                 </select>
+                <select id="bookingsDeletedFilter" class="bookings-sort-select">
+                    <option value="active" ${state.deletedFilter === 'active' ? 'selected' : ''}>Active</option>
+                    <option value="deleted" ${state.deletedFilter === 'deleted' ? 'selected' : ''}>Deleted</option>
+                    <option value="all" ${state.deletedFilter === 'all' ? 'selected' : ''}>All</option>
+                </select>
                 <select id="bookingsPageSize" class="bookings-limit-select">
                     <option value="5" ${state.pageSize === 5 ? 'selected' : ''}>Show 5</option>
                     <option value="10" ${state.pageSize === 10 ? 'selected' : ''}>Show 10</option>
@@ -387,6 +403,7 @@
     const bindTableControls = () => {
         const searchInput = document.getElementById('bookingsSearchInput');
         const sortSelect = document.getElementById('bookingsSortSelect');
+        const deletedFilterSelect = document.getElementById('bookingsDeletedFilter');
         const pageSizeSelect = document.getElementById('bookingsPageSize');
         const firstButton = document.getElementById('bookingsPageFirst');
         const prevButton = document.getElementById('bookingsPagePrev');
@@ -410,6 +427,13 @@
         if (sortSelect) {
             sortSelect.addEventListener('change', () => {
                 state.sortBy = sortSelect.value || 'created_desc';
+                loadBookings({ page: 1, showLoader: false });
+            });
+        }
+
+        if (deletedFilterSelect) {
+            deletedFilterSelect.addEventListener('change', () => {
+                state.deletedFilter = deletedFilterSelect.value || 'active';
                 loadBookings({ page: 1, showLoader: false });
             });
         }
@@ -621,6 +645,7 @@
             params.set('page', String(requestedPage));
             params.set('limit', String(Math.max(1, Number(state.pageSize) || 5)));
             params.set('sortBy', String(state.sortBy || 'created_desc'));
+            params.set('deleted', String(state.deletedFilter || 'active'));
 
             const normalizedSearch = String(state.searchTerm || '').trim();
             if (normalizedSearch) {

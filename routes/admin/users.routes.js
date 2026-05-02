@@ -20,15 +20,27 @@ const {
   ADMIN_DELETE_OWNER_EMAIL
 } = require('../../utils/adminHelpers');
 
+const resolveDeletedFilterMode = (value) => {
+  const normalized = String(value || 'active').trim().toLowerCase();
+  if (normalized === 'deleted') return 'deleted';
+  if (normalized === 'all') return 'all';
+  return 'active';
+};
+
 // @route   GET /api/admin/users
 // @desc    Get all registered users
 // @access  Private/Admin
 router.get('/users', protect, isAdmin, async (req, res) => {
   try {
-    const { q = '', limit = 100 } = req.query;
+    const { q = '', limit = 100, deleted } = req.query;
+    const deletedFilterMode = resolveDeletedFilterMode(deleted);
+    const includeDeleted = deletedFilterMode !== 'active';
     const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
 
     const query = {};
+    if (deletedFilterMode === 'deleted') {
+      query.isDeleted = true;
+    }
     if (q && q.trim()) {
       const regex = new RegExp(q.trim(), 'i');
       query.$or = [
@@ -39,7 +51,8 @@ router.get('/users', protect, isAdmin, async (req, res) => {
     }
 
     const users = await User.find(query)
-      .select('name email mobile role createdAt')
+      .setOptions({ includeDeleted })
+      .select('name email mobile role createdAt isDeleted deletedAt')
       .sort({ createdAt: -1 })
       .limit(safeLimit);
 
@@ -309,16 +322,25 @@ router.post('/users/:id/reset-default-password', protect, isAdmin, async (req, r
 });
 
 // @route   DELETE /api/admin/users/:id
-// @desc    Delete a user and their associated bookings
+// @desc    Soft delete a user and their bookings
 // @access  Private/Admin
 router.delete('/users/:id', protect, isAdmin, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('name email role');
+    const user = await User.findById(req.params.id)
+      .setOptions({ includeDeleted: true })
+      .select('name email role isDeleted');
 
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
+      });
+    }
+
+    if (user.isDeleted === true) {
+      return res.status(400).json({
+        success: false,
+        message: 'User is already deleted'
       });
     }
 
@@ -348,13 +370,28 @@ router.delete('/users/:id', protect, isAdmin, async (req, res) => {
       }
     }
 
-    const deletedBookings = await Booking.deleteMany({ userId: user._id });
-    await User.deleteOne({ _id: user._id });
+    const deletionDate = new Date();
+
+    const affectedBookings = await Booking.updateMany(
+      { userId: user._id, isDeleted: { $ne: true } },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: deletionDate,
+          deletedBy: req.user?._id || null
+        }
+      }
+    );
+
+    user.isDeleted = true;
+    user.deletedAt = deletionDate;
+    user.deletedBy = req.user?._id || null;
+    await user.save();
 
     res.json({
       success: true,
-      message: 'User deleted successfully',
-      deletedBookings: deletedBookings.deletedCount || 0,
+      message: 'User moved to deleted records',
+      deletedBookings: affectedBookings.modifiedCount || 0,
       user: {
         _id: user._id,
         name: user.name,
@@ -366,6 +403,112 @@ router.delete('/users/:id', protect, isAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error deleting user'
+    });
+  }
+});
+
+// @route   DELETE /api/admin/users/:id/permanent
+// @desc    Permanently delete a soft-deleted user and their soft-deleted bookings
+// @access  Private/Admin
+router.delete('/users/:id/permanent', protect, isAdmin, async (req, res) => {
+  try {
+    const user = await User.findOne({
+      _id: req.params.id,
+      isDeleted: true
+    })
+      .setOptions({ includeDeleted: true })
+      .select('name email role');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deleted user not found'
+      });
+    }
+
+    if (user.role === 'admin') {
+      const settings = await AdminSettings.getSettings();
+      if (Array.isArray(settings.adminEmails)) {
+        const targetEmail = (user.email || '').trim().toLowerCase();
+        settings.adminEmails = settings.adminEmails.filter((email) => (email || '').trim().toLowerCase() !== targetEmail);
+        await settings.save();
+      }
+    }
+
+    const removedBookings = await Booking.deleteMany({
+      userId: user._id,
+      isDeleted: true
+    });
+
+    const userRemoval = await User.deleteOne({ _id: user._id });
+    if ((userRemoval?.deletedCount || 0) < 1) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to permanently delete user'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User permanently deleted',
+      deletedBookings: removedBookings.deletedCount || 0
+    });
+  } catch (error) {
+    console.error('Permanent delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error permanently deleting user'
+    });
+  }
+});
+
+// @route   PUT /api/admin/users/:id/restore
+// @desc    Restore a soft-deleted user and their soft-deleted bookings
+// @access  Private/Admin
+router.put('/users/:id/restore', protect, isAdmin, async (req, res) => {
+  try {
+    const user = await User.findOne({
+      _id: req.params.id,
+      isDeleted: true
+    }).setOptions({ includeDeleted: true });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Deleted user not found'
+      });
+    }
+
+    user.isDeleted = false;
+    user.deletedAt = null;
+    user.deletedBy = null;
+    await user.save();
+
+    await Booking.updateMany(
+      { userId: user._id, isDeleted: true },
+      {
+        $set: {
+          isDeleted: false,
+          deletedAt: null,
+          deletedBy: null
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'User restored successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Restore user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error restoring user'
     });
   }
 });
