@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JamRoom - Catalog</title>
+    <script src="/js/shared/theme.js"></script>
+
+    <link rel="stylesheet" href="/css/shared.css">
+
+    <script src="/js/shared/utils.js"></script>
+    <script src="/js/shared/alerts.js"></script>
+    <script src="/js/shared/auth.js"></script>
+    <script src="/js/shared/navigation.js"></script>
+
+    <link rel="stylesheet" href="/css/pages/catalog.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="navigationContainer"></div>
+
+        <main class="catalog-layout">
+            <section class="catalog-shell" aria-labelledby="catalogTitle">
+                <header class="catalog-header">
+                    <h1 id="catalogTitle">Catalog</h1>
+                    <p>Browse all available catalog items and rates. Updates in Admin Settings appear here automatically.</p>
+                </header>
+
+                <div id="catalogTabs" class="catalog-tabs" role="tablist" aria-label="Catalog categories"></div>
+
+                <section id="catalogPanel" class="catalog-panel" role="tabpanel" aria-live="polite">
+                    <p class="catalog-loading">Loading catalog...</p>
+                </section>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <p>&copy; 2026 JamRoom Studio. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        const escapeHtml = (value) => String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        const formatInr = (amount) => {
+            const value = Number(amount || 0);
+            if (!Number.isFinite(value) || value <= 0) return 'Included';
+
+            try {
+                return new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: 'INR',
+                    maximumFractionDigits: 0
+                }).format(value);
+            } catch (error) {
+                return `Rs ${value}`;
+            }
+        };
+
+        const getRateLabel = (item) => {
+            const rentalType = String(item?.rentalType || 'inhouse').toLowerCase();
+            const isPerDay = rentalType === 'perday';
+            const isPerSession = rentalType === 'persession';
+            const amount = isPerDay
+                ? Number(item?.perdayPrice || item?.price || 0)
+                : Number(item?.price || 0);
+            const priceLabel = formatInr(amount);
+
+            if (priceLabel === 'Included') {
+                return 'Included in package';
+            }
+
+            if (isPerDay) return `${priceLabel} / day`;
+            if (isPerSession) return `${priceLabel} / session`;
+            return `${priceLabel} / hr`;
+        };
+
+        const getCurrentUser = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                return null;
+            }
+
+            try {
+                const response = await fetch(`${window.location.origin}/api/auth/me`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    return null;
+                }
+
+                const data = await response.json();
+                return data.user || null;
+            } catch (error) {
+                return null;
+            }
+        };
+
+        const buildCatalogCategorySnapshot = (rentalType) => {
+            const categoryId = String(rentalType?._id || rentalType?.name || '').trim();
+            const categoryName = String(rentalType?.name || '').trim() || 'Category';
+            const categoryDescription = String(rentalType?.description || '').trim();
+            const categoryItems = [];
+
+            if (Number(rentalType?.basePrice || 0) > 0) {
+                categoryItems.push({
+                    name: `${categoryName} (Base)`,
+                    description: categoryDescription,
+                    rentalType: rentalType?.rentalType || 'inhouse',
+                    price: Number(rentalType?.basePrice || 0),
+                    perdayPrice: Number(rentalType?.basePrice || 0),
+                    isBase: true
+                });
+            }
+
+            const subItems = Array.isArray(rentalType?.subItems) ? rentalType.subItems : [];
+            subItems.forEach((subItem) => {
+                if (subItem?.deletedAt) return;
+                categoryItems.push({
+                    name: String(subItem?.name || '').trim(),
+                    description: String(subItem?.description || '').trim(),
+                    rentalType: subItem?.rentalType || rentalType?.rentalType || 'inhouse',
+                    price: Number(subItem?.price || 0),
+                    perdayPrice: Number(subItem?.perdayPrice || 0),
+                    isBase: false
+                });
+            });
+
+            if (!categoryItems.length) {
+                return null;
+            }
+
+            return {
+                id: categoryId,
+                name: categoryName,
+                description: categoryDescription,
+                items: categoryItems
+            };
+        };
+
+        const renderCatalogPanel = (catalogCategories, categoryId) => {
+            const panel = document.getElementById('catalogPanel');
+            const tabs = document.getElementById('catalogTabs');
+            if (!panel || !tabs) return;
+
+            const selected = catalogCategories.find((entry) => entry.id === categoryId) || catalogCategories[0];
+            if (!selected) {
+                panel.innerHTML = '<p class="catalog-empty">Catalog is not configured yet. Please add items from Admin Settings.</p>';
+                tabs.innerHTML = '';
+                return;
+            }
+
+            tabs.querySelectorAll('.catalog-tab').forEach((tabBtn) => {
+                const isActive = tabBtn.getAttribute('data-category-id') === selected.id;
+                tabBtn.classList.toggle('active', isActive);
+                tabBtn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                tabBtn.setAttribute('tabindex', isActive ? '0' : '-1');
+            });
+
+            const listMarkup = selected.items.map((item, index) => {
+                const rowId = `catalog-row-${index}`;
+                return `
+                    <li class="catalog-item-row${item.isBase ? ' catalog-item-base' : ''}">
+                        <button
+                            type="button"
+                            class="catalog-item-trigger"
+                            data-row-id="${rowId}"
+                            aria-expanded="false"
+                            aria-controls="${rowId}"
+                        >
+                            <span class="catalog-item-name">${escapeHtml(item.name || 'Item')}</span>
+                            <strong class="catalog-rate">${escapeHtml(getRateLabel(item))}</strong>
+                        </button>
+                        <div id="${rowId}" class="catalog-item-detail" hidden>
+                            <p>${escapeHtml(item.description || 'No description available')}</p>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+
+            panel.innerHTML = `
+                <div class="catalog-panel-head">
+                    <h2>${escapeHtml(selected.name)}</h2>
+                    <p>${escapeHtml(selected.description || 'Choose from available items in this category.')}</p>
+                </div>
+                <div class="catalog-table-head" aria-hidden="true">
+                    <span>Item</span>
+                    <span>Rate</span>
+                </div>
+                <ul class="catalog-item-list" aria-label="Catalog items and rates">
+                    ${listMarkup}
+                </ul>
+            `;
+
+            panel.querySelectorAll('.catalog-item-trigger').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const rowId = button.getAttribute('data-row-id');
+                    if (!rowId) return;
+
+                    const detail = document.getElementById(rowId);
+                    if (!detail) return;
+
+                    const isExpanded = button.getAttribute('aria-expanded') === 'true';
+                    button.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+                    detail.hidden = isExpanded;
+                    button.closest('.catalog-item-row')?.classList.toggle('expanded', !isExpanded);
+                });
+            });
+        };
+
+        const renderCatalogTabs = (catalogCategories, onSelect) => {
+            const tabs = document.getElementById('catalogTabs');
+            if (!tabs) return;
+
+            tabs.innerHTML = catalogCategories.map((category) => `
+                <button type="button" class="catalog-tab" role="tab" data-category-id="${escapeHtml(category.id)}" aria-selected="false" tabindex="-1">
+                    ${escapeHtml(category.name)}
+                </button>
+            `).join('');
+
+            tabs.querySelectorAll('.catalog-tab').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const categoryId = button.getAttribute('data-category-id') || '';
+                    if (!categoryId) return;
+                    onSelect(categoryId);
+                });
+            });
+        };
+
+        const loadCatalog = async () => {
+            const panel = document.getElementById('catalogPanel');
+            if (!panel) return;
+
+            panel.innerHTML = '<p class="catalog-loading">Loading catalog...</p>';
+
+            try {
+                const response = await fetch('/api/bookings/settings');
+                const data = await response.json();
+
+                if (!response.ok || !data?.success) {
+                    throw new Error(data?.message || 'Failed to load catalog settings');
+                }
+
+                const rentalTypes = Array.isArray(data?.settings?.rentalTypes) ? data.settings.rentalTypes : [];
+                const catalogCategories = rentalTypes
+                    .filter((category) => !category?.deletedAt)
+                    .map(buildCatalogCategorySnapshot)
+                    .filter(Boolean);
+
+                if (!catalogCategories.length) {
+                    panel.innerHTML = '<p class="catalog-empty">Catalog is not configured yet. Please add items from Admin Settings.</p>';
+                    document.getElementById('catalogTabs').innerHTML = '';
+                    return;
+                }
+
+                renderCatalogTabs(catalogCategories, (categoryId) => {
+                    renderCatalogPanel(catalogCategories, categoryId);
+                });
+                renderCatalogPanel(catalogCategories, catalogCategories[0].id);
+            } catch (error) {
+                panel.innerHTML = '<p class="catalog-empty">Unable to load catalog right now. Please try again in a moment.</p>';
+                console.error('Failed to load catalog:', error);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            window.NavigationManager.init(null);
+            window.NavigationManager.render('navigationContainer');
+
+            try {
+                const user = await getCurrentUser();
+                if (user) {
+                    window.NavigationManager.updateAuth(user, 'navigationContainer');
+                }
+            } catch (error) {
+                console.error('Catalog page auth init failed:', error);
+            }
+
+            loadCatalog();
+        });
+    </script>
+</body>
+</html>

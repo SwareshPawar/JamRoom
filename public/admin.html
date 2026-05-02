@@ -205,105 +205,124 @@
             <!-- Settings Tab -->
             <div id="settingsTab" class="tab-content">
                 <h2>Admin Settings</h2>
-                <select id="settingsDeletedFilter" class="users-search-input" style="max-width: 220px; margin-bottom: 10px;">
-                    <option value="active" selected>Active Catalog Items</option>
-                    <option value="deleted">Deleted Catalog Items</option>
-                    <option value="all">All Catalog Items</option>
-                </select>
                 <div id="settingsAlert" class="alert"></div>
-                <form id="settingsForm">
-                    <div class="form-group">
-                        <label>Studio Name*</label>
-                        <input type="text" id="studioName" required placeholder="Swar JamRoom & Music Studio (SwarJRS)">
-                    </div>
-                    <div class="form-group">
-                        <label>Studio Address*</label>
-                        <textarea id="studioAddress" rows="3" placeholder="Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>UPI ID*</label>
-                        <input type="text" id="upiId" required>
-                    </div>
-                    <div class="form-group">
-                        <label>UPI Name*</label>
-                        <input type="text" id="upiName" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Admin Emails (comma-separated)*</label>
-                        <textarea id="adminEmails" rows="3" placeholder="admin1@example.com, admin2@example.com"></textarea>
-                    </div>
-                    
-                    <!-- GST Configuration Section -->
-                    <h3 class="settings-section-title">🧾 GST/Tax Configuration</h3>
-                    <div class="settings-highlight-card">
-                        <div class="form-group">
-                            <label class="settings-checkbox-label">
-                                <input type="checkbox" id="gstEnabled" class="settings-checkbox-input">
-                                <span class="settings-checkbox-text">Enable GST/Tax on Bills</span>
-                            </label>
-                            <small class="settings-help-text">When disabled, all bills will show subtotal only without any tax</small>
-                        </div>
-                        <div id="gstDetails" class="settings-gst-details">
-                            <div class="form-group settings-gst-grid">
-                                <div>
-                                    <label>GST Rate (%)</label>
-                                    <input type="number" id="gstRate" min="0" max="100" step="0.01" placeholder="18">
-                                    <small class="settings-help-text">Enter percentage (e.g., 18 for 18%)</small>
-                                </div>
-                                <div>
-                                    <label>Display Name</label>
-                                    <input type="text" id="gstDisplayName" placeholder="GST" maxlength="20">
-                                    <small class="settings-help-text">What to call it on bills (e.g., GST, Tax, VAT)</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Rental Types and Pricing Section -->
-                    <h3 class="settings-section-title">🏷️ Rental Types & Pricing</h3>
-                    <div class="settings-rental-toolbar">
-                        <p class="settings-rental-toolbar-note">Expand only the category you want to edit.</p>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="addRentalType()">+ Add Rental Type</button>
-                    </div>
-                    <div id="rentalTypesContainer">
-                        <!-- Rental types will be loaded here dynamically -->
-                    </div>
-                    <div class="settings-rental-toolbar settings-rental-toolbar-bottom">
-                        <button type="button" class="btn btn-secondary add-rental-btn" onclick="addRentalType()">+ Add Rental Type</button>
-                    </div>
+                
+                <!-- Settings Sub-tabs Navigation -->
+                <div class="settings-tabs-nav">
+                    <button type="button" class="settings-tab-btn active" data-settings-tab="basic" onclick="switchSettingsTab('basic', this)">⚙️ Basic Settings</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="rentals" onclick="switchSettingsTab('rentals', this)">🏷️ Rental Types & Pricing</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="bindings" onclick="switchSettingsTab('bindings', this)">🔗 Category Bindings</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="instagram" onclick="switchSettingsTab('instagram', this)">📸 Instagram Highlights</button>
+                </div>
 
-                    <h3 class="settings-section-title">🔗 Category Bindings</h3>
-                    <div class="settings-highlight-card">
-                        <p class="settings-help-text">Bind compatible categories in one direction (left to right). Selecting the left category on booking will also include the right category. Allowed: same rental type, or either side is Per-session.</p>
-                        <div class="form-grid-3">
+                <form id="settingsForm">
+                    <!-- Basic Settings Tab -->
+                    <div class="settings-tab-pane active" data-settings-pane="basic">
+                        <div class="form-group">
+                            <label>Studio Name*</label>
+                            <input type="text" id="studioName" required placeholder="Swar JamRoom & Music Studio (SwarJRS)">
+                        </div>
+                        <div class="form-group">
+                            <label>Studio Address*</label>
+                            <textarea id="studioAddress" rows="3" placeholder="Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>UPI ID*</label>
+                            <input type="text" id="upiId" required>
+                        </div>
+                        <div class="form-group">
+                            <label>UPI Name*</label>
+                            <input type="text" id="upiName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Admin Emails (comma-separated)*</label>
+                            <textarea id="adminEmails" rows="3" placeholder="admin1@example.com, admin2@example.com"></textarea>
+                        </div>
+                        
+                        <!-- GST Configuration Section -->
+                        <h3 class="settings-section-title">🧾 GST/Tax Configuration</h3>
+                        <div class="settings-highlight-card">
                             <div class="form-group">
-                                <label for="bindingCategoryA">Primary Category</label>
-                                <select id="bindingCategoryA">
-                                    <option value="">Select category</option>
-                                </select>
+                                <label class="settings-checkbox-label">
+                                    <input type="checkbox" id="gstEnabled" class="settings-checkbox-input">
+                                    <span class="settings-checkbox-text">Enable GST/Tax on Bills</span>
+                                </label>
+                                <small class="settings-help-text">When disabled, all bills will show subtotal only without any tax</small>
                             </div>
-                            <div class="form-group">
-                                <label for="bindingCategoryB">Included Category</label>
-                                <select id="bindingCategoryB">
-                                    <option value="">Select category</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <button type="button" class="btn btn-primary btn-full" onclick="addCategoryBindingPair()">+ Add Binding</button>
+                            <div id="gstDetails" class="settings-gst-details">
+                                <div class="form-group settings-gst-grid">
+                                    <div>
+                                        <label>GST Rate (%)</label>
+                                        <input type="number" id="gstRate" min="0" max="100" step="0.01" placeholder="18">
+                                        <small class="settings-help-text">Enter percentage (e.g., 18 for 18%)</small>
+                                    </div>
+                                    <div>
+                                        <label>Display Name</label>
+                                        <input type="text" id="gstDisplayName" placeholder="GST" maxlength="20">
+                                        <small class="settings-help-text">What to call it on bills (e.g., GST, Tax, VAT)</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div id="bindingPairsList" class="rental-type-subitems-section"></div>
                     </div>
                     
-                    <!-- Instagram Embeds Section -->
-                    <h3 class="settings-section-title">📸 Homepage Instagram Highlights</h3>
-                    <div class="settings-highlight-card">
-                        <p class="settings-help-text">Add Instagram post/reel URLs to display on the homepage. Paste the post URL (e.g. <code>https://www.instagram.com/p/XXXXXX/</code>). There is no limit on the number of embeds.</p>
-                        <div id="instagramEmbedsContainer">
-                            <!-- embed rows injected here -->
+                    <!-- Rental Types Tab -->
+                    <div class="settings-tab-pane" data-settings-pane="rentals">
+                        <select id="settingsDeletedFilter" class="users-search-input" style="max-width: 220px; margin-bottom: 10px;">
+                            <option value="active" selected>Active Catalog Items</option>
+                            <option value="deleted">Deleted Catalog Items</option>
+                            <option value="all">All Catalog Items</option>
+                        </select>
+                        <h3 class="settings-section-title">🏷️ Rental Types & Pricing</h3>
+                        <div class="settings-rental-toolbar">
+                            <p class="settings-rental-toolbar-note">Expand only the category you want to edit.</p>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="addRentalType()">+ Add Rental Type</button>
                         </div>
-                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="addInstagramEmbed()">+ Add Instagram Post</button>
+                        <div id="rentalTypesContainer">
+                            <!-- Rental types will be loaded here dynamically -->
+                        </div>
+                        <div class="settings-rental-toolbar settings-rental-toolbar-bottom">
+                            <button type="button" class="btn btn-secondary add-rental-btn" onclick="addRentalType()">+ Add Rental Type</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Category Bindings Tab -->
+                    <div class="settings-tab-pane" data-settings-pane="bindings">
+                        <h3 class="settings-section-title">🔗 Category Bindings</h3>
+                        <div class="settings-highlight-card">
+                            <p class="settings-help-text">Bind compatible categories in one direction (left to right). Selecting the left category on booking will also include the right category. Allowed: same rental type, or either side is Per-session.</p>
+                            <div class="form-grid-3">
+                                <div class="form-group">
+                                    <label for="bindingCategoryA">Primary Category</label>
+                                    <select id="bindingCategoryA">
+                                        <option value="">Select category</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="bindingCategoryB">Included Category</label>
+                                    <select id="bindingCategoryB">
+                                        <option value="">Select category</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>&nbsp;</label>
+                                    <button type="button" class="btn btn-primary btn-full" onclick="addCategoryBindingPair()">+ Add Binding</button>
+                                </div>
+                            </div>
+                            <div id="bindingPairsList" class="binding-pairs-list"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Instagram Highlights Tab -->
+                    <div class="settings-tab-pane" data-settings-pane="instagram">
+                        <h3 class="settings-section-title">📸 Homepage Instagram Highlights</h3>
+                        <div class="settings-highlight-card">
+                            <p class="settings-help-text">Add Instagram post/reel URLs to display on the homepage. Paste the post URL (e.g. <code>https://www.instagram.com/p/XXXXXX/</code>). There is no limit on the number of embeds.</p>
+                            <div id="instagramEmbedsContainer">
+                                <!-- embed rows injected here -->
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="addInstagramEmbed()">+ Add Instagram Post</button>
+                        </div>
                     </div>
 
                     <div class="modal-actions-row">
@@ -1434,6 +1453,25 @@
             if (tab === 'users') loadUsersManagementList();
             if (tab === 'savedQuotations') loadSavedQuotations();
             if (tab === 'deletedRecords') loadDeletedRecords(true);
+        };
+
+        // Settings sub-tab switching
+        window.switchSettingsTab = (tabName, triggerElement = null) => {
+            // Remove active class from all settings tabs and panes
+            document.querySelectorAll('.settings-tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.settings-tab-pane').forEach(pane => pane.classList.remove('active'));
+
+            // Add active class to clicked button
+            const activeButton = triggerElement || event?.target;
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+
+            // Show the corresponding pane
+            const pane = document.querySelector(`.settings-tab-pane[data-settings-pane="${tabName}"]`);
+            if (pane) {
+                pane.classList.add('active');
+            }
         };
 
         // Load statistics
@@ -3531,7 +3569,7 @@
                     rentalDiv.dataset.rentalId = rentalId;
                 }
                 rentalDiv.innerHTML = `
-                    <details class="rental-type-collapse" ${index === 0 ? 'open' : ''}>
+                    <details class="rental-type-collapse">
                         <summary class="rental-type-summary">
                             <div class="rental-type-summary-main">
                                 <strong>${escapeHtml(categoryTitle)}</strong>
@@ -3665,15 +3703,24 @@
 
             listEl.innerHTML = categoryBindingPairs
                 .map((pair, index) => `
-                    <div class="rental-subitem-row">
-                        <div>
-                            <label class="rental-subitem-label">Binding</label>
-                            <input type="text" class="rental-subitem-input" readonly value="${pair.leftCategory} (${pair.leftRentalType}) → ${pair.rightCategory} (${pair.rightRentalType})">
+                    <div class="binding-pair-card">
+                        <div class="binding-pair-display">
+                            <div class="binding-capsule">
+                                <span class="binding-category">${escapeHtml(pair.leftCategory)}</span>
+                                <span class="binding-type">${pair.leftRentalType === 'perday' ? '📅' : pair.leftRentalType === 'persession' ? '🎵' : '⏱️'}</span>
+                            </div>
+                            <div class="binding-arrow">→</div>
+                            <div class="binding-capsule">
+                                <span class="binding-type">${pair.rightRentalType === 'perday' ? '📅' : pair.rightRentalType === 'persession' ? '🎵' : '⏱️'}</span>
+                                <span class="binding-category">${escapeHtml(pair.rightCategory)}</span>
+                            </div>
                         </div>
-                        ${settingsDeletedFilter === 'deleted'
-                            ? `<button type="button" class="btn btn-success btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'restore')">Restore</button>
-                               <button type="button" class="btn btn-danger btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'permanent')">Permanent Delete</button>`
-                            : `<button type="button" class="btn btn-danger btn-sm rental-subitem-remove" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'delete')">×</button>`}
+                        <div class="binding-actions">
+                            ${settingsDeletedFilter === 'deleted'
+                                ? `<button type="button" class="btn btn-success btn-sm" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'restore')">Restore</button>
+                                   <button type="button" class="btn btn-danger btn-sm" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'permanent')">Permanent Delete</button>`
+                                : `<button type="button" class="btn btn-danger btn-sm" onclick="removeCategoryBindingPair(${index}, '${pair._id || ''}', 'delete')">Remove</button>`}
+                        </div>
                     </div>
                 `)
                 .join('');
