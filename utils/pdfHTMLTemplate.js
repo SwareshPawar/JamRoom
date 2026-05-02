@@ -3,7 +3,7 @@
  * This generates consistent HTML for both server-side (puppeteer) and client-side (html2pdf) PDF generation
  */
 
-const { buildServiceGroupSummary } = require('../public/js/shared/quotation-billing');
+const { buildServiceGroupSummary } = require('./shared/quotationBilling');
 
 /**
  * Format time from 24-hour to 12-hour format

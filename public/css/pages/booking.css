@@ -263,6 +263,7 @@
     padding: 10px;
     margin: 8px 0;
     border: 1px solid var(--border-color-light);
+    cursor: pointer;
     border-radius: 8px;
     background: var(--surface-elevated);
     transition: var(--transition-normal);
@@ -292,7 +293,7 @@
     font-size: 12px;
 }
 
-.rental-option.unavailable .rental-checkbox {
+.rental-option.unavailable input[type="checkbox"].rental-checkbox {
     cursor: not-allowed;
     border-color: var(--border-color);
     background: var(--surface-2);
@@ -391,7 +392,7 @@
     font-weight: 600;
 }
 
-.rental-checkbox {
+input[type="checkbox"].rental-checkbox {
     -webkit-appearance: none;
     appearance: none;
     width: 24px;
@@ -406,14 +407,15 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color) 28%, transparent);
     transition: var(--transition-normal);
     flex: 0 0 auto;
+    padding: 0;
 }
 
-.rental-checkbox:checked {
+input[type="checkbox"].rental-checkbox:checked {
     background: var(--primary-color);
     border-color: var(--primary-color-dark);
 }
 
-.rental-checkbox:checked::after {
+input[type="checkbox"].rental-checkbox:checked::after {
     content: '✓';
     position: absolute;
     color: var(--text-inverse);
@@ -424,7 +426,7 @@
     transform: translate(-50%, -50%);
 }
 
-.rental-checkbox:focus-visible {
+input[type="checkbox"].rental-checkbox:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px var(--focus-ring);
 }

@@ -710,7 +710,7 @@ const buildRentalOptionHTML = (item, mode) => {
                 : 'Charged for jam duration');
 
     return `
-        <div class="rental-option ${item.isRequired ? 'base' : 'child'}${selectedClass}" data-rental-id="${item.key}" data-rental-mode="${mode}">
+        <div class="rental-option ${item.isRequired ? 'base' : 'child'}${selectedClass}" data-rental-id="${item.key}" data-rental-mode="${mode}" onclick="if(!event.target.closest('.quantity-btn') && event.target.type !== 'checkbox'){const cb=this.querySelector('.rental-checkbox');if(!cb.disabled){cb.checked=!cb.checked;toggleRental('${item.key}','${mode}');}}">
             <input type="checkbox" class="rental-checkbox" ${defaultChecked} ${defaultDisabled} onchange="toggleRental('${item.key}', '${mode}')">
             <div class="rental-meta">
                 <div class="rental-name">${item.name}</div>
