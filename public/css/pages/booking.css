@@ -110,6 +110,10 @@
     margin-top: 6px;
 }
 
+.perday-return-hidden {
+    display: none;
+}
+
 .perday-booked-panel {
     margin-top: 10px;
     border: 1px solid color-mix(in srgb, var(--warning-color) 40%, transparent);
@@ -604,13 +608,16 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 }
 
 .reference-view {
-    background: var(--surface-1);
+    background: color-mix(in srgb, var(--secondary-color) 8%, var(--surface-1));
     padding: 20px;
     border-radius: 8px;
     margin-top: 20px;
-    border: 1px solid var(--border-color);
+    border: 1px solid color-mix(in srgb, var(--secondary-color) 35%, var(--border-color));
     display: grid;
     gap: 10px;
+    cursor: default;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--secondary-color) 18%, transparent);
+    pointer-events: none;
 }
 
 .reference-view-head {
@@ -633,10 +640,16 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 }
 
 .reference-view-body {
-    background: var(--surface-elevated);
-    border: 1px dashed var(--border-color);
+    background: color-mix(in srgb, var(--secondary-color) 7%, var(--surface-elevated));
+    border: 1px dashed color-mix(in srgb, var(--secondary-color) 45%, var(--border-color));
     border-radius: 8px;
     padding: 8px 10px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--secondary-color) 14%, transparent);
+}
+
+#referenceTimeline {
+    pointer-events: none;
+    user-select: none;
 }
 
 .timeline {
@@ -650,6 +663,7 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     border-radius: 5px;
     font-size: 0.9em;
     overflow-wrap: anywhere;
+    cursor: default;
 }
 
 .timeline-item.booked {
@@ -810,6 +824,7 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     line-height: 1.35;
     border: 1px solid var(--border-color-light);
     margin: 4px 0;
+    cursor: default;
 }
 
 .booking-theme-status-success {
@@ -937,6 +952,15 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     select,
     textarea {
         padding: 8px;
+    }
+
+    .field-help-mobile-hidden {
+        display: none;
+    }
+
+    .field-help {
+        margin-top: 4px;
+        font-size: 11px;
     }
 
     .category-header {

@@ -101,8 +101,7 @@ const renderBookingModeOptions = () => {
         ? currentBookingMode
         : getDefaultBookingMode();
 
-    const modeText = selectedMode === 'perday' ? 'Per Day' : 'Per Hour / Session';
-    modeSwitch.innerHTML = `<small class="field-help">Pricing Mode: ${modeText} (auto-selected by Booking Type category)</small>`;
+    modeSwitch.innerHTML = '';
 };
 
 const getMapForMode = (mode) => mode === 'perday' ? perdaySelectedRentals : hourlySelectedRentals;

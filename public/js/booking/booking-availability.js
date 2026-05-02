@@ -41,6 +41,24 @@ const allEndTimeSlots = [
     { value: '00:00', label: '12:00 AM (Midnight)', hour: 24 }
 ];
 
+const getLocalDateString = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const hasFutureStartSlotsForToday = (selectedDate) => {
+    const now = new Date();
+    const todayLocal = getLocalDateString(now);
+    if (selectedDate !== todayLocal) {
+        return true;
+    }
+
+    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+    return allTimeSlots.some((slot) => (slot.hour * 60) > currentTimeInMinutes);
+};
+
 // Populate start time slots based on selected date and availability
 const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     const startTimeSelect = document.getElementById('startTime');
@@ -73,7 +91,7 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
 
     try {
         const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
+        const todayStr = getLocalDateString(now);
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
 
@@ -135,7 +153,11 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         });
 
         if (!hasAvailableSlots) {
-            startTimeSelect.innerHTML = '<option value="">No available time slots for this date</option>';
+            const noSlotMessage = selectedDate === todayStr
+                ? 'No slots left today. Choose another date.'
+                : 'No available time slots for this date';
+
+            startTimeSelect.innerHTML = `<option value="">${noSlotMessage}</option>`;
             startTimeSelect.disabled = true;
         } else {
             startTimeSelect.disabled = false;
@@ -334,8 +356,14 @@ const loadAvailability = async (date) => {
 // Display availability timeline with simplified user view
 const displayAvailability = (data) => {
     const container = document.getElementById('referenceTimeline');
+    const selectedDate = document.getElementById('bookingDate')?.value || '';
 
     if (data.bookings.length === 0 && data.blockedTimes.length === 0) {
+        if (!hasFutureStartSlotsForToday(selectedDate)) {
+            container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No slots left today. Choose another date.</div>';
+            return;
+        }
+
         container.innerHTML = '<div class="booking-theme-status booking-theme-status-success">All time slots available for this date.</div>';
         return;
     }
