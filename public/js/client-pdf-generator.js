@@ -790,7 +790,17 @@ function generateBillHTML(booking, settings) {
             </thead>
             <tbody>
                 ${booking.rentals && booking.rentals.length > 0 ? 
-                    booking.rentals.map(rental => `
+                    booking.rentals.map(rental => {
+                        const rentalType = String(rental.rentalType || 'inhouse').trim().toLowerCase().replace(/[\s_-]+/g, '');
+                        const isPerDay = rentalType === 'perday';
+                        const isPerSession = rentalType === 'persession' || rentalType === 'session';
+                        const isPerTrack = rentalType === 'pertrack' || rentalType === 'track';
+                        const unitLabel = isPerDay ? '/day' : (isPerSession ? '/session' : (isPerTrack ? '/track' : '/hr'));
+                        const durationLabel = isPerDay ? '1 day' : (isPerSession ? '1 session' : (isPerTrack ? `${rental.quantity} track(s)` : `${booking.duration} hr(s)`));
+                        const lineAmount = isPerDay
+                            ? (rental.price * rental.quantity)
+                            : (isPerSession || isPerTrack ? (rental.price * rental.quantity) : (rental.price * rental.quantity * booking.duration));
+                        return `
                         <tr>
                             <td>
                                 <strong>${rental.name}</strong>
@@ -801,11 +811,12 @@ function generateBillHTML(booking, settings) {
                                 </small>
                             </td>
                             <td style="text-align: center;">${rental.quantity}</td>
-                            <td style="text-align: center;">${booking.duration} hr(s)</td>
-                            <td class="amount-cell">₹${rental.price}/hr</td>
-                            <td class="amount-cell">₹${(rental.price * rental.quantity * booking.duration).toFixed(2)}</td>
+                            <td style="text-align: center;">${durationLabel}</td>
+                            <td class="amount-cell">₹${rental.price}${unitLabel}</td>
+                            <td class="amount-cell">₹${lineAmount.toFixed(2)}</td>
                         </tr>
-                    `).join('') : `
+                    `;
+                    }).join('') : `
                         <tr>
                             <td>
                                 <strong>${booking.rentalType || 'JamRoom Booking'}</strong>
@@ -910,8 +921,8 @@ async function generatePDFClient(booking, settings) {
     
     console.log('Starting client-side PDF generation...');
     
-    // Generate HTML content
-    const htmlContent = generateBillHTML(booking, settings);
+    // Generate HTML content using unified template to avoid legacy drift.
+    const htmlContent = generateUnifiedPDFHTML(booking, settings);
     
     // Create a temporary container that matches server-side rendering
     const tempContainer = document.createElement('div');

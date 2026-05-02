@@ -3,7 +3,6 @@ const fsSync = require('fs');
 const path = require('path');
 const AdminSettings = require('../models/AdminSettings');
 const { generateUnifiedPDFHTML } = require('./pdfHTMLTemplate');
-const { buildServiceGroupSummary } = require('../public/js/shared/quotation-billing');
 
 // Check if we're in a serverless environment
 const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
@@ -11,6 +10,88 @@ const DEFAULT_STUDIO_WEBSITE = 'https://jam-room-mu.vercel.app/';
 const QUOTATION_LOGO_PATH = path.join(__dirname, '..', 'public', 'icons', 'jamroom-192.png');
 
 let cachedQuotationLogoDataUri = null;
+
+const normalizeRentalType = (value) => {
+  const type = String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (type === 'perday') return 'perday';
+  if (type === 'persession' || type === 'session') return 'persession';
+  if (type === 'pertrack' || type === 'track') return 'pertrack';
+  if (type === 'inhouse' || type === 'hourly') return 'inhouse';
+  return '';
+};
+
+const toPlainBooking = (booking) => {
+  if (!booking) return booking;
+  if (typeof booking.toObject === 'function') {
+    return booking.toObject({
+      depopulate: true,
+      versionKey: false,
+      getters: false,
+      virtuals: false
+    });
+  }
+  return booking;
+};
+
+const normalizeNameKey = (value) => String(value || '').trim().toLowerCase();
+
+const buildCatalogRentalTypeMap = (settings = {}) => {
+  const map = new Map();
+  const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+
+  rentalTypes.forEach((type) => {
+    const categoryType = normalizeRentalType(type?.rentalType) || 'inhouse';
+    const categoryName = normalizeNameKey(type?.name);
+    if (categoryName && !map.has(categoryName)) {
+      map.set(categoryName, categoryType);
+    }
+
+    const subItems = Array.isArray(type?.subItems) ? type.subItems : [];
+    subItems.forEach((subItem) => {
+      const itemName = normalizeNameKey(subItem?.name);
+      if (!itemName) return;
+      const itemType = normalizeRentalType(subItem?.rentalType) || categoryType;
+      map.set(itemName, itemType || 'inhouse');
+    });
+  });
+
+  return map;
+};
+
+const enrichBookingRentalsWithCatalogTypes = (booking, settings = {}) => {
+  const plainBooking = toPlainBooking(booking);
+
+  if (!plainBooking || !Array.isArray(plainBooking.rentals) || plainBooking.rentals.length === 0) {
+    return plainBooking;
+  }
+
+  const rentalTypeMap = buildCatalogRentalTypeMap(settings);
+  if (rentalTypeMap.size === 0) {
+    return plainBooking;
+  }
+
+  const enrichedRentals = plainBooking.rentals.map((rental) => {
+    const existingType = normalizeRentalType(rental?.rentalType);
+    if (existingType) {
+      return rental;
+    }
+
+    const matchedType = rentalTypeMap.get(normalizeNameKey(rental?.name)) || '';
+    if (!matchedType) {
+      return rental;
+    }
+
+    return {
+      ...rental,
+      rentalType: matchedType
+    };
+  });
+
+  return {
+    ...plainBooking,
+    rentals: enrichedRentals
+  };
+};
 
 /**
  * Create optimized puppeteer configuration for serverless environments
@@ -78,7 +159,8 @@ const generateBill = async (booking) => {
     console.log('Retrieved admin settings');
 
       // Generate HTML content
-    const htmlContent = await generateBillHTML(booking, settings);
+    const bookingWithResolvedTypes = enrichBookingRentalsWithCatalogTypes(booking, settings);
+    const htmlContent = await generateBillHTML(bookingWithResolvedTypes, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
 
     console.log('🚀 Launching puppeteer...');
@@ -157,7 +239,8 @@ const generateBillForDownload = async (booking, retryCount = 0) => {
     console.log('Retrieved admin settings:', settings ? '✅ Found' : '❌ Not found');
 
         // Generate HTML content
-    const htmlContent = await generateBillHTML(booking, settings);
+    const bookingWithResolvedTypes = enrichBookingRentalsWithCatalogTypes(booking, settings);
+    const htmlContent = await generateBillHTML(bookingWithResolvedTypes, settings);
     console.log('Generated HTML content, length:', htmlContent.length);
 
     console.log('🚀 Launching puppeteer with serverless config...');
@@ -251,22 +334,7 @@ const generateBillFilename = (booking, settings) => {
  * Generate PDF with filename
  */
 const generateBillForDownloadWithFilename = async (booking) => {
-  try {
-    console.log('Generating PDF with filename for booking:', booking._id);
-
-        // Ensure database connection in serverless environment
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState !== 1) {
-              // Set serverless-specific connection timeouts
-      mongoose.connection.serverSelectionTimeoutMS = 8000;
-      mongoose.connection.socketTimeoutMS = 15000;
-      await mongoose.connect(process.env.MONGO_URI);
-      console.log('✅ MongoDB connected for PDF generation');
-    }
-  } catch (error) {
-    console.error('❌ MongoDB connection failed:', error);
-    throw new Error('Database connection failed');
-  }
+  console.log('Generating PDF with filename for booking:', booking._id);
 
   const settings = await AdminSettings.getSettings();
   const pdfBuffer = await generateBillForDownload(booking);

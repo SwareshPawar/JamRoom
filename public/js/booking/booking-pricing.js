@@ -37,45 +37,45 @@ const updatePriceDisplay = () => {
     selectedRentals.forEach((rental) => {
         // Calculate item total based on rental type
         let itemTotal;
-        let durationText;
         let displayQuantity;
+        let showHourMultiplier = false;
 
         if (bookingMode === 'perday' || rental.rentalType === 'perday') {
             // Per-day rentals: charged by selected day range.
             itemTotal = rental.price * rental.quantity * perDayDays;
             displayQuantity = rental.quantity;
-            durationText = perDayDays > 0 ? `${perDayDays} day(s)` : 'Waiting for valid pickup/return';
-        } else if (rental.rentalType === 'persession') {
+        } else if (rental.rentalType === 'persession' || rental.rentalType === 'pertrack') {
             // Per-session rentals: charged once per booking session.
             itemTotal = rental.price * rental.quantity;
             displayQuantity = rental.quantity;
-            durationText = 'Per session';
         } else if (rental.isRequired || rental.fullId.includes('_base')) {
             // JamRoom base rentals
             itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
             displayQuantity = rental.quantity;
-            durationText = `${duration}h`;
+            showHourMultiplier = true;
         } else if (rental.price === 0) {
             // Free add-ons (mics, jacks): allow quantities, no cost
             itemTotal = 0;
             displayQuantity = rental.quantity;
-            durationText = 'FREE';
         } else if (rental.name.includes('IEM')) {
             // IEM: special case - allow quantities but duration-based pricing
             itemTotal = (rental.price || rental.basePrice) * rental.quantity * duration;
             displayQuantity = rental.quantity;
-            durationText = `${duration}h (tied to JamRoom)`;
+            showHourMultiplier = true;
         } else {
             // Paid in-house rentals: tied to jamroom duration (quantity 1, but duration varies)
             itemTotal = (rental.price || rental.basePrice) * 1 * duration;
-            displayQuantity = 1; // Show as 1 for display consistency
-            durationText = `${duration}h (tied to JamRoom)`;
+            displayQuantity = 1;
+            showHourMultiplier = true;
         }
         subtotal += itemTotal;
 
+        const quantityText = displayQuantity > 1 ? ` x${displayQuantity}` : '';
+        const hourText = showHourMultiplier && duration > 1 ? ` x${duration}h` : '';
+
         selectedRentalsHTML += `
             <div class="rental-item">
-                <span>${rental.name} × ${displayQuantity} (${durationText})</span>
+                <span>${rental.name}${quantityText}${hourText}</span>
                 <span>₹${itemTotal}</span>
             </div>
         `;

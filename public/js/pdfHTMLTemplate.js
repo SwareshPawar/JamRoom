@@ -59,17 +59,23 @@ const getServiceGroupingUtils = () => {
     return {
         buildServiceGroupSummary: (items = [], calculation = {}) => {
             const normalizeType = (value) => {
-                const type = String(value || 'inhouse').toLowerCase();
-                if (type === 'perday' || type === 'persession') return type;
+                const type = String(value || 'inhouse').trim().toLowerCase().replace(/[\s_-]+/g, '');
+                if (type === 'perday' || type === 'persession' || type === 'pertrack' || type === 'session' || type === 'track') {
+                    return type === 'session' ? 'persession' : type === 'track' ? 'pertrack' : type;
+                }
                 return 'inhouse';
             };
-            const billingLabel = (type) => {
+            const billingLabel = (type, item = {}) => {
                 if (type === 'perday') {
                     const days = Number(calculation?.perdayDays || 0);
                     return days > 0 ? `Per day x ${days}` : 'Per day';
                 }
                 if (type === 'persession') {
-                    return 'Per event / project';
+                    return 'Per session';
+                }
+                if (type === 'pertrack') {
+                    const quantity = Number(item?.quantity || 0);
+                    return quantity > 0 ? `Per track x ${quantity}` : 'Per track';
                 }
                 const hours = Number(calculation?.inhouseDurationHours || 0);
                 return hours > 0 ? `Per hour x ${hours}` : 'Per hour';
@@ -78,6 +84,7 @@ const getServiceGroupingUtils = () => {
                 const price = Number(item?.price || 0);
                 const quantity = Number(item?.quantity || 0);
                 if (type === 'persession') return price * quantity;
+                if (type === 'pertrack') return price * quantity;
                 if (type === 'perday') return price * quantity * Number(calculation?.perdayDays || 0);
                 return price * quantity * Number(calculation?.inhouseDurationHours || 0);
             };
@@ -95,7 +102,7 @@ const getServiceGroupingUtils = () => {
                 let key = 'studio';
                 if (/mix|master|stem/.test(categoryText)) key = 'finishing';
                 else if (/foley|sound effect|sfx/.test(categoryText)) key = 'sound-design';
-                else if (/composition|arrangement|recording|tracking|vocal|editing|production|session/.test(categoryText) || type === 'persession') key = 'production';
+                else if (/composition|arrangement|recording|tracking|vocal|editing|production|session|track/.test(categoryText) || type === 'persession' || type === 'pertrack') key = 'production';
 
                 groups[key].items.push({
                     rentalType: type,
@@ -103,7 +110,7 @@ const getServiceGroupingUtils = () => {
                     description: String(item?.description || '').trim() || 'Studio rental service',
                     quantity: Number(item?.quantity || 0),
                     rate: Number(item?.price || 0),
-                    billingLabel: billingLabel(type),
+                    billingLabel: billingLabel(type, item),
                     amount: amount(item, type)
                 });
             });
@@ -122,8 +129,20 @@ const getServiceGroupingUtils = () => {
  * @returns {string} Complete HTML content
  */
 const generateUnifiedPDFHTML = (booking, settings) => {
+    const normalizeRentalType = (value) => {
+        const raw = String(value || 'inhouse').trim().toLowerCase();
+        const compact = raw.replace(/[\s_-]+/g, '');
+        if (compact === 'perday') return 'perday';
+        if (compact === 'persession' || compact === 'session') return 'persession';
+        if (compact === 'pertrack' || compact === 'track') return 'pertrack';
+        return 'inhouse';
+    };
+
     const bookingDate = new Date(booking.date);
-    const isPerday = booking.bookingMode === 'perday';
+    const normalizedBookingRentalType = normalizeRentalType(booking.rentalType);
+    const isPerday = booking.bookingMode === 'perday' || normalizedBookingRentalType === 'perday';
+    const isPerSessionBooking = normalizedBookingRentalType === 'persession';
+    const isPerTrackBooking = normalizedBookingRentalType === 'pertrack';
     const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
     const perDayStartLabel = booking.perDayStartDate ? new Date(booking.perDayStartDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');
     const perDayEndLabel = booking.perDayEndDate ? new Date(booking.perDayEndDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');
@@ -172,13 +191,13 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         ? groupedServices.map((group) => {
             const groupSubtotal = Number(group.subtotal || 0);
             const rows = group.items.map((item) => {
-                const rentalType = String(item.rentalType || 'inhouse').toLowerCase();
+                const rentalType = normalizeRentalType(item.rentalType || 'inhouse');
                 const bookingMeta = rentalType === 'perday'
                     ? `${perDayStartLabel} ${formatTime12Hour(booking.startTime)} to ${perDayEndLabel} ${formatTime12Hour(booking.endTime)}`
                     : `${bookingDate.toLocaleDateString('en-IN')} (${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)})`;
                 const itemRateLabel = rentalType === 'perday'
                     ? `&#8377;${item.rate}/day`
-                    : (rentalType === 'persession' ? `&#8377;${item.rate}/event` : `&#8377;${item.rate}/hr`);
+                    : (rentalType === 'persession' ? `&#8377;${item.rate}/session` : (rentalType === 'pertrack' ? `&#8377;${item.rate}/track` : `&#8377;${item.rate}/hr`));
                 return `
                 <div class="service-row">
                     <div class="service-copy">
@@ -220,8 +239,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                         <div class="service-desc">${isPerday ? `${perDayDays} day(s) &middot; ${perDayTimeRangeLabel}` : `${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)}`}${booking.notes ? ` &middot; ${booking.notes}` : ''}</div>
                     </div>
                     <div class="service-meta">
-                        <div class="service-meta-top">&#8377;${(subtotal / safeDuration).toFixed(2)}/hr</div>
-                        <div class="service-meta-sub">Per hour x ${safeDuration}</div>
+                        <div class="service-meta-top">${isPerSessionBooking ? `&#8377;${subtotal.toFixed(2)}/session` : (isPerTrackBooking ? `&#8377;${subtotal.toFixed(2)}/track` : `&#8377;${(subtotal / safeDuration).toFixed(2)}/hr`)}</div>
+                        <div class="service-meta-sub">${isPerSessionBooking ? 'Per session' : (isPerTrackBooking ? 'Per track' : `Per hour x ${safeDuration}`)}</div>
                     </div>
                     <div class="service-amount">&#8377;${subtotal.toFixed(2)}</div>
                 </div>
@@ -249,8 +268,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .invoice-panel h2{font-size:30px;line-height:1;margin-bottom:12px;color:#fff;font-weight:800}
         .invoice-panel .meta-line{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88)}
         .body{padding:28px 30px 30px}
-        .bill-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
-        .info-card{background:#f8fafc;border:1px solid #dbe5f0;border-radius:18px;padding:16px 18px}
+        .bill-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;break-inside:avoid;page-break-inside:avoid}
+        .info-card{background:#f8fafc;border:1px solid #dbe5f0;border-radius:18px;padding:16px 18px;break-inside:avoid;page-break-inside:avoid}
         .info-label{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:#64748b;font-weight:700;margin-bottom:10px}
         .info-name{font-size:18px;font-weight:700;color:#0f172a;margin-bottom:4px}
         .info-email{font-size:13px;color:#64748b;margin-bottom:6px}
@@ -264,13 +283,13 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .status-partial{background:#fff4d6;color:#8a5700;border:1px solid #ffd166}
         .status-refunded{background:#e2e3e5;color:#383d41;border:1px solid #d6d8db}
         .status-cancelled{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
-        .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:hidden;margin-bottom:16px;background:#fff}
-        .service-group-header{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff}
+        .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:hidden;margin-bottom:16px;background:#fff;break-inside:avoid;page-break-inside:avoid}
+        .service-group-header{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
         .service-group-header h3{font-size:18px;margin-bottom:4px;color:#fff;font-weight:700}
         .service-group-header p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5;margin:0}
         .service-group-subtotal{font-size:14px;font-weight:800;white-space:nowrap;background:rgba(255,255,255,0.12);border-radius:999px;padding:8px 12px;color:#fff;flex-shrink:0}
         .service-group-body{padding:6px 18px 8px}
-        .service-row{display:grid;grid-template-columns:1.5fr 0.7fr 0.45fr;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #edf2f7}
+        .service-row{display:grid;grid-template-columns:1.5fr 0.7fr 0.45fr;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #edf2f7;break-inside:avoid;page-break-inside:avoid}
         .service-row:last-child{border-bottom:0}
         .service-title{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
         .service-desc{font-size:12px;line-height:1.5;color:#64748b}
@@ -278,7 +297,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .service-meta-top{font-size:13px;font-weight:700;color:#0f172a}
         .service-meta-sub{font-size:11px;color:#64748b;margin-top:4px}
         .service-amount{text-align:right;font-size:14px;font-weight:800;color:#0f172a}
-        .totals-card{background:#0f172a;color:#fff;border-radius:22px;padding:20px 22px;margin:18px 0}
+        .totals-card{background:#0f172a;color:#fff;border-radius:22px;padding:20px 22px;margin:18px 0;break-inside:avoid;page-break-inside:avoid}
         .totals-card h3{font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:#cbd5e1;margin-bottom:12px}
         .total-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;font-size:14px;color:#e2e8f0}
         .grand-total{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-top:12px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.14)}
@@ -286,7 +305,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .grand-total strong{font-size:32px;color:#ffffff;line-height:1}
         .received-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0 4px;font-size:14px;color:#86efac;border-top:1px solid rgba(255,255,255,0.1);margin-top:10px}
         .due-row{display:flex;justify-content:space-between;gap:16px;padding:4px 0;font-size:14px;color:#fca5a5;font-weight:700}
-        .payment-card{border-radius:18px;padding:16px 18px;margin:0 0 18px}
+        .payment-card{border-radius:18px;padding:16px 18px;margin:0 0 18px;break-inside:avoid;page-break-inside:avoid}
         .payment-card.paid{background:#dcfce7;border:1px solid #86efac}
         .payment-card.partial{background:#fff4d6;border:1px solid #ffd166}
         .payment-card.pending{background:#fff3cd;border:1px solid #ffeaa7}
@@ -302,8 +321,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .payment-card.paid .payment-message{color:#14532d}
         .payment-card.partial .payment-message{color:#78350f}
         .payment-card.pending .payment-message{color:#856404}
-        .footer{margin-top:22px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.7;text-align:center}
-        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}}
+        .footer{margin-top:22px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.7;text-align:center;break-inside:avoid;page-break-inside:avoid}
+        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-group,.service-row,.info-card,.bill-grid,.totals-card,.payment-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group-header{break-after:avoid;page-break-after:avoid}}
     </style>
 </head>
 <body>

@@ -14,7 +14,11 @@
 
 const normalizeRentalType = (value) => {
   const type = String(value || 'inhouse').trim().toLowerCase();
-  if (type === 'perday' || type === 'persession') return type;
+  const compactType = type.replace(/[\s_-]+/g, '');
+
+  if (compactType === 'perday') return 'perday';
+  if (compactType === 'persession' || compactType === 'session') return 'persession';
+  if (compactType === 'pertrack' || compactType === 'track') return 'pertrack';
   return 'inhouse';
 };
 
@@ -25,13 +29,20 @@ const getCount = (calculation, rentalType) => {
   if (rentalType === 'persession') {
     return 1;
   }
+  if (rentalType === 'pertrack') {
+    return 1;
+  }
   return Number(calculation?.inhouseDurationHours || 0);
 };
 
 const getQuotationBillingLabel = (rentalTypeInput, calculation = {}) => {
   const rentalType = normalizeRentalType(rentalTypeInput);
   if (rentalType === 'persession') {
-    return 'Per event / project';
+    return 'Per session';
+  }
+  if (rentalType === 'pertrack') {
+    const quantity = Number(calculation?.itemQuantity || 0);
+    return quantity > 0 ? `Per track x ${quantity}` : 'Per track';
   }
 
   const count = getCount(calculation, rentalType);
@@ -50,6 +61,9 @@ const getQuotationItemAmount = (item = {}, calculation = {}) => {
   if (rentalType === 'persession') {
     return price * quantity;
   }
+  if (rentalType === 'pertrack') {
+    return price * quantity;
+  }
 
   const count = getCount(calculation, rentalType);
   if (count <= 0) {
@@ -65,7 +79,7 @@ const isQuantityEnabled = (item = {}) => {
 
   // Backward-compatible fallback for older data without explicit quantityEnabled
   const rentalType = normalizeRentalType(item?.rentalType);
-  if (rentalType === 'perday' || rentalType === 'persession') return true;
+  if (rentalType === 'perday' || rentalType === 'persession' || rentalType === 'pertrack') return true;
   if (Number(item?.price || 0) === 0) return true;
   if ((String(item?.name || '').includes('IEM'))) return true;
   return false;
@@ -83,6 +97,10 @@ const QUOTATION_CHARGE_GROUPS = Object.freeze([
   Object.freeze({
     rentalType: 'persession',
     title: 'Per Event Charges (Show, party, or project based)'
+  }),
+  Object.freeze({
+    rentalType: 'pertrack',
+    title: 'Per-Track Charges (Track-count based)'
   })
 ]);
 
@@ -159,7 +177,7 @@ const classifyServiceItem = (item = {}) => {
   }
 
   return {
-    groupKey: normalizeRentalType(item?.rentalType) === 'persession' ? 'production' : 'studio',
+    groupKey: ['persession', 'pertrack'].includes(normalizeRentalType(item?.rentalType)) ? 'production' : 'studio',
     title: rawName || 'Custom Service',
     description: rawCategory
       ? `${rawCategory} support tailored to your quotation requirements.`
@@ -185,6 +203,7 @@ const buildServiceGroupSummary = (items = [], calculation = {}) => {
 
     const amount = getQuotationItemAmount(item, calculation);
     const quantityEnabled = isQuantityEnabled(item);
+    const rentalType = normalizeRentalType(item?.rentalType);
     group.items.push({
       key: String(item?.id || item?.fullId || item?.name || '') + `-${group.items.length}`,
       title: meta.title,
@@ -193,10 +212,13 @@ const buildServiceGroupSummary = (items = [], calculation = {}) => {
       quantity: Number(item?.quantity || 0),
       quantityEnabled,
       rate: Number(item?.price || 0),
-      billingLabel: getQuotationBillingLabel(item?.rentalType, calculation),
+      billingLabel: getQuotationBillingLabel(item?.rentalType, {
+        ...calculation,
+        itemQuantity: Number(item?.quantity || 0)
+      }),
       amount,
       order: meta.order,
-      rentalType: normalizeRentalType(item?.rentalType)
+      rentalType
     });
 
     group.subtotal += amount;

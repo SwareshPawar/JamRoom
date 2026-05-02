@@ -1,5 +1,56 @@
 const ical = require('ical-generator').default || require('ical-generator');
 
+const IST_TIMEZONE = 'Asia/Kolkata';
+const IST_OFFSET_MINUTES = 330;
+
+const toYmdInIst = (dateObj) => {
+  const parts = new Intl.DateTimeFormat('en-IN', {
+    timeZone: IST_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(dateObj);
+
+  const get = (type) => parts.find((part) => part.type === type)?.value || '';
+  const year = get('year');
+  const month = get('month');
+  const day = get('day');
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeStartDateToYmd = (startDate) => {
+  if (startDate instanceof Date) {
+    return toYmdInIst(startDate);
+  }
+
+  const raw = String(startDate || '').trim();
+  if (!raw) {
+    throw new Error('Invalid startDate for calendar invite');
+  }
+
+  if (raw.includes('T')) {
+    return toYmdInIst(new Date(raw));
+  }
+
+  return raw;
+};
+
+const format12Hour = (timeValue) => {
+  const [hourRaw, minuteRaw] = String(timeValue || '00:00').split(':');
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, '0')} ${suffix}`;
+};
+
+const buildUtcDateFromIst = (dateStr, timeStr) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hour, minute] = timeStr.split(':').map(Number);
+  const utcMillis = Date.UTC(year, month - 1, day, hour, minute) - (IST_OFFSET_MINUTES * 60 * 1000);
+  return new Date(utcMillis);
+};
+
 /**
  * Generate iCal calendar invite
  * @param {Object} options - Calendar event options
@@ -26,30 +77,24 @@ const generateCalendarInvite = (options) => {
       studioName = 'Swar JamRoom & Music Studio (SwarJRS)'
     } = options;
 
-    // Convert startDate to string if it's a Date object
-    let dateStr = startDate;
-    if (startDate instanceof Date) {
-      dateStr = startDate.toISOString().split('T')[0];
+    const dateStr = normalizeStartDateToYmd(startDate);
+
+    // Convert IST booking date/time to exact UTC instants for ICS storage.
+    const startDateTime = buildUtcDateFromIst(dateStr, startTime);
+    const endDateTime = buildUtcDateFromIst(dateStr, endTime);
+
+    // Handle midnight crossover, e.g. 23:00 -> 00:00.
+    if (endDateTime <= startDateTime) {
+      endDateTime.setDate(endDateTime.getDate() + 1);
     }
 
-    // Parse date and time
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const [startHour, startMinute] = startTime.split(':').map(Number);
-    const [endHour, endMinute] = endTime.split(':').map(Number);
-
-    // Create dates in IST (India Standard Time - UTC+5:30)
-    // We use UTC and then adjust for IST offset
-    const startDateTime = new Date(Date.UTC(year, month - 1, day, startHour, startMinute));
-    const endDateTime = new Date(Date.UTC(year, month - 1, day, endHour, endMinute));
-    
-    // Adjust from IST to UTC (subtract 5 hours 30 minutes)
-    startDateTime.setMinutes(startDateTime.getMinutes() - 330);
-    endDateTime.setMinutes(endDateTime.getMinutes() - 330);
+    const descriptionWithIstTime = `${description}\nTime (IST): ${format12Hour(startTime)} - ${format12Hour(endTime)}`;
 
     // Create calendar
     const calendar = ical({
       name: 'JamRoom Booking',
-      prodId: '//JamRoom//Booking System//EN'
+      prodId: '//JamRoom//Booking System//EN',
+      timezone: IST_TIMEZONE
     });
 
     // Create event
@@ -57,9 +102,10 @@ const generateCalendarInvite = (options) => {
       start: startDateTime,
       end: endDateTime,
       summary: title,
-      description: description,
+      description: descriptionWithIstTime,
       location: location,
       url: process.env.BASE_URL,
+      timezone: IST_TIMEZONE,
       organizer: {
         name: studioName,
         email: process.env.EMAIL_USER
@@ -94,7 +140,8 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
   try {
     const calendar = ical({
       name: 'JamRoom Bookings',
-      prodId: '//JamRoom//Booking System//EN'
+      prodId: '//JamRoom//Booking System//EN',
+      timezone: IST_TIMEZONE
     });
 
     events.forEach(eventOptions => {
@@ -108,20 +155,24 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
         attendees = []
       } = eventOptions;
 
-      const [year, month, day] = startDate.split('-').map(Number);
-      const [startHour, startMinute] = startTime.split(':').map(Number);
-      const [endHour, endMinute] = endTime.split(':').map(Number);
+      const dateStr = normalizeStartDateToYmd(startDate);
+      const startDateTime = buildUtcDateFromIst(dateStr, startTime);
+      const endDateTime = buildUtcDateFromIst(dateStr, endTime);
 
-      const startDateTime = new Date(year, month - 1, day, startHour, startMinute);
-      const endDateTime = new Date(year, month - 1, day, endHour, endMinute);
+      if (endDateTime <= startDateTime) {
+        endDateTime.setDate(endDateTime.getDate() + 1);
+      }
+
+      const descriptionWithIstTime = `${description}\nTime (IST): ${format12Hour(startTime)} - ${format12Hour(endTime)}`;
 
       const event = calendar.createEvent({
         start: startDateTime,
         end: endDateTime,
         summary: title,
-        description: description,
+        description: descriptionWithIstTime,
         location: location,
         url: process.env.BASE_URL,
+        timezone: IST_TIMEZONE,
         organizer: {
           name: studioName,
           email: process.env.EMAIL_USER

@@ -1042,7 +1042,11 @@
                         </label>
                         <label class="settings-checkbox-label">
                             <input type="checkbox" id="quoteTypeSession" class="settings-checkbox-input quote-type-checkbox" value="persession" checked>
-                            <span class="settings-checkbox-text">🎯 <strong>Per Event / Project</strong><span style="color:#4b5563;font-weight:400;"> — Flat rate per show, party, event, or project scope</span></span>
+                            <span class="settings-checkbox-text">🎯 <strong>Per Session</strong><span style="color:#4b5563;font-weight:400;"> — Flat rate per booking session or project scope</span></span>
+                        </label>
+                        <label class="settings-checkbox-label">
+                            <input type="checkbox" id="quoteTypeTrack" class="settings-checkbox-input quote-type-checkbox" value="pertrack" checked>
+                            <span class="settings-checkbox-text">🎚️ <strong>Per Track</strong><span style="color:#4b5563;font-weight:400;"> — Charged by track count, independent of booking duration</span></span>
                         </label>
                     </div>
                     <small class="settings-help-text">Uncheck a type to hide those items and their schedule fields from this quotation.</small>
@@ -3513,6 +3517,7 @@
                 const subItemsHTML = hasSubItems ? rental.subItems.map((sub, subIndex) => {
                     const isPerday = categoryRentalType === 'perday';
                     const isPerSession = categoryRentalType === 'persession';
+                    const isPerTrack = categoryRentalType === 'pertrack';
                     const subItemId = sub?._id ? String(sub._id) : '';
                     return `
                     <div class="rental-subitem-row" data-rental="${index}" ${subItemId ? `data-subitem-id="${subItemId}"` : ''}>
@@ -3528,12 +3533,12 @@
                         </div>
                         <div>
                             <label class="rental-subitem-label">Rental Type</label>
-                            <input type="text" value="${categoryRentalType === 'perday' ? 'Per-day' : categoryRentalType === 'persession' ? 'Per-session' : 'In-house'}"
+                            <input type="text" value="${categoryRentalType === 'perday' ? 'Per-day' : categoryRentalType === 'persession' ? 'Per-session' : categoryRentalType === 'pertrack' ? 'Per-track' : 'In-house'}"
                                    class="rental-subitem-input" readonly>
                         </div>
                         <div class="hourly-price-field">
                             <label class="rental-subitem-label hourly-price-label">
-                                ${isPerSession ? 'Price (₹/session)' : 'Price (₹/hr)'} ${isPerday ? '<span class="price-flag price-flag-inactive">(not used for per-day)</span>' : '<span class="price-flag price-flag-active">(active)</span>'}
+                                ${isPerSession ? 'Price (₹/session)' : isPerTrack ? 'Price (₹/track)' : 'Price (₹/hr)'} ${isPerday ? '<span class="price-flag price-flag-inactive">(not used for per-day)</span>' : '<span class="price-flag price-flag-active">(active)</span>'}
                             </label>
                             <input type="number" value="${sub.price || ''}" data-rental="${index}" data-subitem="${subIndex}" data-field="price"
                                    class="rental-subitem-input ${isPerday ? 'rental-subitem-input-muted' : ''}" min="0" ${isPerday ? 'placeholder="Not used"' : ''}>
@@ -3595,10 +3600,11 @@
                                         <option value="inhouse" ${categoryRentalType === 'inhouse' ? 'selected' : ''}>Per Hour (In-house)</option>
                                         <option value="perday" ${categoryRentalType === 'perday' ? 'selected' : ''}>Per Day</option>
                                         <option value="persession" ${categoryRentalType === 'persession' ? 'selected' : ''}>Per Session</option>
+                                        <option value="pertrack" ${categoryRentalType === 'pertrack' ? 'selected' : ''}>Per Track</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="rental-type-label">Base Price (₹/hr)* <small class="rental-type-note">(used if no sub-items)</small></label>
+                                    <label class="rental-type-label">Base Price* <small class="rental-type-note">(used if no sub-items)</small></label>
                                     <input type="number" value="${rental.basePrice || ''}" data-field="categoryBasePrice" onchange="updateRentalType(${index}, 'basePrice', parseInt(this.value))" 
                                            class="rental-type-input" min="0">
                                 </div>
@@ -3632,12 +3638,14 @@
                                     <label class="rental-type-subitems-title">🎸 Individual Items (Optional)</label>
                                     <button type="button" onclick="addSubItem(${index})" class="btn btn-primary btn-sm rental-subitem-add">+ Add Item</button>
                                 </div>
-                                <p class="rental-type-subitems-note">Add individual items with different prices (e.g., Moog Synth - ₹500/hr, Roland Synth - ₹400/hr)</p>
+                                <p class="rental-type-subitems-note">Add individual items with different prices (e.g., Roland Synth - ₹400/hr, Stem Mastering - ₹1500/session, Extra Mix Track - ₹500/track)</p>
                                 <div class="rental-type-hint-box">
                                     <p class="rental-type-hint-title">💡 Rental Types:</p>
                                     <p class="rental-type-hint-text">
                                         <strong>🔗 In-house:</strong> Tied to jam session duration (e.g., guitar for 2-hour session = ₹200 × 2 = ₹400)<br>
-                                        <strong>📅 Per-day:</strong> Flat daily rate regardless of session length (e.g., guitar for any session = ₹800/day)
+                                        <strong>📅 Per-day:</strong> Flat daily rate regardless of session length (e.g., guitar for any session = ₹800/day)<br>
+                                        <strong>🎯 Per-session:</strong> Charged once for the whole session (e.g., mastering = ₹1500/session)<br>
+                                        <strong>🎚️ Per-track:</strong> Charged by track count (e.g., extra mix = ₹500/track)
                                     </p>
                                 </div>
                                 <div class="sub-items-container" data-rental="${index}">
@@ -3654,9 +3662,11 @@
         }
 
         const normalizeBindingRentalType = (value) => {
-            const normalized = String(value || 'inhouse').toLowerCase();
+            const normalized = String(value || 'inhouse').trim().toLowerCase().replace(/[\s_-]+/g, '');
             if (normalized === 'perday') return 'perday';
             if (normalized === 'persession') return 'persession';
+            if (normalized === 'session') return 'persession';
+            if (normalized === 'pertrack' || normalized === 'track') return 'pertrack';
             return 'inhouse';
         };
 
@@ -3710,11 +3720,11 @@
                         <div class="binding-pair-display">
                             <div class="binding-capsule">
                                 <span class="binding-category">${escapeHtml(pair.leftCategory)}</span>
-                                <span class="binding-type">${pair.leftRentalType === 'perday' ? '📅' : pair.leftRentalType === 'persession' ? '🎵' : '⏱️'}</span>
+                                <span class="binding-type">${pair.leftRentalType === 'perday' ? '📅' : pair.leftRentalType === 'persession' ? '🎵' : pair.leftRentalType === 'pertrack' ? '🎚️' : '⏱️'}</span>
                             </div>
                             <div class="binding-arrow">→</div>
                             <div class="binding-capsule">
-                                <span class="binding-type">${pair.rightRentalType === 'perday' ? '📅' : pair.rightRentalType === 'persession' ? '🎵' : '⏱️'}</span>
+                                <span class="binding-type">${pair.rightRentalType === 'perday' ? '📅' : pair.rightRentalType === 'persession' ? '🎵' : pair.rightRentalType === 'pertrack' ? '🎚️' : '⏱️'}</span>
                                 <span class="binding-category">${escapeHtml(pair.rightCategory)}</span>
                             </div>
                         </div>
@@ -3761,12 +3771,13 @@
             const leftRentalType = categoryMap.get(leftCategory) || 'inhouse';
             const rightRentalType = categoryMap.get(rightCategory) || 'inhouse';
 
+            const isFlexibleRentalType = (type) => type === 'persession' || type === 'pertrack';
             const isValidPair = leftRentalType === rightRentalType
-                || leftRentalType === 'persession'
-                || rightRentalType === 'persession';
+                || isFlexibleRentalType(leftRentalType)
+                || isFlexibleRentalType(rightRentalType);
 
             if (!isValidPair) {
-                showAlert('settingsAlert', 'Invalid binding. Allowed only same rental type, or one side as per-session.', 'warning');
+                showAlert('settingsAlert', 'Invalid binding. Allowed only same rental type, or one side as per-session/per-track.', 'warning');
                 return;
             }
 
@@ -3869,9 +3880,10 @@
 
                     const leftRentalType = normalizeBindingRentalType(categoryMap.get(leftCategory));
                     const rightRentalType = normalizeBindingRentalType(categoryMap.get(rightCategory));
+                    const isFlexibleRentalType = (type) => type === 'persession' || type === 'pertrack';
                     const isValidPair = leftRentalType === rightRentalType
-                        || leftRentalType === 'persession'
-                        || rightRentalType === 'persession';
+                        || isFlexibleRentalType(leftRentalType)
+                        || isFlexibleRentalType(rightRentalType);
 
                     if (!isValidPair) {
                         return null;
@@ -4091,8 +4103,8 @@
             const rentalCard = document.querySelector(`.rental-type-card[data-rental-index="${index}"]`);
             if (!rentalCard) return;
 
-            const normalizedRentalType = String(value || 'inhouse').trim().toLowerCase();
-            const categoryRentalType = ['perday', 'persession'].includes(normalizedRentalType) ? normalizedRentalType : 'inhouse';
+            const normalizedRentalType = String(value || 'inhouse').trim().toLowerCase().replace(/[\s_-]+/g, '');
+            const categoryRentalType = ['perday', 'persession', 'pertrack'].includes(normalizedRentalType) ? normalizedRentalType : 'inhouse';
 
             const categoryRentalTypeSelect = rentalCard.querySelector('select[data-field="categoryRentalType"]');
             if (categoryRentalTypeSelect) {
@@ -4113,6 +4125,8 @@
                         ? 'Per-day'
                         : categoryRentalType === 'persession'
                             ? 'Per-session'
+                            : categoryRentalType === 'pertrack'
+                                ? 'Per-track'
                             : 'In-house';
                 }
 
@@ -4126,6 +4140,8 @@
                 if (hourlyPriceLabel) {
                     hourlyPriceLabel.innerHTML = categoryRentalType === 'persession'
                         ? 'Price (₹/session) <span class="price-flag price-flag-active">(active)</span>'
+                        : categoryRentalType === 'pertrack'
+                            ? 'Price (₹/track) <span class="price-flag price-flag-active">(active)</span>'
                         : isPerday
                             ? 'Price (₹/hr) <span class="price-flag price-flag-inactive">(not used for per-day)</span>'
                             : 'Price (₹/hr) <span class="price-flag price-flag-active">(active)</span>';
@@ -4752,9 +4768,11 @@
                 const hourly = document.getElementById('quoteTypeHourly');
                 const perday = document.getElementById('quoteTypePerday');
                 const session = document.getElementById('quoteTypeSession');
+                const track = document.getElementById('quoteTypeTrack');
                 if (hourly) hourly.checked = selectedTypes.includes('inhouse');
                 if (perday) perday.checked = selectedTypes.includes('perday');
                 if (session) session.checked = selectedTypes.includes('persession');
+                if (track) track.checked = selectedTypes.includes('pertrack');
             }
 
             const inhouse = template.schedules?.inhouse || {};
@@ -4891,6 +4909,7 @@
             if (document.getElementById('quoteTypeHourly')?.checked) types.push('inhouse');
             if (document.getElementById('quoteTypePerday')?.checked) types.push('perday');
             if (document.getElementById('quoteTypeSession')?.checked) types.push('persession');
+            if (document.getElementById('quoteTypeTrack')?.checked) types.push('pertrack');
             return types;
         };
 
@@ -4940,7 +4959,7 @@
                         description: type.description || '', isRequired: false, isBase: true,
                         maxQuantity, quantityEnabled
                     }));
-                    const basePriceUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
+                    const basePriceUnit = categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
                     html += `<div class="admin-rental-row base">
                         <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedBaseData}">
                         <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}${basePriceUnit}</label>
@@ -4964,10 +4983,11 @@
                         const qtyEnableInputId = getQuotationQtyEnableInputId(itemId);
                         const isPerday = categoryRentalType === 'perday';
                         const isPerSession = categoryRentalType === 'persession';
+                        const isPerTrack = categoryRentalType === 'pertrack';
                         const maxQuantity = sanitizeQuotationMaxQuantity(subItem.maxQuantity ?? type.maxQuantity);
                         const quantityEnabled = subItem.quantityEnabled === true;
                         const displayPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
-                        const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
+                        const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : isPerTrack ? '/track' : '/hr';
                         const encodedRentalData = encodeURIComponent(JSON.stringify({
                             id: itemId, name: subItem.name, category: type.name,
                             price: displayPrice, perdayPrice: subItem.perdayPrice || 0,
@@ -4977,7 +4997,7 @@
                         html += `<div class="admin-rental-row child">
                             <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedRentalData}">
                             <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">
-                                ${isPerday ? '📅' : isPerSession ? '🎯' : '🔗'} ${escapeHtml(subItem.name)} - ${displayPrice === 0 ? 'FREE' : `₹${displayPrice}${priceUnit}`}
+                                ${isPerday ? '📅' : isPerSession ? '🎯' : isPerTrack ? '🎚️' : '🔗'} ${escapeHtml(subItem.name)} - ${displayPrice === 0 ? 'FREE' : `₹${displayPrice}${priceUnit}`}
                             </label>
                             <div class="admin-rental-qty">
                                 ${quantityEnabled
@@ -5004,7 +5024,7 @@
                         description: type.description || `${type.name} rental`, isRequired: false, isBase: false,
                         maxQuantity, quantityEnabled
                     }));
-                    const categoryUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
+                    const categoryUnit = categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
                     html += `<div class="admin-rental-row child">
                         <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedRentalData}">
                         <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">🔗 ${escapeHtml(type.name)} - ₹${type.basePrice}${categoryUnit}</label>
@@ -5119,7 +5139,7 @@
             const perdaySchedule = calculateQuotePerdayDays({ strict, required: hasPerday });
             let subtotal = 0;
             selectedRentals.forEach((rental) => {
-                if (rental.rentalType === 'persession') {
+                if (rental.rentalType === 'persession' || rental.rentalType === 'pertrack') {
                     subtotal += rental.price * rental.quantity;
                 } else if (rental.rentalType === 'perday') {
                     if (perdaySchedule.isValid) subtotal += rental.price * rental.quantity * perdaySchedule.days;
@@ -5870,7 +5890,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                         maxQuantity: baseMaxQuantity
                     }));
 
-                    const basePriceUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
+                    const basePriceUnit = categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
 
                     const shouldCheckCreateBase = false;
 
@@ -5897,8 +5917,9 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                         const qtyInputId = getRentalInputId(itemId);
                         const isPerday = categoryRentalType === 'perday';
                         const isPerSession = categoryRentalType === 'persession';
+                        const isPerTrack = categoryRentalType === 'pertrack';
                         const displayPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
-                        const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
+                        const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : isPerTrack ? '/track' : '/hr';
                         const isFree = displayPrice === 0;
                         const showQuantityControls = subItem.quantityEnabled === true;
                         const maxQuantity = normalizeConfiguredMaxQuantity(subItem.maxQuantity, normalizeConfiguredMaxQuantity(type.maxQuantity, 10));
@@ -5917,13 +5938,14 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                             maxQuantity
                         }));
 
-                        const icon = isFree ? '🆓' : (isPerday ? '📅' : isPerSession ? '🎯' : '🔗');
-                        const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : isPerSession ? ' (Per-session)' : ' (In-house)');
+                        const icon = isFree ? '🆓' : (isPerday ? '📅' : isPerSession ? '🎯' : isPerTrack ? '🎚️' : '🔗');
+                        const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : isPerSession ? ' (Per-session)' : isPerTrack ? ' (Per-track)' : ' (In-house)');
                         const priceDisplay = isFree ? 'FREE' : `₹${displayPrice}${priceUnit}`;
                         const details = [
                             isPerday ? 'Flat per-day pricing' : '',
                             (isPerSession && !isFree) ? 'Flat per-session pricing' : '',
-                            (!isPerday && !isPerSession && !isFree) ? 'Tied to session duration' : '',
+                            (isPerTrack && !isFree) ? 'Charged by track count' : '',
+                            (!isPerday && !isPerSession && !isPerTrack && !isFree) ? 'Tied to session duration' : '',
                             isFree ? 'Free add-on' : ''
                         ].filter(Boolean).join(' | ');
 
@@ -5959,7 +5981,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                         quantityEnabled: type.quantityEnabled === true
                     }));
 
-                    const categoryUnit = categoryRentalType === 'persession' ? '/session' : '/hr';
+                    const categoryUnit = categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
 
                     html += `
                         <div class="admin-rental-row child">
@@ -6026,7 +6048,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
 
                 if (rental.rentalType === 'perday') {
                     itemTotal = rental.price * rental.quantity;
-                } else if (rental.rentalType === 'persession') {
+                } else if (rental.rentalType === 'persession' || rental.rentalType === 'pertrack') {
                     itemTotal = rental.price * rental.quantity;
                 } else if (rental.isRequired || String(rental.fullId).includes('_base')) {
                     itemTotal = rental.price * rental.quantity * calculatedDuration;

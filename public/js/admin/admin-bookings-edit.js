@@ -112,12 +112,13 @@
                     const effectiveRentalType = matchedRental?.rentalType || configuredRentalType;
                     const isPerday = effectiveRentalType === 'perday';
                     const isPerSession = effectiveRentalType === 'persession';
+                    const isPerTrack = effectiveRentalType === 'pertrack';
                     const defaultPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
                     const effectivePrice = matchedRental ? Number(matchedRental.price || defaultPrice) : defaultPrice;
-                    const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : '/hr';
+                    const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : isPerTrack ? '/track' : '/hr';
                     const isFree = effectivePrice === 0;
                     const quantityEnabled = matchedRental?.quantityEnabled === true || subItem.quantityEnabled === true;
-                    const showQuantityControls = quantityEnabled || isPerday || isPerSession || isFree || (subItem.name || '').includes('IEM');
+                    const showQuantityControls = quantityEnabled || isPerday || isPerSession || isPerTrack || isFree || (subItem.name || '').includes('IEM');
                     const maxQuantity = normalizeConfiguredMaxQuantity(subItem.maxQuantity, normalizeConfiguredMaxQuantity(type.maxQuantity, 10));
                     const quantityValue = Math.max(1, Math.min(maxQuantity, parseInt(matchedRental?.quantity, 10) || 1));
 
@@ -136,13 +137,14 @@
                         maxQuantity
                     }));
 
-                    const icon = isFree ? '🆓' : (isPerday ? '📅' : isPerSession ? '🎯' : '🔗');
-                    const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : isPerSession ? ' (Per-session)' : ' (In-house)');
+                    const icon = isFree ? '🆓' : (isPerday ? '📅' : isPerSession ? '🎯' : isPerTrack ? '🎚️' : '🔗');
+                    const typeLabel = isFree ? '' : (isPerday ? ' (Per-day)' : isPerSession ? ' (Per-session)' : isPerTrack ? ' (Per-track)' : ' (In-house)');
                     const priceDisplay = isFree ? 'FREE' : `₹${effectivePrice}${priceUnit}`;
                     const details = [
                         isPerday ? 'Flat per-day pricing' : '',
                         (isPerSession && !isFree) ? 'Flat per-session pricing' : '',
-                        (!isPerday && !isPerSession && !isFree) ? 'Tied to session duration' : '',
+                        (isPerTrack && !isFree) ? 'Charged by track count' : '',
+                        (!isPerday && !isPerSession && !isPerTrack && !isFree) ? 'Tied to session duration' : '',
                         isFree ? 'Free add-on' : ''
                     ].filter(Boolean).join(' | ');
 
@@ -218,8 +220,10 @@
                 const itemId = `custom_existing_${index}`;
                 const qtyInputId = getEditRentalInputId(itemId, deps);
                 const isPerday = String(rental?.rentalType || '').toLowerCase() === 'perday';
+                const isPerSession = String(rental?.rentalType || '').toLowerCase() === 'persession';
+                const isPerTrack = String(rental?.rentalType || '').toLowerCase() === 'pertrack';
                 const effectivePrice = Number(rental?.price || 0);
-                const priceUnit = isPerday ? '/day' : '/hr';
+                const priceUnit = isPerday ? '/day' : isPerSession ? '/session' : isPerTrack ? '/track' : '/hr';
                 const maxQuantity = normalizeConfiguredMaxQuantity(rental?.maxQuantity, 100);
                 const quantityValue = Math.max(1, Math.min(maxQuantity, parseInt(rental?.quantity, 10) || 1));
 
@@ -229,7 +233,7 @@
                     category: rental?.category || '',
                     price: effectivePrice,
                     perdayPrice: isPerday ? effectivePrice : (Number(rental?.perdayPrice) || 0),
-                    rentalType: isPerday ? 'perday' : 'inhouse',
+                    rentalType: isPerday ? 'perday' : isPerSession ? 'persession' : isPerTrack ? 'pertrack' : 'inhouse',
                     description: rental?.description || '',
                     isRequired: false,
                     isBase: false,
@@ -278,13 +282,14 @@
             }
             const isPerday = rentalData.rentalType === 'perday';
             const isPerSession = rentalData.rentalType === 'persession';
+            const isPerTrack = rentalData.rentalType === 'pertrack';
             const isFree = (isPerday ? (rentalData.perdayPrice || 0) : (rentalData.price || 0)) === 0;
             const isIem = (rentalData.name || '').includes('IEM');
             const isBase = rentalData.isRequired || String(rentalData.id).includes('_base');
             const quantityEnabled = rentalData.quantityEnabled === true;
 
             let effectiveQuantity = clampedQuantity;
-            if (!quantityEnabled && !isPerday && !isPerSession && !isFree && !isIem && !isBase && !rentalData.allowCustomQuantity) {
+            if (!quantityEnabled && !isPerday && !isPerSession && !isPerTrack && !isFree && !isIem && !isBase && !rentalData.allowCustomQuantity) {
                 effectiveQuantity = 1;
             }
 
@@ -364,7 +369,7 @@
 
             if (item.rentalType === 'perday') {
                 itemTotal = item.price * item.quantity;
-            } else if (item.rentalType === 'persession') {
+            } else if (item.rentalType === 'persession' || item.rentalType === 'pertrack') {
                 itemTotal = item.price * item.quantity;
             } else if (item.isRequired || String(item.fullId).includes('_base')) {
                 itemTotal = item.price * item.quantity * duration;

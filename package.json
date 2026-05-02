@@ -13,6 +13,8 @@
     "catalog:backup": "node scripts/catalog/exportAdminSettingsCatalog.js",
     "catalog:restore:preview": "node scripts/catalog/restoreAdminSettingsCatalog.js",
     "catalog:restore:apply": "node scripts/catalog/restoreAdminSettingsCatalog.js --apply",
+    "bookings:rental-types:preview": "node scripts/db/backfillBookingRentalTypes.js",
+    "bookings:rental-types:apply": "node scripts/db/backfillBookingRentalTypes.js --apply",
     "cleanup:test-users": "node scripts/setup/deleteTestUsers.js",
     "cleanup:test-users:apply": "node scripts/setup/deleteTestUsers.js --apply"
   },

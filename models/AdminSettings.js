@@ -12,7 +12,7 @@ const adminSettingsSchema = new mongoose.Schema({
     // Category-level rental type controls how all child items are billed.
     rentalType: {
       type: String,
-      enum: ['inhouse', 'perday', 'persession'],
+      enum: ['inhouse', 'perday', 'persession', 'pertrack'],
       default: 'inhouse'
     },
     basePrice: {
@@ -56,7 +56,7 @@ const adminSettingsSchema = new mongoose.Schema({
       // Rental type: 'inhouse' (tied to jamroom duration) or 'perday' (independent)
       rentalType: {
         type: String,
-        enum: ['inhouse', 'perday', 'persession'],
+        enum: ['inhouse', 'perday', 'persession', 'pertrack'],
         default: 'inhouse'
       },
       // Per-day price (only used when rentalType is 'perday')
@@ -94,7 +94,7 @@ const adminSettingsSchema = new mongoose.Schema({
     },
     selectedTypes: [{
       type: String,
-      enum: ['inhouse', 'perday', 'persession']
+      enum: ['inhouse', 'perday', 'persession', 'pertrack']
     }],
     rentals: [{
       name: {
@@ -114,7 +114,7 @@ const adminSettingsSchema = new mongoose.Schema({
       },
       rentalType: {
         type: String,
-        enum: ['inhouse', 'perday', 'persession'],
+        enum: ['inhouse', 'perday', 'persession', 'pertrack'],
         default: 'inhouse'
       },
       quantity: {
@@ -172,12 +172,12 @@ const adminSettingsSchema = new mongoose.Schema({
       },
       leftRentalType: {
         type: String,
-        enum: ['inhouse', 'perday', 'persession'],
+        enum: ['inhouse', 'perday', 'persession', 'pertrack'],
         default: 'inhouse'
       },
       rightRentalType: {
         type: String,
-        enum: ['inhouse', 'perday', 'persession'],
+        enum: ['inhouse', 'perday', 'persession', 'pertrack'],
         default: 'inhouse'
       },
       deletedAt: {

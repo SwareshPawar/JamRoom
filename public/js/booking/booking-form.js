@@ -83,9 +83,6 @@ const collectBookingFormDraft = () => {
     const bandName = document.getElementById('bandName')?.value || '';
     const notes = document.getElementById('notes')?.value || '';
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-    const rentalsSnapshot = typeof window.getBookingRentalDraftSnapshot === 'function'
-        ? window.getBookingRentalDraftSnapshot()
-        : { hourly: [], perday: [] };
 
     const hasDraftValues =
         !!bookingDate ||
@@ -97,9 +94,7 @@ const collectBookingFormDraft = () => {
         !!perdayReturnTime ||
         !!bookingType.trim() ||
         !!bandName.trim() ||
-        !!notes.trim() ||
-        (Array.isArray(rentalsSnapshot.hourly) && rentalsSnapshot.hourly.length > 0) ||
-        (Array.isArray(rentalsSnapshot.perday) && rentalsSnapshot.perday.length > 0);
+        !!notes.trim();
 
     if (!hasDraftValues) {
         return null;
@@ -118,8 +113,7 @@ const collectBookingFormDraft = () => {
         perdayReturnTime,
         bookingType,
         bandName,
-        notes,
-        rentals: rentalsSnapshot
+        notes
     };
 };
 
@@ -214,10 +208,6 @@ const restoreBookingFormDraft = async () => {
             perdayReturnTimeEl.value = parsedDraft.perdayReturnTime;
         }
 
-        if (typeof window.applyBookingRentalDraftSelection === 'function') {
-            window.applyBookingRentalDraftSelection(parsedDraft.rentals || {});
-        }
-
         refreshBookingTypeOptions();
 
         if (selectedMode === 'hourly') {
@@ -284,7 +274,7 @@ const buildRentalsForSubmission = (duration) => {
         if (rental.rentalType === 'perday') {
             itemTotal = rental.price * rental.quantity;
             effectiveQuantity = rental.quantity;
-        } else if (rental.rentalType === 'persession') {
+        } else if (rental.rentalType === 'persession' || rental.rentalType === 'pertrack') {
             itemTotal = (rental.price || rental.basePrice) * rental.quantity;
             effectiveQuantity = rental.quantity;
         } else if (rental.isRequired || rental.fullId.includes('_base')) {
@@ -376,7 +366,7 @@ const buildBookingFormPayload = () => {
             const qty = Math.max(1, Number(rental?.quantity || 1));
             const unitPrice = Number(rental?.price || 0);
 
-            if (rentalType === 'persession') {
+            if (rentalType === 'persession' || rentalType === 'pertrack') {
                 return sum + (unitPrice * qty);
             }
 

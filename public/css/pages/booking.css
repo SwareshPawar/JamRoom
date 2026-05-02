@@ -15,6 +15,38 @@
     min-width: 0;
 }
 
+#bookingSection {
+    border: 1px solid color-mix(in srgb, var(--primary-color) 30%, var(--border-color));
+    background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--primary-color) 7%, var(--surface-elevated)) 0%,
+            var(--surface-elevated) 62%
+        );
+}
+
+#bookingSection .section-header {
+    border-bottom: 1px dashed color-mix(in srgb, var(--primary-color) 45%, var(--border-color));
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+}
+
+#bookingSection .section-header h2 {
+    margin: 0;
+    letter-spacing: 0.02em;
+}
+
+#bookingSection .section-content {
+    background: color-mix(in srgb, var(--primary-color) 4%, var(--surface-1));
+    border: 1px solid color-mix(in srgb, var(--primary-color) 24%, var(--border-color-light));
+    border-radius: 12px;
+    padding: 14px;
+}
+
+#myBookingsSection {
+    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--surface-elevated) 88%, var(--surface-1));
+}
+
 /* Form styles now in shared.css */
 
 .time-container {
@@ -345,6 +377,49 @@
     gap: 6px;
     white-space: normal;
     min-width: 0;
+}
+
+.rental-details {
+    grid-column: 1 / -1;
+    border-top: 1px dashed var(--border-color-light);
+    margin-top: 2px;
+    padding-top: 6px;
+}
+
+.rental-details summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-color-light);
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rental-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.rental-details summary::before {
+    content: '▾';
+    font-size: 11px;
+    line-height: 1;
+    color: var(--text-color-light);
+    transition: transform 0.2s ease;
+}
+
+.rental-details[open] summary::before {
+    transform: rotate(180deg);
+}
+
+.rental-details .rental-description {
+    margin: 8px 0 0;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color-light);
+    background: color-mix(in srgb, var(--surface-1) 84%, var(--surface-elevated));
 }
 
 .quantity-info {

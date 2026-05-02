@@ -52,6 +52,10 @@ const bookingSchema = new mongoose.Schema({
       type: String,
       required: [true, 'Rental name is required']
     },
+    category: {
+      type: String,
+      default: ''
+    },
     description: {
       type: String,
       default: ''
@@ -65,6 +69,11 @@ const bookingSchema = new mongoose.Schema({
       type: Number,
       default: 1,
       min: 1
+    },
+    rentalType: {
+      type: String,
+      enum: ['inhouse', 'perday', 'persession', 'pertrack'],
+      default: 'inhouse'
     }
   }],
   // Total price for all rentals

@@ -49,7 +49,9 @@ const loadMyBookings = async () => {
                         const days = isPerday ? perDayDays : 1;
                         const amount = (isPerday || rentalType === 'perday')
                             ? (r.price * r.quantity * days)
-                            : (r.price * r.quantity * (booking.duration || 1));
+                            : (rentalType === 'persession' || rentalType === 'pertrack')
+                                ? (r.price * r.quantity)
+                                : (r.price * r.quantity * (booking.duration || 1));
                         return `<li>${r.name} × ${r.quantity} - ₹${amount}</li>`;
                     }).join('')
                 : `<li>${booking.rentalType || 'Unknown rental'}</li>`;

@@ -303,6 +303,7 @@ class JamRoomUtils {
                 || subItems.some((subItem) => String(subItem?.rentalType || '').toLowerCase() === 'perday');
             const inferredHasHourly = categoryRentalType === 'inhouse'
                 || categoryRentalType === 'persession'
+                || categoryRentalType === 'pertrack'
                 || (typeName === 'JamRoom' && Number(type?.basePrice || 0) > 0)
                 || (!hasSubItems && Number(type?.basePrice || 0) > 0)
                 || subItems.some((subItem) => String(subItem?.rentalType || '').toLowerCase() !== 'perday');

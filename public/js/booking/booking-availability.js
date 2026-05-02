@@ -59,6 +59,9 @@ const hasFutureStartSlotsForToday = (selectedDate) => {
     return allTimeSlots.some((slot) => (slot.hour * 60) > currentTimeInMinutes);
 };
 
+let availabilityRequestSeq = 0;
+let activeAvailabilityController = null;
+
 // Populate start time slots based on selected date and availability
 const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     const startTimeSelect = document.getElementById('startTime');
@@ -297,17 +300,29 @@ const loadAvailability = async (date) => {
     }
 
     if (!date) {
+        availabilityRequestSeq += 1;
+        if (activeAvailabilityController) {
+            activeAvailabilityController.abort();
+            activeAvailabilityController = null;
+        }
         container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">Select a date to view availability</div>';
         window.currentAvailabilityData = null;
         return;
     }
 
+    const requestId = ++availabilityRequestSeq;
+
+    if (activeAvailabilityController) {
+        activeAvailabilityController.abort();
+    }
+
     container.innerHTML = '<div class="booking-theme-status booking-theme-status-loading">Loading availability...</div>';
 
     let timeoutId;
+    const controller = new AbortController();
+    activeAvailabilityController = controller;
     try {
         const token = localStorage.getItem('token');
-        const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), 12000);
         const res = await fetch(`${API_URL}/api/bookings/availability/${date}`, {
             headers: {
@@ -324,6 +339,11 @@ const loadAvailability = async (date) => {
         const data = await res.json();
         console.log('Availability data loaded:', data);
 
+        const activeDate = document.getElementById('bookingDate')?.value || '';
+        if (requestId !== availabilityRequestSeq || activeDate !== date) {
+            return;
+        }
+
         // Store availability data globally for time slot filtering
         window.currentAvailabilityData = data;
 
@@ -334,7 +354,14 @@ const loadAvailability = async (date) => {
         await populateStartTimeSlots(date, data);
 
     } catch (error) {
+        const activeDate = document.getElementById('bookingDate')?.value || '';
+        const isStaleRequest = requestId !== availabilityRequestSeq || activeDate !== date;
+        if (isStaleRequest) {
+            return;
+        }
+
         console.error('Error loading availability:', error);
+
         if (error.name === 'AbortError') {
             container.innerHTML = '<div class="booking-theme-status booking-theme-status-danger">Loading availability timed out. Please try again.</div>';
         } else {
@@ -349,6 +376,10 @@ const loadAvailability = async (date) => {
     } finally {
         if (timeoutId) {
             clearTimeout(timeoutId);
+        }
+
+        if (requestId === availabilityRequestSeq && activeAvailabilityController === controller) {
+            activeAvailabilityController = null;
         }
     }
 };

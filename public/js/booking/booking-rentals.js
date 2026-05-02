@@ -21,9 +21,13 @@ const rentalCatalog = {
 };
 
 const normalizeRentalType = (value) => {
-    const normalized = String(value || 'inhouse').toLowerCase();
+    const normalized = String(value || 'inhouse')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_-]+/g, '');
     if (normalized === 'perday') return 'perday';
-    if (normalized === 'persession') return 'persession';
+    if (normalized === 'persession' || normalized === 'session') return 'persession';
+    if (normalized === 'pertrack' || normalized === 'track') return 'pertrack';
     return 'inhouse';
 };
 const normalizeRentalNameKey = (name) => String(name || '').trim().toLowerCase();
@@ -50,7 +54,7 @@ const inferAvailableBookingModesFromSettings = () => {
 
         if (categoryRentalType === 'perday') {
             hasPerday = true;
-        } else if (categoryRentalType === 'inhouse' || categoryRentalType === 'persession') {
+        } else if (categoryRentalType === 'inhouse' || categoryRentalType === 'persession' || categoryRentalType === 'pertrack') {
             hasHourly = true;
         }
 
@@ -220,7 +224,13 @@ const applyBookingRentalDraftSelection = (draftSelection = {}) => {
     }
 };
 
-const getTodayDateString = () => new Date().toISOString().split('T')[0];
+const getTodayDateString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 const combineDateAndTime = (dateValue, timeValue) => {
     if (!dateValue || !timeValue) return null;
@@ -689,6 +699,7 @@ const isQuantityControlEnabled = (item) => {
     if (item.isRequired) return false;
     if (item.rentalType === 'perday') return true;
     if (item.rentalType === 'persession') return true;
+    if (item.rentalType === 'pertrack') return true;
     if (item.price === 0) return true;
     if ((item.name || '').includes('IEM')) return true;
     return false;
@@ -696,24 +707,23 @@ const isQuantityControlEnabled = (item) => {
 
 const buildRentalOptionHTML = (item, mode) => {
     const showQuantity = isQuantityControlEnabled(item);
-    const priceUnit = item.rentalType === 'perday' ? '/day' : item.rentalType === 'persession' ? '/session' : '/hr';
+    const priceUnit = item.rentalType === 'perday'
+        ? '/day'
+        : item.rentalType === 'persession'
+            ? '/session'
+            : item.rentalType === 'pertrack'
+                ? '/track'
+                : '/hr';
     const defaultChecked = item.isRequired ? 'checked' : '';
     const defaultDisabled = item.isRequired ? 'disabled' : '';
     const selectedClass = item.isRequired ? ' selected' : '';
-    const infoText = item.isRequired
-        ? 'Always required'
-        : (item.rentalType === 'perday'
-            ? 'Charged per selected day'
-            : item.rentalType === 'persession'
-                ? 'Charged once per session'
-                : 'Charged for jam duration');
+    const hasDescription = String(item.description || '').trim().length > 0;
 
     return `
-        <div class="rental-option ${item.isRequired ? 'base' : 'child'}${selectedClass}" data-rental-id="${item.key}" data-rental-mode="${mode}" onclick="if(!event.target.closest('.quantity-btn') && event.target.type !== 'checkbox'){const cb=this.querySelector('.rental-checkbox');if(!cb.disabled){cb.checked=!cb.checked;toggleRental('${item.key}','${mode}');}}">
+        <div class="rental-option ${item.isRequired ? 'base' : 'child'}${selectedClass}" data-rental-id="${item.key}" data-rental-mode="${mode}" onclick="if(!event.target.closest('.quantity-btn') && event.target.type !== 'checkbox' && !event.target.closest('.rental-details')){const cb=this.querySelector('.rental-checkbox');if(!cb.disabled){cb.checked=!cb.checked;toggleRental('${item.key}','${mode}');}}">
             <input type="checkbox" class="rental-checkbox" ${defaultChecked} ${defaultDisabled} onchange="toggleRental('${item.key}', '${mode}')">
             <div class="rental-meta">
                 <div class="rental-name">${item.name}</div>
-                <div class="rental-description">${item.description || ''}</div>
                 <div class="rental-price">${item.price === 0 ? 'FREE' : `₹${item.price}${priceUnit}`}</div>
             </div>
             <div class="rental-qty">
@@ -723,8 +733,14 @@ const buildRentalOptionHTML = (item, mode) => {
                            <span class="quantity-display">1</span>
                            <button type="button" class="quantity-btn" onclick="updateQuantity('${item.key}', 1, '${mode}')">+</button>
                        </div>`
-                    : `<div class="quantity-info centered">${infoText}</div>`}
+                    : ''}
             </div>
+            ${hasDescription
+                ? `<details class="rental-details">
+                       <summary>Details</summary>
+                       <div class="rental-description">${item.description}</div>
+                   </details>`
+                : ''}
         </div>
     `;
 };
@@ -783,6 +799,10 @@ const getCategoryRentalType = (type) => {
         return 'persession';
     }
 
+    if (subItems.some((subItem) => normalizeRentalType(subItem?.rentalType) === 'pertrack')) {
+        return 'pertrack';
+    }
+
     return 'inhouse';
 };
 
@@ -815,9 +835,10 @@ const getConfiguredBindingPairs = () => {
                 return null;
             }
 
+            const isFlexibleRentalType = (type) => type === 'persession' || type === 'pertrack';
             const isValidPair = leftRentalType === rightRentalType
-                || leftRentalType === 'persession'
-                || rightRentalType === 'persession';
+                || isFlexibleRentalType(leftRentalType)
+                || isFlexibleRentalType(rightRentalType);
             if (!isValidPair) {
                 return null;
             }
@@ -1010,7 +1031,7 @@ const populateRentalTypes = () => {
         }
 
         const sessionItems = (hourlyGroups.get(categoryName) || [])
-            .filter((item) => item.rentalType === 'persession');
+            .filter((item) => item.rentalType === 'persession' || item.rentalType === 'pertrack');
 
         return [...perdayItems, ...sessionItems];
     };

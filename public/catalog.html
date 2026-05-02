@@ -66,6 +66,7 @@
             const rentalType = String(item?.rentalType || 'inhouse').toLowerCase();
             const isPerDay = rentalType === 'perday';
             const isPerSession = rentalType === 'persession';
+            const isPerTrack = rentalType === 'pertrack';
             const amount = isPerDay
                 ? Number(item?.perdayPrice || item?.price || 0)
                 : Number(item?.price || 0);
@@ -77,6 +78,7 @@
 
             if (isPerDay) return `${priceLabel} / day`;
             if (isPerSession) return `${priceLabel} / session`;
+            if (isPerTrack) return `${priceLabel} / track`;
             return `${priceLabel} / hr`;
         };
 

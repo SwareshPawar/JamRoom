@@ -16,9 +16,6 @@ const { isAdmin } = require('../../middleware/admin');
 const { sendEmail } = require('../../utils/email');
 const { generateCalendarInvite } = require('../../utils/calendar');
 const {
-  generateBill,
-  generateBillForDownload,
-  generateBillFilename,
   generateBillForDownloadWithFilename
 } = require('../../utils/billGenerator');
 const {
@@ -473,12 +470,14 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     const settings = await AdminSettings.getSettings();
 
     let pdfBuffer = null;
-    let filename = generateBillFilename(booking, settings);
+    let filename = '';
 
     console.log('📄 Generating eBill PDF attachment...');
 
     try {
-      pdfBuffer = await generateBillForDownload(booking);
+      const generated = await generateBillForDownloadWithFilename(booking);
+      pdfBuffer = generated.pdfBuffer;
+      filename = generated.filename;
       console.log('✅ eBill PDF generated successfully, size:', pdfBuffer?.length);
     } catch (error) {
       console.error('PDF generation failed for eBill:', error.message);
