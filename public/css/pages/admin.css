@@ -180,20 +180,6 @@
     flex: 1;
 }
 
-.modal-actions-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.btn-flex {
-    flex: 1;
-}
-
-.btn-full {
-    width: 100%;
-}
-
 .reason-group-spacing {
     margin-top: 15px;
 }
@@ -365,27 +351,6 @@
 
 .text-gap-left {
     margin-left: 8px;
-}
-
-.text-center-muted-padded {
-    text-align: center;
-    padding: 20px;
-    color: var(--text-color-light);
-}
-
-.text-success-no-margin {
-    color: var(--success-color);
-    margin: 0;
-}
-
-.text-warning-no-margin {
-    color: var(--warning-color);
-    margin: 0;
-}
-
-.text-danger-no-margin {
-    color: var(--danger-color);
-    margin: 0;
 }
 
 .blocked-item-row {
@@ -2039,7 +2004,6 @@ textarea:focus {
 /* Ensure touch-friendly button sizing on mobile */
 .settings-tab-pane .btn {
     min-height: 44px;
-}
 }
 
 @keyframes fadeIn {
