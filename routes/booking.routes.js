@@ -774,7 +774,7 @@ router.post('/', protect, async (req, res) => {
     // Send WhatsApp confirmation to customer if mobile provided
     if (req.user.mobile) {
       try {
-        await sendCustomerBookingRequestWhatsApp(req.user.mobile, {
+        const customerWhatsappResult = await sendCustomerBookingRequestWhatsApp(req.user.mobile, {
           userName: req.user.name,
           date: displayDate,
           startTime: effectiveStartTime,
@@ -784,7 +784,12 @@ router.post('/', protect, async (req, res) => {
           upiId: settings.upiId,
           upiName: resolvedUpiName
         });
-        console.log('Customer booking WhatsApp sent to:', req.user.mobile);
+
+        if (customerWhatsappResult?.success) {
+          console.log('Customer booking WhatsApp sent to:', req.user.mobile);
+        } else {
+          console.log('Customer booking WhatsApp failed:', customerWhatsappResult?.message || customerWhatsappResult?.error || 'Unknown error');
+        }
       } catch (whatsappError) {
         console.log('Customer booking WhatsApp failed:', whatsappError.message);
       }
@@ -833,7 +838,7 @@ router.post('/', protect, async (req, res) => {
 
     // Send WhatsApp notification to admin and other notification recipients
     try {
-      await sendBookingRequestNotifications({
+      const bookingRequestWhatsappResult = await sendBookingRequestNotifications({
         userName: req.user.name,
         userEmail: req.user.email,
         userMobile: req.user.mobile,
@@ -843,6 +848,21 @@ router.post('/', protect, async (req, res) => {
         totalAmount: calculatedTotalAmount,
         bandName
       }, settings.whatsappNotifications);
+
+      if (Array.isArray(bookingRequestWhatsappResult)) {
+        const successCount = bookingRequestWhatsappResult.filter((entry) => entry?.success).length;
+        const failureCount = bookingRequestWhatsappResult.length - successCount;
+        console.log(`Booking request WhatsApp notifications result: ${successCount} success, ${failureCount} failed`);
+
+        if (failureCount > 0) {
+          const failedNumbers = bookingRequestWhatsappResult
+            .filter((entry) => !entry?.success)
+            .map((entry) => `${entry.number}: ${entry.message || 'Unknown error'}`);
+          console.log('Booking request WhatsApp failed recipients:', failedNumbers.join('; '));
+        }
+      } else if (bookingRequestWhatsappResult?.success === false) {
+        console.log('Booking request WhatsApp notifications skipped/failed:', bookingRequestWhatsappResult.message || 'Unknown error');
+      }
     } catch (whatsappError) {
       console.log('WhatsApp booking request notifications failed:', whatsappError.message);
     }
