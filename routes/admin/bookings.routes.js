@@ -14,7 +14,7 @@ const AdminSettings = require('../../models/AdminSettings');
 const { protect } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/admin');
 const { sendEmail } = require('../../utils/email');
-const { generateCalendarInvite } = require('../../utils/calendar');
+const { generateCalendarInvite, buildBookingCalendarUid } = require('../../utils/calendar');
 const {
   generateBillForDownloadWithFilename
 } = require('../../utils/billGenerator');
@@ -331,6 +331,14 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       });
     }
 
+    if (!booking.calendarUid) {
+      booking.calendarUid = buildBookingCalendarUid(booking._id);
+    }
+
+    if (!Number.isFinite(Number(booking.calendarSequence))) {
+      booking.calendarSequence = 0;
+    }
+
     booking.bookingStatus = 'CONFIRMED';
     await booking.save();
 
@@ -394,7 +402,11 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       startTime: booking.startTime,
       endTime: booking.endTime,
       attendees: [booking.userEmail, ...adminNotificationEmails],
-      studioName: settings.studioName || 'Swar JamRoom'
+      studioName: settings.studioName || 'Swar JamRoom',
+      uid: booking.calendarUid,
+      sequence: booking.calendarSequence,
+      method: 'REQUEST',
+      status: 'CONFIRMED'
     });
 
     await sendUnifiedBookingConfirmationEmails({
@@ -843,6 +855,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
     if (reason) {
       booking.notes = (booking.notes ? booking.notes + '\n' : '') + `Rejection reason: ${reason}`;
     }
+
     await booking.save();
 
     const settings = await AdminSettings.getSettings();
@@ -873,7 +886,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
 
     if (booking.userMobile) {
       try {
-        const message = `❌ JamRoom Booking Declined\n\nHi ${booking.userName},\nUnfortunately, your booking request has been declined.\n\n📅 Date: ${displayDate}\n⏰ Time: ${booking.startTime}-${booking.endTime}\n${reason ? `📝 Reason: ${reason}` : ''}\n\nPlease contact us for alternative slots. 📞`;
+        const message = `❌ JamRoom Booking Declined\n\nHi ${booking.userName},\nUnfortunately, your booking request has been declined.\n\n📅 Date: ${displayDate}\n⏰ Time: ${formatTimeRange12Hour(booking.startTime, booking.endTime)}\n${reason ? `📝 Reason: ${reason}` : ''}\n\nPlease contact us for alternative slots. 📞`;
         await sendWhatsApp(booking.userMobile, message);
       } catch (whatsappError) {
         console.log('Customer rejection WhatsApp failed:', whatsappError.message);
@@ -1086,6 +1099,11 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       });
     }
 
+    const previousDateYmd = formatDateAsYmdInIst(new Date(booking.date));
+    const previousStartTime = String(booking.startTime || '');
+    const previousEndTime = String(booking.endTime || '');
+    const previousDuration = Number(booking.duration || 0);
+
     const settings = await AdminSettings.getSettings();
     const gstEnabled = settings?.gstConfig?.enabled || false;
     const gstRate = gstEnabled ? (settings?.gstConfig?.rate || 0.18) : 0;
@@ -1292,9 +1310,40 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       booking.paymentMode = ['UPI', 'CASH', 'OTHER'].includes(normalizedMode) ? normalizedMode : '';
     }
 
+    const updatedDateYmd = formatDateAsYmdInIst(new Date(booking.date));
+    const hasCalendarRelevantChange = (
+      previousDateYmd !== updatedDateYmd ||
+      previousStartTime !== String(booking.startTime || '') ||
+      previousEndTime !== String(booking.endTime || '') ||
+      previousDuration !== Number(booking.duration || 0)
+    );
+
+    if (booking.bookingStatus === 'CONFIRMED' && hasCalendarRelevantChange) {
+      if (!booking.calendarUid) {
+        booking.calendarUid = buildBookingCalendarUid(booking._id);
+      }
+      booking.calendarSequence = Math.max(0, Number(booking.calendarSequence || 0)) + 1;
+    }
+
     await booking.save();
 
     const displayDate = formatBookingDisplayDate(booking.date);
+    const updateInvite = (booking.bookingStatus === 'CONFIRMED' && hasCalendarRelevantChange)
+      ? generateCalendarInvite({
+          title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
+          description: `Booking updated for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
+          location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
+          startDate: updatedDateYmd,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          attendees: [booking.userEmail],
+          studioName: settings.studioName || 'Swar JamRoom',
+          uid: booking.calendarUid,
+          sequence: booking.calendarSequence,
+          method: 'REQUEST',
+          status: 'CONFIRMED'
+        })
+      : null;
 
     try {
       await sendEmail({
@@ -1313,8 +1362,16 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
             <li><strong>Price:</strong> ₹${booking.price}</li>
             ${booking.notes ? `<li><strong>Notes:</strong> ${booking.notes}</li>` : ''}
           </ul>
+          ${updateInvite ? '<p>An updated calendar invite is attached. Please accept it to refresh your calendar slot.</p>' : ''}
           <p>If you have any questions about these changes, please contact us.</p>
-        `
+        `,
+        attachments: updateInvite
+          ? [{
+              filename: 'booking-updated.ics',
+              content: updateInvite,
+              contentType: 'text/calendar; charset=utf-8; method=REQUEST'
+            }]
+          : []
       });
     } catch (emailError) {
       console.log('Update notification email failed:', emailError.message);
@@ -1468,7 +1525,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         if (checkTimeConflict(startTime, endTime, booking.startTime, booking.endTime)) {
           return res.status(400).json({
             success: false,
-            message: `Time conflict with existing booking (${booking.startTime} - ${booking.endTime})`
+            message: `Time conflict with existing booking (${formatTimeRange12Hour(booking.startTime, booking.endTime)})`
           });
         }
       }
@@ -1478,7 +1535,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         if (checkTimeConflict(startTime, endTime, blocked.startTime, blocked.endTime)) {
           return res.status(400).json({
             success: false,
-            message: `This time slot is blocked by admin (${blocked.startTime} - ${blocked.endTime})`
+            message: `This time slot is blocked by admin (${formatTimeRange12Hour(blocked.startTime, blocked.endTime)})`
           });
         }
       }
@@ -1553,8 +1610,13 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       amountPaid: normalizedPaymentTracking.amountPaid,
       paymentReference: normalizedPaymentReference,
       paymentNote: normalizedPaymentNote,
-      bookingStatus: enforcedBookingStatus
+      bookingStatus: enforcedBookingStatus,
+      calendarSequence: 0
     });
+
+    // Replace placeholder UID with one derived from the actual saved booking id.
+    booking.calendarUid = buildBookingCalendarUid(booking._id);
+    await booking.save();
 
     const displayDate = formatBookingDisplayDate(bookingDate);
 
@@ -1581,7 +1643,11 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       startTime,
       endTime,
       attendees: [selectedUser.email, ...adminNotificationEmails],
-      studioName: settings.studioName || 'Swar JamRoom'
+      studioName: settings.studioName || 'Swar JamRoom',
+      uid: booking.calendarUid,
+      sequence: booking.calendarSequence,
+      method: 'REQUEST',
+      status: 'CONFIRMED'
     });
 
     const loginCredentialsSection = selectedUser.forcePasswordReset ? `

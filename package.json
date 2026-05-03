@@ -15,6 +15,7 @@
     "catalog:restore:apply": "node scripts/catalog/restoreAdminSettingsCatalog.js --apply",
     "bookings:rental-types:preview": "node scripts/db/backfillBookingRentalTypes.js",
     "bookings:rental-types:apply": "node scripts/db/backfillBookingRentalTypes.js --apply",
+    "test:calendar": "node scripts/tests/verifyCalendarInvite.js",
     "cleanup:test-users": "node scripts/setup/deleteTestUsers.js",
     "cleanup:test-users:apply": "node scripts/setup/deleteTestUsers.js --apply"
   },

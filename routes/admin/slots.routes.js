@@ -9,7 +9,7 @@ const Booking = require('../../models/Booking');
 const BlockedTime = require('../../models/BlockedTime');
 const { protect } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/admin');
-const { buildHourlySlotModeFilter } = require('../../utils/adminHelpers');
+const { buildHourlySlotModeFilter, formatTimeRange12Hour } = require('../../utils/adminHelpers');
 
 const resolveDeletedFilterMode = (value) => {
   const normalized = String(value || 'active').trim().toLowerCase();
@@ -54,7 +54,7 @@ router.post('/block-time', protect, isAdmin, async (req, res) => {
       if (checkTimeConflict(startTime, endTime, booking.startTime, booking.endTime)) {
         return res.status(400).json({
           success: false,
-          message: `Cannot block: Conflicts with existing booking (${booking.startTime} - ${booking.endTime})`
+          message: `Cannot block: Conflicts with existing booking (${formatTimeRange12Hour(booking.startTime, booking.endTime)})`
         });
       }
     }

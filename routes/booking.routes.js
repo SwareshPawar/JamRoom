@@ -6,7 +6,7 @@ const User = require('../models/User');
 const AdminSettings = require('../models/AdminSettings');
 const { protect } = require('../middleware/auth');
 const { sendEmail } = require('../utils/email');
-const { generateCalendarInvite } = require('../utils/calendar');
+const { generateCalendarInvite, buildBookingCalendarUid } = require('../utils/calendar');
 const { generateBill } = require('../utils/billGenerator');
 const { 
   sendBookingRequestNotifications, 
@@ -580,7 +580,7 @@ router.post('/', protect, async (req, res) => {
         if (checkTimeConflict(effectiveStartTime, effectiveEndTime, booking.startTime, booking.endTime)) {
           return res.status(400).json({
             success: false,
-            message: `Time conflict with existing booking (${booking.startTime} - ${booking.endTime})`
+            message: `Time conflict with existing booking (${formatTimeRange12Hour(booking.startTime, booking.endTime)})`
           });
         }
       }
@@ -594,7 +594,7 @@ router.post('/', protect, async (req, res) => {
         if (checkTimeConflict(effectiveStartTime, effectiveEndTime, blocked.startTime, blocked.endTime)) {
           return res.status(400).json({
             success: false,
-            message: `This time slot is blocked by admin (${blocked.startTime} - ${blocked.endTime})`
+            message: `This time slot is blocked by admin (${formatTimeRange12Hour(blocked.startTime, blocked.endTime)})`
           });
         }
       }
@@ -1124,7 +1124,16 @@ router.put('/:id/cancel', protect, async (req, res) => {
       });
     }
 
+    const wasConfirmedBefore = booking.bookingStatus === 'CONFIRMED';
+
     booking.bookingStatus = 'CANCELLED';
+    if (wasConfirmedBefore) {
+      if (!booking.calendarUid) {
+        booking.calendarUid = buildBookingCalendarUid(booking._id);
+      }
+      booking.calendarSequence = Math.max(0, Number(booking.calendarSequence || 0)) + 1;
+    }
+
     await booking.save();
 
     const displayDate = formatDateLongInIst(booking.date);
@@ -1134,7 +1143,43 @@ router.put('/:id/cancel', protect, async (req, res) => {
       ? `${formatDateShortInIst(booking.perDayStartDate)} ${formatTime12Hour(booking.startTime)} to ${formatDateShortInIst(booking.perDayEndDate)} ${formatTime12Hour(booking.endTime)} (${booking.perDayDays || 1} day(s))`
       : displayDate;
 
-    // Send cancellation email
+    let cancellationInvite = null;
+    let settings = null;
+    let adminCancellationEmails = [];
+    if (wasConfirmedBefore) {
+      settings = await AdminSettings.getSettings();
+
+      const normalizedUserEmail = String(booking.userEmail || '').trim().toLowerCase();
+      const dedupe = new Set();
+      adminCancellationEmails = Array.isArray(settings?.adminEmails)
+        ? settings.adminEmails
+          .map((email) => String(email || '').trim())
+          .filter((email) => {
+            if (!email || !isValidEmail(email)) return false;
+            const normalized = email.toLowerCase();
+            if (normalized === normalizedUserEmail || dedupe.has(normalized)) return false;
+            dedupe.add(normalized);
+            return true;
+          })
+        : [];
+
+      cancellationInvite = generateCalendarInvite({
+        title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
+        description: `Booking cancelled for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
+        location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
+        startDate: formatDateAsYmdInIst(new Date(booking.date)),
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        attendees: [booking.userEmail, ...adminCancellationEmails],
+        studioName: settings.studioName || 'Swar JamRoom',
+        uid: booking.calendarUid,
+        sequence: booking.calendarSequence,
+        method: 'CANCEL',
+        status: 'CANCELLED'
+      });
+    }
+
+    // Send cancellation email to customer
     try {
       await sendEmail({
         to: req.user.email,
@@ -1152,11 +1197,52 @@ router.put('/:id/cancel', protect, async (req, res) => {
             }
             <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
           </ul>
+          ${cancellationInvite ? '<p>A cancellation calendar invite is attached to remove this slot from your calendar.</p>' : ''}
           <p>If you paid for this booking, please contact us for a refund.</p>
-        `
+        `,
+        attachments: cancellationInvite
+          ? [{
+              filename: 'booking-cancelled.ics',
+              content: cancellationInvite,
+              contentType: 'text/calendar; charset=utf-8; method=CANCEL'
+            }]
+          : []
       });
     } catch (emailError) {
       console.log('Cancellation email failed:', emailError.message);
+    }
+
+    // Send cancellation notifications to admin/staff recipients.
+    if (cancellationInvite && adminCancellationEmails.length > 0) {
+      const studioName = settings?.studioName || 'Swar JamRoom';
+
+      for (const recipientEmail of adminCancellationEmails) {
+        try {
+          await sendEmail({
+            to: recipientEmail,
+            subject: `Booking Cancelled - ${studioName}`,
+            html: `
+              <h2>Booking Cancelled</h2>
+              <p>A confirmed booking has been cancelled by the customer.</p>
+              <ul>
+                <li><strong>User:</strong> ${booking.userName} (${booking.userEmail})</li>
+                <li><strong>Date:</strong> ${displayDate}</li>
+                <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
+                <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
+                <li><strong>Booking ID:</strong> ${booking._id}</li>
+              </ul>
+              <p>The attached cancellation invite removes the slot from calendar apps.</p>
+            `,
+            attachments: [{
+              filename: 'booking-cancelled.ics',
+              content: cancellationInvite,
+              contentType: 'text/calendar; charset=utf-8; method=CANCEL'
+            }]
+          });
+        } catch (emailError) {
+          console.log(`Admin/staff cancellation email failed for ${recipientEmail}:`, emailError.message);
+        }
+      }
     }
 
     res.json({

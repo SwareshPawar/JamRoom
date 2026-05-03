@@ -2,6 +2,39 @@ const ical = require('ical-generator').default || require('ical-generator');
 const { getVtimezoneComponent } = require('@touch4it/ical-timezones');
 
 const IST_TIMEZONE = 'Asia/Kolkata';
+const DEFAULT_CALENDAR_UID_DOMAIN = process.env.CALENDAR_UID_DOMAIN || 'jamroom.local';
+
+const isValidTime24 = (value) => /^([0-1]?\d|2[0-3]):[0-5]\d$/.test(String(value || '').trim());
+
+const assertValidTime24 = (value, label) => {
+  if (!isValidTime24(value)) {
+    throw new Error(`Invalid ${label}. Expected HH:MM in 24-hour format.`);
+  }
+};
+
+const normalizeCalendarMethod = (methodValue) => {
+  const normalized = String(methodValue || 'REQUEST').trim().toUpperCase();
+  return normalized || 'REQUEST';
+};
+
+const normalizeEventStatus = (statusValue) => {
+  if (!statusValue) return null;
+
+  const normalized = String(statusValue).trim().toUpperCase();
+  if (normalized === 'CANCELLED') return 'CANCELLED';
+  if (normalized === 'CONFIRMED') return 'CONFIRMED';
+  if (normalized === 'TENTATIVE') return 'TENTATIVE';
+  return null;
+};
+
+const buildBookingCalendarUid = (bookingId) => {
+  const rawId = String(bookingId || '').trim();
+  if (!rawId) {
+    throw new Error('Cannot build calendar UID without booking id');
+  }
+
+  return `booking-${rawId}@${DEFAULT_CALENDAR_UID_DOMAIN}`;
+};
 
 const toYmdInIst = (dateObj) => {
   const parts = new Intl.DateTimeFormat('en-IN', {
@@ -45,6 +78,8 @@ const format12Hour = (timeValue) => {
 };
 
 const buildCalendarDateTime = (dateStr, timeStr) => {
+  assertValidTime24(timeStr, 'time');
+
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);
 
@@ -64,6 +99,10 @@ const buildCalendarDateTime = (dateStr, timeStr) => {
  * @param {string} options.endTime - End time (HH:MM)
  * @param {Array} options.attendees - Array of attendee emails
  * @param {string} options.studioName - Studio name for organizer (optional)
+ * @param {string} options.method - Calendar METHOD (REQUEST/CANCEL)
+ * @param {string} options.status - Event STATUS (CONFIRMED/CANCELLED/TENTATIVE)
+ * @param {string} options.uid - Stable event UID
+ * @param {number} options.sequence - Event sequence number
  * @returns {string} iCal string
  */
 const generateCalendarInvite = (options) => {
@@ -76,8 +115,15 @@ const generateCalendarInvite = (options) => {
       startTime,
       endTime,
       attendees = [],
-      studioName = 'Swar JamRoom & Music Studio (SwarJRS)'
+      studioName = 'Swar JamRoom & Music Studio (SwarJRS)',
+      method = 'REQUEST',
+      status = null,
+      uid = '',
+      sequence = 0
     } = options;
+
+    assertValidTime24(startTime, 'startTime');
+    assertValidTime24(endTime, 'endTime');
 
     const dateStr = normalizeStartDateToYmd(startDate);
 
@@ -102,11 +148,13 @@ const generateCalendarInvite = (options) => {
     });
 
     if (typeof calendar.method === 'function') {
-      calendar.method('REQUEST');
+      calendar.method(normalizeCalendarMethod(method));
     }
 
+    const normalizedStatus = normalizeEventStatus(status);
+
     // Create event
-    const event = calendar.createEvent({
+    const eventData = {
       start: startDateTime,
       end: endDateTime,
       summary: title,
@@ -118,7 +166,21 @@ const generateCalendarInvite = (options) => {
         name: studioName,
         email: process.env.EMAIL_USER
       }
-    });
+    };
+
+    if (uid) {
+      eventData.id = String(uid).trim();
+    }
+
+    if (Number.isFinite(Number(sequence))) {
+      eventData.sequence = Math.max(0, Math.floor(Number(sequence)));
+    }
+
+    if (normalizedStatus) {
+      eventData.status = normalizedStatus;
+    }
+
+    const event = calendar.createEvent(eventData);
 
     // Add attendees
     attendees.forEach(email => {
@@ -167,8 +229,14 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
         startDate,
         startTime,
         endTime,
-        attendees = []
+        attendees = [],
+        uid = '',
+        sequence = 0,
+        status = null
       } = eventOptions;
+
+      assertValidTime24(startTime, 'startTime');
+      assertValidTime24(endTime, 'endTime');
 
       const dateStr = normalizeStartDateToYmd(startDate);
       const startDateTime = buildCalendarDateTime(dateStr, startTime);
@@ -180,7 +248,7 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
 
       const descriptionWithIstTime = `${description}\nTime (IST): ${format12Hour(startTime)} - ${format12Hour(endTime)}`;
 
-      const event = calendar.createEvent({
+      const eventData = {
         start: startDateTime,
         end: endDateTime,
         summary: title,
@@ -192,7 +260,22 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
           name: studioName,
           email: process.env.EMAIL_USER
         }
-      });
+      };
+
+      if (uid) {
+        eventData.id = String(uid).trim();
+      }
+
+      if (Number.isFinite(Number(sequence))) {
+        eventData.sequence = Math.max(0, Math.floor(Number(sequence)));
+      }
+
+      const normalizedStatus = normalizeEventStatus(status);
+      if (normalizedStatus) {
+        eventData.status = normalizedStatus;
+      }
+
+      const event = calendar.createEvent(eventData);
 
       attendees.forEach(email => {
         event.createAttendee({
@@ -213,5 +296,6 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
 
 module.exports = {
   generateCalendarInvite,
-  generateMultipleEvents
+  generateMultipleEvents,
+  buildBookingCalendarUid
 };

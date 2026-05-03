@@ -138,6 +138,16 @@ const bookingSchema = new mongoose.Schema({
     enum: ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED'],
     default: 'PENDING'
   },
+  calendarUid: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  calendarSequence: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   paymentReference: {
     type: String,
     trim: true
