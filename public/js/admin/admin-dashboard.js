@@ -6,6 +6,14 @@
 (() => {
     const STAT_IDS = ['totalBookings', 'pendingBookings', 'confirmedBookings', 'totalRevenue', 'totalUnpaidAmount'];
 
+    const setOutstandingState = (value) => {
+        const card = document.querySelector('.stat-card-outstanding');
+        if (!card) return;
+
+        const amount = Number(value);
+        card.classList.toggle('is-clear', Number.isFinite(amount) && amount <= 0);
+    };
+
     const setText = (id, value) => {
         const el = document.getElementById(id);
         if (el) {
@@ -34,6 +42,7 @@
         setText('confirmedBookings', stats.confirmedBookings ?? 0);
         setText('totalRevenue', `₹${stats.totalRevenue ?? 0}`);
         setText('totalUnpaidAmount', `₹${stats.totalUnpaidAmount ?? 0}`);
+        setOutstandingState(stats.totalUnpaidAmount ?? 0);
     };
 
     const renderStatsUnavailable = () => {
@@ -43,6 +52,7 @@
         setText('confirmedBookings', 'N/A');
         setText('totalRevenue', 'N/A');
         setText('totalUnpaidAmount', 'N/A');
+        setOutstandingState(null);
     };
 
     const loadStats = async ({ apiUrl }) => {
