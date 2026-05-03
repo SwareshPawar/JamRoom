@@ -88,12 +88,30 @@ async function checkAuth() {
             return true;
         }
 
-        throw new Error('Authentication failed');
+        // Null user from AuthManager means auth failed (401) or network error
+        // AuthManager already cleared the token for 401; for network errors, preserve it
+        const stillHasToken = !!localStorage.getItem('token');
+        if (!stillHasToken) {
+            // Token was cleared by AuthManager (401 response) — redirect to login
+            window.location.href = '/login.html';
+            return false;
+        }
+
+        // Network/abort error but token still intact — redirect to login without clearing token
+        // so the next page load can try again with the still-valid token
+        window.location.href = '/login.html';
+        return false;
 
     } catch (error) {
         console.error('Auth check failed:', error);
-        localStorage.removeItem('token');
-        window.location.href = '/login.html';
+        // Only remove token if it was an explicit auth rejection
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Token still present — likely a code error, not an auth error; preserve token
+            window.location.href = '/login.html';
+        } else {
+            window.location.href = '/login.html';
+        }
         return false;
     }
 }

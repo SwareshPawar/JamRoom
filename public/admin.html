@@ -1403,17 +1403,34 @@
                 return;
             }
 
+            let res;
             try {
-                const res = await fetch(`${API_URL}/api/auth/me`, {
+                res = await fetch(`${API_URL}/api/auth/me`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+            } catch (networkError) {
+                // Network failure (server down, no internet) - keep session intact
+                console.error('Admin auth: network error during session check', networkError);
+                return;
+            }
 
-                if (!res.ok) throw new Error('Not authenticated');
+            if (!res.ok) {
+                // Only clear token on explicit auth rejection (401/403)
+                if (res.status === 401 || res.status === 403) {
+                    localStorage.removeItem('token');
+                    window.location.href = '/login.html';
+                } else {
+                    console.error('Admin auth: server error', res.status);
+                }
+                return;
+            }
 
+            try {
                 const data = await res.json();
                 currentUser = data.user;
-                
-                if (currentUser.role !== 'admin') {
+
+                if (!currentUser || currentUser.role !== 'admin') {
+                    localStorage.removeItem('token');
                     alert('Admin access required');
                     window.location.href = '/index.html';
                     return;
@@ -1423,12 +1440,21 @@
                 window.NavigationManager.init(currentUser);
                 window.NavigationManager.updateAuth(currentUser);
                 window.NavigationManager.render('navigationContainer');
-                
+            } catch (parseError) {
+                console.error('Admin auth: failed to parse auth response', parseError);
+                return;
+            }
+
+            // Load dashboard data separately — errors here must NOT affect the session
+            try {
                 await loadStats();
+            } catch (e) {
+                console.error('Admin auth: loadStats failed', e);
+            }
+            try {
                 await loadBookings();
-            } catch (error) {
-                localStorage.removeItem('token');
-                window.location.href = '/login.html';
+            } catch (e) {
+                console.error('Admin auth: loadBookings failed', e);
             }
         };
 

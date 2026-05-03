@@ -27,6 +27,7 @@
   "license": "ISC",
   "dependencies": {
     "@sparticuz/chromium": "^143.0.4",
+    "@touch4it/ical-timezones": "^1.9.0",
     "axios": "^1.13.4",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

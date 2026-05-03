@@ -79,8 +79,13 @@ class AuthManager {
                 const data = await response.json();
                 this.setUserData(data.user);
                 return data.user;
-            } else {
+            } else if (response.status === 401 || response.status === 403) {
+                // Explicit auth rejection — token is invalid/expired
                 this.clearUserData();
+                return null;
+            } else {
+                // Server error (5xx) or unexpected status — preserve session, just return null
+                console.warn(`AuthManager: Auth check returned ${response.status}, preserving session`);
                 return null;
             }
         } catch (error) {

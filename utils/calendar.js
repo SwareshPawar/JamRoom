@@ -1,4 +1,5 @@
 const ical = require('ical-generator').default || require('ical-generator');
+const { getVtimezoneComponent } = require('@touch4it/ical-timezones');
 
 const IST_TIMEZONE = 'Asia/Kolkata';
 
@@ -94,7 +95,10 @@ const generateCalendarInvite = (options) => {
     const calendar = ical({
       name: 'JamRoom Booking',
       prodId: '//JamRoom//Booking System//EN',
-      timezone: IST_TIMEZONE
+      timezone: {
+        name: IST_TIMEZONE,
+        generator: getVtimezoneComponent
+      }
     });
 
     if (typeof calendar.method === 'function') {
@@ -145,7 +149,10 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
     const calendar = ical({
       name: 'JamRoom Bookings',
       prodId: '//JamRoom//Booking System//EN',
-      timezone: IST_TIMEZONE
+      timezone: {
+        name: IST_TIMEZONE,
+        generator: getVtimezoneComponent
+      }
     });
 
     if (typeof calendar.method === 'function') {
