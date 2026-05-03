@@ -1,7 +1,6 @@
 const ical = require('ical-generator').default || require('ical-generator');
 
 const IST_TIMEZONE = 'Asia/Kolkata';
-const IST_OFFSET_MINUTES = 330;
 
 const toYmdInIst = (dateObj) => {
   const parts = new Intl.DateTimeFormat('en-IN', {
@@ -44,11 +43,13 @@ const format12Hour = (timeValue) => {
   return `${displayHour}:${String(minute).padStart(2, '0')} ${suffix}`;
 };
 
-const buildUtcDateFromIst = (dateStr, timeStr) => {
+const buildCalendarDateTime = (dateStr, timeStr) => {
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);
-  const utcMillis = Date.UTC(year, month - 1, day, hour, minute) - (IST_OFFSET_MINUTES * 60 * 1000);
-  return new Date(utcMillis);
+
+  // Important: use date components (not UTC-offset math) so generated ICS
+  // wall-clock times stay identical across runtime TZs (local, Vercel UTC, etc.).
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
 };
 
 /**
@@ -79,9 +80,8 @@ const generateCalendarInvite = (options) => {
 
     const dateStr = normalizeStartDateToYmd(startDate);
 
-    // Convert IST booking date/time to exact UTC instants for ICS storage.
-    const startDateTime = buildUtcDateFromIst(dateStr, startTime);
-    const endDateTime = buildUtcDateFromIst(dateStr, endTime);
+    const startDateTime = buildCalendarDateTime(dateStr, startTime);
+    const endDateTime = buildCalendarDateTime(dateStr, endTime);
 
     // Handle midnight crossover, e.g. 23:00 -> 00:00.
     if (endDateTime <= startDateTime) {
@@ -156,8 +156,8 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
       } = eventOptions;
 
       const dateStr = normalizeStartDateToYmd(startDate);
-      const startDateTime = buildUtcDateFromIst(dateStr, startTime);
-      const endDateTime = buildUtcDateFromIst(dateStr, endTime);
+      const startDateTime = buildCalendarDateTime(dateStr, startTime);
+      const endDateTime = buildCalendarDateTime(dateStr, endTime);
 
       if (endDateTime <= startDateTime) {
         endDateTime.setDate(endDateTime.getDate() + 1);

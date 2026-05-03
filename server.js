@@ -1,4 +1,8 @@
 require('dotenv').config();
+
+// Keep server-side date operations consistent across local and Vercel runtimes.
+process.env.TZ = process.env.TZ || 'Asia/Kolkata';
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
