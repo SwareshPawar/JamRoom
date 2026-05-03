@@ -17,6 +17,7 @@ const ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS = [
   'vinitapawar2912@gmail.com',
   'swareshpawar@gmail.com'
 ];
+const IST_TIMEZONE = 'Asia/Kolkata';
 
 // ─── Time Formatting ──────────────────────────────────────────────────────────
 
@@ -111,9 +112,29 @@ const formatDateAsYmd = (dateValue) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatDateAsYmdInIst = (dateValue) => {
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) {
+    return '';
+  }
+
+  const parts = new Intl.DateTimeFormat('en-IN', {
+    timeZone: IST_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(dateValue);
+
+  const getPart = (type) => parts.find((part) => part.type === type)?.value || '';
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  return `${year}-${month}-${day}`;
+};
+
 const formatBookingDisplayDate = (date) => {
   const bookingDate = new Date(date);
   return bookingDate.toLocaleDateString('en-IN', {
+    timeZone: IST_TIMEZONE,
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -610,6 +631,7 @@ module.exports = {
   // Date
   parseDateInputToStartOfDay,
   formatDateAsYmd,
+  formatDateAsYmdInIst,
   formatBookingDisplayDate,
   // Filters
   buildHourlySlotModeFilter,

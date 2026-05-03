@@ -13,6 +13,46 @@ const {
   sendCustomerBookingRequestWhatsApp 
 } = require('../utils/whatsapp');
 
+const IST_TIMEZONE = 'Asia/Kolkata';
+
+const formatDateAsYmdInIst = (dateValue) => {
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) {
+    return '';
+  }
+
+  const parts = new Intl.DateTimeFormat('en-IN', {
+    timeZone: IST_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(dateValue);
+
+  const getPart = (type) => parts.find((part) => part.type === type)?.value || '';
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+};
+
+const formatDateLongInIst = (dateValue) => {
+  const parsedDate = new Date(dateValue);
+  if (Number.isNaN(parsedDate.getTime())) return '';
+
+  return parsedDate.toLocaleDateString('en-IN', {
+    timeZone: IST_TIMEZONE,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+const formatDateShortInIst = (dateValue) => {
+  const parsedDate = new Date(dateValue);
+  if (Number.isNaN(parsedDate.getTime())) return '';
+
+  return parsedDate.toLocaleDateString('en-IN', {
+    timeZone: IST_TIMEZONE
+  });
+};
+
 const formatTime12Hour = (time24) => {
   if (!time24) return time24;
 
@@ -665,15 +705,10 @@ router.post('/', protect, async (req, res) => {
     });
 
     // Format date for display
-    const displayDate = bookingDate.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const displayDate = formatDateLongInIst(bookingDate);
 
     const perDayDateLabel = normalizedMode === 'perday'
-      ? `${perDayStart.toLocaleDateString('en-IN')} ${formatTime12Hour(effectiveStartTime)} to ${perDayEnd.toLocaleDateString('en-IN')} ${formatTime12Hour(effectiveEndTime)} (${computedPerDayDays} day(s))`
+      ? `${formatDateShortInIst(perDayStart)} ${formatTime12Hour(effectiveStartTime)} to ${formatDateShortInIst(perDayEnd)} ${formatTime12Hour(effectiveEndTime)} (${computedPerDayDays} day(s))`
       : null;
 
     // Create rentals summary for email with correct per-day pricing
@@ -896,8 +931,14 @@ router.get('/availability/perday-items', async (req, res) => {
 
 router.get('/availability/:date', async (req, res) => {
   try {
-    const date = new Date(req.params.date);
-    date.setHours(0, 0, 0, 0);
+    const date = parseDateOnlyToStartOfDay(req.params.date);
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format. Use YYYY-MM-DD.'
+      });
+    }
+
     const dayStart = new Date(date);
     const dayEnd = new Date(date);
     dayEnd.setHours(23, 59, 59, 999);
@@ -916,7 +957,7 @@ router.get('/availability/:date', async (req, res) => {
 
     res.json({
       success: true,
-      date: date.toISOString().split('T')[0],
+      date: formatDateAsYmdInIst(date),
       bookings,
       blockedTimes
     });
@@ -1086,16 +1127,11 @@ router.put('/:id/cancel', protect, async (req, res) => {
     booking.bookingStatus = 'CANCELLED';
     await booking.save();
 
-    const displayDate = booking.date.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const displayDate = formatDateLongInIst(booking.date);
 
     const isPerday = booking.bookingMode === 'perday';
     const perdayRangeText = (booking.perDayStartDate && booking.perDayEndDate)
-      ? `${new Date(booking.perDayStartDate).toLocaleDateString('en-IN')} ${formatTime12Hour(booking.startTime)} to ${new Date(booking.perDayEndDate).toLocaleDateString('en-IN')} ${formatTime12Hour(booking.endTime)} (${booking.perDayDays || 1} day(s))`
+      ? `${formatDateShortInIst(booking.perDayStartDate)} ${formatTime12Hour(booking.startTime)} to ${formatDateShortInIst(booking.perDayEndDate)} ${formatTime12Hour(booking.endTime)} (${booking.perDayDays || 1} day(s))`
       : displayDate;
 
     // Send cancellation email

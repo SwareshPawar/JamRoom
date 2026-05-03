@@ -30,6 +30,7 @@ const {
   formatTimeRange12Hour,
   parseDateInputToStartOfDay,
   formatDateAsYmd,
+  formatDateAsYmdInIst,
   formatBookingDisplayDate,
   buildHourlySlotModeFilter,
   escapeRegExp,
@@ -81,26 +82,30 @@ router.get('/bookings/calendar', protect, isAdmin, async (req, res) => {
       bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
     }).populate('userId', 'name email').sort({ date: 1, startTime: 1 });
 
-    const calendarEvents = bookings.map(booking => ({
-      id: booking._id,
-      title: `${booking.userName} - ${booking.rentalType}`,
-      start: `${booking.date.toISOString().split('T')[0]}T${booking.startTime}:00`,
-      end: `${booking.date.toISOString().split('T')[0]}T${booking.endTime}:00`,
-      backgroundColor: booking.bookingStatus === 'CONFIRMED' ? '#28a745' : '#ffc107',
-      borderColor: booking.bookingStatus === 'CONFIRMED' ? '#1e7e34' : '#d39e00',
-      textColor: booking.bookingStatus === 'CONFIRMED' ? 'white' : 'black',
-      extendedProps: {
-        bookingId: booking._id,
-        userName: booking.userName,
-        userEmail: booking.userEmail,
-        bandName: booking.bandName,
-        rentalType: booking.rentalType,
-        price: booking.price,
-        status: booking.bookingStatus,
-        paymentStatus: booking.paymentStatus,
-        notes: booking.notes
-      }
-    }));
+    const calendarEvents = bookings.map((booking) => {
+      const bookingDateYmd = formatDateAsYmdInIst(new Date(booking.date));
+
+      return {
+        id: booking._id,
+        title: `${booking.userName} - ${booking.rentalType}`,
+        start: `${bookingDateYmd}T${booking.startTime}:00`,
+        end: `${bookingDateYmd}T${booking.endTime}:00`,
+        backgroundColor: booking.bookingStatus === 'CONFIRMED' ? '#28a745' : '#ffc107',
+        borderColor: booking.bookingStatus === 'CONFIRMED' ? '#1e7e34' : '#d39e00',
+        textColor: booking.bookingStatus === 'CONFIRMED' ? 'white' : 'black',
+        extendedProps: {
+          bookingId: booking._id,
+          userName: booking.userName,
+          userEmail: booking.userEmail,
+          bandName: booking.bandName,
+          rentalType: booking.rentalType,
+          price: booking.price,
+          status: booking.bookingStatus,
+          paymentStatus: booking.paymentStatus,
+          notes: booking.notes
+        }
+      };
+    });
 
     res.json({
       success: true,
@@ -182,15 +187,33 @@ router.get('/bookings', protect, isAdmin, async (req, res) => {
     }
 
     if (date) {
-      const queryDate = new Date(date);
-      queryDate.setHours(0, 0, 0, 0);
-      query.date = queryDate;
+      const queryDate = parseDateInputToStartOfDay(date);
+      if (!queryDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid date format. Use YYYY-MM-DD.'
+        });
+      }
+
+      const queryDayStart = new Date(queryDate);
+      const queryDayEnd = new Date(queryDate);
+      queryDayEnd.setHours(23, 59, 59, 999);
+      query.date = { $gte: queryDayStart, $lte: queryDayEnd };
     } else if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      query.date = { $gte: start, $lte: end };
+      const start = parseDateInputToStartOfDay(startDate);
+      const end = parseDateInputToStartOfDay(endDate);
+
+      if (!start || !end) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid date range. Use YYYY-MM-DD.'
+        });
+      }
+
+      const rangeStart = new Date(start);
+      const rangeEnd = new Date(end);
+      rangeEnd.setHours(23, 59, 59, 999);
+      query.date = { $gte: rangeStart, $lte: rangeEnd };
     }
 
     const searchTerm = String(q || '').trim();
@@ -350,7 +373,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
             html: `
               <h2>Booking Request Update</h2>
               <p>Hi ${pendingBooking.userName},</p>
-              <p>Unfortunately, your booking request for ${pendingBooking.date.toLocaleDateString('en-IN')} from ${formatTime12Hour(pendingBooking.startTime)} to ${formatTime12Hour(pendingBooking.endTime)} has been automatically rejected due to a scheduling conflict with another confirmed booking.</p>
+              <p>Unfortunately, your booking request for ${formatBookingDisplayDate(pendingBooking.date)} from ${formatTime12Hour(pendingBooking.startTime)} to ${formatTime12Hour(pendingBooking.endTime)} has been automatically rejected due to a scheduling conflict with another confirmed booking.</p>
               <p>Please feel free to make a new booking request for a different time slot.</p>
               <p>Thank you for your understanding.</p>
             `
@@ -367,7 +390,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
       description: `Booking confirmed for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
       location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
-      startDate: booking.date,
+      startDate: formatDateAsYmdInIst(new Date(booking.date)),
       startTime: booking.startTime,
       endTime: booking.endTime,
       attendees: [booking.userEmail, ...adminNotificationEmails],
@@ -526,7 +549,7 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
     }
 
     const bookingDate = new Date(booking.date);
-    const displayDate = bookingDate.toLocaleDateString('en-IN');
+    const displayDate = formatBookingDisplayDate(bookingDate);
 
     const subtotal = Number.isFinite(Number(booking.subtotal))
       ? Number(booking.subtotal)
@@ -824,12 +847,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
 
     const settings = await AdminSettings.getSettings();
 
-    const displayDate = booking.date.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const displayDate = formatBookingDisplayDate(booking.date);
 
     try {
       await sendEmail({
@@ -914,12 +932,7 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
     }
 
     const settings = await AdminSettings.getSettings();
-    const displayDate = booking.date.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const displayDate = formatBookingDisplayDate(booking.date);
 
     try {
       await sendEmail({
@@ -1105,7 +1118,17 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       });
     }
 
-    if (date) booking.date = new Date(date);
+    if (date) {
+      const parsedBookingDate = parseDateInputToStartOfDay(date);
+      if (!parsedBookingDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid date format. Use YYYY-MM-DD.'
+        });
+      }
+
+      booking.date = parsedBookingDate;
+    }
     if (startTime) booking.startTime = startTime;
     if (endTime) booking.endTime = endTime;
     if (duration !== undefined && duration !== null) {
@@ -1271,12 +1294,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
 
     await booking.save();
 
-    const displayDate = booking.date.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const displayDate = formatBookingDisplayDate(booking.date);
 
     try {
       await sendEmail({
@@ -1559,7 +1577,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       title: `${settings.studioName || 'Swar JamRoom'} Booking - ${rentalTypeSummary}`,
       description: `Booking confirmed for ${selectedUser.name}${bandName ? ` (${bandName})` : ''}`,
       location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
-      startDate: bookingDate,
+      startDate: formatDateAsYmdInIst(new Date(bookingDate)),
       startTime,
       endTime,
       attendees: [selectedUser.email, ...adminNotificationEmails],
