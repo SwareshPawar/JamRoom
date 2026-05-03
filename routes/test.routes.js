@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { generateCalendarInvite } = require('../utils/calendar');
 
 // Simple WhatsApp test without database dependency
 const testWhatsApp = async (mobile, message) => {
@@ -342,6 +343,40 @@ router.post('/admin-booking', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error testing admin booking creation',
+      error: error.message
+    });
+  }
+});
+
+// @route   GET /api/test/calendar-preview
+// @desc    Preview generated calendar invite payload for timezone verification
+// @access  Public (for testing)
+router.get('/calendar-preview', (req, res) => {
+  try {
+    const {
+      date = '2026-05-03',
+      startTime = '11:00',
+      endTime = '14:00',
+      title = 'JamRoom Booking Preview'
+    } = req.query;
+
+    const calendarInvite = generateCalendarInvite({
+      title: String(title),
+      description: 'Calendar preview endpoint',
+      location: 'Swar JamRoom & Music Studio',
+      startDate: String(date),
+      startTime: String(startTime),
+      endTime: String(endTime),
+      attendees: []
+    });
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.status(200).send(calendarInvite);
+  } catch (error) {
+    console.error('Calendar preview test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate calendar preview',
       error: error.message
     });
   }

@@ -97,6 +97,10 @@ const generateCalendarInvite = (options) => {
       timezone: IST_TIMEZONE
     });
 
+    if (typeof calendar.method === 'function') {
+      calendar.method('REQUEST');
+    }
+
     // Create event
     const event = calendar.createEvent({
       start: startDateTime,
@@ -143,6 +147,10 @@ const generateMultipleEvents = (events, studioName = 'Swar JamRoom & Music Studi
       prodId: '//JamRoom//Booking System//EN',
       timezone: IST_TIMEZONE
     });
+
+    if (typeof calendar.method === 'function') {
+      calendar.method('REQUEST');
+    }
 
     events.forEach(eventOptions => {
       const {

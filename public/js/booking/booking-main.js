@@ -105,6 +105,53 @@
 
         // Booking history + billing actions moved to booking-bookings.js
 
+        const initBookingDatePickers = () => {
+            if (typeof window.flatpickr !== 'function') {
+                return;
+            }
+
+            const dateInputIds = ['bookingDate', 'perdayStartDate', 'perdayEndDate'];
+
+            dateInputIds.forEach((inputId) => {
+                const inputEl = document.getElementById(inputId);
+                if (!inputEl || inputEl.dataset.flatpickrBound === '1') {
+                    return;
+                }
+
+                inputEl.dataset.flatpickrBound = '1';
+
+                const picker = window.flatpickr(inputEl, {
+                    dateFormat: 'Y-m-d',
+                    altInput: true,
+                    altFormat: 'd M Y',
+                    disableMobile: true,
+                    minDate: inputEl.min || 'today',
+                    clickOpens: !inputEl.disabled,
+                    onReady: (_selectedDates, _dateStr, instance) => {
+                        if (instance.altInput) {
+                            instance.altInput.disabled = inputEl.disabled;
+                        }
+                    },
+                    onChange: () => {
+                        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+
+                const disabledObserver = new MutationObserver(() => {
+                    picker.set('clickOpens', !inputEl.disabled);
+                    if (picker.altInput) {
+                        picker.altInput.disabled = inputEl.disabled;
+                    }
+                });
+
+                disabledObserver.observe(inputEl, {
+                    attributes: true,
+                    attributeFilter: ['disabled']
+                });
+            });
+        };
+
         // Event listeners - Add safety checks since NavigationManager handles logout button
         const logoutBtnLegacy = document.getElementById('logoutBtn');
         if (logoutBtnLegacy) {
@@ -117,6 +164,8 @@
         if (window.initBookingFormHandlers) {
             window.initBookingFormHandlers();
         }
+
+        initBookingDatePickers();
 
         // Initialize
         checkAuth();

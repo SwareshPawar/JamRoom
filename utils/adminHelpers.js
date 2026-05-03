@@ -568,7 +568,8 @@ const sendUnifiedBookingConfirmationEmails = async ({
       `,
       attachments: [{
         filename: 'booking.ics',
-        content: calendarInvite
+        content: calendarInvite,
+        contentType: 'text/calendar; charset=utf-8; method=REQUEST'
       }]
     });
   } catch (emailError) {
@@ -605,7 +606,8 @@ const sendUnifiedBookingConfirmationEmails = async ({
           `,
           attachments: [{
             filename: 'booking.ics',
-            content: calendarInvite
+            content: calendarInvite,
+            contentType: 'text/calendar; charset=utf-8; method=REQUEST'
           }]
         });
       } catch (recipientEmailError) {
