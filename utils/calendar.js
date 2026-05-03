@@ -83,12 +83,10 @@ const buildCalendarDateTime = (dateStr, timeStr) => {
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);
 
-  // Use Date.UTC so the wall-clock digits sit in the UTC position.
-  // ical-generator with a VTIMEZONE generator reads the UTC numeric value
-  // to emit DTSTART;TZID=Asia/Kolkata:...T<HHmmss>. Using the local
-  // constructor when TZ=Asia/Kolkata would store the time as 06:30Z and
-  // output T063000 instead of T120000.
-  return new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0));
+  // ical-generator serializes the event using the Date's local clock fields
+  // together with the supplied TZID. Build the Date with the requested wall
+  // time so DTSTART;TZID=Asia/Kolkata preserves the booking time exactly.
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
 };
 
 /**
