@@ -146,7 +146,13 @@ const sendWhatsAppMeta = async (mobile, message) => {
  * @param {string} message - WhatsApp message content
  * @param {string} provider - Preferred provider ('twilio', 'msg91', 'meta')
  */
-const sendWhatsApp = async (mobile, message, provider = 'twilio') => {
+const getDefaultProvider = () => {
+  if (process.env.META_WHATSAPP_TOKEN && process.env.META_WHATSAPP_PHONE_ID) return 'meta';
+  if (process.env.MSG91_API_KEY) return 'msg91';
+  return 'twilio';
+};
+
+const sendWhatsApp = async (mobile, message, provider = getDefaultProvider()) => {
   if (!mobile || !message) {
     return { success: false, message: 'Mobile number and message are required' };
   }
