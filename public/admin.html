@@ -214,6 +214,7 @@
                     <button type="button" class="settings-tab-btn" data-settings-tab="rentals" onclick="switchSettingsTab('rentals', this)">🏷️ Rental Types & Pricing</button>
                     <button type="button" class="settings-tab-btn" data-settings-tab="bindings" onclick="switchSettingsTab('bindings', this)">🔗 Category Bindings</button>
                     <button type="button" class="settings-tab-btn" data-settings-tab="instagram" onclick="switchSettingsTab('instagram', this)">📸 Instagram Highlights</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="pdfsections" onclick="switchSettingsTab('pdfsections', this)">📄 PDF Sections</button>
                 </div>
 
                 <form id="settingsForm">
@@ -314,6 +315,26 @@
                         </div>
                     </div>
                     
+                    <!-- PDF Sections Tab -->
+                    <div class="settings-tab-pane" data-settings-pane="pdfsections">
+                        <h3 class="settings-section-title">📄 PDF Bill Sections</h3>
+                        <div class="settings-highlight-card">
+                            <p class="settings-help-text">Define how catalog items are grouped into PDF bill sections. Assign whole categories or individual catalog items directly from DB-backed catalog lists. Once an item is assigned to one section, it is hidden from other section pickers to prevent duplicates.</p>
+                            <div class="pdf-sections-header">
+                                <div class="pdf-default-group-row">
+                                    <label>Default section (unmatched items)</label>
+                                    <select id="pdfDefaultGroupKey">
+                                        <option value="studio">Studio Usage</option>
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="addPdfGroup()">+ Add Section</button>
+                            </div>
+                            <div id="pdfGroupsContainer">
+                                <div class="pdf-groups-empty">Loading sections…</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Instagram Highlights Tab -->
                     <div class="settings-tab-pane" data-settings-pane="instagram">
                         <h3 class="settings-section-title">📸 Homepage Instagram Highlights</h3>
@@ -1188,15 +1209,13 @@
         let categoryBindingPairs = [];
 
         // Utility functions - Using shared modules
-        const showAlert = (elementIdOrMessage, messageOrType, type = 'info') => {
-            let message = messageOrType;
-            let alertType = type;
-
-            if (arguments.length <= 2) {
-                message = elementIdOrMessage;
-                alertType = messageOrType || 'info';
-            }
-
+        // Supports both call styles:
+        //   3-arg legacy: showAlert(elementId, message, type)  — elementId is ignored, message+type used
+        //   2-arg modern: showAlert(message, type)
+        const showAlert = (elementIdOrMessage, messageOrType, typeArg) => {
+            const isThreeArg = typeArg !== undefined;
+            const message = isThreeArg ? messageOrType : elementIdOrMessage;
+            const alertType = isThreeArg ? (typeArg || 'info') : (messageOrType || 'info');
             if (window.alertManager) {
                 window.alertManager.show(String(message || ''), String(alertType || 'info'));
             }
@@ -3074,6 +3093,9 @@
                 // Load Instagram embeds
                 loadInstagramEmbedsUI(Array.isArray(settings.instagramEmbeds) ? settings.instagramEmbeds : []);
 
+                // Load PDF service grouping config
+                loadServiceGroupingConfig(settings.serviceGroupingConfig || {});
+
             } catch (error) {
                 showAlert('settingsAlert', 'Failed to load settings', 'error');
             }
@@ -3111,7 +3133,8 @@
                     rate: parseFloat(document.getElementById('gstRate').value) / 100 || 0.18, // Convert percentage to decimal
                     displayName: document.getElementById('gstDisplayName').value || 'GST'
                 },
-                instagramEmbeds: collectInstagramEmbeds()
+                instagramEmbeds: collectInstagramEmbeds(),
+                serviceGroupingConfig: collectServiceGroupingConfig()
             };
 
             try {
@@ -3280,6 +3303,378 @@
             });
             return result;
         }
+
+        // ── PDF Sections (Service Grouping) Management ───────────────────────
+        // In-memory state:
+        // {
+        //   defaultGroupKey,
+        //   groups: [{key,title,subtitle,icon,order}],
+        //   categoryRules: [] (kept for backward compatibility),
+        //   catalogAssignments: [{groupKey,assignmentType,categoryName,itemName}]
+        // }
+        let serviceGroupingData = {
+            defaultGroupKey: 'studio',
+            groups: [],
+            categoryRules: [],
+            catalogAssignments: []
+        };
+
+        const PDF_DEFAULT_GROUPS = [
+            { key: 'studio',       icon: '🎸', title: 'Studio Usage',         subtitle: 'Room access, instruments, and in-studio equipment support', order: 10 },
+            { key: 'production',   icon: '🎧', title: 'Production Services',   subtitle: 'Composition, arrangement, recording, and creative production support', order: 20 },
+            { key: 'finishing',    icon: '🎼', title: 'Finishing & Delivery',   subtitle: 'Mixing, mastering, and final polish for release-ready output', order: 30 },
+            { key: 'sound-design', icon: '🎬', title: 'Sound Design',          subtitle: 'Foley, textures, and custom effects for cinematic or visual work', order: 40 }
+        ];
+        function loadServiceGroupingConfig(config) {
+            const groups = Array.isArray(config?.groups) && config.groups.length > 0 ? config.groups : PDF_DEFAULT_GROUPS;
+            const groupKeys = new Set(groups.map((g) => String(g?.key || '').trim().toLowerCase()).filter(Boolean));
+            const rules = Array.isArray(config?.categoryRules) ? config.categoryRules : [];
+            const assignments = Array.isArray(config?.catalogAssignments) ? config.catalogAssignments : [];
+
+            serviceGroupingData = {
+                defaultGroupKey: String(config?.defaultGroupKey || groups[0]?.key || 'studio'),
+                groups: groups.map(g => ({
+                    key:      String(g.key      || '').trim().toLowerCase(),
+                    icon:     String(g.icon     || '').trim(),
+                    title:    String(g.title    || '').trim(),
+                    subtitle: String(g.subtitle || '').trim(),
+                    order:    Number.isFinite(Number(g.order)) ? Number(g.order) : 10
+                })).filter(g => g.key && g.title).sort((a, b) => a.order - b.order),
+                categoryRules: rules.map(r => ({
+                    groupKey:    String(r.groupKey    || '').trim().toLowerCase(),
+                    title:       String(r.title       || '').trim(),
+                    description: String(r.description || '').trim(),
+                    order:       Number.isFinite(Number(r.order)) ? Number(r.order) : 10,
+                    matchField:  ['name','category','both'].includes(r.matchField) ? r.matchField : 'both',
+                    keywords:    (Array.isArray(r.keywords) ? r.keywords : []).map(k => String(k).trim().toLowerCase()).filter(Boolean)
+                })).filter(r => r.groupKey && r.keywords.length > 0),
+                catalogAssignments: assignments.map((entry) => ({
+                    groupKey: String(entry?.groupKey || '').trim().toLowerCase(),
+                    assignmentType: String(entry?.assignmentType || '').trim().toLowerCase() === 'subitem' ? 'subitem' : 'category',
+                    categoryName: String(entry?.categoryName || '').trim(),
+                    itemName: String(entry?.itemName || '').trim()
+                })).filter((entry) => {
+                    if (!entry.groupKey || !groupKeys.has(entry.groupKey)) return false;
+                    if (entry.assignmentType === 'category') return Boolean(entry.categoryName);
+                    return Boolean(entry.categoryName && entry.itemName);
+                })
+            };
+            renderServiceGroupingUI();
+        }
+
+        function normalizeAssignmentKey(value) {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function getCatalogAssignmentKey(assignment = {}) {
+            const assignmentType = String(assignment.assignmentType || '').trim().toLowerCase();
+            if (assignmentType === 'subitem') {
+                return `subitem::${normalizeAssignmentKey(assignment.categoryName)}::${normalizeAssignmentKey(assignment.itemName)}`;
+            }
+            return `category::${normalizeAssignmentKey(assignment.categoryName)}`;
+        }
+
+        function getAssignedCatalogKeySet() {
+            return new Set((serviceGroupingData.catalogAssignments || []).map((entry) => getCatalogAssignmentKey(entry)).filter(Boolean));
+        }
+
+        function getAssignmentsForGroup(groupKey) {
+            const target = String(groupKey || '').trim().toLowerCase();
+            return (serviceGroupingData.catalogAssignments || [])
+                .map((entry, index) => ({ ...entry, __index: index }))
+                .filter((entry) => entry.groupKey === target);
+        }
+
+        function renderServiceGroupingUI() {
+            const container = document.getElementById('pdfGroupsContainer');
+            const defaultSel = document.getElementById('pdfDefaultGroupKey');
+            if (!container || !defaultSel) return;
+
+            // Refresh default group dropdown
+            defaultSel.innerHTML = serviceGroupingData.groups.map(g =>
+                `<option value="${escapeHtml(g.key)}" ${g.key === serviceGroupingData.defaultGroupKey ? 'selected' : ''}>${escapeHtml(g.icon ? g.icon + ' ' : '')}${escapeHtml(g.title)}</option>`
+            ).join('');
+
+            if (serviceGroupingData.groups.length === 0) {
+                container.innerHTML = '<div class="pdf-groups-empty">No sections yet. Click "+ Add Section" to create one.</div>';
+                return;
+            }
+
+            const assignedCatalogKeys = getAssignedCatalogKeySet();
+
+            container.innerHTML = serviceGroupingData.groups.map((g, gi) => {
+                const assignmentsForGroup = getAssignmentsForGroup(g.key);
+                const assignmentRowsHTML = assignmentsForGroup.length > 0
+                    ? assignmentsForGroup.map((entry) => buildPdfAssignmentRowHTML(entry)).join('')
+                    : '<div class="pdf-empty-rules">No catalog items assigned to this section yet.</div>';
+
+                const catalogOptions = buildCatalogPickerOptions(assignedCatalogKeys);
+
+                return `
+                <div class="pdf-group-card" data-group-idx="${gi}">
+                    <div class="pdf-group-card-header">
+                        <span class="pdf-group-card-title">${escapeHtml(g.icon || '')} ${escapeHtml(g.title || 'Untitled Section')}</span>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removePdfGroup(${gi})">Remove Section</button>
+                    </div>
+                    <div class="pdf-group-card-body">
+                        <div class="pdf-group-fields">
+                            <div class="pdf-group-field">
+                                <label>Key</label>
+                                <input type="text" class="pdf-group-key" value="${escapeHtml(g.key)}" placeholder="studio" oninput="syncPdfGroupField(${gi},'key',this.value)">
+                            </div>
+                            <div class="pdf-group-field">
+                                <label>Icon</label>
+                                <input type="text" class="pdf-group-icon" value="${escapeHtml(g.icon)}" placeholder="🎸" oninput="syncPdfGroupField(${gi},'icon',this.value)">
+                            </div>
+                            <div class="pdf-group-field">
+                                <label>Section Title</label>
+                                <input type="text" class="pdf-group-title" value="${escapeHtml(g.title)}" placeholder="Studio Usage" oninput="syncPdfGroupField(${gi},'title',this.value)">
+                            </div>
+                            <div class="pdf-group-field">
+                                <label>Subtitle</label>
+                                <input type="text" class="pdf-group-subtitle" value="${escapeHtml(g.subtitle)}" placeholder="Short description shown on PDF" oninput="syncPdfGroupField(${gi},'subtitle',this.value)">
+                            </div>
+                            <div class="pdf-group-field">
+                                <label>Order</label>
+                                <input type="number" class="pdf-group-order" value="${g.order}" placeholder="10" min="1" oninput="syncPdfGroupField(${gi},'order',this.value)">
+                            </div>
+                        </div>
+                        <div class="pdf-rules-section">
+                            <div class="pdf-rules-toolbar">
+                                <span class="pdf-rules-label">Catalog Assignments</span>
+                                <div class="pdf-rules-actions">
+                                    <select class="pdf-catalog-picker" id="pdfCatalogPicker_${gi}">
+                                        <option value="">Select unassigned catalog item…</option>
+                                        ${catalogOptions}
+                                    </select>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="addCatalogAssignment(${gi})">+ Add Item</button>
+                                </div>
+                            </div>
+                            <div class="pdf-rules-list" id="pdfRules_${gi}">
+                                ${assignmentRowsHTML}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function buildPdfAssignmentRowHTML(entry) {
+            const label = entry.assignmentType === 'subitem'
+                ? `${entry.categoryName} → ${entry.itemName}`
+                : `${entry.categoryName} (whole category)`;
+            const assignmentTypeLabel = entry.assignmentType === 'subitem' ? 'Item' : 'Category';
+            return `
+            <div class="pdf-rule-row">
+                <div class="pdf-rule-keywords">
+                    <span class="pdf-rule-tag">${escapeHtml(assignmentTypeLabel)}</span>
+                    <span>${escapeHtml(label)}</span>
+                </div>
+                <button type="button" class="btn btn-danger btn-sm" style="padding:3px 8px;" onclick="removeCatalogAssignment(${entry.__index})">×</button>
+            </div>`;
+        }
+
+        function buildCatalogPickerOptions(assignedCatalogKeys = new Set()) {
+            const rentalTypes = adminSettingsData?.rentalTypes || [];
+            const active = rentalTypes.filter(rt => !rt.deletedAt);
+            if (active.length === 0) return '';
+
+            const assignedCategoryKeys = new Set();
+            const assignedSubItemCategoryKeys = new Set();
+            assignedCatalogKeys.forEach((key) => {
+                if (key.startsWith('category::')) {
+                    assignedCategoryKeys.add(key);
+                    return;
+                }
+                if (key.startsWith('subitem::')) {
+                    const parts = key.split('::');
+                    if (parts.length >= 3) {
+                        assignedSubItemCategoryKeys.add(`category::${parts[1]}`);
+                    }
+                }
+            });
+
+            const categoryOpts = active
+                .filter((rt) => {
+                    const categoryKey = `category::${normalizeAssignmentKey(rt.name)}`;
+                    // Hide category if itself assigned OR any sub-item from same category already assigned.
+                    return !assignedCategoryKeys.has(categoryKey) && !assignedSubItemCategoryKeys.has(categoryKey);
+                })
+                .map(rt => `<option value="category|${encodeURIComponent(rt.name)}|">📁 ${escapeHtml(rt.name)} (whole category)</option>`)
+                .join('');
+
+            const itemOpts = active.flatMap(rt => {
+                const categoryKey = `category::${normalizeAssignmentKey(rt.name)}`;
+                // If whole category assigned anywhere, hide all its sub-items.
+                if (assignedCategoryKeys.has(categoryKey)) {
+                    return [];
+                }
+                return (Array.isArray(rt.subItems) ? rt.subItems : [])
+                    .filter(si => si && !si.deletedAt && si.name)
+                    .filter(si => !assignedCatalogKeys.has(`subitem::${normalizeAssignmentKey(rt.name)}::${normalizeAssignmentKey(si.name)}`))
+                    .map(si => `<option value="subitem|${encodeURIComponent(rt.name)}|${encodeURIComponent(si.name)}">  ↳ ${escapeHtml(rt.name)} → ${escapeHtml(si.name)}</option>`);
+            }).join('');
+
+            const categoriesGroup = categoryOpts ? `<optgroup label="── Categories ──">${categoryOpts}</optgroup>` : '';
+            const itemsGroup = itemOpts ? `<optgroup label="── Sub-items ──">${itemOpts}</optgroup>` : '';
+            return categoriesGroup + itemsGroup;
+        }
+
+        function syncPdfGroupField(gi, field, value) {
+            if (!serviceGroupingData.groups[gi]) return;
+            if (field === 'order') value = Number(value) || 1;
+            serviceGroupingData.groups[gi][field] = field === 'key' ? value.trim().toLowerCase() : (typeof value === 'string' ? value : value);
+            // Only update the card header title/icon live without full re-render
+            const card = document.querySelector(`.pdf-group-card[data-group-idx="${gi}"]`);
+            if (card) {
+                const titleEl = card.querySelector('.pdf-group-card-title');
+                if (titleEl) {
+                    const g = serviceGroupingData.groups[gi];
+                    titleEl.textContent = (g.icon ? g.icon + ' ' : '') + (g.title || 'Untitled Section');
+                }
+            }
+            // Refresh default group dropdown to reflect key/title changes
+            const defaultSel = document.getElementById('pdfDefaultGroupKey');
+            if (defaultSel) {
+                const currentVal = defaultSel.value;
+                defaultSel.innerHTML = serviceGroupingData.groups.map(g =>
+                    `<option value="${escapeHtml(g.key)}" ${g.key === (currentVal || serviceGroupingData.defaultGroupKey) ? 'selected' : ''}>${escapeHtml(g.icon ? g.icon + ' ' : '')}${escapeHtml(g.title)}</option>`
+                ).join('');
+            }
+        }
+
+        function addPdfGroup() {
+            const nextOrder = serviceGroupingData.groups.length > 0
+                ? Math.max(...serviceGroupingData.groups.map(g => g.order)) + 10
+                : 10;
+            serviceGroupingData.groups.push({ key: `group${Date.now()}`, icon: '', title: 'New Section', subtitle: '', order: nextOrder });
+            renderServiceGroupingUI();
+            // Scroll to the new card
+            setTimeout(() => {
+                const cards = document.querySelectorAll('.pdf-group-card');
+                if (cards.length > 0) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 50);
+        }
+
+        function removePdfGroup(gi) {
+            const group = serviceGroupingData.groups[gi];
+            if (!group) return;
+            if (!confirm(`Remove section "${group.title}"? Catalog assignments in this section will also be removed.`)) return;
+            // Remove the group and its assignments
+            serviceGroupingData.groups.splice(gi, 1);
+            serviceGroupingData.categoryRules = serviceGroupingData.categoryRules.filter(r => r.groupKey !== group.key);
+            serviceGroupingData.catalogAssignments = serviceGroupingData.catalogAssignments.filter(a => a.groupKey !== group.key);
+            renderServiceGroupingUI();
+        }
+
+        function addCatalogAssignment(gi) {
+            const picker = document.getElementById(`pdfCatalogPicker_${gi}`);
+            if (!picker || !picker.value) return;
+            const [assignmentTypeRaw, categoryEncoded, itemEncoded] = picker.value.split('|');
+            const group = serviceGroupingData.groups[gi];
+            if (!group) return;
+
+            const assignmentType = assignmentTypeRaw === 'subitem' ? 'subitem' : 'category';
+            const categoryName = decodeURIComponent(categoryEncoded || '').trim();
+            const itemName = decodeURIComponent(itemEncoded || '').trim();
+
+            if (!categoryName) return;
+            if (assignmentType === 'subitem' && !itemName) return;
+
+            const assignment = {
+                groupKey: group.key,
+                assignmentType,
+                categoryName,
+                itemName: assignmentType === 'subitem' ? itemName : ''
+            };
+
+            const assignmentKey = getCatalogAssignmentKey(assignment);
+            const alreadyAssigned = (serviceGroupingData.catalogAssignments || []).some((entry) => getCatalogAssignmentKey(entry) === assignmentKey);
+            if (alreadyAssigned) {
+                showAlert('settingsAlert', 'This catalog item is already assigned to another section.', 'warning');
+                return;
+            }
+
+            // Prevent overlap: category assignment cannot coexist with any of its sub-item assignments.
+            const categoryKey = `category::${normalizeAssignmentKey(categoryName)}`;
+            const categorySubitemPrefix = `subitem::${normalizeAssignmentKey(categoryName)}::`;
+            if (assignmentType === 'category') {
+                const hasSubitemConflict = (serviceGroupingData.catalogAssignments || []).some((entry) => {
+                    const key = getCatalogAssignmentKey(entry);
+                    return key.startsWith(categorySubitemPrefix);
+                });
+                if (hasSubitemConflict) {
+                    showAlert('settingsAlert', 'Cannot assign whole category because some sub-items from this category are already assigned.', 'warning');
+                    return;
+                }
+            }
+
+            if (assignmentType === 'subitem') {
+                const hasCategoryConflict = (serviceGroupingData.catalogAssignments || []).some((entry) => {
+                    const key = getCatalogAssignmentKey(entry);
+                    return key === categoryKey;
+                });
+                if (hasCategoryConflict) {
+                    showAlert('settingsAlert', 'Cannot assign sub-item because its whole category is already assigned.', 'warning');
+                    return;
+                }
+            }
+
+            serviceGroupingData.catalogAssignments.push(assignment);
+
+            picker.value = '';
+            renderServiceGroupingUI();
+        }
+
+        function removeCatalogAssignment(index) {
+            const parsed = Number(index);
+            if (!Number.isInteger(parsed) || parsed < 0) return;
+            if (!Array.isArray(serviceGroupingData.catalogAssignments) || parsed >= serviceGroupingData.catalogAssignments.length) return;
+            serviceGroupingData.catalogAssignments.splice(parsed, 1);
+            renderServiceGroupingUI();
+        }
+
+        function collectServiceGroupingConfig() {
+            // Flush group field values from DOM before collecting
+            document.querySelectorAll('.pdf-group-card').forEach((card) => {
+                const gi = parseInt(card.dataset.groupIdx, 10);
+                const g = serviceGroupingData.groups[gi];
+                if (!g) return;
+                g.key      = (card.querySelector('.pdf-group-key')?.value      || '').trim().toLowerCase();
+                g.icon     = (card.querySelector('.pdf-group-icon')?.value     || '').trim();
+                g.title    = (card.querySelector('.pdf-group-title')?.value    || '').trim();
+                g.subtitle = (card.querySelector('.pdf-group-subtitle')?.value || '').trim();
+                g.order    = parseInt(card.querySelector('.pdf-group-order')?.value || '10', 10) || 10;
+            });
+            const defaultGroupKey = document.getElementById('pdfDefaultGroupKey')?.value
+                || (serviceGroupingData.groups[0]?.key || 'studio');
+
+            const dedupAssignments = [];
+            const seenAssignmentKeys = new Set();
+            (serviceGroupingData.catalogAssignments || []).forEach((entry) => {
+                const normalized = {
+                    groupKey: String(entry?.groupKey || '').trim().toLowerCase(),
+                    assignmentType: String(entry?.assignmentType || '').trim().toLowerCase() === 'subitem' ? 'subitem' : 'category',
+                    categoryName: String(entry?.categoryName || '').trim(),
+                    itemName: String(entry?.itemName || '').trim()
+                };
+                if (!normalized.groupKey || !normalized.categoryName) return;
+                if (normalized.assignmentType === 'subitem' && !normalized.itemName) return;
+                const key = getCatalogAssignmentKey(normalized);
+                if (!key || seenAssignmentKeys.has(key)) return;
+                seenAssignmentKeys.add(key);
+                dedupAssignments.push(normalized);
+            });
+
+            return {
+                defaultGroupKey,
+                groups: serviceGroupingData.groups.filter(g => g.key && g.title),
+                categoryRules: serviceGroupingData.categoryRules.filter(r => r.groupKey && r.keywords.length > 0),
+                catalogAssignments: dedupAssignments
+            };
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         // ────────────────────────────────────────────────────────────────────
 
         let usersTabDraftSaveTimer = null;

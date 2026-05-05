@@ -140,11 +140,35 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const classPlanBaseFee = Math.max(0, Number(classSession?.totalFeeBeforeDiscount || subtotal) || 0);
     const classPlanDiscount = Math.max(0, Number(classSession?.discountAmount || 0) || 0);
 
+    // For class plan bookings, look up the real catalog category for the class item
+    // so that catalogAssignment-based PDF section rules can match it correctly.
+    const resolveClassItemCategory = (itemName) => {
+        const nameLower = String(itemName || '').trim().toLowerCase();
+        if (!nameLower || !Array.isArray(settings?.rentalTypes)) return null;
+        for (const rt of settings.rentalTypes) {
+            if (rt.deletedAt) continue;
+            const catName = String(rt?.name || '').trim();
+            if (catName.toLowerCase() === nameLower) return catName;
+            if (Array.isArray(rt.subItems)) {
+                for (const si of rt.subItems) {
+                    if (si.deletedAt) continue;
+                    if (String(si?.name || '').trim().toLowerCase() === nameLower) return catName;
+                }
+            }
+        }
+        return null;
+    };
+
+    const classItemName = classSession?.itemName || classSession?.selectedClassItemName || classSession?.instrument || 'Music Classes';
+    const classItemCategory = classSession?.itemCategory
+        || resolveClassItemCategory(classItemName)
+        || 'Class Plans';
+
     const groupedServiceItems = isClassPlanBooking
         ? [{
             id: classSession?.itemId || 'class-plan',
-            name: classSession?.itemName || classSession?.instrument || 'Music Classes',
-            category: classSession?.itemCategory || 'Class Plans',
+            name: classItemName,
+            category: classItemCategory,
             description: `${classPlanMonths} month plan${classSession?.location ? ` at ${classSession.location}` : ''}`,
             rentalType: 'persession',
             quantity: 1,

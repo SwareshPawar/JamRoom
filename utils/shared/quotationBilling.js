@@ -186,11 +186,21 @@ const getServiceGroupingConfig = (config = {}) => {
     .filter((rule) => rule.groupKey && rule.keywords.length > 0)
     .sort((left, right) => left.order - right.order);
 
+  const catalogAssignments = (Array.isArray(config?.catalogAssignments) ? config.catalogAssignments : [])
+    .map((entry) => ({
+      groupKey: String(entry?.groupKey || '').trim().toLowerCase(),
+      assignmentType: String(entry?.assignmentType || '').trim().toLowerCase() === 'subitem' ? 'subitem' : 'category',
+      categoryName: String(entry?.categoryName || '').trim().toLowerCase(),
+      itemName: String(entry?.itemName || '').trim().toLowerCase()
+    }))
+    .filter((entry) => entry.groupKey && (entry.assignmentType === 'category' ? entry.categoryName : (entry.categoryName && entry.itemName)));
+
   const defaultGroupKey = String(config?.defaultGroupKey || groups[0]?.key || 'studio').trim().toLowerCase();
 
   return {
     groups,
     rules,
+    catalogAssignments,
     defaultGroupKey,
     groupKeys: groups.map((group) => group.key)
   };
@@ -203,6 +213,26 @@ const classifyServiceItem = (item = {}, config = {}) => {
   const categoryLower = rawCategory.toLowerCase();
   const normalizedConfig = getServiceGroupingConfig(config);
 
+  // Priority 1: explicit catalog assignments (admin-managed, no duplication)
+  const matchedAssignment = normalizedConfig.catalogAssignments.find((entry) => {
+    if (entry.assignmentType === 'category') {
+      return entry.categoryName === categoryLower;
+    }
+    return entry.categoryName === categoryLower && entry.itemName === nameLower;
+  });
+
+  if (matchedAssignment) {
+    return {
+      groupKey: matchedAssignment.groupKey,
+      title: rawName || 'Service',
+      description: rawCategory
+        ? `${rawCategory} support tailored to your quotation requirements.`
+        : 'Professional service support tailored to your booking requirements.',
+      order: 5
+    };
+  }
+
+  // Priority 2: legacy keyword rules
   const matchedRule = normalizedConfig.rules.find((rule) => {
     const searchText = rule.matchField === 'name'
       ? nameLower

@@ -459,6 +459,29 @@ const adminSettingsSchema = new mongoose.Schema({
         trim: true,
         lowercase: true
       }]
+    }],
+    catalogAssignments: [{
+      groupKey: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true
+      },
+      assignmentType: {
+        type: String,
+        enum: ['category', 'subitem'],
+        default: 'category'
+      },
+      categoryName: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      itemName: {
+        type: String,
+        trim: true,
+        default: ''
+      }
     }]
   },
   updatedAt: {
