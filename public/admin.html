@@ -1125,6 +1125,7 @@
                     <small class="settings-help-text">Template will store selected items and quantities, and always use current catalog rates when reused.</small>
                 </div>
                 <div class="action-row-end">
+                    <button type="button" onclick="saveQuotationTemplateOnly()" class="btn btn-secondary">Save Template</button>
                     <button type="button" onclick="hideQuotationModal()" class="btn btn-secondary">Cancel</button>
                     <button type="submit" class="btn btn-primary">Send Quotation</button>
                 </div>
@@ -4771,7 +4772,7 @@
             document.getElementById('quoteTaxAmount').value = '0';
             document.getElementById('quoteTotalAmount').value = '0';
             // Reset type checkboxes and schedule visibility
-            ['quoteTypeHourly', 'quoteTypePerday', 'quoteTypeSession'].forEach((id) => {
+            ['quoteTypeHourly', 'quoteTypePerday', 'quoteTypeSession', 'quoteTypeTrack'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.checked = true;
             });
@@ -5318,6 +5319,90 @@
         function hideQuotationModal() {
             closeModal('quotationModal');
             resetQuotationForm();
+        }
+
+        async function saveQuotationTemplateOnly() {
+            try {
+                const updateLoadedTemplate = document.getElementById('quoteUpdateLoadedTemplate')?.checked === true;
+                const templateName = String(document.getElementById('quoteTemplateName')?.value || '').trim();
+
+                if (!templateName) {
+                    throw new Error('Template name is required to save quotation template.');
+                }
+                if (updateLoadedTemplate && !activeQuotationTemplateId) {
+                    throw new Error('No loaded template selected to update.');
+                }
+
+                const quoteData = collectQuotationSelectedRentals({ strict: true });
+                const rentalTypes = Array.isArray(createBookingSettings?.rentalTypes) ? createBookingSettings.rentalTypes : [];
+                const derivedLabel = typeof window.deriveAdminBookingTypeLabel === 'function'
+                    ? window.deriveAdminBookingTypeLabel(quoteData.selectedRentals, rentalTypes) : '';
+                const quoteLabel = String(document.getElementById('quoteBookingType').value || '').trim() || derivedLabel || 'Quotation';
+
+                showLoading(updateLoadedTemplate ? 'Updating quotation template...' : 'Saving quotation template...');
+                const token = localStorage.getItem('token');
+                const endpoint = updateLoadedTemplate
+                    ? `${API_URL}/api/admin/quotations/saved/${encodeURIComponent(activeQuotationTemplateId)}`
+                    : `${API_URL}/api/admin/quotations/saved`;
+                const method = updateLoadedTemplate ? 'PUT' : 'POST';
+
+                const res = await fetch(endpoint, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        name: templateName,
+                        quotation: {
+                            rentalType: quoteLabel,
+                            selectedTypes: getSelectedQuoteTypes(),
+                            rentals: quoteData.selectedRentals,
+                            schedules: {
+                                inhouse: {
+                                    date: quoteData.inhouseSchedule?.date || '',
+                                    startTime: quoteData.inhouseSchedule?.startTime || '',
+                                    endTime: quoteData.inhouseSchedule?.endTime || ''
+                                },
+                                perday: {
+                                    startDate: quoteData.perdaySchedule?.startDate || '',
+                                    endDate: quoteData.perdaySchedule?.endDate || '',
+                                    pickupTime: quoteData.perdaySchedule?.pickupTime || '',
+                                    returnTime: quoteData.perdaySchedule?.returnTime || ''
+                                }
+                            },
+                            notes: String(document.getElementById('quoteNotes').value || '').trim()
+                        }
+                    })
+                });
+
+                const result = await res.json();
+                if (!res.ok || !result.success) {
+                    throw new Error(result.message || 'Failed to save quotation template');
+                }
+
+                if (result.quotation?.id) {
+                    activeQuotationTemplateId = String(result.quotation.id);
+                }
+                activeQuotationTemplateName = templateName;
+
+                const quoteSaveTemplateEl = document.getElementById('quoteSaveTemplate');
+                const updateLoadedTemplateEl = document.getElementById('quoteUpdateLoadedTemplate');
+                const loadedTemplateInfoEl = document.getElementById('quoteLoadedTemplateInfo');
+                if (quoteSaveTemplateEl) quoteSaveTemplateEl.checked = true;
+                if (updateLoadedTemplateEl) {
+                    updateLoadedTemplateEl.disabled = false;
+                    updateLoadedTemplateEl.checked = true;
+                }
+                if (loadedTemplateInfoEl) {
+                    loadedTemplateInfoEl.style.display = 'block';
+                    loadedTemplateInfoEl.textContent = `Loaded template: ${activeQuotationTemplateName || 'Saved quotation'}. Keep "Update loaded quotation template" enabled to overwrite this template.`;
+                }
+
+                await loadSavedQuotations();
+                showSuccessAlert(result.message || (updateLoadedTemplate ? 'Quotation template updated' : 'Quotation template saved'));
+            } catch (error) {
+                showErrorAlert(error.message || 'Failed to save quotation template');
+            } finally {
+                hideLoading();
+            }
         }
 
         async function submitQuotation(event) {

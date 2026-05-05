@@ -24,8 +24,10 @@ const {
 
 const normalizeRentalTypeValue = (value) => {
   const normalized = String(value || 'inhouse').toLowerCase();
-  if (normalized === 'perday') return 'perday';
-  if (normalized === 'persession') return 'persession';
+  const compact = normalized.replace(/[\s_-]+/g, '');
+  if (compact === 'perday') return 'perday';
+  if (compact === 'persession' || compact === 'session') return 'persession';
+  if (compact === 'pertrack' || compact === 'track') return 'pertrack';
   return 'inhouse';
 };
 
@@ -49,6 +51,7 @@ const calculateQuotationTotals = ({ rentals, schedules }) => {
   const hasInhouse = safeRentals.some((r) => normalizeRentalTypeValue(r?.rentalType) === 'inhouse');
   const hasPerday = safeRentals.some((r) => normalizeRentalTypeValue(r?.rentalType) === 'perday');
   const hasPersession = safeRentals.some((r) => normalizeRentalTypeValue(r?.rentalType) === 'persession');
+  const hasPertrack = safeRentals.some((r) => normalizeRentalTypeValue(r?.rentalType) === 'pertrack');
 
   const inhouseDate = String(inhouseSchedule?.date || '').trim();
   const inhouseStartTime = String(inhouseSchedule?.startTime || '').trim();
@@ -104,7 +107,7 @@ const calculateQuotationTotals = ({ rentals, schedules }) => {
     const rentalType = normalizeRentalTypeValue(rental?.rentalType);
     const itemPrice = Number(rental?.price || 0);
     const itemQuantity = Math.max(1, Number(rental?.quantity || 1));
-    if (rentalType === 'persession') {
+    if (rentalType === 'persession' || rentalType === 'pertrack') {
       subtotal += itemPrice * itemQuantity;
     } else if (rentalType === 'perday') {
       subtotal += itemPrice * itemQuantity * perdayDays;
@@ -118,6 +121,7 @@ const calculateQuotationTotals = ({ rentals, schedules }) => {
     hasInhouse,
     hasPerday,
     hasPersession,
+    hasPertrack,
     inhouseDurationHours,
     perdayDays,
     schedules: {
@@ -360,6 +364,67 @@ router.post('/quotations/saved', protect, isAdmin, async (req, res) => {
   }
 });
 
+// @route   PUT /api/admin/quotations/saved/:id
+// @desc    Update an existing saved quotation template
+// @access  Private/Admin
+router.put('/quotations/saved/:id', protect, isAdmin, async (req, res) => {
+  try {
+    const templateId = String(req.params?.id || '').trim();
+    if (!templateId) {
+      return res.status(400).json({ success: false, message: 'Template id is required' });
+    }
+
+    const settings = await AdminSettings.getSettings();
+    const currentItems = Array.isArray(settings.savedQuotations) ? settings.savedQuotations : [];
+    const targetIndex = currentItems.findIndex((item) => String(item?._id) === templateId);
+
+    if (targetIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Saved quotation not found' });
+    }
+
+    const templateName = String(req.body?.name || '').trim();
+    if (!templateName) {
+      return res.status(400).json({ success: false, message: 'Template name is required' });
+    }
+
+    const parsed = sanitizeQuotationPayload(req.body?.quotation || {}, settings);
+    const existing = currentItems[targetIndex];
+
+    currentItems[targetIndex] = {
+      name: templateName,
+      rentalTypeLabel: parsed.rentalTypeLabel,
+      selectedTypes: parsed.selectedTypes,
+      notes: parsed.notes,
+      schedules: parsed.schedules,
+      rentals: parsed.rentals.map((item) => ({
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        rentalType: item.rentalType,
+        quantity: item.quantity,
+        priceSnapshot: item.price
+      })),
+      _id: existing?._id,
+      createdAt: existing?.createdAt || new Date(),
+      updatedAt: new Date(),
+      deletedAt: existing?.deletedAt || null
+    };
+
+    settings.savedQuotations = currentItems;
+    await settings.save();
+
+    const updated = settings.savedQuotations.find((item) => String(item?._id) === templateId);
+    res.json({
+      success: true,
+      message: 'Quotation template updated',
+      quotation: toSavedQuotationResponse(updated, settings)
+    });
+  } catch (error) {
+    console.error('Update quotation template error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to update quotation template' });
+  }
+});
+
 // @route   DELETE /api/admin/quotations/saved/:id
 // @desc    Soft delete saved quotation template
 // @access  Private/Admin
@@ -526,6 +591,7 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
     if (calculation.hasInhouse) selectedTypeLabels.push('In-house');
     if (calculation.hasPerday) selectedTypeLabels.push('Per-day');
     if (calculation.hasPersession) selectedTypeLabels.push('Per-event');
+    if (calculation.hasPertrack) selectedTypeLabels.push('Per-track');
 
     const quotationPresentation = buildQuotationPresentationData({
       rentalTypeLabel,

@@ -248,12 +248,12 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .status-partial{background:#fff4d6;color:#8a5700;border:1px solid #ffd166}
         .status-refunded{background:#e2e3e5;color:#383d41;border:1px solid #d6d8db}
         .status-cancelled{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
-        .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:hidden;margin-bottom:16px;background:#fff;break-inside:avoid;page-break-inside:avoid}
+        .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:visible;margin-bottom:16px;background:#fff;break-inside:auto;page-break-inside:auto}
         .service-group-header{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
         .service-group-header h3{font-size:18px;margin-bottom:4px;color:#fff;font-weight:700}
         .service-group-header p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5;margin:0}
         .service-group-subtotal{font-size:14px;font-weight:800;white-space:nowrap;background:rgba(255,255,255,0.12);border-radius:999px;padding:8px 12px;color:#fff;flex-shrink:0}
-        .service-group-body{padding:6px 18px 8px}
+        .service-group-body{padding:6px 18px 8px;break-inside:auto;page-break-inside:auto}
         .service-row{display:grid;grid-template-columns:1.5fr 0.7fr 0.45fr;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #edf2f7;break-inside:avoid;page-break-inside:avoid}
         .service-row:last-child{border-bottom:0}
         .service-copy{}
@@ -288,7 +288,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .payment-card.partial .payment-message{color:#78350f}
         .payment-card.pending .payment-message{color:#856404}
         .footer{margin-top:22px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.7;text-align:center;break-inside:avoid;page-break-inside:avoid}
-        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-group,.service-row,.info-card,.bill-grid,.totals-card,.payment-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group-header{break-after:avoid;page-break-after:avoid}}
+        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-row,.info-card,.bill-grid,.totals-card,.payment-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-header{break-after:avoid;page-break-after:avoid}}
     </style>
 </head>
 <body>
