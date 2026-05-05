@@ -99,58 +99,8 @@
         })
     ]);
 
-    const DEFAULT_SERVICE_GROUPS = Object.freeze([
-        Object.freeze({
-            key: 'studio',
-            icon: '🎸',
-            title: 'Studio Usage',
-            subtitle: 'Room access, instruments, and in-studio equipment support',
-            order: 10
-        }),
-        Object.freeze({
-            key: 'production',
-            icon: '🎧',
-            title: 'Production Services',
-            subtitle: 'Composition, arrangement, recording, and creative production support',
-            order: 20
-        }),
-        Object.freeze({
-            key: 'finishing',
-            icon: '🎼',
-            title: 'Finishing & Delivery',
-            subtitle: 'Mixing, mastering, and final polish for release-ready output',
-            order: 30
-        }),
-        Object.freeze({
-            key: 'sound-design',
-            icon: '🎬',
-            title: 'Sound Design',
-            subtitle: 'Foley, textures, and custom effects for cinematic or visual work',
-            order: 40
-        })
-    ]);
-
-    const DEFAULT_SERVICE_RULES = Object.freeze([
-        Object.freeze({ groupKey: 'studio', title: 'JamRoom Studio', description: 'Professional in-studio room usage with monitoring, setup support, and a comfortable recording environment.', order: 10, matchField: 'name', keywords: ['jamroom', 'jam room'] }),
-        Object.freeze({ groupKey: 'studio', title: 'Bass Guitar', description: 'Live bass instrument support for rehearsals, jams, and recording sessions.', order: 20, matchField: 'both', keywords: ['bass guitar'] }),
-        Object.freeze({ groupKey: 'studio', title: 'Keyboard', description: 'Keyboard setup for composing, rehearsing, and recording melodic parts.', order: 30, matchField: 'both', keywords: ['keyboard', 'piano'] }),
-        Object.freeze({ groupKey: 'studio', title: 'Studio Equipment', description: 'Studio equipment support prepared for tracking, rehearsal, and live session needs.', order: 40, matchField: 'both', keywords: ['guitar', 'amp', 'drum', 'mic', 'microphone', 'monitor', 'speaker', 'console', 'mixer'] }),
-        Object.freeze({ groupKey: 'production', title: 'Composition', description: 'Original music composition crafted around your creative brief, mood, and structure.', order: 50, matchField: 'both', keywords: ['composition'] }),
-        Object.freeze({ groupKey: 'production', title: 'Arrangement Enhancement', description: 'Enhancing the music with additional instrument layers and a fuller arrangement.', order: 60, matchField: 'both', keywords: ['arrangement layering'] }),
-        Object.freeze({ groupKey: 'production', title: 'Arrangement', description: 'Structuring and refining the song so the production feels complete and performance-ready.', order: 70, matchField: 'both', keywords: ['arrangement'] }),
-        Object.freeze({ groupKey: 'production', title: 'Production Service', description: 'Hands-on recording and production support tailored to the session requirement.', order: 80, matchField: 'both', keywords: ['recording', 'tracking', 'vocal', 'editing'] }),
-        Object.freeze({ groupKey: 'finishing', title: 'Stem Mastering', description: 'Mastering from grouped stems for better tonal control, polish, and release-ready output.', order: 90, matchField: 'both', keywords: ['stem mastering'] }),
-        Object.freeze({ groupKey: 'finishing', title: 'Mastering', description: 'Final polish, loudness balance, and clarity tuning for a release-ready final version.', order: 100, matchField: 'both', keywords: ['mastering'] }),
-        Object.freeze({ groupKey: 'finishing', title: 'Mixing', description: 'Balancing vocals and instruments for clarity, space, punch, and a polished sound.', order: 110, matchField: 'both', keywords: ['mix'] }),
-        Object.freeze({ groupKey: 'sound-design', title: 'Foley / Sound Design', description: 'Custom sound effects and texture creation for scenes, visuals, or storytelling moments.', order: 120, matchField: 'both', keywords: ['foley', 'sound effect', 'sfx'] })
-    ]);
-
     const getServiceGroupingConfig = (config = {}) => {
-        const groupsInput = Array.isArray(config?.groups) && config.groups.length > 0
-            ? config.groups
-            : DEFAULT_SERVICE_GROUPS;
-
-        const groups = groupsInput
+        const groups = (Array.isArray(config?.groups) ? config.groups : [])
             .map((group, index) => ({
                 key: String(group?.key || '').trim().toLowerCase(),
                 icon: String(group?.icon || '').trim(),
@@ -161,11 +111,7 @@
             .filter((group) => group.key && group.title)
             .sort((left, right) => left.order - right.order);
 
-        const rulesInput = Array.isArray(config?.categoryRules) && config.categoryRules.length > 0
-            ? config.categoryRules
-            : DEFAULT_SERVICE_RULES;
-
-        const rules = rulesInput
+        const rules = (Array.isArray(config?.categoryRules) ? config.categoryRules : [])
             .map((rule, index) => ({
                 groupKey: String(rule?.groupKey || '').trim().toLowerCase(),
                 title: String(rule?.title || '').trim(),
@@ -247,10 +193,16 @@
             };
         }
 
+        const resolvedRentalType = normalizeRentalType(item?.rentalType);
+        let fallbackGroupKey = normalizedConfig.defaultGroupKey;
+        if (['persession', 'pertrack'].includes(resolvedRentalType)) {
+            fallbackGroupKey = normalizedConfig.groupKeys.includes('production') ? 'production' : normalizedConfig.defaultGroupKey;
+        } else if (resolvedRentalType === 'perday') {
+            fallbackGroupKey = normalizedConfig.groupKeys.includes('perday-rentals') ? 'perday-rentals' : normalizedConfig.defaultGroupKey;
+        }
+
         return {
-            groupKey: ['persession', 'pertrack'].includes(normalizeRentalType(item?.rentalType))
-                ? (normalizedConfig.groupKeys.includes('production') ? 'production' : normalizedConfig.defaultGroupKey)
-                : normalizedConfig.defaultGroupKey,
+            groupKey: fallbackGroupKey,
             title: rawName || 'Custom Service',
             description: rawCategory
                 ? `${rawCategory} support tailored to your quotation requirements.`
