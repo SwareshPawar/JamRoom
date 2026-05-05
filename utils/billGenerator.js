@@ -3,6 +3,7 @@ const fsSync = require('fs');
 const path = require('path');
 const AdminSettings = require('../models/AdminSettings');
 const { generateUnifiedPDFHTML } = require('./pdfHTMLTemplate');
+const { buildServiceGroupSummary } = require('./shared/quotationBilling');
 
 // Check if we're in a serverless environment
 const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
