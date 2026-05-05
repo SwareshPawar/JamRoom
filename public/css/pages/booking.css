@@ -271,6 +271,73 @@ span.flatpickr-weekday {
     margin-top: 6px;
 }
 
+.lesson-slot-form {
+    margin-top: 6px;
+}
+
+.lesson-slot-trigger {
+    display: inline-block;
+    cursor: pointer;
+    list-style: none;
+    margin-top: 2px;
+}
+
+.lesson-slot-trigger::-webkit-details-marker {
+    display: none;
+}
+
+.lesson-slot-form-panel {
+    margin-top: 10px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--secondary-color) 35%, var(--border-color));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--secondary-color) 8%, var(--surface-1));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--secondary-color) 14%, transparent);
+}
+
+.lesson-slot-time-container {
+    margin-top: 10px;
+}
+
+.lesson-slot-field {
+    margin-bottom: 0;
+}
+
+.lesson-slot-field label {
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+}
+
+.lesson-slot-field input,
+.lesson-slot-field select,
+.slot-req-date-alt {
+    width: 100%;
+    min-height: 42px;
+    padding: 12px 14px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--surface-0);
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: var(--font-size-md);
+}
+
+.lesson-slot-field input:focus,
+.lesson-slot-field select:focus,
+.slot-req-date-alt:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.lesson-slot-submit {
+    margin-top: 10px;
+}
+
+.slot-req-time-loading {
+    margin-top: 6px;
+}
+
 .perday-return-hidden {
     display: none;
 }

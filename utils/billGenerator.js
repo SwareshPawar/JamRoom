@@ -421,7 +421,8 @@ const buildQuotationPresentationData = (data, settings) => {
 
   const serviceGroups = buildServiceGroupSummary(
     Array.isArray(data?.rentals) ? data.rentals : [],
-    data?.calculation || {}
+    data?.calculation || {},
+    settings?.serviceGroupingConfig || {}
   ).map((group) => ({
     ...group,
     subtotalLabel: formatCurrency(group.subtotal),

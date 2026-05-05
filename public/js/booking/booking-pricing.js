@@ -81,6 +81,52 @@ const updatePriceDisplay = () => {
         `;
     });
 
+    // For class bookings, override pricing with monthly fee from config
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const isClassBooking = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
+    if (isClassBooking) {
+        const classConfig = typeof window.getClassConfig === 'function'
+            ? window.getClassConfig()
+            : { monthlyFee: Number(window.adminSettings?.classConfig?.monthlyFee || 0), classesPerMonth: 4, multiMonthDiscounts: [] };
+        const planMonths = Math.max(1, Number(document.getElementById('classPlanMonths')?.value || 1));
+        const classesPerMonth = Math.max(1, Number(classConfig.classesPerMonth || 4));
+        const totalClasses = classesPerMonth * planMonths;
+        const monthlyFee = Math.max(0, Number(classConfig.monthlyFee || 0));
+        const totalBeforeDiscount = monthlyFee * planMonths;
+
+        const discountAmount = typeof window.getClassDiscountForMonths === 'function'
+            ? window.getClassDiscountForMonths(planMonths, classConfig, totalBeforeDiscount)
+            : 0;
+
+        const discountEntry = (Array.isArray(classConfig.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [])
+            .find((entry) => Number(entry?.months) === planMonths);
+        const fallbackPercent = planMonths <= 1 ? 0 : planMonths <= 3 ? 5 : planMonths <= 6 ? 10 : planMonths <= 9 ? 12.5 : 15;
+        const discountPercent = discountEntry
+            ? Math.max(0, Number(discountEntry.discountPercent || 0))
+            : fallbackPercent;
+        const totalAfterDiscount = Math.max(0, totalBeforeDiscount - discountAmount);
+
+        subtotal = totalAfterDiscount;
+        selectedRentalsHTML = `
+            <div class="rental-item">
+                <span>${bookingType} — ${planMonths} month(s)</span>
+                <span>₹${totalBeforeDiscount}</span>
+            </div>
+            <div class="rental-item">
+                <span>Discount (${discountPercent}%)</span>
+                <span>-₹${discountAmount}</span>
+            </div>
+            <div class="rental-item">
+                <span>Classes Included</span>
+                <span>${classesPerMonth}/month (${totalClasses} total)</span>
+            </div>
+            <div class="rental-item" style="font-size:0.82em;opacity:0.75;">
+                <span>1 item only, class completion tracked weekly</span>
+                <span>Plan Active</span>
+            </div>
+        `;
+    }
+
     // Use admin settings for GST calculation
     const gstEnabled = window.adminSettings?.gstConfig?.enabled || false;
     const gstRate = window.adminSettings?.gstConfig?.rate || 0.18;

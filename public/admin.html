@@ -629,6 +629,44 @@
         </div>
     </div>
 
+    <!-- Class Lesson Completion Modal -->
+    <div id="classLessonCompletionModal" class="modal">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <h2 id="classLessonCompletionTitle">Mark Class Completed</h2>
+                <span class="close" onclick="hideClassLessonCompletionModal()">&times;</span>
+            </div>
+
+            <div id="classLessonCompletionSummary" class="admin-theme-info-card" style="margin: 0.75rem 0 1rem; padding: 0.75rem 1rem;"></div>
+
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="classCompletedDate">Completed Date*</label>
+                    <input type="date" id="classCompletedDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="classCompletedStartTime">Completed Start Time*</label>
+                    <input type="time" id="classCompletedStartTime" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="classCompletedNotes">Lesson Notes</label>
+                <textarea id="classCompletedNotes" rows="2" placeholder="Optional notes for this class"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="classCompletedDetails">Topics / Details Covered</label>
+                <textarea id="classCompletedDetails" rows="3" placeholder="What was taught in this class?"></textarea>
+            </div>
+
+            <div class="modal-actions-row">
+                <button onclick="submitClassLessonCompletion()" class="btn btn-success btn-flex">Save Completion</button>
+                <button onclick="hideClassLessonCompletionModal()" class="btn btn-secondary btn-flex">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Booking Modal -->
     <div id="editBookingModal" class="modal">
         <div class="modal-content">
@@ -1150,10 +1188,17 @@
         let categoryBindingPairs = [];
 
         // Utility functions - Using shared modules
-        const showAlert = (elementId, message, type = 'info') => {
-            // Use shared AlertManager for consistency across all pages
+        const showAlert = (elementIdOrMessage, messageOrType, type = 'info') => {
+            let message = messageOrType;
+            let alertType = type;
+
+            if (arguments.length <= 2) {
+                message = elementIdOrMessage;
+                alertType = messageOrType || 'info';
+            }
+
             if (window.alertManager) {
-                window.alertManager.show(message, type);
+                window.alertManager.show(String(message || ''), String(alertType || 'info'));
             }
         };
 

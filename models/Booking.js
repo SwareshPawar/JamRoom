@@ -172,6 +172,173 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  classSession: {
+    isClassBooking: {
+      type: Boolean,
+      default: false
+    },
+    location: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    instrument: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    classMonth: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    monthlyFee: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    classesPerMonth: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    classNumberInMonth: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    classesRemainingAfterBooking: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    monthlyFeeDueNow: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    planMonths: {
+      type: Number,
+      min: 1,
+      default: 1
+    },
+    weeksPerMonthWindow: {
+      type: Number,
+      min: 1,
+      default: 5
+    },
+    planStartDate: {
+      type: Date,
+      default: null
+    },
+    planEndDate: {
+      type: Date,
+      default: null
+    },
+    totalClassesPlanned: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    completedClassesCount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    selectedClassItemName: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    totalFeeBeforeDiscount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    discountAmount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    totalFeeAfterDiscount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    lessons: [{
+      weekNumber: {
+        type: Number,
+        min: 1,
+        default: 1
+      },
+      classNumber: {
+        type: Number,
+        min: 1,
+        default: 1
+      },
+      scheduledDate: {
+        type: Date,
+        default: null
+      },
+      scheduledStartTime: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      scheduledEndTime: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      status: {
+        type: String,
+        enum: ['SCHEDULED', 'COMPLETED', 'CANCELLED'],
+        default: 'SCHEDULED'
+      },
+      completedAt: {
+        type: Date,
+        default: null
+      },
+      completedDate: {
+        type: Date,
+        default: null
+      },
+      completedStartTime: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      completedEndTime: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      notes: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      details: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      slotRequest: {
+        proposedDate: { type: Date, default: null },
+        proposedStartTime: { type: String, trim: true, default: '' },
+        proposedEndTime: { type: String, trim: true, default: '' },
+        requestedAt: { type: Date, default: null },
+        status: { type: String, enum: ['NONE', 'PENDING', 'APPROVED', 'REJECTED'], default: 'NONE' },
+        respondedAt: { type: Date, default: null },
+        responseNote: { type: String, trim: true, default: '' }
+      },
+      completedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+      }
+    }]
+  },
   isDeleted: {
     type: Boolean,
     default: false
@@ -202,6 +369,7 @@ bookingSchema.index({ bookingStatus: 1 });
 bookingSchema.index({ paymentStatus: 1 });
 bookingSchema.index({ date: 1, bookingStatus: 1 });
 bookingSchema.index({ bookingMode: 1, perDayStartDate: 1, perDayEndDate: 1 });
+bookingSchema.index({ userId: 1, 'classSession.classMonth': 1, 'classSession.isClassBooking': 1, bookingStatus: 1 });
 bookingSchema.index({ isDeleted: 1, deletedAt: -1 });
 
 const shouldIncludeDeleted = (query) => {

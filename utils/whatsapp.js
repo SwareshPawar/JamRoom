@@ -204,6 +204,19 @@ const sendCustomerBookingRequestWhatsApp = async (mobile, bookingDetails) => {
     return { success: false, message: 'No mobile number provided' };
   }
 
+  const classSession = bookingDetails.classSession || {};
+  const classSection = classSession.isClassBooking
+    ? `
+🎓 Class Plan:
+• Instrument: ${classSession.instrument || 'Music'}
+• Location: ${classSession.location || 'Not selected'}
+• Class Count: ${classSession.classNumberInMonth || 0}/${classSession.classesPerMonth || 0}
+• Remaining: ${classSession.classesRemainingAfterBooking ?? 0}
+• Monthly Fee: ₹${classSession.monthlyFee || 0}
+• Fee Due Now: ₹${classSession.monthlyFeeDueNow || 0}
+`
+    : '';
+
   const message = `🎵 JamRoom Booking Request Received! 🎵
 
 Hi ${bookingDetails.userName}!
@@ -213,6 +226,7 @@ Your booking request has been submitted successfully.
 ⏰ Time: ${bookingDetails.startTime}-${bookingDetails.endTime}
 ⏱️ Duration: ${bookingDetails.duration} hour(s)
 💰 Total: ₹${bookingDetails.totalAmount}
+${classSection}
 
 💳 Payment Details:
 UPI ID: ${bookingDetails.upiId}
@@ -234,6 +248,11 @@ const sendBookingConfirmationWhatsApp = async (mobile, bookingDetails) => {
     return { success: false, message: 'No mobile number provided' };
   }
 
+  const classSession = bookingDetails.classSession || {};
+  const classSection = classSession.isClassBooking
+    ? `\n🎓 Class Plan: ${classSession.instrument || 'Music'} | ${classSession.location || 'N/A'} | Remaining: ${classSession.classesRemainingAfterBooking ?? 0}/${classSession.classesPerMonth || 0}`
+    : '';
+
   let message;
   
   if (bookingDetails.status === 'CONFIRMED' || bookingDetails.status === 'confirmed') {
@@ -246,6 +265,7 @@ Hi! Your booking is now confirmed.
 💰 Total: ₹${bookingDetails.totalAmount}
 🆔 Booking ID: ${bookingDetails.bookingId}
 📊 Payment Status: ${bookingDetails.paymentStatus || 'Pending'}
+${classSection}
 
 ${bookingDetails.rentals ? `🎸 Items:\n${bookingDetails.rentals}` : ''}
 
@@ -353,6 +373,7 @@ const sendBookingRequestNotifications = async (bookingDetails, whatsappSettings)
 ⏰ Time: ${bookingDetails.startTime}-${bookingDetails.endTime}
 💰 Amount: ₹${bookingDetails.totalAmount}
 ${bookingDetails.bandName ? `🎸 Band: ${bookingDetails.bandName}` : ''}
+${bookingDetails.classSession?.isClassBooking ? `🎓 Class: ${bookingDetails.classSession.instrument || 'Music'} @ ${bookingDetails.classSession.location || 'N/A'} | Remaining: ${bookingDetails.classSession.classesRemainingAfterBooking ?? 0}/${bookingDetails.classSession.classesPerMonth || 0}` : ''}
 
 Please check admin panel to approve. 📋`;
 
@@ -378,6 +399,7 @@ const sendBookingConfirmationNotifications = async (bookingDetails, whatsappSett
 💰 Amount: ₹${bookingDetails.totalAmount}
 🆔 Booking ID: ${bookingDetails.bookingId}
 ${bookingDetails.bandName ? `🎸 Band: ${bookingDetails.bandName}` : ''}
+${bookingDetails.classSession?.isClassBooking ? `🎓 Class: ${bookingDetails.classSession.instrument || 'Music'} @ ${bookingDetails.classSession.location || 'N/A'} | Remaining: ${bookingDetails.classSession.classesRemainingAfterBooking ?? 0}/${bookingDetails.classSession.classesPerMonth || 0}` : ''}
 
 Studio is booked and ready! 🎵`;
 

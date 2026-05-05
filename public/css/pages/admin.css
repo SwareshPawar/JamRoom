@@ -1537,6 +1537,60 @@ table td small {
     color: var(--text-color);
 }
 
+.booking-class-tracking-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.booking-class-tracking-head h4 {
+    margin: 0;
+}
+
+.booking-class-tracking-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--warning-color) 14%, var(--surface-elevated));
+    border: 1px solid color-mix(in srgb, var(--warning-color) 38%, transparent);
+    color: var(--warning-color);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.lesson-status-pending-approval {
+    margin-left: 6px;
+    font-size: 0.7em;
+    vertical-align: middle;
+}
+
+.lesson-slot-request-admin {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--warning-color) 10%, var(--surface-elevated));
+    border: 1px solid color-mix(in srgb, var(--warning-color) 32%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning-color) 12%, transparent);
+}
+
+.lesson-slot-request-title {
+    margin-bottom: 6px !important;
+    color: var(--text-color) !important;
+}
+
+.lesson-slot-request-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
 .booking-kv-grid {
     display: grid;
     gap: 6px;
@@ -1887,6 +1941,10 @@ textarea:focus {
     #modalBookingDetails .booking-meta-list li {
         font-size: 0.9rem;
         line-height: 1.4;
+    }
+
+    .booking-class-tracking-head {
+        align-items: flex-start;
     }
 }
 

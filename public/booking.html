@@ -53,6 +53,26 @@
                         </select>
                     </div>
 
+                    <div class="form-group booking-hidden-initial" id="classLocationGroup">
+                        <label for="classLocation">Class Location*</label>
+                        <select id="classLocation">
+                            <option value="">Select class location</option>
+                        </select>
+                        <small class="field-help">Select location only for guitar/keyboard class bookings.</small>
+                    </div>
+
+                    <div class="form-group booking-hidden-initial" id="classPlanMonthsGroup">
+                        <label for="classPlanMonths">Class Plan Duration*</label>
+                        <select id="classPlanMonths">
+                            <option value="1">1 Month</option>
+                        </select>
+                        <small class="field-help" id="classDiscountHint">Discounts apply for long-term plans.</small>
+                    </div>
+
+                    <div class="form-group booking-hidden-initial" id="classPlanInfoGroup">
+                        <div class="field-help" id="classPlanInfoText">4 classes per month. Plan schedule will be generated after booking.</div>
+                    </div>
+
                     <div id="hourlyBookingBlock" class="booking-flow-block">
                     <div class="form-group">
                         <label for="bookingDate">Select Date*</label>
@@ -74,14 +94,14 @@
 
                     <div class="time-container">
                         <div class="form-group">
-                            <label for="startTime">Start Time*</label>
+                            <label for="startTime" id="startTimeLabel">Start Time*</label>
                             <select id="startTime" required disabled>
                                 <option value="">Select date first</option>
                             </select>
                             <div id="startTimeLoading" class="loading-text start-time-loading">Loading available times...</div>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="endTimeGroup">
                             <label for="endTime">End Time*</label>
                             <select id="endTime" required disabled>
                                 <option value="">Select start time first</option>

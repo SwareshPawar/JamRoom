@@ -252,10 +252,53 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.get('/stats', protect, isAdmin, async (req, res) => {
   try {
-    const totalBookings = await Booking.countDocuments();
-    const pendingBookings = await Booking.countDocuments({ bookingStatus: 'PENDING' });
-    const confirmedBookings = await Booking.countDocuments({ bookingStatus: 'CONFIRMED' });
-    const confirmedPaymentBookings = await Booking.find({ bookingStatus: 'CONFIRMED' }).select('price paymentStatus amountPaid');
+    const [
+      totalBookings,
+      pendingBookingApprovals,
+      confirmedBookings,
+      confirmedPaymentBookings,
+      pendingSlotApprovalAgg,
+      recentBookings
+    ] = await Promise.all([
+      Booking.countDocuments(),
+      Booking.countDocuments({ bookingStatus: 'PENDING' }),
+      Booking.countDocuments({ bookingStatus: 'CONFIRMED' }),
+      Booking.find({ bookingStatus: 'CONFIRMED' }).select('price paymentStatus amountPaid'),
+      Booking.aggregate([
+        {
+          $match: {
+            isDeleted: { $ne: true },
+            'classSession.lessons.slotRequest.status': 'PENDING'
+          }
+        },
+        {
+          $project: {
+            pendingSlotApprovals: {
+              $size: {
+                $filter: {
+                  input: { $ifNull: ['$classSession.lessons', []] },
+                  as: 'lesson',
+                  cond: { $eq: ['$$lesson.slotRequest.status', 'PENDING'] }
+                }
+              }
+            }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$pendingSlotApprovals' }
+          }
+        }
+      ]),
+      Booking.find()
+        .populate('userId', 'name email')
+        .sort({ createdAt: -1 })
+        .limit(5)
+    ]);
+
+    const pendingSlotApprovals = Number(pendingSlotApprovalAgg?.[0]?.total || 0);
+    const pendingBookings = pendingBookingApprovals + pendingSlotApprovals;
 
     const statsTotals = confirmedPaymentBookings.reduce((acc, booking) => {
       const collected = computeCollectedAmount({
@@ -273,16 +316,13 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
       return acc;
     }, { totalRevenue: 0, totalUnpaidAmount: 0 });
 
-    const recentBookings = await Booking.find()
-      .populate('userId', 'name email')
-      .sort({ createdAt: -1 })
-      .limit(5);
-
     res.json({
       success: true,
       stats: {
         totalBookings,
         pendingBookings,
+        pendingBookingApprovals,
+        pendingSlotApprovals,
         confirmedBookings,
         totalRevenue: statsTotals.totalRevenue,
         totalUnpaidAmount: statsTotals.totalUnpaidAmount,

@@ -66,6 +66,10 @@ const refreshBookingTypeOptions = () => {
         }
     }
 
+    if (typeof window.refreshClassLocationUI === 'function') {
+        window.refreshClassLocationUI();
+    }
+
     return options;
 };
 
@@ -76,9 +80,13 @@ const collectBookingFormDraft = () => {
     const bandName = document.getElementById('bandName')?.value || '';
     const notes = document.getElementById('notes')?.value || '';
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const classLocation = document.getElementById('classLocation')?.value || '';
+    const classPlanMonths = document.getElementById('classPlanMonths')?.value || '1';
 
     const hasDraftValues =
         !!bookingType.trim() ||
+        !!classLocation.trim() ||
+        String(classPlanMonths || '1').trim() !== '1' ||
         !!bandName.trim() ||
         !!notes.trim();
 
@@ -91,6 +99,8 @@ const collectBookingFormDraft = () => {
         savedAt: Date.now(),
         bookingMode,
         bookingType,
+        classLocation,
+        classPlanMonths,
         bandName,
         notes
     };
@@ -163,6 +173,23 @@ const restoreBookingFormDraft = async () => {
                     window.setActiveBookingCategory(savedBookingType);
                 }
             }
+        }
+
+        const classLocationEl = document.getElementById('classLocation');
+        if (classLocationEl && typeof parsedDraft.classLocation === 'string') {
+            classLocationEl.value = parsedDraft.classLocation;
+        }
+
+        const classPlanMonthsEl = document.getElementById('classPlanMonths');
+        if (classPlanMonthsEl && typeof parsedDraft.classPlanMonths === 'string') {
+            classPlanMonthsEl.value = parsedDraft.classPlanMonths;
+        }
+
+        if (typeof window.refreshClassLocationUI === 'function') {
+            window.refreshClassLocationUI();
+        }
+        if (typeof window.refreshClassPlanInfoUI === 'function') {
+            window.refreshClassPlanInfoUI();
         }
 
         const today = getTodayDateString();
@@ -334,7 +361,7 @@ const buildBookingFormPayload = () => {
 
     const { rentalsArray, subtotal } = buildRentalsForSubmission(duration);
 
-    const adjustedSubtotal = bookingMode === 'perday'
+    let adjustedSubtotal = bookingMode === 'perday'
         ? rentalsArray.reduce((sum, rental) => {
             const rentalType = String(rental?.rentalType || 'inhouse').toLowerCase();
             const qty = Math.max(1, Number(rental?.quantity || 1));
@@ -348,16 +375,42 @@ const buildBookingFormPayload = () => {
         }, 0)
         : subtotal;
 
+    const bookingType = document.getElementById('bookingTypeSelect')?.value.trim() || '';
+    const classLocation = document.getElementById('classLocation')?.value.trim() || '';
+    const classPlanMonths = Math.max(1, Number(document.getElementById('classPlanMonths')?.value || 1));
+    const isClassBookingCategory = typeof window.isClassBookingCategory === 'function'
+        ? window.isClassBookingCategory(bookingType)
+        : false;
+
+    if (!bookingType) {
+        throw new Error('Please select a booking type from the booking catalog.');
+    }
+
+    if (isClassBookingCategory && !classLocation) {
+        throw new Error('Please select class location for guitar/keyboard class booking.');
+    }
+
+    if (isClassBookingCategory && rentalsArray.length !== 1) {
+        throw new Error('Please select exactly one class item for class booking.');
+    }
+
+    if (isClassBookingCategory) {
+        const classConfig = typeof window.getClassConfig === 'function'
+            ? window.getClassConfig()
+            : { monthlyFee: Number(window.adminSettings?.classConfig?.monthlyFee || 0), multiMonthDiscounts: [] };
+        const monthlyFee = Math.max(0, Number(classConfig.monthlyFee || 0));
+        const totalBeforeDiscount = monthlyFee * classPlanMonths;
+        const discountAmount = typeof window.getClassDiscountForMonths === 'function'
+            ? window.getClassDiscountForMonths(classPlanMonths, classConfig, totalBeforeDiscount)
+            : 0;
+        adjustedSubtotal = Math.max(0, totalBeforeDiscount - discountAmount);
+    }
+
     const gstEnabled = window.adminSettings?.gstConfig?.enabled || false;
     const gstRate = window.adminSettings?.gstConfig?.rate || 0.18;
 
     const taxAmount = gstEnabled ? Math.round(adjustedSubtotal * gstRate) : 0;
     const totalAmount = adjustedSubtotal + taxAmount;
-    const bookingType = document.getElementById('bookingTypeSelect')?.value.trim() || '';
-
-    if (!bookingType) {
-        throw new Error('Please select a booking type from the booking catalog.');
-    }
 
     return {
         formData: {
@@ -371,6 +424,8 @@ const buildBookingFormPayload = () => {
             subtotal: adjustedSubtotal,
             taxAmount,
             totalAmount,
+            classLocation: isClassBookingCategory ? classLocation : undefined,
+            classPlanMonths: isClassBookingCategory ? classPlanMonths : undefined,
             bandName: document.getElementById('bandName')?.value || '',
             notes: document.getElementById('notes')?.value || '',
             perDayStartDate: bookingMode === 'perday' ? perDayStartDate : undefined,
@@ -411,6 +466,16 @@ const resetBookingFormState = () => {
 
     if (priceDisplay) {
         priceDisplay.style.display = 'none';
+    }
+
+    const classLocationEl = document.getElementById('classLocation');
+    if (classLocationEl) {
+        classLocationEl.value = '';
+    }
+
+    const classPlanMonthsEl = document.getElementById('classPlanMonths');
+    if (classPlanMonthsEl) {
+        classPlanMonthsEl.value = '1';
     }
 
     if (typeof window.resetBookingRentalState === 'function') {
@@ -504,6 +569,9 @@ const bindBookingDateChange = (bookingDateEl) => {
             window.currentAvailabilityData = null;
         }
 
+        if (typeof window.refreshClassPlanInfoUI === 'function') {
+            window.refreshClassPlanInfoUI();
+        }
         updatePriceDisplay();
     };
 
@@ -535,6 +603,31 @@ const initBookingFormHandlers = () => {
             if (typeof window.setActiveBookingCategory === 'function') {
                 window.setActiveBookingCategory(selectedCategory);
             }
+            if (typeof window.refreshClassLocationUI === 'function') {
+                window.refreshClassLocationUI();
+            }
+            if (typeof window.refreshClassPlanInfoUI === 'function') {
+                window.refreshClassPlanInfoUI();
+            }
+            updatePriceDisplay();
+            scheduleBookingFormDraftSave();
+        });
+    }
+
+    const classLocationEl = document.getElementById('classLocation');
+    if (classLocationEl) {
+        classLocationEl.addEventListener('change', () => {
+            scheduleBookingFormDraftSave();
+        });
+    }
+
+    const classPlanMonthsEl = document.getElementById('classPlanMonths');
+    if (classPlanMonthsEl) {
+        classPlanMonthsEl.addEventListener('change', () => {
+            if (typeof window.refreshClassPlanInfoUI === 'function') {
+                window.refreshClassPlanInfoUI();
+            }
+            updatePriceDisplay();
             scheduleBookingFormDraftSave();
         });
     }
@@ -542,7 +635,30 @@ const initBookingFormHandlers = () => {
     const startTimeEl = document.getElementById('startTime');
     if (startTimeEl) {
         startTimeEl.addEventListener('change', () => {
-            populateEndTimeSlots();
+            const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+            const isClass = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
+            if (isClass && startTimeEl.value) {
+                // Auto-set end time based on class session duration configured in admin settings
+                const classConfig = typeof window.getClassConfig === 'function' ? window.getClassConfig() : { sessionDurationHours: 1 };
+                const sessionDurationHours = Math.max(1, Number(classConfig.sessionDurationHours || 1));
+                const [h, m] = startTimeEl.value.split(':').map(Number);
+                const endHour = (h + sessionDurationHours) % 24;
+                const endTimeVal = `${String(endHour).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+                const endTimeEl = document.getElementById('endTime');
+                if (endTimeEl) {
+                    let opt = endTimeEl.querySelector(`option[value="${endTimeVal}"]`);
+                    if (!opt) {
+                        opt = document.createElement('option');
+                        opt.value = endTimeVal;
+                        opt.textContent = endTimeVal;
+                        endTimeEl.appendChild(opt);
+                    }
+                    endTimeEl.value = endTimeVal;
+                    endTimeEl.disabled = false;
+                }
+            } else {
+                populateEndTimeSlots();
+            }
             updatePriceDisplay();
             scheduleBookingFormDraftSave();
         });

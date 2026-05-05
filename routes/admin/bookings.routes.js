@@ -394,20 +394,23 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
 
     const displayDate = formatBookingDisplayDate(booking.date);
 
-    const calendarInvite = generateCalendarInvite({
-      title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
-      description: `Booking confirmed for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
-      location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
-      startDate: formatDateAsYmdInIst(new Date(booking.date)),
-      startTime: booking.startTime,
-      endTime: booking.endTime,
-      attendees: [booking.userEmail, ...adminNotificationEmails],
-      studioName: settings.studioName || 'Swar JamRoom',
-      uid: booking.calendarUid,
-      sequence: booking.calendarSequence,
-      method: 'REQUEST',
-      status: 'CONFIRMED'
-    });
+    // Class bookings don't get a calendar invite on approval — individual slot invites are sent per completed lesson
+    const calendarInvite = booking.classSession?.isClassBooking
+      ? null
+      : generateCalendarInvite({
+          title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
+          description: `Booking confirmed for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
+          location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
+          startDate: formatDateAsYmdInIst(new Date(booking.date)),
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          attendees: [booking.userEmail, ...adminNotificationEmails],
+          studioName: settings.studioName || 'Swar JamRoom',
+          uid: booking.calendarUid,
+          sequence: booking.calendarSequence,
+          method: 'REQUEST',
+          status: 'CONFIRMED'
+        });
 
     await sendUnifiedBookingConfirmationEmails({
       settings,
@@ -423,7 +426,8 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
           date: displayDate,
           startTime: booking.startTime,
           endTime: booking.endTime,
-          totalAmount: booking.price
+          totalAmount: booking.price,
+          classSession: booking.classSession
         });
       } catch (whatsappError) {
         console.log('Customer WhatsApp confirmation failed:', whatsappError.message);
@@ -441,7 +445,8 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
         totalAmount: booking.price,
         bookingId: booking._id,
         bandName: booking.bandName,
-        paymentStatus: booking.paymentStatus
+        paymentStatus: booking.paymentStatus,
+        classSession: booking.classSession
       }, settings.whatsappNotifications);
     } catch (whatsappError) {
       console.log('Staff WhatsApp notifications failed:', whatsappError.message);
@@ -458,6 +463,222 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       success: false,
       message: 'Server error approving booking'
     });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/complete
+// @desc    Mark a class lesson as completed with notes/details
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/complete', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const {
+      completedDate,
+      completedStartTime,
+      notes,
+      details
+    } = req.body || {};
+
+    const [booking, settings] = await Promise.all([
+      Booking.findById(id),
+      AdminSettings.getSettings()
+    ]);
+    const sessionDurationHours = Math.max(1, Number(settings?.classConfig?.sessionDurationHours || 1));
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    if (!booking.classSession?.isClassBooking) {
+      return res.status(400).json({
+        success: false,
+        message: 'This booking is not a class plan booking'
+      });
+    }
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) {
+      return res.status(404).json({
+        success: false,
+        message: 'Class lesson not found'
+      });
+    }
+
+    if (String(lesson.status || '').toUpperCase() === 'COMPLETED') {
+      return res.status(400).json({
+        success: false,
+        message: 'This class lesson is already marked as completed'
+      });
+    }
+
+    const normalizedCompletedDate = parseDateInputToStartOfDay(completedDate);
+    if (!normalizedCompletedDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid completed date. Please use YYYY-MM-DD format.'
+      });
+    }
+
+    const startTimeValue = String(completedStartTime || lesson.scheduledStartTime || '').trim();
+    const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (!timePattern.test(startTimeValue)) {
+      return res.status(400).json({ success: false, message: 'Invalid start time format. Use HH:mm.' });
+    }
+    const startMins = startTimeValue.split(':').reduce((h, m, i) => i === 0 ? Number(m) * 60 : h + Number(m), 0);
+    const endMins = startMins + sessionDurationHours * 60;
+    const endTimeValue = `${String(Math.floor(endMins / 60) % 24).padStart(2, '0')}:${String(endMins % 60).padStart(2, '0')}`;
+
+    lesson.status = 'COMPLETED';
+    lesson.completedAt = new Date();
+    lesson.completedDate = normalizedCompletedDate;
+    lesson.completedStartTime = startTimeValue;
+    lesson.completedEndTime = endTimeValue;
+    lesson.notes = String(notes || '').trim();
+    lesson.details = String(details || '').trim();
+    lesson.completedBy = req.user._id;
+
+    const completedClassesCount = lessons.filter((entry) => String(entry?.status || '').toUpperCase() === 'COMPLETED').length;
+    const totalClassesPlanned = Math.max(0, Number(booking.classSession.totalClassesPlanned || lessons.length || 0));
+
+    booking.classSession.completedClassesCount = completedClassesCount;
+    booking.classSession.classesRemainingAfterBooking = Math.max(0, totalClassesPlanned - completedClassesCount);
+    booking.markModified('classSession');
+
+    await booking.save();
+
+    res.json({
+      success: true,
+      message: 'Class lesson marked as completed',
+      booking
+    });
+  } catch (error) {
+    console.error('Complete class lesson error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating class lesson status'
+    });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/cancel
+// @desc    Cancel a class lesson
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/cancel', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const { reason } = req.body || {};
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (!booking.classSession?.isClassBooking) {
+      return res.status(400).json({ success: false, message: 'This booking is not a class plan booking' });
+    }
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) {
+      return res.status(404).json({ success: false, message: 'Class lesson not found' });
+    }
+
+    const currentStatus = String(lesson.status || '').toUpperCase();
+    if (currentStatus === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'This class lesson is already cancelled' });
+    }
+    if (currentStatus === 'COMPLETED') {
+      return res.status(400).json({ success: false, message: 'Cannot cancel a lesson that is already completed' });
+    }
+
+    lesson.status = 'CANCELLED';
+    lesson.notes = String(reason || lesson.notes || '').trim();
+
+    const completedClassesCount = lessons.filter((entry) => String(entry?.status || '').toUpperCase() === 'COMPLETED').length;
+    const totalClassesPlanned = Math.max(0, Number(booking.classSession.totalClassesPlanned || lessons.length || 0));
+    booking.classSession.completedClassesCount = completedClassesCount;
+    booking.classSession.classesRemainingAfterBooking = Math.max(0, totalClassesPlanned - completedClassesCount);
+    booking.markModified('classSession');
+
+    await booking.save();
+
+    res.json({ success: true, message: 'Class lesson cancelled', booking });
+  } catch (error) {
+    console.error('Cancel class lesson error:', error);
+    res.status(500).json({ success: false, message: 'Server error cancelling class lesson' });
+  }
+});
+
+// @route   POST /api/admin/bookings/:id/send-ebill
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/approve-slot
+// @desc    Approve a student's slot request — updates scheduledDate/Time
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const { responseNote } = req.body || {};
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (!booking.classSession?.isClassBooking) return res.status(400).json({ success: false, message: 'Not a class booking' });
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found' });
+
+    if (!lesson.slotRequest || String(lesson.slotRequest.status || '') !== 'PENDING') {
+      return res.status(400).json({ success: false, message: 'No pending slot request for this lesson' });
+    }
+
+    lesson.scheduledDate = lesson.slotRequest.proposedDate;
+    lesson.scheduledStartTime = lesson.slotRequest.proposedStartTime;
+    lesson.scheduledEndTime = lesson.slotRequest.proposedEndTime;
+    lesson.slotRequest.status = 'APPROVED';
+    lesson.slotRequest.respondedAt = new Date();
+    lesson.slotRequest.responseNote = String(responseNote || '').trim();
+
+    booking.markModified('classSession');
+    await booking.save();
+    res.json({ success: true, message: 'Slot request approved', booking });
+  } catch (error) {
+    console.error('Approve slot error:', error);
+    res.status(500).json({ success: false, message: 'Server error approving slot' });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/reject-slot
+// @desc    Reject a student's slot request
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/reject-slot', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const { responseNote } = req.body || {};
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (!booking.classSession?.isClassBooking) return res.status(400).json({ success: false, message: 'Not a class booking' });
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found' });
+
+    if (!lesson.slotRequest || String(lesson.slotRequest.status || '') !== 'PENDING') {
+      return res.status(400).json({ success: false, message: 'No pending slot request for this lesson' });
+    }
+
+    lesson.slotRequest.status = 'REJECTED';
+    lesson.slotRequest.respondedAt = new Date();
+    lesson.slotRequest.responseNote = String(responseNote || '').trim();
+
+    booking.markModified('classSession');
+    await booking.save();
+    res.json({ success: true, message: 'Slot request rejected', booking });
+  } catch (error) {
+    console.error('Reject slot error:', error);
+    res.status(500).json({ success: false, message: 'Server error rejecting slot' });
   }
 });
 
