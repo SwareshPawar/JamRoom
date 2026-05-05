@@ -287,8 +287,12 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .payment-card.paid .payment-message{color:#14532d}
         .payment-card.partial .payment-message{color:#78350f}
         .payment-card.pending .payment-message{color:#856404}
+        .terms-card{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:18px;padding:16px 18px;margin:0 0 18px;break-inside:avoid;page-break-inside:avoid}
+        .terms-card-hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px}
+        .terms-list{margin:0;padding-left:18px;color:#7f1d1d}
+        .terms-list li{margin:0 0 6px 0;font-size:12px;line-height:1.7}
         .footer{margin-top:22px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.7;text-align:center;break-inside:avoid;page-break-inside:avoid}
-        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-row,.info-card,.bill-grid,.totals-card,.payment-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-header{break-after:avoid;page-break-after:avoid}}
+        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-row,.info-card,.bill-grid,.totals-card,.payment-card,.terms-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-header{break-after:avoid;page-break-after:avoid}}
     </style>
 </head>
 <body>
@@ -351,6 +355,15 @@ const generateUnifiedPDFHTML = (booking, settings) => {
             ${settings?.upiId ? `<div class="payment-row"><strong>UPI ID</strong><span>${settings.upiId}</span></div>` : ''}
             ${booking.paymentNote ? `<div class="payment-row"><strong>Payment Note</strong><span>${booking.paymentNote}</span></div>` : ''}
             <div class="payment-message">${paymentMessage}</div>
+        </div>
+
+        <div class="terms-card">
+            <div class="terms-card-hd">⚠ Booking Terms</div>
+            <ul class="terms-list">
+                <li>50% advance payment is required to confirm and block your booking slot.</li>
+                <li>Cancellation within 24 hours of the scheduled session is non-refundable.</li>
+                <li>All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.</li>
+            </ul>
         </div>
 
         <div class="footer">

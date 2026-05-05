@@ -442,6 +442,7 @@ const buildQuotationPresentationData = (data, settings) => {
       ? `Extra studio time is billed at ${formatCurrency(inhouseHourlyRate)}/hour, subject to availability.`
       : 'Additional studio time or scope changes are billed at the applicable quoted rate.',
     'Cancellation within 24 hours of the scheduled session is non-refundable.',
+    'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.',
     'This quotation is valid for 7 days, subject to slot and team availability at confirmation.'
   ];
 

@@ -564,6 +564,14 @@ const sendUnifiedBookingConfirmationEmails = async ({
         <p>A calendar invite is attached to this email.</p>
         ${paymentMessageByStatus}
         <p>Looking forward to seeing you at ${studioLabel}!</p>
+        <div style="background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:8px;padding:12px 16px;margin:16px 0;">
+          <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px;">⚠ Booking Terms</div>
+          <ul style="margin:0;padding-left:18px;color:#7f1d1d;font-size:13px;line-height:1.7;">
+            <li style="margin-bottom:5px;">50% advance payment is required to confirm and block your booking slot.</li>
+            <li style="margin-bottom:5px;">Cancellation within 24 hours of the scheduled session is non-refundable.</li>
+            <li>All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.</li>
+          </ul>
+        </div>
         ${customerExtraHtml}
       `,
       attachments: [{
