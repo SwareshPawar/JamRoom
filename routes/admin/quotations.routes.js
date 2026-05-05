@@ -11,6 +11,7 @@ const { protect } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/admin');
 const { generateQuotationPDF, buildQuotationPresentationData } = require('../../utils/billGenerator');
 const { sendEmail } = require('../../utils/email');
+const { sendWhatsApp } = require('../../utils/whatsapp');
 const {
   parseOptionalEmailList,
   isValidEmail,
@@ -723,6 +724,69 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
       });
     }
 
+    const whatsappRecipients = selectedUsers
+      .map((user) => ({
+        name: String(user?.name || '').trim(),
+        email: normalizeEmail(user?.email),
+        mobile: String(user?.mobile || '').trim()
+      }))
+      .filter((user) => user.mobile);
+
+    const buildQuotationScheduleText = () => {
+      const parts = [];
+
+      if (calculation.hasInhouse && calculation.schedules?.inhouse?.date) {
+        const inhouse = calculation.schedules.inhouse;
+        parts.push(`In-house: ${inhouse.date} ${inhouse.startTime}-${inhouse.endTime}`);
+      }
+
+      if (calculation.hasPerday && calculation.schedules?.perday?.startDate) {
+        const perday = calculation.schedules.perday;
+        parts.push(`Per-day: ${perday.startDate} ${perday.pickupTime} to ${perday.endDate} ${perday.returnTime}`);
+      }
+
+      return parts.join('\n');
+    };
+
+    const quotationScheduleText = buildQuotationScheduleText();
+    const whatsappResults = [];
+
+    for (const recipient of whatsappRecipients) {
+      const quotationMessage = `🎵 ${settings?.studioName || 'JamRoom'} Quotation Sent
+
+Hi ${recipient.name || 'there'},
+Your quotation has been shared via email.
+
+📌 Type: ${rentalTypeLabel}
+💰 Total: ₹${totalAmount}
+${quotationScheduleText ? `📅 Schedule:\n${quotationScheduleText}\n` : ''}
+
+To confirm, reply on email or WhatsApp us at ${quotationPresentation.studioPhone}.`;
+
+      const result = await sendWhatsApp(recipient.mobile, quotationMessage);
+      whatsappResults.push({
+        name: recipient.name,
+        email: recipient.email,
+        mobile: recipient.mobile,
+        success: Boolean(result?.success),
+        message: result?.message || result?.error || null,
+        data: result?.data || null
+      });
+    }
+
+    const whatsappSuccessCount = whatsappResults.filter((item) => item.success).length;
+    const whatsappFailureCount = whatsappResults.length - whatsappSuccessCount;
+
+    if (whatsappResults.length > 0) {
+      console.log(`Quotation WhatsApp notifications result: ${whatsappSuccessCount} success, ${whatsappFailureCount} failed`);
+      if (whatsappFailureCount > 0) {
+        const failedRecipients = whatsappResults
+          .filter((item) => !item.success)
+          .map((item) => `${item.mobile}: ${item.message || 'Unknown error'}`);
+        console.log('Quotation WhatsApp failed recipients:', failedRecipients.join('; '));
+      }
+    }
+
     let savedQuotation = null;
     if (shouldSaveTemplate) {
       const templateName = saveTemplateName || rentalTypeLabel || `Quotation ${generatedAt.toLocaleDateString('en-IN')}`;
@@ -776,6 +840,12 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
       recipients: recipientEmails,
       emailDeliveryMode,
       pdfAttached: !!pdfBuffer,
+      whatsapp: {
+        recipientsAttempted: whatsappResults.length,
+        successful: whatsappSuccessCount,
+        failed: whatsappFailureCount,
+        results: whatsappResults
+      },
       quotation: {
         rentalType: rentalTypeLabel,
         schedules: calculation.schedules,
