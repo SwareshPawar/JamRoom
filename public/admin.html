@@ -4980,7 +4980,7 @@
         const displayQuotationRentals = (rentalTypes = []) => {
             const container = document.getElementById('quotationRentals');
             if (!container) return;
-            const activeRentalTypes = (Array.isArray(rentalTypes) ? rentalTypes : []).filter((type) => !type?.deletedAt);
+            const activeRentalTypes = Array.isArray(rentalTypes) ? rentalTypes : [];
 
             if (activeRentalTypes.length === 0) {
                 container.innerHTML = '<div class="loading-inline-muted">No rental options configured</div>';
@@ -4990,7 +4990,7 @@
             let html = '';
             activeRentalTypes.forEach((type) => {
                 const categoryRentalType = normalizeQuoteRentalType(type.rentalType || 'inhouse');
-                const activeSubItems = (Array.isArray(type.subItems) ? type.subItems : []).filter((subItem) => !subItem?.deletedAt);
+                const activeSubItems = Array.isArray(type.subItems) ? type.subItems : [];
 
                 html += `<div class="quote-rental-group"><details class="admin-rental-collapse"><summary class="admin-rental-summary">${escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
                 if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0 && categoryRentalType !== 'perday') {
@@ -5284,10 +5284,7 @@
         async function showQuotationModal() {
             try {
                 resetQuotationForm();
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/settings`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const res = await fetch(`${API_URL}/api/bookings/settings`);
                 if (!res.ok) throw new Error('Failed to load settings for quotation');
                 const result = await res.json();
                 createBookingSettings = result.settings || {};
