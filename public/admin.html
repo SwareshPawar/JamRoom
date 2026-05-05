@@ -4698,14 +4698,6 @@
             return Math.min(100, parsed);
         };
 
-        const normalizeQuoteRentalType = (value) => {
-            const normalized = String(value || 'inhouse').trim().toLowerCase().replace(/[\s_-]+/g, '');
-            if (normalized === 'perday') return 'perday';
-            if (normalized === 'persession' || normalized === 'session') return 'persession';
-            if (normalized === 'pertrack' || normalized === 'track') return 'pertrack';
-            return 'inhouse';
-        };
-
         const syncQuotationQuantityInputState = (rentalId) => {
             const safeRentalId = String(rentalId || '').trim();
             if (!safeRentalId) return;
@@ -4779,7 +4771,7 @@
             document.getElementById('quoteTaxAmount').value = '0';
             document.getElementById('quoteTotalAmount').value = '0';
             // Reset type checkboxes and schedule visibility
-            ['quoteTypeHourly', 'quoteTypePerday', 'quoteTypeSession', 'quoteTypeTrack'].forEach((id) => {
+            ['quoteTypeHourly', 'quoteTypePerday', 'quoteTypeSession'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.checked = true;
             });
@@ -4953,20 +4945,13 @@
             const perdaySection = document.getElementById('quotePerdayScheduleSection');
             if (inhouseSection) inhouseSection.style.display = selectedTypes.includes('inhouse') ? '' : 'none';
             if (perdaySection) perdaySection.style.display = selectedTypes.includes('perday') ? '' : 'none';
-
-            document.querySelectorAll('#quotationRentals .admin-rental-row[data-rental-type]').forEach((row) => {
-                const rowType = normalizeQuoteRentalType(row.dataset.rentalType);
-                row.style.display = (selectedTypes.length === 0 || selectedTypes.includes(rowType)) ? '' : 'none';
+            document.querySelectorAll('#quotationRentals [data-rental-type-group]').forEach((group) => {
+                const groupType = group.dataset.rentalTypeGroup;
+                group.style.display = (selectedTypes.length === 0 || selectedTypes.includes(groupType)) ? '' : 'none';
             });
-
-            document.querySelectorAll('#quotationRentals .quote-rental-group').forEach((group) => {
-                const visibleRows = group.querySelectorAll('.admin-rental-row[data-rental-type]:not([style*="display: none"])');
-                group.style.display = visibleRows.length > 0 ? '' : 'none';
-            });
-
             document.querySelectorAll('#quotationRentals input[name="quotationRental"]:checked').forEach((input) => {
                 const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental || '{}'));
-                const rentalType = normalizeQuoteRentalType(rentalData.rentalType || 'inhouse');
+                const rentalType = String(rentalData.rentalType || 'inhouse').toLowerCase();
                 if (selectedTypes.length > 0 && !selectedTypes.includes(rentalType)) {
                     input.checked = false;
                     if (rentalData?.id) {
@@ -4980,19 +4965,14 @@
         const displayQuotationRentals = (rentalTypes = []) => {
             const container = document.getElementById('quotationRentals');
             if (!container) return;
-            const activeRentalTypes = Array.isArray(rentalTypes) ? rentalTypes : [];
-
-            if (activeRentalTypes.length === 0) {
+            if (!Array.isArray(rentalTypes) || rentalTypes.length === 0) {
                 container.innerHTML = '<div class="loading-inline-muted">No rental options configured</div>';
                 return;
             }
-
             let html = '';
-            activeRentalTypes.forEach((type) => {
-                const categoryRentalType = normalizeQuoteRentalType(type.rentalType || 'inhouse');
-                const activeSubItems = Array.isArray(type.subItems) ? type.subItems : [];
-
-                html += `<div class="quote-rental-group"><details class="admin-rental-collapse"><summary class="admin-rental-summary">${escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
+            rentalTypes.forEach((type) => {
+                const categoryRentalType = String(type.rentalType || 'inhouse').toLowerCase();
+                html += `<div class="quote-rental-group" data-rental-type-group="${categoryRentalType}"><details class="admin-rental-collapse"><summary class="admin-rental-summary">${escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
                 if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0 && categoryRentalType !== 'perday') {
                     const baseId = `${type.name}_base`;
                     const qtyInputId = getQuotationQtyInputId(baseId);
@@ -5006,7 +4986,7 @@
                         maxQuantity, quantityEnabled
                     }));
                     const basePriceUnit = categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
-                    html += `<div class="admin-rental-row base" data-rental-type="${categoryRentalType}">
+                    html += `<div class="admin-rental-row base">
                         <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedBaseData}">
                         <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">🏠 ${escapeHtml(type.name)} (Base) - ₹${type.basePrice}${basePriceUnit}</label>
                         <div class="admin-rental-qty">
@@ -5022,15 +5002,14 @@
                         </div>
                     </div>`;
                 }
-                if (activeSubItems.length > 0) {
-                    activeSubItems.forEach((subItem) => {
+                if (Array.isArray(type.subItems) && type.subItems.length > 0) {
+                    type.subItems.forEach((subItem) => {
                         const itemId = `${type.name}__${subItem.name}`;
                         const qtyInputId = getQuotationQtyInputId(itemId);
                         const qtyEnableInputId = getQuotationQtyEnableInputId(itemId);
-                        const itemRentalType = normalizeQuoteRentalType(subItem.rentalType || categoryRentalType);
-                        const isPerday = itemRentalType === 'perday';
-                        const isPerSession = itemRentalType === 'persession';
-                        const isPerTrack = itemRentalType === 'pertrack';
+                        const isPerday = categoryRentalType === 'perday';
+                        const isPerSession = categoryRentalType === 'persession';
+                        const isPerTrack = categoryRentalType === 'pertrack';
                         const maxQuantity = sanitizeQuotationMaxQuantity(subItem.maxQuantity ?? type.maxQuantity);
                         const quantityEnabled = subItem.quantityEnabled === true;
                         const displayPrice = isPerday ? (subItem.perdayPrice || 0) : (subItem.price || 0);
@@ -5038,10 +5017,10 @@
                         const encodedRentalData = encodeURIComponent(JSON.stringify({
                             id: itemId, name: subItem.name, category: type.name,
                             price: displayPrice, perdayPrice: subItem.perdayPrice || 0,
-                            rentalType: itemRentalType, description: subItem.description || '',
+                            rentalType: categoryRentalType, description: subItem.description || '',
                             isRequired: false, isBase: false, maxQuantity, quantityEnabled
                         }));
-                        html += `<div class="admin-rental-row child" data-rental-type="${itemRentalType}">
+                        html += `<div class="admin-rental-row child">
                             <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedRentalData}">
                             <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">
                                 ${isPerday ? '📅' : isPerSession ? '🎯' : isPerTrack ? '🎚️' : '🔗'} ${escapeHtml(subItem.name)} - ${displayPrice === 0 ? 'FREE' : `₹${displayPrice}${priceUnit}`}
@@ -5072,7 +5051,7 @@
                         maxQuantity, quantityEnabled
                     }));
                     const categoryUnit = categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
-                    html += `<div class="admin-rental-row child" data-rental-type="${categoryRentalType}">
+                    html += `<div class="admin-rental-row child">
                         <input type="checkbox" id="quote_rental_${qtyInputId}" name="quotationRental" data-rental="${encodedRentalData}">
                         <label for="quote_rental_${qtyInputId}" class="admin-rental-meta">🔗 ${escapeHtml(type.name)} - ₹${type.basePrice}${categoryUnit}</label>
                         <div class="admin-rental-qty">
@@ -5284,11 +5263,15 @@
         async function showQuotationModal() {
             try {
                 resetQuotationForm();
-                const res = await fetch(`${API_URL}/api/bookings/settings`);
-                if (!res.ok) throw new Error('Failed to load settings for quotation');
-                const result = await res.json();
-                createBookingSettings = result.settings || {};
-
+                if (!createBookingSettings || !Array.isArray(createBookingSettings.rentalTypes)) {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${API_URL}/api/admin/settings`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) throw new Error('Failed to load settings for quotation');
+                    const result = await res.json();
+                    createBookingSettings = result.settings || {};
+                }
                 displayQuotationRentals(createBookingSettings.rentalTypes || []);
                 recalculateQuotationTotals();
                 document.getElementById('quotationModal').classList.add('show');
