@@ -27,13 +27,24 @@
 
         <div class="main-content my-bookings-main-content">
             <div class="section" id="myBookingsPageSection">
-                <div class="section-header section-header-with-action">
+                <div class="section-header">
                     <h2>My Bookings</h2>
-                    <a href="/lesson-tracker.html" class="btn btn-secondary btn-sm">Open Lesson Tracker</a>
                 </div>
                 <div class="section-content">
-                    <div id="bookingsLoading" class="loading-text">Loading...</div>
-                    <div id="bookingsList" class="bookings-list booking-hidden-initial"></div>
+                    <div class="my-bookings-tabs" role="tablist" aria-label="My booking sections">
+                        <button type="button" id="myBookingsTabButton" class="my-bookings-tab active" role="tab" aria-selected="true" aria-controls="myBookingsTabPanel">All Bookings</button>
+                        <button type="button" id="lessonTrackerTabButton" class="my-bookings-tab" role="tab" aria-selected="false" aria-controls="lessonTrackerTabPanel" hidden>Lesson Tracker</button>
+                    </div>
+
+                    <div id="myBookingsTabPanel" class="my-bookings-tab-panel active" role="tabpanel" aria-labelledby="myBookingsTabButton">
+                        <div id="bookingsLoading" class="loading-text">Loading...</div>
+                        <div id="bookingsList" class="bookings-list booking-hidden-initial"></div>
+                    </div>
+
+                    <div id="lessonTrackerTabPanel" class="my-bookings-tab-panel" role="tabpanel" aria-labelledby="lessonTrackerTabButton" hidden>
+                        <div id="lessonTrackerLoading" class="loading-text">Loading...</div>
+                        <div id="lessonTrackerList" class="bookings-list booking-hidden-initial"></div>
+                    </div>
                 </div>
             </div>
         </div>

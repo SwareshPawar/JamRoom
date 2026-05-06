@@ -353,10 +353,13 @@ const buildLessonRowHTML = (lesson, bookingId) => {
 
 // Load user's bookings
 const loadMyBookings = async (options = {}) => {
-    const loadingEl = document.getElementById('bookingsLoading');
-    const bookingsEl = document.getElementById('bookingsList');
+    const loadingElementId = options?.loadingElementId || 'bookingsLoading';
+    const bookingsElementId = options?.bookingsElementId || 'bookingsList';
+    const loadingEl = document.getElementById(loadingElementId);
+    const bookingsEl = document.getElementById(bookingsElementId);
     const classOnly = options?.classOnly === true;
     const trackerMode = options?.trackerMode === true; // Lesson Tracker page: focused lesson view
+    const prefetchedBookings = Array.isArray(options?.allBookings) ? options.allBookings : null;
 
     if (!loadingEl && !bookingsEl) {
         return;
@@ -374,15 +377,18 @@ const loadMyBookings = async (options = {}) => {
     }
 
     try {
-        const token = localStorage.getItem('token');
-        const apiBase = resolveApiUrl();
-        const res = await fetch(`${apiBase}/api/bookings/my-bookings`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        let allBookings = prefetchedBookings;
+        if (!allBookings) {
+            const token = localStorage.getItem('token');
+            const apiBase = resolveApiUrl();
+            const res = await fetch(`${apiBase}/api/bookings/my-bookings`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
 
-        const data = await res.json();
+            const data = await res.json();
+            allBookings = Array.isArray(data.bookings) ? data.bookings : [];
+        }
 
-        const allBookings = Array.isArray(data.bookings) ? data.bookings : [];
         const bookings = classOnly
             ? allBookings.filter((entry) => entry?.classSession?.isClassBooking)
             : allBookings;
@@ -444,130 +450,55 @@ const loadMyBookings = async (options = {}) => {
                 `;
             });
         } else {
-            // ── MY BOOKINGS MODE: full booking cards with class details tab ──────────
-            bookings.forEach(booking => {
+            html += '<div class="table-container bookings-user-table-container"><table class="bookings-user-table"><thead><tr><th>#</th><th>Booking</th><th>Date</th><th>Time</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead><tbody>';
+
+            bookings.forEach((booking, index) => {
                 const isPerday = booking.bookingMode === 'perday';
                 const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
-                const perDayRange = (booking.perDayStartDate && booking.perDayEndDate)
-                    ? `${formatBookingDate(booking.perDayStartDate)} to ${formatBookingDate(booking.perDayEndDate)}`
-                    : formatBookingDate(booking.date);
-                const perDayTimeRange = `${formatBookingTime(booking.startTime)} to ${formatBookingTime(booking.endTime)}`;
-                const statusClass = booking.bookingStatus.toLowerCase();
-                const rentalsDisplay = booking.rentals && booking.rentals.length > 0
-                    ? booking.rentals.filter(r => r && r.name && r.quantity !== undefined && r.price !== undefined)
-                        .map(r => {
-                            const rentalType = String(r.rentalType || 'inhouse').toLowerCase();
-                            const days = isPerday ? perDayDays : 1;
-                            const amount = (isPerday || rentalType === 'perday')
-                                ? (r.price * r.quantity * days)
-                                : (rentalType === 'persession' || rentalType === 'pertrack')
-                                    ? (r.price * r.quantity)
-                                    : (r.price * r.quantity * (booking.duration || 1));
-                            return `<li>${r.name} × ${r.quantity}${amount > 0 ? ` — ₹${amount}` : ''}</li>`;
-                        }).join('')
-                    : `<li>${booking.rentalType || 'Unknown rental'}</li>`;
-
-                const bookingDateLine = isPerday
-                    ? `<p><strong>📅 Per-day Range:</strong> ${perDayRange} (${perDayDays} day(s))</p>`
-                    : `<p><strong>📅 Date:</strong> ${formatBookingDate(booking.date)}</p>`;
-                const bookingTimeLine = isPerday
-                    ? `<p><strong>🕐 Pick-up/Return:</strong> ${perDayTimeRange}</p>`
-                    : `<p><strong>🕐 Time:</strong> ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)} (${booking.duration}h)</p>`;
-
-                const classSession = booking.classSession || {};
+                const statusClass = String(booking.bookingStatus || '').toLowerCase();
                 const bookingItemNames = booking.rentals && booking.rentals.length > 0
                     ? booking.rentals.filter((r) => r && r.name).map((r) => r.name)
                     : [];
-                const bookingSummaryTitle = classSession.isClassBooking
+                const classSession = booking.classSession || {};
+                const bookingTitle = classSession.isClassBooking
                     ? (classSession.selectedClassItemName || classSession.instrument || 'Music Class')
                     : (bookingItemNames.length > 0
-                        ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2} more` : ''}`
+                        ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2}` : ''}`
                         : (booking.rentalType || 'Booking'));
-                const bookingSummaryMeta = isPerday
-                    ? `${perDayRange} | ${perDayTimeRange}`
-                    : `${formatBookingDate(booking.date)} | ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}`;
 
-                // Class progress badge shown inline in summary
-                const classSummaryBadge = classSession.isClassBooking
-                    ? (() => {
-                        const done = Number(classSession.completedClassesCount || 0);
-                        const tot = Number(classSession.totalClassesPlanned || 0);
-                        return `<span class="booking-class-progress-badge">${done}/${tot} classes</span>`;
-                    })()
-                    : '';
+                const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
+                    ? `${formatBookingDate(booking.perDayStartDate)}<br><small>to ${formatBookingDate(booking.perDayEndDate)}</small>`
+                    : formatBookingDate(booking.date);
+                const timeText = isPerday
+                    ? `${formatBookingTime(booking.startTime)} to ${formatBookingTime(booking.endTime)}<br><small>${perDayDays} day(s)</small>`
+                    : `${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}<br><small>${Math.max(1, Number(booking.duration) || 1)}h</small>`;
 
-                const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
-                const lessonRowsHTML = lessons.length > 0
-                    ? lessons.map((lesson) => buildLessonRowHTML(lesson, booking._id)).join('')
-                    : '';
-
-                const classSessionDetails = classSession.isClassBooking
-                    ? `
-                        <p><strong>🎓 Instrument:</strong> ${classSession.instrument || 'Music'}</p>
-                        <p><strong>🎼 Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument || 'N/A'}</p>
-                        <p><strong>📍 Location:</strong> ${classSession.location || 'N/A'}</p>
-                        <p><strong>🗓️ Weekly Slot:</strong> ${(classSession.preferredWeekday || 'N/A')} ${classSession.preferredStartTime ? `at ${formatBookingTime(classSession.preferredStartTime)}` : ''}</p>
-                        <p><strong>📅 Plan Window:</strong> ${classSession.planStartDate ? formatBookingDate(classSession.planStartDate) : 'N/A'} → ${classSession.planEndDate ? formatBookingDate(classSession.planEndDate) : 'N/A'}</p>
-                        <p><strong>📚 Classes:</strong> ${classSession.classesPerMonth || 0}/month, ${classSession.totalClassesPlanned || 0} total</p>
-                        <p><strong>✅ Progress:</strong> ${classSession.completedClassesCount || 0}/${classSession.totalClassesPlanned || 0} completed (${classSession.classesRemainingAfterBooking ?? 0} remaining)</p>
-                        <p><strong>💳 Fee:</strong> ₹${classSession.totalFeeBeforeDiscount || classSession.monthlyFee || 0} | <strong>Discount:</strong> ₹${classSession.discountAmount || 0} | <strong>Paid:</strong> ₹${classSession.totalFeeAfterDiscount || classSession.monthlyFeeDueNow || 0}</p>
-                    `
-                    : '';
-
-                const classSessionBlock = classSession.isClassBooking
-                    ? `
-                        <div class="booking-class-tabs">
-                            <div class="booking-class-tab-list" role="tablist" aria-label="Class booking sections">
-                                <button type="button" class="booking-class-tab active" data-tab-target="details" onclick="switchBookingClassTab(this, 'details')">Class Details</button>
-                                <button type="button" class="booking-class-tab" data-tab-target="tracker" onclick="switchBookingClassTab(this, 'tracker')">Lesson Tracker</button>
-                            </div>
-                            <div class="booking-class-tab-panel active" data-tab-panel="details">
-                                ${classSessionDetails}
-                            </div>
-                            <div class="booking-class-tab-panel" data-tab-panel="tracker" hidden>
-                                ${lessons.length > 0
-                                    ? `<ul class="lesson-accordion-list">${lessonRowsHTML}</ul>`
-                                    : '<p class="booking-empty-message booking-empty-padded">No lesson tracker entries yet.</p>'}
-                            </div>
-                        </div>
-                    `
-                    : '';
+                const actionButtons = [
+                    booking.bookingStatus === 'PENDING'
+                        ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger btn-sm">Cancel</button>`
+                        : '',
+                    (booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
+                        ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download Bill PDF">Download Bill</button>`
+                        : ''
+                ].filter(Boolean).join(' ');
 
                 html += `
-                    <details class="booking-card booking-card-collapsible ${statusClass}">
-                        <summary class="booking-card-summary">
-                            <div class="booking-card-summary-primary">
-                                <h4 class="booking-card-title">${bookingSummaryTitle}${classSummaryBadge}</h4>
-                                <p class="booking-card-summary-meta">${bookingSummaryMeta}</p>
-                            </div>
-                            <div class="booking-card-summary-side">
-                                <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
-                                <strong class="booking-card-summary-total">₹${booking.price}</strong>
-                            </div>
-                        </summary>
-                        <div class="booking-card-body">
-                            <p><strong>📝 Items:</strong></p>
-                            <ul class="booking-rentals-list">${rentalsDisplay}</ul>
-                            ${bookingDateLine}
-                            ${bookingTimeLine}
-                            ${classSessionBlock}
-                            <p><strong>💰 Total:</strong> ₹${booking.price}
-                                ${booking.subtotal !== undefined && booking.taxAmount !== undefined
-                                ? `<small>(Subtotal: ₹${booking.subtotal} + Tax: ₹${booking.taxAmount})</small>` : ''}
-                            </p>
-                            ${booking.bandName ? `<p><strong>🎵 Band:</strong> ${booking.bandName}</p>` : ''}
-                            <div class="booking-actions-row">
-                                ${booking.bookingStatus === 'PENDING'
-                                ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger">Cancel Booking</button>`
-                                : ''}
-                                ${(booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
-                                ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary" title="Download Bill PDF">📄 Download Bill</button>`
-                                : ''}
-                            </div>
-                        </div>
-                    </details>
+                    <tr>
+                        <td class="bookings-user-col-serial">${index + 1}</td>
+                        <td>
+                            <strong>${bookingTitle}</strong>
+                            ${booking.bandName ? `<br><small>Band: ${booking.bandName}</small>` : ''}
+                        </td>
+                        <td>${dateText}</td>
+                        <td>${timeText}</td>
+                        <td><span class="status-badge status-${statusClass}">${booking.bookingStatus || 'N/A'}</span></td>
+                        <td><strong>₹${Number(booking.price || 0)}</strong></td>
+                        <td class="bookings-user-actions">${actionButtons || '<small>N/A</small>'}</td>
+                    </tr>
                 `;
             });
+
+            html += '</tbody></table></div>';
         }
 
         if (bookingsEl) {
@@ -622,7 +553,11 @@ const submitSlotRequest = async (bookingId, lessonId, btnEl) => {
         if (!res.ok) throw new Error(data?.message || 'Failed to submit slot request');
 
         showBookingAlert(data.message || 'Slot request submitted!', 'success');
-        await loadMyBookings();
+        if (typeof window.refreshMyBookingsPage === 'function') {
+            await window.refreshMyBookingsPage();
+        } else {
+            await loadMyBookings();
+        }
     } catch (error) {
         showBookingAlert(error.message || 'Failed to submit slot request', 'error');
         if (btnEl) btnEl.disabled = false;
@@ -649,7 +584,11 @@ const cancelSlotRequest = async (bookingId, lessonId, btnEl) => {
         if (!res.ok) throw new Error(data?.message || 'Failed to withdraw request');
 
         showBookingAlert(data.message || 'Slot request withdrawn.', 'success');
-        await loadMyBookings();
+        if (typeof window.refreshMyBookingsPage === 'function') {
+            await window.refreshMyBookingsPage();
+        } else {
+            await loadMyBookings();
+        }
     } catch (error) {
         showBookingAlert(error.message || 'Failed to withdraw request', 'error');
         if (btnEl) btnEl.disabled = false;
@@ -672,7 +611,11 @@ const cancelBooking = async (bookingId) => {
         if (!res.ok) throw new Error('Failed to cancel booking');
 
         showBookingAlert('Booking cancelled successfully', 'success');
-        await loadMyBookings();
+        if (typeof window.refreshMyBookingsPage === 'function') {
+            await window.refreshMyBookingsPage();
+        } else {
+            await loadMyBookings();
+        }
     } catch (error) {
         showBookingAlert(error.message || 'Failed to cancel booking', 'error');
     } finally {

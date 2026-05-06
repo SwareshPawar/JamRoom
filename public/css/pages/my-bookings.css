@@ -21,6 +21,79 @@
     margin-bottom: 10px;
 }
 
+.my-bookings-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.my-bookings-tab {
+    border: 1px solid var(--border-color);
+    background: var(--surface-1);
+    color: var(--text-color);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.my-bookings-tab.active {
+    border-color: color-mix(in srgb, var(--primary-color) 65%, var(--border-color));
+    background: color-mix(in srgb, var(--primary-color) 14%, var(--surface-1));
+    color: var(--primary-color);
+}
+
+.my-bookings-tab-panel {
+    display: none;
+}
+
+.my-bookings-tab-panel.active {
+    display: block;
+}
+
+.bookings-user-table-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.bookings-user-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+}
+
+.bookings-user-table th,
+.bookings-user-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border-color-light);
+    vertical-align: top;
+    text-align: left;
+}
+
+.bookings-user-table th {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: var(--text-color-light);
+    background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1));
+}
+
+.bookings-user-col-serial {
+    font-weight: 700;
+    text-align: center;
+}
+
+.bookings-user-actions {
+    white-space: nowrap;
+}
+
+.bookings-user-actions .btn {
+    margin: 0 4px 4px 0;
+}
+
 /* ── Tracker-mode plan card ─────────────────────────────────────────────── */
 .tracker-plan-card {
     background: var(--surface-elevated);
@@ -103,16 +176,15 @@
 }
 
 @media (max-width: 768px) {
-    .section-header-with-action {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
     .tracker-plan-header {
         flex-direction: column;
     }
 
     .tracker-progress-stats {
         gap: 10px;
+    }
+
+    .bookings-user-table {
+        min-width: 680px;
     }
 }
