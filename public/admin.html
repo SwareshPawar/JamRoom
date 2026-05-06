@@ -216,8 +216,9 @@
                     <button type="button" class="settings-tab-btn active" data-settings-tab="basic" onclick="switchSettingsTab('basic', this)">⚙️ Basic Settings</button>
                     <button type="button" class="settings-tab-btn" data-settings-tab="rentals" onclick="switchSettingsTab('rentals', this)">🏷️ Rental Types & Pricing</button>
                     <button type="button" class="settings-tab-btn" data-settings-tab="bindings" onclick="switchSettingsTab('bindings', this)">🔗 Category Bindings</button>
-                    <button type="button" class="settings-tab-btn" data-settings-tab="instagram" onclick="switchSettingsTab('instagram', this)">📸 Instagram Highlights</button>
                     <button type="button" class="settings-tab-btn" data-settings-tab="pdfsections" onclick="switchSettingsTab('pdfsections', this)">📄 PDF Sections</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="classconfig" onclick="switchSettingsTab('classconfig', this)">🎓 Class Program Configuration</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="instagram" onclick="switchSettingsTab('instagram', this)">📸 Instagram Highlights</button>
                 </div>
 
                 <form id="settingsForm">
@@ -279,8 +280,69 @@
                             <option value="all">All Catalog Items</option>
                         </select>
                         <h3 class="settings-section-title">🏷️ Rental Types & Pricing</h3>
+                        <div class="settings-rental-toolbar">
+                            <p class="settings-rental-toolbar-note">Expand only the category you want to edit.</p>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="addRentalType()">+ Add Rental Type</button>
+                        </div>
+                        <div id="rentalTypesContainer">
+                            <!-- Rental types will be loaded here dynamically -->
+                        </div>
+                        <div class="settings-rental-toolbar settings-rental-toolbar-bottom">
+                            <button type="button" class="btn btn-secondary add-rental-btn" onclick="addRentalType()">+ Add Rental Type</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Category Bindings Tab -->
+                    <div class="settings-tab-pane" data-settings-pane="bindings">
+                        <h3 class="settings-section-title">🔗 Category Bindings</h3>
+                        <div class="settings-highlight-card">
+                            <p class="settings-help-text">Bind compatible categories in one direction (left to right). Selecting the left category on booking will also include the right category. Allowed: same rental type, or either side is Per-session.</p>
+                            <div class="form-grid-3">
+                                <div class="form-group">
+                                    <label for="bindingCategoryA">Primary Category</label>
+                                    <select id="bindingCategoryA">
+                                        <option value="">Select category</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="bindingCategoryB">Included Category</label>
+                                    <select id="bindingCategoryB">
+                                        <option value="">Select category</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>&nbsp;</label>
+                                    <button type="button" class="btn btn-primary btn-full" onclick="addCategoryBindingPair()">+ Add Binding</button>
+                                </div>
+                            </div>
+                            <div id="bindingPairsList" class="binding-pairs-list"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- PDF Sections Tab -->
+                    <div class="settings-tab-pane" data-settings-pane="pdfsections">
+                        <h3 class="settings-section-title">📄 PDF Bill Sections</h3>
+                        <div class="settings-highlight-card">
+                            <p class="settings-help-text">Define how catalog items are grouped into PDF bill sections. Assign whole categories or individual catalog items directly from DB-backed catalog lists. Once an item is assigned to one section, it is hidden from other section pickers to prevent duplicates.</p>
+                            <div class="pdf-sections-header">
+                                <div class="pdf-default-group-row">
+                                    <label>Default section (unmatched items)</label>
+                                    <select id="pdfDefaultGroupKey">
+                                        <option value="studio">Studio Usage</option>
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="addPdfGroup()">+ Add Section</button>
+                            </div>
+                            <div id="pdfGroupsContainer">
+                                <div class="pdf-groups-empty">Loading sections…</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Class Program Configuration Tab -->
+                    <div class="settings-tab-pane" data-settings-pane="classconfig">
+                        <h3 class="settings-section-title">🎓 Class Program Configuration</h3>
                         <div class="settings-highlight-card" style="margin-bottom: 14px;">
-                            <h4 style="margin-bottom: 12px;">🎓 Class Program Configuration</h4>
                             <p class="settings-help-text" style="margin-bottom: 10px;">Configure all class booking behavior (location, plan months, pricing, matching rules) from here.</p>
                             <div class="form-grid-3">
                                 <div class="form-group">
@@ -342,63 +404,6 @@
                                     <textarea id="classMultiMonthDiscountsText" rows="4" placeholder="months,discountPercent,discountAmount&#10;3,5,0&#10;6,10,0"></textarea>
                                     <small class="settings-help-text">Format: months,percent,amount. Example: 6,10,0</small>
                                 </div>
-                            </div>
-                        </div>
-                        <div class="settings-rental-toolbar">
-                            <p class="settings-rental-toolbar-note">Expand only the category you want to edit.</p>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="addRentalType()">+ Add Rental Type</button>
-                        </div>
-                        <div id="rentalTypesContainer">
-                            <!-- Rental types will be loaded here dynamically -->
-                        </div>
-                        <div class="settings-rental-toolbar settings-rental-toolbar-bottom">
-                            <button type="button" class="btn btn-secondary add-rental-btn" onclick="addRentalType()">+ Add Rental Type</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Category Bindings Tab -->
-                    <div class="settings-tab-pane" data-settings-pane="bindings">
-                        <h3 class="settings-section-title">🔗 Category Bindings</h3>
-                        <div class="settings-highlight-card">
-                            <p class="settings-help-text">Bind compatible categories in one direction (left to right). Selecting the left category on booking will also include the right category. Allowed: same rental type, or either side is Per-session.</p>
-                            <div class="form-grid-3">
-                                <div class="form-group">
-                                    <label for="bindingCategoryA">Primary Category</label>
-                                    <select id="bindingCategoryA">
-                                        <option value="">Select category</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="bindingCategoryB">Included Category</label>
-                                    <select id="bindingCategoryB">
-                                        <option value="">Select category</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>&nbsp;</label>
-                                    <button type="button" class="btn btn-primary btn-full" onclick="addCategoryBindingPair()">+ Add Binding</button>
-                                </div>
-                            </div>
-                            <div id="bindingPairsList" class="binding-pairs-list"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- PDF Sections Tab -->
-                    <div class="settings-tab-pane" data-settings-pane="pdfsections">
-                        <h3 class="settings-section-title">📄 PDF Bill Sections</h3>
-                        <div class="settings-highlight-card">
-                            <p class="settings-help-text">Define how catalog items are grouped into PDF bill sections. Assign whole categories or individual catalog items directly from DB-backed catalog lists. Once an item is assigned to one section, it is hidden from other section pickers to prevent duplicates.</p>
-                            <div class="pdf-sections-header">
-                                <div class="pdf-default-group-row">
-                                    <label>Default section (unmatched items)</label>
-                                    <select id="pdfDefaultGroupKey">
-                                        <option value="studio">Studio Usage</option>
-                                    </select>
-                                </div>
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="addPdfGroup()">+ Add Section</button>
-                            </div>
-                            <div id="pdfGroupsContainer">
-                                <div class="pdf-groups-empty">Loading sections…</div>
                             </div>
                         </div>
                     </div>

@@ -21,6 +21,8 @@ const setSubmitButtonLoading = (submitBtn, isLoading, loadingText = 'Creating Bo
 
 const BOOKING_DRAFT_STORAGE_KEY = 'jamroom_booking_form_draft_v1';
 const BOOKING_DRAFT_MAX_AGE_MS = 1000 * 60 * 60 * 24;
+const BOOKING_CATALOG_PREF_STORAGE_KEY = 'jamroom_booking_catalog_pref_v1';
+let bookingTypeOptionsCache = [];
 let bookingDraftSaveTimer = null;
 let isRestoringBookingDraft = false;
 let hasDraftLifecycleBinding = false;
@@ -45,22 +47,132 @@ const clearBookingFormDraft = () => {
     localStorage.removeItem(BOOKING_DRAFT_STORAGE_KEY);
 };
 
+const getCatalogPreference = () => {
+    const parsed = parseDraftJSON(localStorage.getItem(BOOKING_CATALOG_PREF_STORAGE_KEY));
+    if (!parsed || typeof parsed !== 'object') {
+        return { lastSelected: '', recentSelections: [] };
+    }
+
+    const lastSelected = String(parsed.lastSelected || '').trim();
+    const recentSelections = Array.isArray(parsed.recentSelections)
+        ? parsed.recentSelections.map((value) => String(value || '').trim()).filter(Boolean)
+        : [];
+
+    return { lastSelected, recentSelections };
+};
+
+const saveCatalogPreference = (preference) => {
+    try {
+        localStorage.setItem(BOOKING_CATALOG_PREF_STORAGE_KEY, JSON.stringify(preference));
+    } catch (error) {
+        console.warn('Failed to persist catalog preference:', error);
+    }
+};
+
+const recordCatalogSelection = (catalogValue) => {
+    const normalizedValue = String(catalogValue || '').trim();
+    if (!normalizedValue) return;
+
+    const preference = getCatalogPreference();
+    const dedupedRecent = [
+        normalizedValue,
+        ...preference.recentSelections.filter((value) => value !== normalizedValue)
+    ].slice(0, 10);
+
+    saveCatalogPreference({
+        lastSelected: normalizedValue,
+        recentSelections: dedupedRecent
+    });
+};
+
+const getBookingTypeOptionValues = () => {
+    return bookingTypeOptionsCache
+        .map((option) => String(option?.value || '').trim())
+        .filter(Boolean);
+};
+
+const isKnownBookingTypeValue = (value) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return false;
+    return getBookingTypeOptionValues().includes(normalized);
+};
+
+const setBookingTypeDropdownOpen = (isOpen) => {
+    const combobox = document.getElementById('bookingTypeCombobox');
+    const dropdown = document.getElementById('bookingTypeDropdown');
+    const input = document.getElementById('bookingTypeSelect');
+    if (!combobox || !dropdown || !input) return;
+
+    dropdown.hidden = !isOpen;
+    combobox.classList.toggle('is-open', isOpen);
+    input.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+};
+
+const renderBookingTypeSelectOptions = ({ query = '' } = {}) => {
+    const bookingTypeDropdown = document.getElementById('bookingTypeDropdown');
+    if (!bookingTypeDropdown) return;
+
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const filteredOptions = normalizedQuery
+        ? bookingTypeOptionsCache.filter((option) => {
+            const value = String(option?.value || '').toLowerCase();
+            const label = String(option?.label || option?.value || '').toLowerCase();
+            return label.includes(normalizedQuery) || value.includes(normalizedQuery);
+        })
+        : bookingTypeOptionsCache;
+
+    if (filteredOptions.length === 0) {
+        bookingTypeDropdown.innerHTML = '<div class="booking-type-dropdown-empty">No matching catalog found</div>';
+        return;
+    }
+
+    bookingTypeDropdown.innerHTML = filteredOptions
+        .map((option) => `
+            <button type="button" class="booking-type-option" data-value="${option.value}">
+                <span class="booking-type-option-label">${option.label}</span>
+            </button>
+        `)
+        .join('');
+};
+
 const refreshBookingTypeOptions = () => {
     const bookingTypeSelect = document.getElementById('bookingTypeSelect');
-    if (!bookingTypeSelect || typeof window.getBookingCategoryOptions !== 'function') return [];
+    const bookingTypeDropdown = document.getElementById('bookingTypeDropdown');
+    if (!bookingTypeSelect || !bookingTypeDropdown || typeof window.getBookingCategoryOptions !== 'function') return [];
 
-    const options = window.getBookingCategoryOptions();
+    const preference = getCatalogPreference();
+    const options = [...window.getBookingCategoryOptions()].sort((a, b) => {
+        const aValue = String(a?.value || '').trim();
+        const bValue = String(b?.value || '').trim();
+
+        const aIsLast = aValue && aValue === preference.lastSelected;
+        const bIsLast = bValue && bValue === preference.lastSelected;
+        if (aIsLast !== bIsLast) return aIsLast ? -1 : 1;
+
+        const aRecentIndex = preference.recentSelections.indexOf(aValue);
+        const bRecentIndex = preference.recentSelections.indexOf(bValue);
+        const aRecentRank = aRecentIndex === -1 ? Number.MAX_SAFE_INTEGER : aRecentIndex;
+        const bRecentRank = bRecentIndex === -1 ? Number.MAX_SAFE_INTEGER : bRecentIndex;
+        if (aRecentRank !== bRecentRank) return aRecentRank - bRecentRank;
+
+        return String(a?.label || aValue).localeCompare(String(b?.label || bValue));
+    });
     const currentValue = String(bookingTypeSelect.value || '').trim();
-    const nextValue = currentValue || options[0]?.value || '';
+    const nextValue = currentValue || preference.lastSelected || options[0]?.value || '';
 
-    bookingTypeSelect.innerHTML = [
-        '<option value="">Select booking type</option>',
-        ...options.map((option) => `<option value="${option.value}">${option.label}</option>`)
-    ].join('');
+    bookingTypeOptionsCache = options.map((option) => ({
+        value: String(option?.value || '').trim(),
+        label: String(option?.label || option?.value || '').trim()
+    })).filter((option) => option.value);
 
-    bookingTypeSelect.disabled = options.length === 0;
-    if (nextValue && options.some((option) => option.value === nextValue)) {
+    renderBookingTypeSelectOptions();
+
+    bookingTypeSelect.disabled = bookingTypeOptionsCache.length === 0;
+    if (nextValue && isKnownBookingTypeValue(nextValue)) {
         bookingTypeSelect.value = nextValue;
+    }
+
+    if (nextValue && options.some((option) => option.value === nextValue)) {
         if (typeof window.setActiveBookingCategory === 'function') {
             window.setActiveBookingCategory(nextValue);
         }
@@ -167,7 +279,7 @@ const restoreBookingFormDraft = async () => {
         const bookingTypeEl = document.getElementById('bookingTypeSelect');
         if (bookingTypeEl && typeof parsedDraft.bookingType === 'string') {
             const savedBookingType = parsedDraft.bookingType.trim();
-            if (savedBookingType && bookingTypeEl.querySelector(`option[value="${savedBookingType}"]`)) {
+            if (savedBookingType && isKnownBookingTypeValue(savedBookingType)) {
                 bookingTypeEl.value = savedBookingType;
                 if (typeof window.setActiveBookingCategory === 'function') {
                     window.setActiveBookingCategory(savedBookingType);
@@ -386,6 +498,10 @@ const buildBookingFormPayload = () => {
         throw new Error('Please select a booking type from the booking catalog.');
     }
 
+    if (!isKnownBookingTypeValue(bookingType)) {
+        throw new Error('Please select a valid catalog from the dropdown suggestions.');
+    }
+
     if (isClassBookingCategory && !classLocation) {
         throw new Error('Please select class location for class booking.');
     }
@@ -597,12 +713,63 @@ const initBookingFormHandlers = () => {
     }
 
     const bookingTypeEl = document.getElementById('bookingTypeSelect');
-    if (bookingTypeEl) {
-        bookingTypeEl.addEventListener('change', () => {
-            const selectedCategory = bookingTypeEl.value;
-            if (typeof window.setActiveBookingCategory === 'function') {
-                window.setActiveBookingCategory(selectedCategory);
+    const bookingTypeDropdownEl = document.getElementById('bookingTypeDropdown');
+    const bookingTypeToggleEl = document.getElementById('bookingTypeToggle');
+    if (bookingTypeEl && bookingTypeDropdownEl) {
+        let isSelectingFromDropdown = false;
+        let highlightedOptionIndex = -1;
+
+        const getDropdownOptionButtons = () => {
+            return Array.from(bookingTypeDropdownEl.querySelectorAll('.booking-type-option'));
+        };
+
+        const setHighlightedOption = (nextIndex) => {
+            const optionButtons = getDropdownOptionButtons();
+            if (optionButtons.length === 0) {
+                highlightedOptionIndex = -1;
+                return;
             }
+
+            const boundedIndex = Math.max(0, Math.min(nextIndex, optionButtons.length - 1));
+            highlightedOptionIndex = boundedIndex;
+
+            optionButtons.forEach((button, index) => {
+                button.classList.toggle('is-active', index === boundedIndex);
+            });
+
+            optionButtons[boundedIndex].scrollIntoView({ block: 'nearest' });
+        };
+
+        const selectHighlightedOption = () => {
+            const optionButtons = getDropdownOptionButtons();
+            const activeButton = optionButtons[highlightedOptionIndex];
+            if (!activeButton) return false;
+
+            const selectedValue = String(activeButton.dataset.value || '').trim();
+            if (!selectedValue) return false;
+
+            bookingTypeEl.value = selectedValue;
+            handleBookingTypeChange({ strict: true });
+            setBookingTypeDropdownOpen(false);
+            highlightedOptionIndex = -1;
+            return true;
+        };
+
+        const handleBookingTypeChange = ({ strict = false } = {}) => {
+            const selectedCategory = String(bookingTypeEl.value || '').trim();
+            if (isKnownBookingTypeValue(selectedCategory) && typeof window.setActiveBookingCategory === 'function') {
+                window.setActiveBookingCategory(selectedCategory);
+                recordCatalogSelection(selectedCategory);
+            }
+
+            if (strict && selectedCategory && !isKnownBookingTypeValue(selectedCategory)) {
+                bookingTypeEl.value = '';
+                showAlert('Please select a catalog from dropdown suggestions only.', 'error');
+            }
+
+            // Restore full suggestion list after selection/validation.
+            renderBookingTypeSelectOptions();
+
             if (typeof window.refreshClassLocationUI === 'function') {
                 window.refreshClassLocationUI();
             }
@@ -611,6 +778,129 @@ const initBookingFormHandlers = () => {
             }
             updatePriceDisplay();
             scheduleBookingFormDraftSave();
+        };
+
+        bookingTypeEl.addEventListener('input', () => {
+            const term = String(bookingTypeEl.value || '').trim();
+            renderBookingTypeSelectOptions({ query: term });
+            setBookingTypeDropdownOpen(true);
+            highlightedOptionIndex = -1;
+
+            if (isKnownBookingTypeValue(term)) {
+                handleBookingTypeChange();
+            }
+        });
+
+        bookingTypeEl.addEventListener('change', () => {
+            handleBookingTypeChange({ strict: true });
+        });
+
+        bookingTypeEl.addEventListener('focus', () => {
+            renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+            setBookingTypeDropdownOpen(true);
+            highlightedOptionIndex = -1;
+        });
+
+        bookingTypeDropdownEl.addEventListener('mousedown', () => {
+            isSelectingFromDropdown = true;
+        });
+
+        bookingTypeDropdownEl.addEventListener('mousemove', (event) => {
+            const optionButton = event.target.closest('.booking-type-option');
+            if (!optionButton) return;
+            const optionButtons = getDropdownOptionButtons();
+            const index = optionButtons.indexOf(optionButton);
+            if (index >= 0) {
+                setHighlightedOption(index);
+            }
+        });
+
+        bookingTypeDropdownEl.addEventListener('click', (event) => {
+            const optionButton = event.target.closest('.booking-type-option');
+            if (!optionButton) return;
+
+            const selectedValue = String(optionButton.dataset.value || '').trim();
+            if (!selectedValue) return;
+
+            bookingTypeEl.value = selectedValue;
+            handleBookingTypeChange({ strict: true });
+            setBookingTypeDropdownOpen(false);
+            highlightedOptionIndex = -1;
+            isSelectingFromDropdown = false;
+        });
+
+        if (bookingTypeToggleEl) {
+            bookingTypeToggleEl.addEventListener('click', () => {
+                const willOpen = bookingTypeDropdownEl.hidden;
+                renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+                setBookingTypeDropdownOpen(willOpen);
+                highlightedOptionIndex = -1;
+                if (willOpen) bookingTypeEl.focus();
+            });
+        }
+
+        document.addEventListener('click', (event) => {
+            const combobox = document.getElementById('bookingTypeCombobox');
+            if (!combobox) return;
+            if (!combobox.contains(event.target)) {
+                setBookingTypeDropdownOpen(false);
+                highlightedOptionIndex = -1;
+            }
+        });
+
+        bookingTypeEl.addEventListener('blur', () => {
+            if (isSelectingFromDropdown) {
+                isSelectingFromDropdown = false;
+                return;
+            }
+            handleBookingTypeChange({ strict: true });
+            setBookingTypeDropdownOpen(false);
+            highlightedOptionIndex = -1;
+        });
+
+        bookingTypeEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                setBookingTypeDropdownOpen(false);
+                highlightedOptionIndex = -1;
+            }
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (bookingTypeDropdownEl.hidden) {
+                    renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+                    setBookingTypeDropdownOpen(true);
+                }
+                setHighlightedOption(highlightedOptionIndex < 0 ? 0 : highlightedOptionIndex + 1);
+                return;
+            }
+
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (bookingTypeDropdownEl.hidden) {
+                    renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+                    setBookingTypeDropdownOpen(true);
+                }
+                const optionButtons = getDropdownOptionButtons();
+                const startIndex = highlightedOptionIndex < 0 ? optionButtons.length - 1 : highlightedOptionIndex - 1;
+                setHighlightedOption(startIndex);
+                return;
+            }
+
+            if (event.key === ' ' && !bookingTypeDropdownEl.hidden) {
+                if (selectHighlightedOption()) {
+                    event.preventDefault();
+                }
+                return;
+            }
+
+            if (event.key === 'Enter' && !bookingTypeDropdownEl.hidden && highlightedOptionIndex >= 0) {
+                if (selectHighlightedOption()) {
+                    event.preventDefault();
+                }
+                return;
+            }
+
         });
     }
 

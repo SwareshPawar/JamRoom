@@ -1305,6 +1305,23 @@ const setActiveBookingCategory = (categoryName) => {
     populateRentalTypes();
 };
 
+const getJamRoomBaseItemForHourly = () => {
+    const jamRoomBaseKey = 'JamRoom_base';
+    const jamRoomBaseItem = rentalCatalog.hourly?.get(jamRoomBaseKey);
+    if (!jamRoomBaseItem) return null;
+
+    const jamRoomBaseDiv = document.querySelector('[data-rental-id="JamRoom_base"][data-rental-mode="hourly"]');
+    const jamRoomBaseCheckbox = jamRoomBaseDiv?.querySelector('.rental-checkbox');
+    if (!jamRoomBaseDiv || !jamRoomBaseCheckbox) return null;
+
+    return {
+        key: jamRoomBaseKey,
+        item: jamRoomBaseItem,
+        div: jamRoomBaseDiv,
+        checkbox: jamRoomBaseCheckbox
+    };
+};
+
 const toggleRental = (rentalKey, mode = 'hourly') => {
     const selectedMap = getMapForMode(mode);
     const item = rentalCatalog[mode]?.get(rentalKey);
@@ -1324,8 +1341,17 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
     const isSingleClassSelectionMode = mode === 'hourly'
         && classConfig.allowOnlySingleClassItem
         && isClassBookingCategory(bookingType);
+    const isJamRoomHourlyFlow = mode === 'hourly' && String(activeBookingCategory || '').trim() === 'JamRoom';
+    const jamRoomBase = isJamRoomHourlyFlow ? getJamRoomBaseItemForHourly() : null;
+    const isJamRoomBaseToggle = Boolean(jamRoomBase && jamRoomBase.key === rentalKey);
 
     if (checkbox.checked) {
+        if (jamRoomBase && !isJamRoomBaseToggle && !jamRoomBase.checkbox.checked) {
+            jamRoomBase.checkbox.checked = true;
+            selectedMap.set(jamRoomBase.key, buildSelectedRentalEntry(jamRoomBase.item, jamRoomBase.key, 1));
+            jamRoomBase.div.classList.add('selected');
+        }
+
         if (isSingleClassSelectionMode) {
             selectedMap.forEach((_value, existingKey) => {
                 if (existingKey === rentalKey) return;
@@ -1341,6 +1367,17 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
         selectedMap.set(rentalKey, buildSelectedRentalEntry(item, rentalKey, 1));
         rentalDiv.classList.add('selected');
     } else {
+        if (jamRoomBase && isJamRoomBaseToggle) {
+            const hasDependentSelections = [...selectedMap.keys()].some((selectedKey) => selectedKey !== jamRoomBase.key);
+            if (hasDependentSelections) {
+                checkbox.checked = true;
+                selectedMap.set(jamRoomBase.key, buildSelectedRentalEntry(item, rentalKey, 1));
+                rentalDiv.classList.add('selected');
+                showAlert('Base JamRoom must remain selected while other hourly items are selected.', 'error');
+                return;
+            }
+        }
+
         selectedMap.delete(rentalKey);
         rentalDiv.classList.remove('selected');
         const quantityDisplay = rentalDiv.querySelector('.quantity-display');

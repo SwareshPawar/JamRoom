@@ -115,6 +115,111 @@
     min-width: 0;
 }
 
+.booking-type-combobox {
+    position: relative;
+}
+
+#bookingTypeSelect {
+    min-height: 46px;
+    padding-right: 42px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 90%, var(--primary-color) 4%) 0%, var(--surface-elevated) 100%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 72%, transparent);
+    cursor: text;
+}
+
+#bookingTypeSelect::placeholder {
+    color: color-mix(in srgb, var(--text-color-light) 88%, transparent);
+}
+
+#bookingTypeSelect:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 56%, var(--border-color));
+}
+
+#bookingTypeSelect:focus {
+    border-color: color-mix(in srgb, var(--primary-color) 76%, var(--border-color));
+    box-shadow:
+        0 0 0 3px var(--focus-ring),
+        inset 0 1px 0 color-mix(in srgb, #ffffff 76%, transparent);
+}
+
+.booking-type-toggle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-1) 88%, var(--primary-color) 8%);
+    color: var(--text-color-light);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: var(--transition-colors);
+}
+
+.booking-type-toggle:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 52%, var(--border-color));
+    color: var(--text-color);
+}
+
+.booking-type-combobox.is-open .booking-type-toggle {
+    color: var(--primary-color);
+    border-color: color-mix(in srgb, var(--primary-color) 65%, var(--border-color));
+}
+
+.booking-type-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 30%, var(--border-color));
+    border-radius: 10px;
+    background: var(--surface-elevated);
+    box-shadow: var(--shadow-lg);
+    z-index: 30;
+    padding: 4px;
+}
+
+.booking-type-option {
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-color);
+    text-align: left;
+    padding: 9px 10px;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.booking-type-option:hover,
+.booking-type-option:focus {
+    outline: none;
+    background: color-mix(in srgb, var(--primary-color) 16%, var(--surface-1));
+}
+
+.booking-type-option.is-active {
+    background: color-mix(in srgb, var(--primary-color) 20%, var(--surface-1));
+    color: var(--text-color);
+}
+
+.booking-type-option-label {
+    display: block;
+    font-weight: 600;
+}
+
+.booking-type-dropdown-empty {
+    padding: 10px;
+    color: var(--text-color-light);
+    font-size: 0.9rem;
+}
+
 #bookingForm input[type="date"] {
     width: 100%;
     max-width: 100%;

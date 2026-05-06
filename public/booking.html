@@ -48,9 +48,13 @@
                 <form id="bookingForm">
                     <div class="form-group">
                         <label for="bookingTypeSelect">Catalog*</label>
-                        <select id="bookingTypeSelect" required>
-                            <option value="">Loading booking catalog...</option>
-                        </select>
+                        <div class="booking-type-combobox" id="bookingTypeCombobox">
+                            <input id="bookingTypeSelect" placeholder="Search and select catalog" autocomplete="off" required aria-autocomplete="list" aria-expanded="false" aria-controls="bookingTypeDropdown">
+                            <button type="button" id="bookingTypeToggle" class="booking-type-toggle" aria-label="Show catalog options" title="Show catalog options">
+                                <span aria-hidden="true">▾</span>
+                            </button>
+                            <div id="bookingTypeDropdown" class="booking-type-dropdown" hidden></div>
+                        </div>
                     </div>
 
                     <div class="form-group booking-hidden-initial" id="classLocationGroup">
