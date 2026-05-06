@@ -2142,23 +2142,53 @@
             try {
                 const token = localStorage.getItem('token');
                 const headers = { 'Authorization': `Bearer ${token}` };
-                const [bookingsRes, usersRes, blockedRes, settingsRes, quotationsRes] = await Promise.all([
-                    fetch(`${API_URL}/api/admin/bookings?deleted=deleted`, { headers }),
-                    fetch(`${API_URL}/api/admin/users?deleted=deleted&limit=300`, { headers }),
-                    fetch(`${API_URL}/api/admin/blocked-times?deleted=deleted`, { headers }),
-                    fetch(`${API_URL}/api/admin/settings/deleted-summary`, { headers }),
-                    fetch(`${API_URL}/api/admin/quotations/saved?deleted=deleted`, { headers })
-                ]);
+                const deletedSources = [
+                    { key: 'bookings', label: 'Bookings', url: `${API_URL}/api/admin/bookings?deleted=deleted` },
+                    { key: 'users', label: 'Users', url: `${API_URL}/api/admin/users?deleted=deleted&limit=300` },
+                    { key: 'blocked', label: 'Blocked Times', url: `${API_URL}/api/admin/blocked-times?deleted=deleted` },
+                    { key: 'settings', label: 'Settings Records', url: `${API_URL}/api/admin/settings/deleted-summary` },
+                    { key: 'quotations', label: 'Saved Quotations', url: `${API_URL}/api/admin/quotations/saved?deleted=deleted` }
+                ];
 
-                if (!bookingsRes.ok || !usersRes.ok || !blockedRes.ok || !settingsRes.ok || !quotationsRes.ok) {
+                const settled = await Promise.all(deletedSources.map(async (source) => {
+                    try {
+                        const response = await fetch(source.url, { headers });
+                        let data = null;
+                        try {
+                            data = await response.json();
+                        } catch (_) {
+                            data = null;
+                        }
+
+                        return {
+                            ...source,
+                            ok: response.ok,
+                            status: response.status,
+                            data
+                        };
+                    } catch (requestError) {
+                        return {
+                            ...source,
+                            ok: false,
+                            status: 0,
+                            data: null,
+                            error: requestError
+                        };
+                    }
+                }));
+
+                const byKey = Object.fromEntries(settled.map((item) => [item.key, item]));
+                const failedSources = settled.filter((item) => !item.ok);
+
+                if (failedSources.length === deletedSources.length) {
                     throw new Error('Failed to load deleted records');
                 }
 
-                const bookingsData = await bookingsRes.json();
-                const usersData = await usersRes.json();
-                const blockedData = await blockedRes.json();
-                const settingsData = await settingsRes.json();
-                const quotationsData = await quotationsRes.json();
+                const bookingsData = byKey.bookings?.data || {};
+                const usersData = byKey.users?.data || {};
+                const blockedData = byKey.blocked?.data || {};
+                const settingsData = byKey.settings?.data || {};
+                const quotationsData = byKey.quotations?.data || {};
 
                 const deletedBookings = Array.isArray(bookingsData.bookings) ? bookingsData.bookings : [];
                 const deletedUsers = Array.isArray(usersData.users) ? usersData.users : [];
@@ -2325,7 +2355,11 @@
                     { key: 'quotations', label: 'Saved Quotations', count: deletedQuotations.length, content: sections[7] || '' }
                 ];
 
-                container.innerHTML = renderDeletedRecordsTabs(tabSections);
+                const warningHtml = failedSources.length
+                    ? `<div class="alert alert-warning" style="margin-bottom: 12px;">Some deleted record sources failed to load: ${failedSources.map((item) => escapeHtml(item.label)).join(', ')}.</div>`
+                    : '';
+
+                container.innerHTML = warningHtml + renderDeletedRecordsTabs(tabSections);
             } catch (error) {
                 container.innerHTML = `<div class="text-danger">${escapeHtml(error.message || 'Failed to load deleted records')}</div>`;
             }
