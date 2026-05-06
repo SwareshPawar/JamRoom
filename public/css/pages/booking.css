@@ -1094,17 +1094,75 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 
 .booking-card {
     background: var(--surface-elevated);
-    padding: 25px;
     border-radius: 12px;
     margin-bottom: 20px;
     border-left: 5px solid var(--primary-color);
     box-shadow: var(--shadow-sm);
     transition: var(--transition-normal);
+    overflow: hidden;
 }
 
 .booking-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
+}
+
+.booking-card-summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    cursor: pointer;
+    padding: 20px 22px;
+    background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+}
+
+.booking-card-summary::-webkit-details-marker {
+    display: none;
+}
+
+.booking-card-summary::after {
+    content: '▶';
+    order: 3;
+    color: var(--text-color-light);
+    font-size: 0.78rem;
+    transition: transform 0.2s ease;
+}
+
+.booking-card[open] .booking-card-summary::after {
+    transform: rotate(90deg);
+}
+
+.booking-card-summary-primary {
+    min-width: 0;
+    flex: 1;
+}
+
+.booking-card-summary-meta {
+    margin: 6px 0 0;
+    color: var(--text-color-light);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+.booking-card-summary-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.booking-card-summary-total {
+    color: var(--text-color);
+    font-size: 1rem;
+    white-space: nowrap;
+}
+
+.booking-card-body {
+    padding: 0 22px 22px;
+    border-top: 1px solid var(--border-color-light);
 }
 
 .booking-card h4 {
@@ -1157,6 +1215,58 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     line-height: 1.6;
 }
 
+.booking-class-tabs {
+    margin-top: 14px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--surface-1) 86%, transparent);
+    overflow: hidden;
+}
+
+.booking-class-tab-list {
+    display: flex;
+    gap: 8px;
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color-light);
+    background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+}
+
+.booking-class-tab {
+    border: 1px solid var(--border-color);
+    background: var(--surface-elevated);
+    color: var(--text-color-light);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-colors);
+}
+
+.booking-class-tab:hover {
+    color: var(--text-color);
+    border-color: color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
+}
+
+.booking-class-tab.active {
+    background: color-mix(in srgb, var(--primary-color) 14%, var(--surface-elevated));
+    color: var(--primary-color);
+    border-color: color-mix(in srgb, var(--primary-color) 45%, var(--border-color));
+}
+
+.booking-class-tab-panel {
+    padding: 16px 18px 18px;
+}
+
+.booking-class-tab-panel[hidden] {
+    display: none;
+}
+
+.booking-class-tab-panel .lesson-accordion-list {
+    margin-top: 0;
+}
+
 .booking-card.pending { border-left-color: var(--warning-color); }
 .booking-card.confirmed { border-left-color: var(--success-color); }
 .booking-card.rejected { border-left-color: var(--danger-color); }
@@ -1185,6 +1295,35 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 .status-cancelled {
     background: color-mix(in srgb, var(--secondary-color) 20%, transparent);
     color: var(--text-color);
+}
+
+@media (max-width: 768px) {
+    .booking-card-summary {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: 18px;
+    }
+
+    .booking-card-summary::after {
+        margin-left: auto;
+    }
+
+    .booking-card-summary-side {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .booking-card-body {
+        padding: 0 18px 18px;
+    }
+
+    .booking-class-tab-list {
+        flex-wrap: wrap;
+    }
+
+    .booking-class-tab-panel {
+        padding: 14px;
+    }
 }
 
 .loading-text {

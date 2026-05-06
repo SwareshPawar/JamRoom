@@ -1012,6 +1012,10 @@ const refreshClassLocationUI = () => {
     const classPlanMonthsGroupEl = document.getElementById('classPlanMonthsGroup');
     const classPlanMonthsEl = document.getElementById('classPlanMonths');
     const classPlanInfoGroupEl = document.getElementById('classPlanInfoGroup');
+    const classPreferredWeekdayGroupEl = document.getElementById('classPreferredWeekdayGroup');
+    const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+    const classPreferredStartTimeGroupEl = document.getElementById('classPreferredStartTimeGroup');
+    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
 
     if (!groupEl || !selectEl) return;
@@ -1048,6 +1052,22 @@ const refreshClassLocationUI = () => {
             classPlanInfoGroupEl.style.display = 'none';
             classPlanInfoGroupEl.classList.add('booking-hidden-initial');
         }
+        if (classPreferredWeekdayGroupEl) {
+            classPreferredWeekdayGroupEl.style.display = 'none';
+            classPreferredWeekdayGroupEl.classList.add('booking-hidden-initial');
+        }
+        if (classPreferredWeekdayEl) {
+            classPreferredWeekdayEl.required = false;
+            classPreferredWeekdayEl.value = '';
+        }
+        if (classPreferredStartTimeGroupEl) {
+            classPreferredStartTimeGroupEl.style.display = 'none';
+            classPreferredStartTimeGroupEl.classList.add('booking-hidden-initial');
+        }
+        if (classPreferredStartTimeEl) {
+            classPreferredStartTimeEl.required = false;
+            classPreferredStartTimeEl.value = '';
+        }
     } else {
         groupEl.style.display = 'block';
         groupEl.classList.remove('booking-hidden-initial');
@@ -1073,6 +1093,20 @@ const refreshClassLocationUI = () => {
         if (classPlanInfoGroupEl) {
             classPlanInfoGroupEl.style.display = 'block';
             classPlanInfoGroupEl.classList.remove('booking-hidden-initial');
+        }
+        if (classPreferredWeekdayGroupEl) {
+            classPreferredWeekdayGroupEl.style.display = 'block';
+            classPreferredWeekdayGroupEl.classList.remove('booking-hidden-initial');
+        }
+        if (classPreferredWeekdayEl) {
+            classPreferredWeekdayEl.required = true;
+        }
+        if (classPreferredStartTimeGroupEl) {
+            classPreferredStartTimeGroupEl.style.display = 'block';
+            classPreferredStartTimeGroupEl.classList.remove('booking-hidden-initial');
+        }
+        if (classPreferredStartTimeEl) {
+            classPreferredStartTimeEl.required = true;
         }
 
         refreshClassPlanInfoUI();

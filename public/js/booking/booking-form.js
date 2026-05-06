@@ -69,6 +69,14 @@ const saveCatalogPreference = (preference) => {
     }
 };
 
+const getWeekdayLabelFromYmd = (ymd) => {
+    const value = String(ymd || '').trim();
+    if (!value) return '';
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+};
+
 const recordCatalogSelection = (catalogValue) => {
     const normalizedValue = String(catalogValue || '').trim();
     if (!normalizedValue) return;
@@ -194,10 +202,14 @@ const collectBookingFormDraft = () => {
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
     const classLocation = document.getElementById('classLocation')?.value || '';
     const classPlanMonths = document.getElementById('classPlanMonths')?.value || '1';
+    const classPreferredWeekday = document.getElementById('classPreferredWeekday')?.value || '';
+    const classPreferredStartTime = document.getElementById('classPreferredStartTime')?.value || '';
 
     const hasDraftValues =
         !!bookingType.trim() ||
         !!classLocation.trim() ||
+        !!classPreferredWeekday.trim() ||
+        !!classPreferredStartTime.trim() ||
         String(classPlanMonths || '1').trim() !== '1' ||
         !!bandName.trim() ||
         !!notes.trim();
@@ -212,6 +224,8 @@ const collectBookingFormDraft = () => {
         bookingMode,
         bookingType,
         classLocation,
+        classPreferredWeekday,
+        classPreferredStartTime,
         classPlanMonths,
         bandName,
         notes
@@ -290,6 +304,16 @@ const restoreBookingFormDraft = async () => {
         const classLocationEl = document.getElementById('classLocation');
         if (classLocationEl && typeof parsedDraft.classLocation === 'string') {
             classLocationEl.value = parsedDraft.classLocation;
+        }
+
+        const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+        if (classPreferredWeekdayEl && typeof parsedDraft.classPreferredWeekday === 'string') {
+            classPreferredWeekdayEl.value = parsedDraft.classPreferredWeekday;
+        }
+
+        const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+        if (classPreferredStartTimeEl && typeof parsedDraft.classPreferredStartTime === 'string') {
+            classPreferredStartTimeEl.value = parsedDraft.classPreferredStartTime;
         }
 
         const classPlanMonthsEl = document.getElementById('classPlanMonths');
@@ -489,6 +513,8 @@ const buildBookingFormPayload = () => {
 
     const bookingType = document.getElementById('bookingTypeSelect')?.value.trim() || '';
     const classLocation = document.getElementById('classLocation')?.value.trim() || '';
+    const classPreferredWeekday = document.getElementById('classPreferredWeekday')?.value.trim() || '';
+    const classPreferredStartTime = document.getElementById('classPreferredStartTime')?.value.trim() || '';
     const classPlanMonths = Math.max(1, Number(document.getElementById('classPlanMonths')?.value || 1));
     const isClassBookingCategory = typeof window.isClassBookingCategory === 'function'
         ? window.isClassBookingCategory(bookingType)
@@ -504,6 +530,14 @@ const buildBookingFormPayload = () => {
 
     if (isClassBookingCategory && !classLocation) {
         throw new Error('Please select class location for class booking.');
+    }
+
+    if (isClassBookingCategory && !classPreferredWeekday) {
+        throw new Error('Please select preferred weekly class day.');
+    }
+
+    if (isClassBookingCategory && !classPreferredStartTime) {
+        throw new Error('Please select preferred class start time.');
     }
 
     if (isClassBookingCategory && rentalsArray.length !== 1) {
@@ -541,6 +575,8 @@ const buildBookingFormPayload = () => {
             taxAmount,
             totalAmount,
             classLocation: isClassBookingCategory ? classLocation : undefined,
+            classPreferredWeekday: isClassBookingCategory ? classPreferredWeekday : undefined,
+            classPreferredStartTime: isClassBookingCategory ? classPreferredStartTime : undefined,
             classPlanMonths: isClassBookingCategory ? classPlanMonths : undefined,
             bandName: document.getElementById('bandName')?.value || '',
             notes: document.getElementById('notes')?.value || '',
@@ -592,6 +628,16 @@ const resetBookingFormState = () => {
     const classPlanMonthsEl = document.getElementById('classPlanMonths');
     if (classPlanMonthsEl) {
         classPlanMonthsEl.value = '1';
+    }
+
+    const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+    if (classPreferredWeekdayEl) {
+        classPreferredWeekdayEl.value = '';
+    }
+
+    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+    if (classPreferredStartTimeEl) {
+        classPreferredStartTimeEl.value = '';
     }
 
     if (typeof window.resetBookingRentalState === 'function') {
@@ -694,6 +740,17 @@ const bindBookingDateChange = (bookingDateEl) => {
     const onDateChange = async (e) => {
         const selectedDate = (e?.target?.value || bookingDateEl.value || '').trim();
         await handleDateSelection(selectedDate);
+
+        const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+        const isClass = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
+        if (isClass) {
+            const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+            const preferredLabel = getWeekdayLabelFromYmd(selectedDate);
+            if (classPreferredWeekdayEl && preferredLabel && !classPreferredWeekdayEl.value) {
+                classPreferredWeekdayEl.value = preferredLabel;
+            }
+        }
+
         scheduleBookingFormDraftSave();
     };
 
@@ -922,6 +979,20 @@ const initBookingFormHandlers = () => {
         });
     }
 
+    const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+    if (classPreferredWeekdayEl) {
+        classPreferredWeekdayEl.addEventListener('change', () => {
+            scheduleBookingFormDraftSave();
+        });
+    }
+
+    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+    if (classPreferredStartTimeEl) {
+        classPreferredStartTimeEl.addEventListener('change', () => {
+            scheduleBookingFormDraftSave();
+        });
+    }
+
     const startTimeEl = document.getElementById('startTime');
     if (startTimeEl) {
         startTimeEl.addEventListener('change', () => {
@@ -945,6 +1016,11 @@ const initBookingFormHandlers = () => {
                     }
                     endTimeEl.value = endTimeVal;
                     endTimeEl.disabled = false;
+                }
+
+                const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+                if (classPreferredStartTimeEl && !classPreferredStartTimeEl.value) {
+                    classPreferredStartTimeEl.value = startTimeEl.value;
                 }
             } else {
                 populateEndTimeSlots();

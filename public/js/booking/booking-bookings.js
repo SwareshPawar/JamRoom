@@ -235,6 +235,20 @@ const loadMyBookings = async () => {
                 : `<p><strong>🕐 Time:</strong> ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)} (${booking.duration}h)</p>`;
 
             const classSession = booking.classSession || {};
+
+            const bookingItemNames = booking.rentals && booking.rentals.length > 0
+                ? booking.rentals
+                    .filter((rental) => rental && rental.name)
+                    .map((rental) => rental.name)
+                : [];
+            const bookingSummaryTitle = classSession.isClassBooking
+                ? (classSession.selectedClassItemName || classSession.instrument || 'Music Class')
+                : (bookingItemNames.length > 0
+                    ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2} more` : ''}`
+                    : (booking.rentalType || 'Booking'));
+            const bookingSummaryMeta = isPerday
+                ? `${perDayRange} | ${perDayTimeRange}`
+                : `${formatDate(booking.date)} | ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`;
             const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
             const lessonRows = lessons.length > 0
                 ? lessons.map((lesson) => {
@@ -340,46 +354,71 @@ const loadMyBookings = async () => {
                 }).join('')
                 : '';
 
-            const classSessionBlock = classSession.isClassBooking
+            const classSessionDetails = classSession.isClassBooking
                 ? `
                     <p><strong>🎓 Class Instrument:</strong> ${classSession.instrument || 'Music'}</p>
                     <p><strong>🎼 Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument || 'N/A'}</p>
                     <p><strong>📍 Class Location:</strong> ${classSession.location || 'N/A'}</p>
+                    <p><strong>🗓️ Default Weekly Slot:</strong> ${(classSession.preferredWeekday || 'N/A')} ${classSession.preferredStartTime ? `at ${formatTime(classSession.preferredStartTime)}` : ''}</p>
                     <p><strong>📅 Plan Window:</strong> ${classSession.planStartDate ? formatDate(classSession.planStartDate) : 'N/A'} to ${classSession.planEndDate ? formatDate(classSession.planEndDate) : 'N/A'}</p>
                     <p><strong>📚 Classes:</strong> ${classSession.classesPerMonth || 0}/month, ${classSession.totalClassesPlanned || 0} total</p>
                     <p><strong>✅ Progress:</strong> ${classSession.completedClassesCount || 0}/${classSession.totalClassesPlanned || 0} completed (${classSession.classesRemainingAfterBooking ?? 0} remaining)</p>
                     <p><strong>💳 Fee:</strong> ₹${classSession.totalFeeBeforeDiscount || classSession.monthlyFee || 0} | <strong>Discount:</strong> ₹${classSession.discountAmount || 0} | <strong>Paid:</strong> ₹${classSession.totalFeeAfterDiscount || classSession.monthlyFeeDueNow || 0}</p>
-                    ${lessonRows ? `<p><strong>🗂️ Lesson Tracker:</strong></p><ul class="lesson-accordion-list">${lessonRows}</ul>` : ''}
+                `
+                : '';
+
+            const classSessionBlock = classSession.isClassBooking
+                ? `
+                    <div class="booking-class-tabs">
+                        <div class="booking-class-tab-list" role="tablist" aria-label="Class booking sections">
+                            <button type="button" class="booking-class-tab active" data-tab-target="details" onclick="switchBookingClassTab(this, 'details')">Class Details</button>
+                            <button type="button" class="booking-class-tab" data-tab-target="tracker" onclick="switchBookingClassTab(this, 'tracker')">Lesson Tracker</button>
+                        </div>
+                        <div class="booking-class-tab-panel active" data-tab-panel="details">
+                            ${classSessionDetails}
+                        </div>
+                        <div class="booking-class-tab-panel" data-tab-panel="tracker" hidden>
+                            ${lessonRows
+                                ? `<ul class="lesson-accordion-list">${lessonRows}</ul>`
+                                : '<p class="booking-empty-message booking-empty-padded">No lesson tracker entries yet.</p>'}
+                        </div>
+                    </div>
                 `
                 : '';
 
             html += `
-                <div class="booking-card ${statusClass}">
-                    <div class="booking-card-header">
-                        <h4 class="booking-card-title">
-                            ${booking.rentals && booking.rentals.length > 0 ? `${booking.rentals.filter(r => r && r.name).length} Rental(s)` : (booking.rentalType || 'Booking')}
-                        </h4>
-                        <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
+                <details class="booking-card booking-card-collapsible ${statusClass}">
+                    <summary class="booking-card-summary">
+                        <div class="booking-card-summary-primary">
+                            <h4 class="booking-card-title">${bookingSummaryTitle}</h4>
+                            <p class="booking-card-summary-meta">${bookingSummaryMeta}</p>
+                        </div>
+                        <div class="booking-card-summary-side">
+                            <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
+                            <strong class="booking-card-summary-total">₹${booking.price}</strong>
+                        </div>
+                    </summary>
+                    <div class="booking-card-body">
+                        <p><strong>📝 Items:</strong></p>
+                        <ul class="booking-rentals-list">${rentalsDisplay}</ul>
+                        ${bookingDateLine}
+                        ${bookingTimeLine}
+                        ${classSessionBlock}
+                        <p><strong>💰 Total:</strong> ₹${booking.price}
+                            ${booking.subtotal !== undefined && booking.taxAmount !== undefined
+                            ? `<small>(Subtotal: ₹${booking.subtotal} + Tax: ₹${booking.taxAmount})</small>` : ''}
+                        </p>
+                        ${booking.bandName ? `<p><strong>🎵 Band:</strong> ${booking.bandName}</p>` : ''}
+                        <div class="booking-actions-row">
+                            ${booking.bookingStatus === 'PENDING'
+                            ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger">Cancel Booking</button>`
+                            : ''}
+                            ${(booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
+                            ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary" title="Download Bill PDF">📄 Download Bill</button>`
+                            : ''}
+                        </div>
                     </div>
-                    <p><strong>📝 Items:</strong></p>
-                    <ul class="booking-rentals-list">${rentalsDisplay}</ul>
-                    ${bookingDateLine}
-                    ${bookingTimeLine}
-                    ${classSessionBlock}
-                    <p><strong>💰 Total:</strong> ₹${booking.price}
-                        ${booking.subtotal !== undefined && booking.taxAmount !== undefined
-                        ? `<small>(Subtotal: ₹${booking.subtotal} + Tax: ₹${booking.taxAmount})</small>` : ''}
-                    </p>
-                    ${booking.bandName ? `<p><strong>🎵 Band:</strong> ${booking.bandName}</p>` : ''}
-                    <div class="booking-actions-row">
-                        ${booking.bookingStatus === 'PENDING'
-                        ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger">Cancel Booking</button>`
-                        : ''}
-                        ${(booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
-                        ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary" title="Download Bill PDF">📄 Download Bill</button>`
-                        : ''}
-                    </div>
-                </div>
+                </details>
             `;
         });
 
@@ -581,6 +620,23 @@ const downloadUserPDF = async (bookingId) => {
     }
 };
 
+const switchBookingClassTab = (btnEl, tabName) => {
+    const tabGroup = btnEl?.closest('.booking-class-tabs');
+    if (!tabGroup) return;
+
+    tabGroup.querySelectorAll('.booking-class-tab').forEach((tabBtn) => {
+        const isActive = tabBtn === btnEl;
+        tabBtn.classList.toggle('active', isActive);
+        tabBtn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    tabGroup.querySelectorAll('.booking-class-tab-panel').forEach((panel) => {
+        const isActive = panel.dataset.tabPanel === tabName;
+        panel.classList.toggle('active', isActive);
+        panel.hidden = !isActive;
+    });
+};
+
 // Expose for inline handlers and cross-file calls.
 window.loadMyBookings = loadMyBookings;
 window.loadSlotRequestTimeOptions = loadSlotRequestTimeOptions;
@@ -588,3 +644,4 @@ window.submitSlotRequest = submitSlotRequest;
 window.cancelSlotRequest = cancelSlotRequest;
 window.cancelBooking = cancelBooking;
 window.downloadUserPDF = downloadUserPDF;
+window.switchBookingClassTab = switchBookingClassTab;

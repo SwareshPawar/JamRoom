@@ -174,6 +174,58 @@ const normalizeRentalTypeToken = (value) => {
   return 'inhouse';
 };
 
+const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const normalizePreferredWeekday = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return '';
+
+  const aliases = {
+    sun: 0,
+    sunday: 0,
+    mon: 1,
+    monday: 1,
+    tue: 2,
+    tues: 2,
+    tuesday: 2,
+    wed: 3,
+    wednesday: 3,
+    thu: 4,
+    thur: 4,
+    thurs: 4,
+    thursday: 4,
+    fri: 5,
+    friday: 5,
+    sat: 6,
+    saturday: 6
+  };
+
+  if (!Object.prototype.hasOwnProperty.call(aliases, raw)) {
+    return '';
+  }
+
+  return WEEKDAY_LABELS[aliases[raw]];
+};
+
+const getNextWeekdayOnOrAfter = (baseDate, weekdayLabel) => {
+  if (!(baseDate instanceof Date) || Number.isNaN(baseDate.getTime())) {
+    return null;
+  }
+
+  const normalizedWeekday = normalizePreferredWeekday(weekdayLabel);
+  if (!normalizedWeekday) return null;
+
+  const targetDow = WEEKDAY_LABELS.indexOf(normalizedWeekday);
+  if (targetDow < 0) return null;
+
+  const nextDate = new Date(baseDate);
+  nextDate.setHours(0, 0, 0, 0);
+  const currentDow = nextDate.getDay();
+  const offset = (targetDow - currentDow + 7) % 7;
+  nextDate.setDate(nextDate.getDate() + offset);
+  return nextDate;
+};
+
 const normalizeKeywordList = (values = [], fallback = []) => {
   const source = Array.isArray(values) && values.length > 0 ? values : fallback;
   return source
@@ -569,7 +621,9 @@ router.post('/', protect, async (req, res) => {
       perDayReturnTime,
       perDayDays,
       classLocation,
-      classPlanMonths
+      classPlanMonths,
+      classPreferredWeekday,
+      classPreferredStartTime
     } = req.body;
 
     const normalizedMode = String(bookingMode).toLowerCase() === 'perday' ? 'perday' : 'hourly';
@@ -674,8 +728,10 @@ router.post('/', protect, async (req, res) => {
     }
 
     // Convert date(s) to start of day using local-date parsing to avoid timezone drift.
-    const bookingDate = parseDateOnlyToStartOfDay(normalizedMode === 'perday' ? perDayStartDate : date);
+    let bookingDate = parseDateOnlyToStartOfDay(normalizedMode === 'perday' ? perDayStartDate : date);
     const todayStart = getTodayStartLocal();
+    let normalizedPreferredWeekday = '';
+    let normalizedPreferredStartTime = '';
 
     if (!bookingDate) {
       return res.status(400).json({
@@ -689,6 +745,38 @@ router.post('/', protect, async (req, res) => {
         success: false,
         message: 'Past dates are not allowed for booking'
       });
+    }
+
+    if (isClassBooking) {
+      normalizedPreferredWeekday = normalizePreferredWeekday(classPreferredWeekday);
+      normalizedPreferredStartTime = String(classPreferredStartTime || '').trim();
+      const validTimePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+      if (!normalizedPreferredWeekday) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select your preferred class day for weekly classes'
+        });
+      }
+
+      if (!validTimePattern.test(normalizedPreferredStartTime)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a valid preferred class start time (HH:mm)'
+        });
+      }
+
+      const preferredFirstClassDate = getNextWeekdayOnOrAfter(bookingDate, normalizedPreferredWeekday);
+      if (!preferredFirstClassDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'Unable to resolve preferred class day. Please choose a valid weekday.'
+        });
+      }
+
+      bookingDate = preferredFirstClassDate;
+      effectiveStartTime = normalizedPreferredStartTime;
+      effectiveEndTime = calculateEndTime(normalizedPreferredStartTime, classConfig.sessionDurationHours);
     }
 
     let perDayStart = null;
@@ -862,6 +950,9 @@ router.post('/', protect, async (req, res) => {
       totalClassesPlanned: 0,
       completedClassesCount: 0,
       selectedClassItemName: '',
+      preferredWeekday: '',
+      preferredStartTime: '',
+      preferredEndTime: '',
       totalFeeBeforeDiscount: 0,
       discountAmount: 0,
       totalFeeAfterDiscount: 0,
@@ -870,6 +961,7 @@ router.post('/', protect, async (req, res) => {
 
     if (isClassBooking) {
       const normalizedLocation = String(classLocation || '').trim();
+
       if (!normalizedLocation) {
         return res.status(400).json({
           success: false,
@@ -941,6 +1033,9 @@ router.post('/', protect, async (req, res) => {
         totalClassesPlanned,
         completedClassesCount: 0,
         selectedClassItemName: normalizedRentals[0]?.name || '',
+        preferredWeekday: normalizedPreferredWeekday,
+        preferredStartTime: effectiveStartTime,
+        preferredEndTime: effectiveEndTime,
         totalFeeBeforeDiscount,
         discountAmount,
         totalFeeAfterDiscount,
@@ -1039,6 +1134,7 @@ router.post('/', protect, async (req, res) => {
             <li><strong>Instrument:</strong> ${classSession.instrument}</li>
             <li><strong>Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument}</li>
             <li><strong>Location:</strong> ${classSession.location}</li>
+            <li><strong>Default Weekly Slot:</strong> ${classSession.preferredWeekday || 'N/A'} ${classSession.preferredStartTime ? `at ${formatTime12Hour(classSession.preferredStartTime)}` : ''}</li>
             <li><strong>Plan:</strong> ${classSession.planMonths} month(s)</li>
             <li><strong>Plan Window:</strong> ${formatDateShortInIst(classSession.planStartDate)} to ${formatDateShortInIst(classSession.planEndDate)}</li>
             <li><strong>Classes:</strong> ${classSession.classesPerMonth} per month (${classSession.totalClassesPlanned} total)</li>
@@ -1053,15 +1149,20 @@ router.post('/', protect, async (req, res) => {
     // Create rentals summary for email with correct per-day pricing
     const rentalsSummary = rentals.map(rental => {
       let itemTotal;
-      if (normalizedMode === 'perday' || rental.rentalType === 'perday') {
+      const rentalTypeValue = normalizeRentalTypeToken(rental?.rentalType);
+
+      if (normalizedMode === 'perday' || rentalTypeValue === 'perday') {
         // Per-day rentals: use per-day price and selected day count.
         const perdayPrice = rental.perdayPrice || rental.price;
         const days = normalizedMode === 'perday' ? computedPerDayDays : 1;
         itemTotal = perdayPrice * rental.quantity * days;
         return `<li>${rental.name} × ${rental.quantity} × ${days} day(s) - ₹${itemTotal}</li>`;
-      } else if (String(rental.rentalType || '').toLowerCase() === 'persession') {
+      } else if (rentalTypeValue === 'persession') {
         itemTotal = rental.price * rental.quantity;
         return `<li>${rental.name} × ${rental.quantity} (Per session) - ₹${itemTotal}</li>`;
+      } else if (rentalTypeValue === 'pertrack') {
+        itemTotal = rental.price * rental.quantity;
+        return `<li>${rental.name} × ${rental.quantity} (Per track) - ₹${itemTotal}</li>`;
       } else {
         // Hourly rentals: use price with duration factor
         itemTotal = rental.price * rental.quantity * durationForPricing;

@@ -250,6 +250,21 @@ const bookingSchema = new mongoose.Schema({
       trim: true,
       default: ''
     },
+    preferredWeekday: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    preferredStartTime: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    preferredEndTime: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     totalFeeBeforeDiscount: {
       type: Number,
       min: 0,

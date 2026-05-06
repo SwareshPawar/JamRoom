@@ -926,6 +926,55 @@ textarea:disabled {
     border-top: 1px solid var(--border-color);
 }
 
+.collapsible-panel {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-color-light);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.collapsible-panel > summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    cursor: pointer;
+    padding: 18px 20px;
+    background: var(--surface-1);
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.collapsible-panel > summary::-webkit-details-marker {
+    display: none;
+}
+
+.collapsible-panel > summary::after {
+    content: '▶';
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    color: var(--text-color-light);
+    transition: transform 0.2s ease;
+}
+
+.collapsible-panel[open] > summary::after {
+    transform: rotate(90deg);
+}
+
+.collapsible-panel-title {
+    margin: 0;
+    font-size: var(--font-size-2xl);
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.collapsible-panel-body {
+    padding: 20px;
+    border-top: 1px solid var(--border-color-light);
+}
+
 /* ================================================================================================= */
 /* Tab System */
 /* ================================================================================================= */
