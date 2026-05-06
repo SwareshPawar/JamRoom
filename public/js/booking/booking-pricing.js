@@ -100,10 +100,9 @@ const updatePriceDisplay = () => {
 
         const discountEntry = (Array.isArray(classConfig.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [])
             .find((entry) => Number(entry?.months) === planMonths);
-        const fallbackPercent = planMonths <= 1 ? 0 : planMonths <= 3 ? 5 : planMonths <= 6 ? 10 : planMonths <= 9 ? 12.5 : 15;
         const discountPercent = discountEntry
             ? Math.max(0, Number(discountEntry.discountPercent || 0))
-            : fallbackPercent;
+            : 0;
         const totalAfterDiscount = Math.max(0, totalBeforeDiscount - discountAmount);
 
         subtotal = totalAfterDiscount;

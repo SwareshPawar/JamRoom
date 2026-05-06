@@ -387,7 +387,7 @@ const buildBookingFormPayload = () => {
     }
 
     if (isClassBookingCategory && !classLocation) {
-        throw new Error('Please select class location for guitar/keyboard class booking.');
+        throw new Error('Please select class location for class booking.');
     }
 
     if (isClassBookingCategory && rentalsArray.length !== 1) {

@@ -420,7 +420,42 @@
                                     : `<div style="display:flex;gap:6px;flex-wrap:wrap">
                                            <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); markClassLessonCompleted('${booking._id}', '${lessonId}')">Mark Completed</button>
                                            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); cancelClassLesson('${booking._id}', '${lessonId}')">Cancel</button>
-                                       </div>${slotReqBlock}`}
+                                       </div>${slotReqBlock}
+                                       <details class="lesson-slot-form" style="margin-top:8px;">
+                                           <summary style="cursor:pointer;font-size:0.85em;font-weight:600;color:var(--primary-color);list-style:none;display:inline-flex;align-items:center;gap:4px;">
+                                               📅 Book Slot (Admin)
+                                           </summary>
+                                           <div style="margin-top:8px;display:grid;gap:8px;">
+                                               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                                   <div class="form-group" style="margin-bottom:0;">
+                                                       <label style="margin-bottom:6px;">Date</label>
+                                                       <input type="date" class="admin-book-slot-date form-control input" data-booking="${booking._id}" data-lesson="${lessonId}" />
+                                                   </div>
+                                                   <div class="form-group" style="margin-bottom:0;">
+                                                       <label style="margin-bottom:6px;">Start Time</label>
+                                                       <select class="admin-book-slot-time">
+                                                           <option value="">Select time</option>
+                                                           <option value="09:00">9:00 AM</option>
+                                                           <option value="10:00">10:00 AM</option>
+                                                           <option value="11:00">11:00 AM</option>
+                                                           <option value="12:00">12:00 PM</option>
+                                                           <option value="13:00">1:00 PM</option>
+                                                           <option value="14:00">2:00 PM</option>
+                                                           <option value="15:00">3:00 PM</option>
+                                                           <option value="16:00">4:00 PM</option>
+                                                           <option value="17:00">5:00 PM</option>
+                                                           <option value="18:00">6:00 PM</option>
+                                                           <option value="19:00">7:00 PM</option>
+                                                           <option value="20:00">8:00 PM</option>
+                                                           <option value="21:00">9:00 PM</option>
+                                                           <option value="22:00">10:00 PM</option>
+                                                           <option value="23:00">11:00 PM</option>
+                                                       </select>
+                                                   </div>
+                                               </div>
+                                               <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); adminBookSlot('${booking._id}','${lessonId}', this)" style="width:100%;">Confirm Slot</button>
+                                           </div>
+                                       </details>`}
                             </div>
                         </details>
                     </li>`;
@@ -578,6 +613,39 @@
         });
 
         modal.classList.add('show');
+
+        // Initialize Flatpickr for admin slot booking date pickers
+        setTimeout(() => {
+            initializeAdminSlotDatePickers();
+        }, 0);
+    };
+
+    const initializeAdminSlotDatePickers = () => {
+        if (typeof window.flatpickr !== 'function') {
+            return;
+        }
+
+        const dateInputs = document.querySelectorAll('.admin-book-slot-date');
+        dateInputs.forEach((inputEl) => {
+            if (inputEl.dataset.flatpickrBound === '1') {
+                return;
+            }
+
+            inputEl.dataset.flatpickrBound = '1';
+
+            window.flatpickr(inputEl, {
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'd M Y',
+                disableMobile: true,
+                minDate: 'today',
+                clickOpens: true,
+                onChange: () => {
+                    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        });
     };
 
     const buildPaginationMarkup = () => {
@@ -1397,6 +1465,36 @@
             }
         };
 
+        const adminBookSlot = async (bookingId, lessonId, triggerBtn) => {
+            const deps = state.loadDeps;
+            if (!deps?.apiUrl) { alert('Unable to book slot. Please refresh.'); return; }
+            const container = triggerBtn?.closest('details');
+            const dateInput = container?.querySelector('.admin-book-slot-date');
+            const timeSelect = container?.querySelector('.admin-book-slot-time');
+            const proposedDate = String(dateInput?.value || '').trim();
+            const proposedStartTime = String(timeSelect?.value || '').trim();
+            if (!proposedDate) { notifyBookingAlert('Please select a date.', 'error'); return; }
+            if (!proposedStartTime) { notifyBookingAlert('Please select a start time.', 'error'); return; }
+            try {
+                showBookingLoading('Booking slot...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${deps.apiUrl}/api/admin/bookings/${bookingId}/class-lessons/${lessonId}/book-slot`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ proposedDate, proposedStartTime })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.message || 'Unable to book slot');
+                notifyBookingAlert('Slot booked successfully. Calendar invite sent to student.', 'success');
+                await loadBookings({ page: state.currentPage || 1, showLoader: false });
+                openBookingDetailsModal(bookingId);
+            } catch (error) {
+                notifyBookingAlert(error.message || 'Unable to book slot', 'error');
+            } finally {
+                hideBookingLoading();
+            }
+        };
+
         window.AdminBookings = window.AdminBookings || {};
     window.AdminBookings.loadBookings = loadBookings;
     window.AdminBookings.approveBooking = approveBooking;
@@ -1406,8 +1504,8 @@
     window.AdminBookings.submitClassLessonCompletion = submitClassLessonCompletion;
     window.AdminBookings.approveSlotRequest = approveSlotRequest;
     window.AdminBookings.rejectSlotRequest = rejectSlotRequest;
+    window.AdminBookings.adminBookSlot = adminBookSlot;
     window.AdminBookings.hideClassLessonCompletionModal = hideClassLessonCompletionModal;
-    window.AdminBookings.syncQuickPaymentForBookingModal = syncQuickPaymentForBookingModal;
     window.AdminBookings.quickUpdateBookingPayment = quickUpdateBookingPayment;
     window.AdminBookings.openBookingDetailsModal = openBookingDetailsModal;
     window.AdminBookings.openBookingPaymentDetails = openBookingPaymentDetails;
@@ -1419,5 +1517,6 @@
     window.submitClassLessonCompletion = submitClassLessonCompletion;
     window.approveSlotRequest = approveSlotRequest;
     window.rejectSlotRequest = rejectSlotRequest;
+    window.adminBookSlot = adminBookSlot;
     window.hideClassLessonCompletionModal = hideClassLessonCompletionModal;
 })();

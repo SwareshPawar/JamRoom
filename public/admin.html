@@ -8,6 +8,7 @@
     
     <!-- Shared CSS -->
     <link rel="stylesheet" href="/css/shared.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     
     <!-- Shared JavaScript Modules -->
     <script src="/js/shared/utils.js"></script>
@@ -27,6 +28,8 @@
     <script src="/js/admin/admin-bookings-edit.js"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
+    <!-- Flatpickr Date Picker -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <!-- Calendar Library -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
     
@@ -276,6 +279,71 @@
                             <option value="all">All Catalog Items</option>
                         </select>
                         <h3 class="settings-section-title">🏷️ Rental Types & Pricing</h3>
+                        <div class="settings-highlight-card" style="margin-bottom: 14px;">
+                            <h4 style="margin-bottom: 12px;">🎓 Class Program Configuration</h4>
+                            <p class="settings-help-text" style="margin-bottom: 10px;">Configure all class booking behavior (location, plan months, pricing, matching rules) from here.</p>
+                            <div class="form-grid-3">
+                                <div class="form-group">
+                                    <label class="settings-checkbox-label">
+                                        <input type="checkbox" id="classConfigEnabled" class="settings-checkbox-input">
+                                        <span class="settings-checkbox-text">Enable Class Bookings</span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label class="settings-checkbox-label">
+                                        <input type="checkbox" id="classAllowOnlySingleClassItem" class="settings-checkbox-input">
+                                        <span class="settings-checkbox-text">Allow Only One Class Item per Booking</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-grid-3">
+                                <div class="form-group">
+                                    <label for="classMonthlyFee">Monthly Fee (₹)</label>
+                                    <input type="number" id="classMonthlyFee" min="0" step="1" placeholder="2000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="classClassesPerMonth">Classes per Month</label>
+                                    <input type="number" id="classClassesPerMonth" min="1" max="31" step="1" placeholder="4">
+                                </div>
+                                <div class="form-group">
+                                    <label for="classWeeksPerMonthWindow">Weeks per Month Window</label>
+                                    <input type="number" id="classWeeksPerMonthWindow" min="1" max="8" step="1" placeholder="5">
+                                </div>
+                            </div>
+
+                            <div class="form-grid-3">
+                                <div class="form-group">
+                                    <label for="classSessionDurationHours">Session Duration (Hours)</label>
+                                    <input type="number" id="classSessionDurationHours" min="1" max="8" step="1" placeholder="1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="classLocationsCsv">Class Locations (comma-separated)</label>
+                                    <input type="text" id="classLocationsCsv" placeholder="Studio A, Studio B">
+                                    <small class="settings-help-text">Used for Class Location* dropdown on booking form.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="classPlanOptionsMonthsCsv">Plan Options in Months (comma-separated)</label>
+                                    <input type="text" id="classPlanOptionsMonthsCsv" placeholder="1,2,3,6,12">
+                                </div>
+                            </div>
+
+                            <div class="form-grid-3">
+                                <div class="form-group">
+                                    <label for="classCategoryKeywordsCsv">Class Category Keywords (comma-separated)</label>
+                                    <input type="text" id="classCategoryKeywordsCsv" placeholder="class, guitar class, keyboard class">
+                                </div>
+                                <div class="form-group">
+                                    <label for="classItemKeywordsCsv">Class Item Keywords (comma-separated)</label>
+                                    <input type="text" id="classItemKeywordsCsv" placeholder="guitar class, keyboard class, guitar lesson">
+                                </div>
+                                <div class="form-group">
+                                    <label for="classMultiMonthDiscountsText">Plan Discounts (one per line)</label>
+                                    <textarea id="classMultiMonthDiscountsText" rows="4" placeholder="months,discountPercent,discountAmount&#10;3,5,0&#10;6,10,0"></textarea>
+                                    <small class="settings-help-text">Format: months,percent,amount. Example: 6,10,0</small>
+                                </div>
+                            </div>
+                        </div>
                         <div class="settings-rental-toolbar">
                             <p class="settings-rental-toolbar-note">Expand only the category you want to edit.</p>
                             <button type="button" class="btn btn-secondary btn-sm" onclick="addRentalType()">+ Add Rental Type</button>
@@ -3030,6 +3098,96 @@
             );
         };
 
+        const parseCsvStringList = (value) => String(value || '')
+            .split(',')
+            .map((entry) => String(entry || '').trim())
+            .filter(Boolean);
+
+        const parseCsvNumberList = (value, { min = 1, max = 24 } = {}) => {
+            return [...new Set(
+                String(value || '')
+                    .split(',')
+                    .map((entry) => Number(String(entry || '').trim()))
+                    .filter((num) => Number.isFinite(num) && num >= min && num <= max)
+                    .map((num) => Math.round(num))
+            )].sort((a, b) => a - b);
+        };
+
+        const parseClassDiscountRows = (value) => {
+            return String(value || '')
+                .split('\n')
+                .map((line) => String(line || '').trim())
+                .filter(Boolean)
+                .map((line) => {
+                    const [monthsRaw, percentRaw, amountRaw] = line.split(',').map((token) => String(token || '').trim());
+                    const months = Number(monthsRaw);
+                    const discountPercent = Math.max(0, Number(percentRaw || 0));
+                    const discountAmount = Math.max(0, Number(amountRaw || 0));
+                    return { months, discountPercent, discountAmount };
+                })
+                .filter((entry) => Number.isFinite(entry.months) && entry.months >= 1 && entry.months <= 24)
+                .sort((a, b) => a.months - b.months);
+        };
+
+        const formatClassDiscountRows = (rows) => {
+            const normalizedRows = Array.isArray(rows) ? rows : [];
+            return normalizedRows
+                .map((entry) => {
+                    const months = Math.max(1, Number(entry?.months || 1));
+                    const discountPercent = Math.max(0, Number(entry?.discountPercent || 0));
+                    const discountAmount = Math.max(0, Number(entry?.discountAmount || 0));
+                    return `${months},${discountPercent},${discountAmount}`;
+                })
+                .join('\n');
+        };
+
+        const loadClassConfigForm = (classConfig = {}) => {
+            const source = classConfig || {};
+            const fallbackCategoryKeywords = ['class', 'guitar class', 'keyboard class', 'music class'];
+            const fallbackItemKeywords = ['guitar class', 'keyboard class', 'guitar lesson', 'keyboard lesson'];
+            const fallbackLocations = [String(document.getElementById('studioName')?.value || 'Studio').trim()].filter(Boolean);
+            const fallbackPlanOptionsMonths = [1];
+
+            const locations = Array.isArray(source.locations) && source.locations.length > 0 ? source.locations : fallbackLocations;
+            const categoryKeywords = Array.isArray(source.categoryKeywords) && source.categoryKeywords.length > 0 ? source.categoryKeywords : fallbackCategoryKeywords;
+            const itemKeywords = Array.isArray(source.itemKeywords) && source.itemKeywords.length > 0 ? source.itemKeywords : fallbackItemKeywords;
+            const planOptionsMonths = Array.isArray(source.planOptionsMonths) && source.planOptionsMonths.length > 0
+                ? source.planOptionsMonths
+                : fallbackPlanOptionsMonths;
+
+            document.getElementById('classConfigEnabled').checked = source.enabled !== false;
+            document.getElementById('classAllowOnlySingleClassItem').checked = source.allowOnlySingleClassItem !== false;
+            document.getElementById('classMonthlyFee').value = Number(source.monthlyFee ?? 2000);
+            document.getElementById('classClassesPerMonth').value = Number(source.classesPerMonth ?? 4);
+            document.getElementById('classWeeksPerMonthWindow').value = Number(source.weeksPerMonthWindow ?? 5);
+            document.getElementById('classSessionDurationHours').value = Number(source.sessionDurationHours ?? 1);
+            document.getElementById('classLocationsCsv').value = locations.map((value) => String(value || '').trim()).filter(Boolean).join(', ');
+            document.getElementById('classPlanOptionsMonthsCsv').value = planOptionsMonths
+                .map((value) => Number(value))
+                .filter((value) => Number.isFinite(value))
+                .sort((a, b) => a - b)
+                .join(', ');
+            document.getElementById('classCategoryKeywordsCsv').value = categoryKeywords.map((value) => String(value || '').trim()).filter(Boolean).join(', ');
+            document.getElementById('classItemKeywordsCsv').value = itemKeywords.map((value) => String(value || '').trim()).filter(Boolean).join(', ');
+            document.getElementById('classMultiMonthDiscountsText').value = formatClassDiscountRows(source.multiMonthDiscounts || []);
+        };
+
+        const collectClassConfigFromForm = () => {
+            return {
+                enabled: document.getElementById('classConfigEnabled').checked,
+                monthlyFee: Math.max(0, Number(document.getElementById('classMonthlyFee').value || 0)),
+                classesPerMonth: Math.max(1, Number(document.getElementById('classClassesPerMonth').value || 1)),
+                weeksPerMonthWindow: Math.max(1, Number(document.getElementById('classWeeksPerMonthWindow').value || 1)),
+                sessionDurationHours: Math.max(1, Number(document.getElementById('classSessionDurationHours').value || 1)),
+                allowOnlySingleClassItem: document.getElementById('classAllowOnlySingleClassItem').checked,
+                locations: parseCsvStringList(document.getElementById('classLocationsCsv').value),
+                planOptionsMonths: parseCsvNumberList(document.getElementById('classPlanOptionsMonthsCsv').value, { min: 1, max: 24 }),
+                categoryKeywords: parseCsvStringList(document.getElementById('classCategoryKeywordsCsv').value).map((v) => v.toLowerCase()),
+                itemKeywords: parseCsvStringList(document.getElementById('classItemKeywordsCsv').value).map((v) => v.toLowerCase()),
+                multiMonthDiscounts: parseClassDiscountRows(document.getElementById('classMultiMonthDiscountsText').value)
+            };
+        };
+
         // Load settings
         const loadSettings = async () => {
             try {
@@ -3076,6 +3234,7 @@
                 
                 // Load rental types
                 loadRentalTypes(settings.rentalTypes || []);
+                loadClassConfigForm(settings.classConfig || {});
 
                 categoryBindingPairs = Array.isArray(settings?.bookingCategoryBindings?.pairs)
                     ? settings.bookingCategoryBindings.pairs.map((pair) => ({
@@ -3133,6 +3292,7 @@
                     rate: parseFloat(document.getElementById('gstRate').value) / 100 || 0.18, // Convert percentage to decimal
                     displayName: document.getElementById('gstDisplayName').value || 'GST'
                 },
+                classConfig: collectClassConfigFromForm(),
                 instagramEmbeds: collectInstagramEmbeds(),
                 serviceGroupingConfig: collectServiceGroupingConfig()
             };

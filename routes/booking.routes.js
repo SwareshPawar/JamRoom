@@ -185,8 +185,8 @@ const normalizeClassConfig = (settings) => {
   const source = settings?.classConfig || {};
   const fallbackCategoryKeywords = ['class', 'guitar class', 'keyboard class', 'music class'];
   const fallbackItemKeywords = ['guitar class', 'keyboard class', 'guitar lesson', 'keyboard lesson'];
-  const fallbackLocations = ['Wakad Studio', 'Pimple Saudagar Studio'];
-  const fallbackPlanOptionsMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const fallbackLocations = [String(settings?.studioName || 'Studio').trim()].filter(Boolean);
+  const fallbackPlanOptionsMonths = [1];
 
   const locations = Array.isArray(source.locations) && source.locations.length > 0
     ? source.locations.map((location) => String(location || '').trim()).filter(Boolean)
@@ -196,10 +196,6 @@ const normalizeClassConfig = (settings) => {
     ? source.planOptionsMonths
     : fallbackPlanOptionsMonths)
     .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 24)
-    .sort((a, b) => a - b);
-
-  const mergedPlanOptionsMonths = [...new Set([...fallbackPlanOptionsMonths, ...planOptionsMonths])]
     .filter((value) => Number.isFinite(value) && value >= 1 && value <= 24)
     .sort((a, b) => a - b);
 
@@ -219,21 +215,12 @@ const normalizeClassConfig = (settings) => {
     weeksPerMonthWindow: Math.max(1, Number(source.weeksPerMonthWindow || 5)),
     sessionDurationHours: Math.max(1, Number(source.sessionDurationHours || 1)),
     allowOnlySingleClassItem: source.allowOnlySingleClassItem !== false,
-    planOptionsMonths: mergedPlanOptionsMonths,
+    planOptionsMonths,
     multiMonthDiscounts,
     locations,
     categoryKeywords: normalizeKeywordList(source.categoryKeywords, fallbackCategoryKeywords),
     itemKeywords: normalizeKeywordList(source.itemKeywords, fallbackItemKeywords)
   };
-};
-
-const getDefaultClassDiscountPercent = (months) => {
-  const m = Number(months);
-  if (!Number.isFinite(m) || m <= 1) return 0;
-  if (m <= 3) return 5;
-  if (m <= 6) return 10;
-  if (m <= 9) return 12.5;
-  return 15;
 };
 
 const getClassDiscountForMonths = (months, classConfig, totalFeeBeforeDiscount = 0) => {
@@ -252,9 +239,7 @@ const getClassDiscountForMonths = (months, classConfig, totalFeeBeforeDiscount =
     return Math.max(0, Number(discountEntry.discountAmount || 0));
   }
 
-  const fallbackPercent = getDefaultClassDiscountPercent(monthsNumber);
-  if (fallbackPercent <= 0) return 0;
-  return Math.round(Math.max(0, Number(totalFeeBeforeDiscount || 0)) * (fallbackPercent / 100));
+  return 0;
 };
 
 const addDaysToDate = (baseDate, daysToAdd) => {
@@ -1585,6 +1570,57 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
 
       booking.markModified('classSession');
       await booking.save();
+
+      // Notify user and admin of new slot request
+      const proposedDateLabel = proposedD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+      const formatTime12 = (t) => { const [h, m] = String(t || '00:00').split(':').map(Number); const suf = h >= 12 ? 'PM' : 'AM'; return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${suf}`; };
+      const classItem = booking.classSession?.selectedClassItemName || booking.classSession?.instrument || 'Music Class';
+
+      try {
+        await sendEmail({
+          to: req.user.email,
+          subject: 'Slot Request Submitted - JamRoom',
+          html: `
+            <h2>Slot Request Received</h2>
+            <p>Hi ${req.user.name},</p>
+            <p>Your slot request has been submitted and is awaiting admin approval.</p>
+            <h3>Requested Slot:</h3>
+            <ul>
+              <li><strong>Class:</strong> ${classItem}</li>
+              <li><strong>Date:</strong> ${proposedDateLabel}</li>
+              <li><strong>Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
+            </ul>
+            <p>You will receive a confirmation email once the slot is approved.</p>
+          `
+        });
+      } catch (emailError) {
+        console.log('Slot request user email failed:', emailError.message);
+      }
+
+      try {
+        const adminSettings = settings;
+        const adminEmails = Array.isArray(adminSettings?.adminEmails) ? adminSettings.adminEmails : [];
+        for (const adminEmail of adminEmails) {
+          await sendEmail({
+            to: adminEmail,
+            subject: 'New Class Slot Request - JamRoom',
+            html: `
+              <h2>New Class Slot Request</h2>
+              <p>A student has submitted a slot request requiring your approval.</p>
+              <h3>Details:</h3>
+              <ul>
+                <li><strong>Student:</strong> ${req.user.name} (${req.user.email})</li>
+                <li><strong>Class:</strong> ${classItem}</li>
+                <li><strong>Requested Date:</strong> ${proposedDateLabel}</li>
+                <li><strong>Requested Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
+              </ul>
+              <p>Please review and approve or reject this slot request in the admin panel.</p>
+            `
+          });
+        }
+      } catch (emailError) {
+        console.log('Slot request admin email failed:', emailError.message);
+      }
 
       res.json({ success: true, message: 'Slot request submitted. Awaiting admin approval.', booking });
     } catch (error) {

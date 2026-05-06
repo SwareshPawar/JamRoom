@@ -892,8 +892,8 @@ const getBookingCategoryOptions = () => {
 const getClassConfig = () => {
     const source = settings?.classConfig || {};
     const fallbackCategoryKeywords = ['class', 'guitar class', 'keyboard class', 'music class'];
-    const fallbackLocations = ['Wakad Studio', 'Pimple Saudagar Studio'];
-    const fallbackPlanOptionsMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const fallbackLocations = [String(settings?.studioName || 'Studio').trim()].filter(Boolean);
+    const fallbackPlanOptionsMonths = [1];
 
     const categoryKeywords = Array.isArray(source.categoryKeywords) && source.categoryKeywords.length > 0
         ? source.categoryKeywords
@@ -907,10 +907,6 @@ const getClassConfig = () => {
         ? source.planOptionsMonths
         : fallbackPlanOptionsMonths)
         .map((value) => Number(value))
-        .filter((value) => Number.isFinite(value) && value >= 1 && value <= 24)
-        .sort((a, b) => a - b);
-
-    const mergedPlanOptionsMonths = [...new Set([...fallbackPlanOptionsMonths, ...planOptionsMonths])]
         .filter((value) => Number.isFinite(value) && value >= 1 && value <= 24)
         .sort((a, b) => a - b);
 
@@ -930,7 +926,7 @@ const getClassConfig = () => {
         weeksPerMonthWindow: Math.max(1, Number(source.weeksPerMonthWindow || 5)),
         sessionDurationHours: Math.max(1, Number(source.sessionDurationHours || 1)),
         allowOnlySingleClassItem: source.allowOnlySingleClassItem !== false,
-        planOptionsMonths: mergedPlanOptionsMonths,
+        planOptionsMonths,
         multiMonthDiscounts,
         categoryKeywords: categoryKeywords.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean),
         locations: locations.map((value) => String(value || '').trim()).filter(Boolean)
@@ -952,15 +948,6 @@ const formatYmd = (dateValue) => {
     return `${year}-${month}-${day}`;
 };
 
-const getDefaultClassDiscountPercent = (months) => {
-    const m = Number(months);
-    if (!Number.isFinite(m) || m <= 1) return 0;
-    if (m <= 3) return 5;
-    if (m <= 6) return 10;
-    if (m <= 9) return 12.5;
-    return 15;
-};
-
 const getClassDiscountForMonths = (months, classConfig, totalFeeBeforeDiscount = 0) => {
     const selectedMonths = Number(months);
     if (!Number.isFinite(selectedMonths) || selectedMonths < 1) return 0;
@@ -976,9 +963,7 @@ const getClassDiscountForMonths = (months, classConfig, totalFeeBeforeDiscount =
         return Math.max(0, Number(match.discountAmount || 0));
     }
 
-    const fallbackPercent = getDefaultClassDiscountPercent(selectedMonths);
-    if (fallbackPercent <= 0) return 0;
-    return Math.round(Math.max(0, Number(totalFeeBeforeDiscount || 0)) * (fallbackPercent / 100));
+    return 0;
 };
 
 const refreshClassPlanInfoUI = () => {
@@ -1000,7 +985,7 @@ const refreshClassPlanInfoUI = () => {
         .find((entry) => Number(entry?.months) === planMonths);
     const discountPercent = discountEntry
         ? Math.max(0, Number(discountEntry.discountPercent || 0))
-        : getDefaultClassDiscountPercent(planMonths);
+        : 0;
 
     const startDate = bookingDateEl?.value ? new Date(`${bookingDateEl.value}T00:00:00`) : new Date();
     const endDate = addDays(startDate, planMonths * classConfig.weeksPerMonthWindow * 7);
