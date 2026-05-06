@@ -121,6 +121,8 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
       studioName,
       studioAddress,
       gstConfig,
+      classConfig,
+      serviceGroupingConfig,
       instagramEmbeds
     } = req.body;
 
@@ -154,6 +156,8 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
       if (studioName) settings.studioName = studioName;
       if (studioAddress) settings.studioAddress = studioAddress;
       if (gstConfig) settings.gstConfig = gstConfig;
+      if (classConfig) settings.classConfig = classConfig;
+      if (serviceGroupingConfig) settings.serviceGroupingConfig = serviceGroupingConfig;
       if (instagramEmbeds !== undefined) {
         settings.instagramEmbeds = mergePreservingDeleted(instagramEmbeds, settings.instagramEmbeds);
       }

@@ -223,6 +223,30 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
+// @route   GET /api/auth/validate-reset-token/:token
+// @desc    Check if a reset token is valid before user fills out the form
+// @access  Public
+router.get('/validate-reset-token/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Token is required' });
+    }
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const tokenExists = await User.findOne({ resetToken: hashedToken }).select('+resetToken +resetTokenExpiry');
+    if (!tokenExists) {
+      return res.status(400).json({ success: false, message: 'Invalid reset link. Please request a new password reset.' });
+    }
+    if (tokenExists.resetTokenExpiry < new Date()) {
+      return res.status(400).json({ success: false, message: 'Reset link has expired. Please request a new password reset.' });
+    }
+    return res.json({ success: true, message: 'Token is valid' });
+  } catch (error) {
+    console.error('Validate reset token error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @route   POST /api/auth/reset-password
 // @desc    Reset password
 // @access  Public
@@ -247,15 +271,25 @@ router.post('/reset-password', async (req, res) => {
     // Hash token to compare
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
+    // First check if the token exists at all (regardless of expiry)
+    const tokenExists = await User.findOne({ resetToken: hashedToken }).select('+resetToken +resetTokenExpiry');
+    if (!tokenExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reset link. Please request a new password reset.'
+      });
+    }
+
+    // Now check if it is still valid (not expired)
     const user = await User.findOne({
       resetToken: hashedToken,
-      resetTokenExpiry: { $gt: Date.now() }
+      resetTokenExpiry: { $gt: new Date() }
     }).select('+resetToken +resetTokenExpiry');
 
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired token'
+        message: 'Reset link has expired. Please request a new password reset.'
       });
     }
 

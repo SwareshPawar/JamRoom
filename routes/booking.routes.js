@@ -174,6 +174,188 @@ const normalizeRentalTypeToken = (value) => {
   return 'inhouse';
 };
 
+const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const normalizePreferredWeekday = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return '';
+
+  const aliases = {
+    sun: 0,
+    sunday: 0,
+    mon: 1,
+    monday: 1,
+    tue: 2,
+    tues: 2,
+    tuesday: 2,
+    wed: 3,
+    wednesday: 3,
+    thu: 4,
+    thur: 4,
+    thurs: 4,
+    thursday: 4,
+    fri: 5,
+    friday: 5,
+    sat: 6,
+    saturday: 6
+  };
+
+  if (!Object.prototype.hasOwnProperty.call(aliases, raw)) {
+    return '';
+  }
+
+  return WEEKDAY_LABELS[aliases[raw]];
+};
+
+const getNextWeekdayOnOrAfter = (baseDate, weekdayLabel) => {
+  if (!(baseDate instanceof Date) || Number.isNaN(baseDate.getTime())) {
+    return null;
+  }
+
+  const normalizedWeekday = normalizePreferredWeekday(weekdayLabel);
+  if (!normalizedWeekday) return null;
+
+  const targetDow = WEEKDAY_LABELS.indexOf(normalizedWeekday);
+  if (targetDow < 0) return null;
+
+  const nextDate = new Date(baseDate);
+  nextDate.setHours(0, 0, 0, 0);
+  const currentDow = nextDate.getDay();
+  const offset = (targetDow - currentDow + 7) % 7;
+  nextDate.setDate(nextDate.getDate() + offset);
+  return nextDate;
+};
+
+const normalizeKeywordList = (values = [], fallback = []) => {
+  const source = Array.isArray(values) && values.length > 0 ? values : fallback;
+  return source
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean);
+};
+
+const normalizeClassConfig = (settings) => {
+  const source = settings?.classConfig || {};
+  const fallbackCategoryKeywords = ['class', 'guitar class', 'keyboard class', 'music class'];
+  const fallbackItemKeywords = ['guitar class', 'keyboard class', 'guitar lesson', 'keyboard lesson'];
+  const fallbackLocations = [String(settings?.studioName || 'Studio').trim()].filter(Boolean);
+  const fallbackPlanOptionsMonths = [1];
+
+  const locations = Array.isArray(source.locations) && source.locations.length > 0
+    ? source.locations.map((location) => String(location || '').trim()).filter(Boolean)
+    : fallbackLocations;
+
+  const planOptionsMonths = (Array.isArray(source.planOptionsMonths) && source.planOptionsMonths.length > 0
+    ? source.planOptionsMonths
+    : fallbackPlanOptionsMonths)
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 24)
+    .sort((a, b) => a - b);
+
+  const multiMonthDiscounts = (Array.isArray(source.multiMonthDiscounts) ? source.multiMonthDiscounts : [])
+    .map((entry) => ({
+      months: Number(entry?.months),
+      discountPercent: Math.max(0, Number(entry?.discountPercent || 0)),
+      discountAmount: Math.max(0, Number(entry?.discountAmount || 0))
+    }))
+    .filter((entry) => Number.isFinite(entry.months) && entry.months >= 1 && entry.months <= 24)
+    .sort((a, b) => a.months - b.months);
+
+  return {
+    enabled: source.enabled !== false,
+    monthlyFee: Math.max(0, Number(source.monthlyFee || 2000)),
+    classesPerMonth: Math.max(1, Number(source.classesPerMonth || 4)),
+    weeksPerMonthWindow: Math.max(1, Number(source.weeksPerMonthWindow || 5)),
+    sessionDurationHours: Math.max(1, Number(source.sessionDurationHours || 1)),
+    allowOnlySingleClassItem: source.allowOnlySingleClassItem !== false,
+    planOptionsMonths,
+    multiMonthDiscounts,
+    locations,
+    categoryKeywords: normalizeKeywordList(source.categoryKeywords, fallbackCategoryKeywords),
+    itemKeywords: normalizeKeywordList(source.itemKeywords, fallbackItemKeywords)
+  };
+};
+
+const getClassDiscountForMonths = (months, classConfig, totalFeeBeforeDiscount = 0) => {
+  const monthsNumber = Number(months);
+  if (!Number.isFinite(monthsNumber) || monthsNumber < 1) return 0;
+
+  const discountEntry = (Array.isArray(classConfig?.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [])
+    .find((entry) => Number(entry?.months) === monthsNumber);
+
+  if (discountEntry) {
+    const percent = Math.max(0, Number(discountEntry.discountPercent || 0));
+    if (percent > 0) {
+      return Math.round(Math.max(0, Number(totalFeeBeforeDiscount || 0)) * (percent / 100));
+    }
+
+    return Math.max(0, Number(discountEntry.discountAmount || 0));
+  }
+
+  return 0;
+};
+
+const addDaysToDate = (baseDate, daysToAdd) => {
+  const date = new Date(baseDate);
+  date.setDate(date.getDate() + Number(daysToAdd || 0));
+  return date;
+};
+
+const buildClassLessonsSchedule = ({ planStartDate, startTime, endTime, totalClassesPlanned }) => {
+  const lessons = [];
+  const classes = Math.max(0, Number(totalClassesPlanned || 0));
+
+  for (let i = 0; i < classes; i += 1) {
+    lessons.push({
+      weekNumber: i + 1,
+      classNumber: i + 1,
+      scheduledDate: addDaysToDate(planStartDate, i * 7),
+      scheduledStartTime: startTime,
+      scheduledEndTime: endTime,
+      status: 'SCHEDULED',
+      notes: '',
+      details: ''
+    });
+  }
+
+  return lessons;
+};
+
+const doesContainAnyKeyword = (text, keywords = []) => {
+  const normalizedText = String(text || '').trim().toLowerCase();
+  if (!normalizedText) return false;
+  return keywords.some((keyword) => normalizedText.includes(keyword));
+};
+
+const isClassRental = (rental, classConfig) => {
+  const category = String(rental?.category || '').trim().toLowerCase();
+  const name = String(rental?.name || '').trim().toLowerCase();
+
+  return (
+    doesContainAnyKeyword(category, classConfig.categoryKeywords)
+    || doesContainAnyKeyword(name, classConfig.itemKeywords)
+  );
+};
+
+const deriveClassInstrument = (rentals = []) => {
+  const text = rentals
+    .map((rental) => `${String(rental?.category || '')} ${String(rental?.name || '')}`.toLowerCase())
+    .join(' ');
+
+  if (text.includes('guitar')) return 'Guitar';
+  if (text.includes('keyboard') || text.includes('keys')) return 'Keyboard';
+  return 'Music';
+};
+
+const getClassMonthKeyFromDate = (dateValue) => {
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) {
+    return '';
+  }
+
+  const year = dateValue.getFullYear();
+  const month = String(dateValue.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
+
 /**
  * Helper function to check time conflicts
  */
@@ -211,6 +393,31 @@ const parseDateTime = (dateValue, timeValue) => {
 
   parsedDate.setHours(hours, minutes, 0, 0);
   return parsedDate;
+};
+
+const getClassLessonsForDateRange = (booking, dayStart, dayEnd) => {
+  const lessons = Array.isArray(booking?.classSession?.lessons) ? booking.classSession.lessons : [];
+  const startMs = dayStart instanceof Date ? dayStart.getTime() : Number.NaN;
+  const endMs = dayEnd instanceof Date ? dayEnd.getTime() : Number.NaN;
+
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return [];
+  }
+
+  return lessons.filter((lesson) => {
+    const lessonDate = lesson?.scheduledDate ? new Date(lesson.scheduledDate) : null;
+    if (!(lessonDate instanceof Date) || Number.isNaN(lessonDate.getTime())) {
+      return false;
+    }
+
+    const lessonTime = lessonDate.getTime();
+    if (lessonTime < startMs || lessonTime > endMs) {
+      return false;
+    }
+
+    const lessonStatus = String(lesson?.status || 'SCHEDULED').toUpperCase();
+    return lessonStatus !== 'COMPLETED';
+  });
 };
 
 const parseDateOnlyToStartOfDay = (dateValue) => {
@@ -412,14 +619,18 @@ router.post('/', protect, async (req, res) => {
       perDayEndDate,
       perDayPickupTime,
       perDayReturnTime,
-      perDayDays
+      perDayDays,
+      classLocation,
+      classPlanMonths,
+      classPreferredWeekday,
+      classPreferredStartTime
     } = req.body;
 
     const normalizedMode = String(bookingMode).toLowerCase() === 'perday' ? 'perday' : 'hourly';
-    const effectiveStartTime = normalizedMode === 'perday'
+    let effectiveStartTime = normalizedMode === 'perday'
       ? String(perDayPickupTime || startTime || '')
       : String(startTime || '');
-    const effectiveEndTime = normalizedMode === 'perday'
+    let effectiveEndTime = normalizedMode === 'perday'
       ? String(perDayReturnTime || endTime || '')
       : String(endTime || '');
 
@@ -480,11 +691,36 @@ router.post('/', protect, async (req, res) => {
       rentalType: normalizeRentalTypeToken(rental?.rentalType)
     }));
 
+    const settings = await AdminSettings.getSettings();
+    const classConfig = normalizeClassConfig(settings);
+    const isClassBooking = normalizedMode === 'hourly'
+      && classConfig.enabled
+      && normalizedRentals.some((rental) => isClassRental(rental, classConfig));
+
+    if (isClassBooking && classConfig.allowOnlySingleClassItem && normalizedRentals.length !== 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select only one class item for class bookings.'
+      });
+    }
+
+    if (isClassBooking && Number(normalizedRentals[0]?.quantity || 1) !== 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Class plans can include only one class item with quantity 1.'
+      });
+    }
+
+    if (isClassBooking && normalizedMode === 'hourly') {
+      effectiveEndTime = calculateEndTime(effectiveStartTime, classConfig.sessionDurationHours);
+    }
+
     const parsedDuration = Number(duration);
-    const durationForPricing = normalizedMode === 'hourly' ? parsedDuration : 1;
+    const classDurationHours = isClassBooking ? classConfig.sessionDurationHours : parsedDuration;
+    const durationForPricing = normalizedMode === 'hourly' ? classDurationHours : 1;
 
     // Validate duration for hourly mode
-    if (normalizedMode === 'hourly' && parsedDuration < 1) {
+    if (normalizedMode === 'hourly' && durationForPricing < 1) {
       return res.status(400).json({
         success: false,
         message: 'Duration must be at least 1 hour'
@@ -492,8 +728,10 @@ router.post('/', protect, async (req, res) => {
     }
 
     // Convert date(s) to start of day using local-date parsing to avoid timezone drift.
-    const bookingDate = parseDateOnlyToStartOfDay(normalizedMode === 'perday' ? perDayStartDate : date);
+    let bookingDate = parseDateOnlyToStartOfDay(normalizedMode === 'perday' ? perDayStartDate : date);
     const todayStart = getTodayStartLocal();
+    let normalizedPreferredWeekday = '';
+    let normalizedPreferredStartTime = '';
 
     if (!bookingDate) {
       return res.status(400).json({
@@ -507,6 +745,38 @@ router.post('/', protect, async (req, res) => {
         success: false,
         message: 'Past dates are not allowed for booking'
       });
+    }
+
+    if (isClassBooking) {
+      normalizedPreferredWeekday = normalizePreferredWeekday(classPreferredWeekday);
+      normalizedPreferredStartTime = String(classPreferredStartTime || '').trim();
+      const validTimePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+      if (!normalizedPreferredWeekday) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select your preferred class day for weekly classes'
+        });
+      }
+
+      if (!validTimePattern.test(normalizedPreferredStartTime)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a valid preferred class start time (HH:mm)'
+        });
+      }
+
+      const preferredFirstClassDate = getNextWeekdayOnOrAfter(bookingDate, normalizedPreferredWeekday);
+      if (!preferredFirstClassDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'Unable to resolve preferred class day. Please choose a valid weekday.'
+        });
+      }
+
+      bookingDate = preferredFirstClassDate;
+      effectiveStartTime = normalizedPreferredStartTime;
+      effectiveEndTime = calculateEndTime(normalizedPreferredStartTime, classConfig.sessionDurationHours);
     }
 
     let perDayStart = null;
@@ -569,6 +839,10 @@ router.post('/', protect, async (req, res) => {
     }
 
     if (normalizedMode === 'hourly') {
+      const dayStart = new Date(bookingDate);
+      const dayEnd = new Date(bookingDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
       // Check for conflicts with existing bookings (only CONFIRMED bookings block slots)
       const existingBookings = await Booking.find({
         date: bookingDate,
@@ -576,12 +850,40 @@ router.post('/', protect, async (req, res) => {
         ...buildHourlySlotModeFilter()
       });
 
+      const classLessonBookings = await Booking.find({
+        bookingStatus: 'CONFIRMED',
+        'classSession.isClassBooking': true,
+        ...buildHourlySlotModeFilter(),
+        'classSession.lessons': {
+          $elemMatch: {
+            scheduledDate: { $gte: dayStart, $lte: dayEnd },
+            status: { $ne: 'COMPLETED' }
+          }
+        }
+      }).select('classSession.lessons classSession.instrument rentalType');
+
       for (const booking of existingBookings) {
         if (checkTimeConflict(effectiveStartTime, effectiveEndTime, booking.startTime, booking.endTime)) {
           return res.status(400).json({
             success: false,
             message: `Time conflict with existing booking (${formatTimeRange12Hour(booking.startTime, booking.endTime)})`
           });
+        }
+      }
+
+      for (const classBooking of classLessonBookings) {
+        const lessonsForDate = getClassLessonsForDateRange(classBooking, dayStart, dayEnd);
+        for (const lesson of lessonsForDate) {
+          const lessonStart = String(lesson?.scheduledStartTime || '').trim();
+          const lessonEnd = String(lesson?.scheduledEndTime || '').trim();
+          if (!lessonStart || !lessonEnd) continue;
+
+          if (checkTimeConflict(effectiveStartTime, effectiveEndTime, lessonStart, lessonEnd)) {
+            return res.status(400).json({
+              success: false,
+              message: `Time conflict with scheduled class (${formatTimeRange12Hour(lessonStart, lessonEnd)})`
+            });
+          }
         }
       }
 
@@ -631,8 +933,117 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
+    let classSession = {
+      isClassBooking: false,
+      location: '',
+      instrument: '',
+      classMonth: '',
+      monthlyFee: 0,
+      classesPerMonth: 0,
+      classNumberInMonth: 0,
+      classesRemainingAfterBooking: 0,
+      monthlyFeeDueNow: 0,
+      planMonths: 1,
+      weeksPerMonthWindow: classConfig.weeksPerMonthWindow,
+      planStartDate: null,
+      planEndDate: null,
+      totalClassesPlanned: 0,
+      completedClassesCount: 0,
+      selectedClassItemName: '',
+      preferredWeekday: '',
+      preferredStartTime: '',
+      preferredEndTime: '',
+      totalFeeBeforeDiscount: 0,
+      discountAmount: 0,
+      totalFeeAfterDiscount: 0,
+      lessons: []
+    };
+
+    if (isClassBooking) {
+      const normalizedLocation = String(classLocation || '').trim();
+
+      if (!normalizedLocation) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a class location for class bookings'
+        });
+      }
+
+      if (!classConfig.locations.includes(normalizedLocation)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid class location. Allowed locations: ${classConfig.locations.join(', ')}`
+        });
+      }
+
+      const requestedInstrument = deriveClassInstrument(normalizedRentals);
+      const existingActiveClassPlan = await Booking.findOne({
+        userId: req.user._id,
+        'classSession.isClassBooking': true,
+        'classSession.instrument': requestedInstrument,
+        'classSession.classesRemainingAfterBooking': { $gt: 0 },
+        bookingStatus: { $in: ['PENDING', 'CONFIRMED'] }
+      }).select('_id classSession.totalClassesPlanned classSession.completedClassesCount classSession.classesRemainingAfterBooking');
+
+      if (existingActiveClassPlan) {
+        return res.status(400).json({
+          success: false,
+          message: `You already have an active ${requestedInstrument} class plan with ${existingActiveClassPlan.classSession?.classesRemainingAfterBooking || 0} class(es) remaining. Please complete it before placing a new ${requestedInstrument} class order.`
+        });
+      }
+
+      const selectedPlanMonths = Math.max(1, Number(classPlanMonths || 1));
+      if (Array.isArray(classConfig.planOptionsMonths)
+        && classConfig.planOptionsMonths.length > 0
+        && !classConfig.planOptionsMonths.includes(selectedPlanMonths)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid class plan. Allowed months: ${classConfig.planOptionsMonths.join(', ')}`
+        });
+      }
+
+      const classMonth = getClassMonthKeyFromDate(bookingDate);
+      const totalClassesPlanned = classConfig.classesPerMonth * selectedPlanMonths;
+      const totalFeeBeforeDiscount = classConfig.monthlyFee * selectedPlanMonths;
+      const discountAmount = getClassDiscountForMonths(selectedPlanMonths, classConfig, totalFeeBeforeDiscount);
+      const totalFeeAfterDiscount = Math.max(0, totalFeeBeforeDiscount - discountAmount);
+      const planStartDate = bookingDate;
+      const planEndDate = addDaysToDate(planStartDate, selectedPlanMonths * classConfig.weeksPerMonthWindow * 7);
+      const lessons = buildClassLessonsSchedule({
+        planStartDate,
+        startTime: effectiveStartTime,
+        endTime: effectiveEndTime,
+        totalClassesPlanned
+      });
+
+      classSession = {
+        isClassBooking: true,
+        location: normalizedLocation,
+        instrument: requestedInstrument,
+        classMonth,
+        monthlyFee: classConfig.monthlyFee,
+        classesPerMonth: classConfig.classesPerMonth,
+        classNumberInMonth: 1,
+        classesRemainingAfterBooking: totalClassesPlanned,
+        monthlyFeeDueNow: totalFeeAfterDiscount,
+        planMonths: selectedPlanMonths,
+        weeksPerMonthWindow: classConfig.weeksPerMonthWindow,
+        planStartDate,
+        planEndDate,
+        totalClassesPlanned,
+        completedClassesCount: 0,
+        selectedClassItemName: normalizedRentals[0]?.name || '',
+        preferredWeekday: normalizedPreferredWeekday,
+        preferredStartTime: effectiveStartTime,
+        preferredEndTime: effectiveEndTime,
+        totalFeeBeforeDiscount,
+        discountAmount,
+        totalFeeAfterDiscount,
+        lessons
+      };
+    }
+
     // Get admin settings for UPI details and GST configuration
-    const settings = await AdminSettings.getSettings();
     const resolvedUpiName = getDisplayUpiName(settings);
     
     // Validate and recalculate totals based on admin settings
@@ -657,7 +1068,11 @@ router.post('/', protect, async (req, res) => {
       }
     });
 
-    if (Number.isFinite(Number(subtotal)) && Number(subtotal) > 0) {
+    if (classSession.isClassBooking) {
+      calculatedSubtotal = classSession.monthlyFeeDueNow;
+    }
+
+    if (!classSession.isClassBooking && Number.isFinite(Number(subtotal)) && Number(subtotal) > 0) {
       calculatedSubtotal = Number(subtotal);
     }
 
@@ -686,7 +1101,7 @@ router.post('/', protect, async (req, res) => {
       date: bookingDate,
       startTime: effectiveStartTime,
       endTime: effectiveEndTime,
-      duration: normalizedMode === 'perday' ? computedPerDayHours : parsedDuration,
+      duration: normalizedMode === 'perday' ? computedPerDayHours : durationForPricing,
       perDayStartDate: normalizedMode === 'perday' ? perDayStart : undefined,
       perDayEndDate: normalizedMode === 'perday' ? perDayEnd : undefined,
       perDayDays: normalizedMode === 'perday' ? computedPerDayDays : 1,
@@ -700,6 +1115,7 @@ router.post('/', protect, async (req, res) => {
       userMobile: req.user.mobile,
       bandName,
       notes,
+      classSession,
       paymentStatus: 'PENDING',
       bookingStatus: 'PENDING'
     });
@@ -711,18 +1127,42 @@ router.post('/', protect, async (req, res) => {
       ? `${formatDateShortInIst(perDayStart)} ${formatTime12Hour(effectiveStartTime)} to ${formatDateShortInIst(perDayEnd)} ${formatTime12Hour(effectiveEndTime)} (${computedPerDayDays} day(s))`
       : null;
 
+    const classSummaryHtml = classSession.isClassBooking
+      ? `
+          <h3>Class Plan:</h3>
+          <ul>
+            <li><strong>Instrument:</strong> ${classSession.instrument}</li>
+            <li><strong>Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument}</li>
+            <li><strong>Location:</strong> ${classSession.location}</li>
+            <li><strong>Default Weekly Slot:</strong> ${classSession.preferredWeekday || 'N/A'} ${classSession.preferredStartTime ? `at ${formatTime12Hour(classSession.preferredStartTime)}` : ''}</li>
+            <li><strong>Plan:</strong> ${classSession.planMonths} month(s)</li>
+            <li><strong>Plan Window:</strong> ${formatDateShortInIst(classSession.planStartDate)} to ${formatDateShortInIst(classSession.planEndDate)}</li>
+            <li><strong>Classes:</strong> ${classSession.classesPerMonth} per month (${classSession.totalClassesPlanned} total)</li>
+            <li><strong>Monthly Fee:</strong> ₹${classSession.monthlyFee}</li>
+            <li><strong>Plan Fee:</strong> ₹${classSession.totalFeeBeforeDiscount}</li>
+            <li><strong>Discount:</strong> ₹${classSession.discountAmount}</li>
+            <li><strong>Fee Due Now:</strong> ₹${classSession.monthlyFeeDueNow}</li>
+          </ul>
+        `
+      : '';
+
     // Create rentals summary for email with correct per-day pricing
     const rentalsSummary = rentals.map(rental => {
       let itemTotal;
-      if (normalizedMode === 'perday' || rental.rentalType === 'perday') {
+      const rentalTypeValue = normalizeRentalTypeToken(rental?.rentalType);
+
+      if (normalizedMode === 'perday' || rentalTypeValue === 'perday') {
         // Per-day rentals: use per-day price and selected day count.
         const perdayPrice = rental.perdayPrice || rental.price;
         const days = normalizedMode === 'perday' ? computedPerDayDays : 1;
         itemTotal = perdayPrice * rental.quantity * days;
         return `<li>${rental.name} × ${rental.quantity} × ${days} day(s) - ₹${itemTotal}</li>`;
-      } else if (String(rental.rentalType || '').toLowerCase() === 'persession') {
+      } else if (rentalTypeValue === 'persession') {
         itemTotal = rental.price * rental.quantity;
         return `<li>${rental.name} × ${rental.quantity} (Per session) - ₹${itemTotal}</li>`;
+      } else if (rentalTypeValue === 'pertrack') {
+        itemTotal = rental.price * rental.quantity;
+        return `<li>${rental.name} × ${rental.quantity} (Per track) - ₹${itemTotal}</li>`;
       } else {
         // Hourly rentals: use price with duration factor
         itemTotal = rental.price * rental.quantity * durationForPricing;
@@ -752,6 +1192,7 @@ router.post('/', protect, async (req, res) => {
           <ul>
             ${rentalsSummary}
           </ul>
+          ${classSummaryHtml}
           <h3>Price Breakdown:</h3>
           <ul>
             <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
@@ -762,7 +1203,7 @@ router.post('/', protect, async (req, res) => {
           <h3>Payment Details:</h3>
           <p><strong>UPI ID:</strong> ${settings.upiId}</p>
           <p><strong>Name:</strong> ${resolvedUpiName}</p>
-          <p><strong>Amount:</strong> ₹${totalAmount || subtotal}</p>
+          <p><strong>Amount:</strong> ₹${calculatedTotalAmount}</p>
           <p>Please complete the payment and wait for admin approval.</p>
           <p>You will receive a confirmation email once approved.</p>
         `
@@ -782,7 +1223,8 @@ router.post('/', protect, async (req, res) => {
           duration: normalizedMode === 'perday' ? computedPerDayHours : duration,
           totalAmount: calculatedTotalAmount,
           upiId: settings.upiId,
-          upiName: resolvedUpiName
+          upiName: resolvedUpiName,
+          classSession
         });
 
         if (customerWhatsappResult?.success) {
@@ -818,6 +1260,7 @@ router.post('/', protect, async (req, res) => {
             <ul>
               ${rentalsSummary}
             </ul>
+            ${classSummaryHtml}
             <h3>Price Details:</h3>
             <ul>
               <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
@@ -846,7 +1289,8 @@ router.post('/', protect, async (req, res) => {
         startTime: effectiveStartTime,
         endTime: effectiveEndTime,
         totalAmount: calculatedTotalAmount,
-        bandName
+        bandName,
+        classSession
       }, settings.whatsappNotifications);
 
       if (Array.isArray(bookingRequestWhatsappResult)) {
@@ -970,6 +1414,43 @@ router.get('/availability/:date', async (req, res) => {
       ...buildHourlySlotModeFilter()
     }).select('startTime endTime rentalType bookingStatus bookingMode');
 
+    const classLessonBookings = await Booking.find({
+      bookingStatus: 'CONFIRMED',
+      'classSession.isClassBooking': true,
+      ...buildHourlySlotModeFilter(),
+      'classSession.lessons': {
+        $elemMatch: {
+          scheduledDate: { $gte: dayStart, $lte: dayEnd },
+          status: { $ne: 'COMPLETED' }
+        }
+      }
+    }).select('rentalType classSession.instrument classSession.lessons');
+
+    const classLessonSlots = [];
+    classLessonBookings.forEach((booking) => {
+      const lessonsForDate = getClassLessonsForDateRange(booking, dayStart, dayEnd);
+      lessonsForDate.forEach((lesson) => {
+        const lessonStart = String(lesson?.scheduledStartTime || '').trim();
+        const lessonEnd = String(lesson?.scheduledEndTime || '').trim();
+        if (!lessonStart || !lessonEnd) return;
+
+        classLessonSlots.push({
+          startTime: lessonStart,
+          endTime: lessonEnd,
+          rentalType: booking?.classSession?.instrument || booking?.rentalType || 'Class',
+          bookingStatus: 'CONFIRMED',
+          bookingMode: 'hourly'
+        });
+      });
+    });
+
+    const dedupeKey = (slot) => `${String(slot?.startTime || '')}|${String(slot?.endTime || '')}|${String(slot?.rentalType || '')}`;
+    const mergedBookingsMap = new Map();
+    [...bookings, ...classLessonSlots].forEach((slot) => {
+      mergedBookingsMap.set(dedupeKey(slot), slot);
+    });
+    const mergedBookings = Array.from(mergedBookingsMap.values());
+
     // Get all blocked times for the date
     const blockedTimes = await BlockedTime.find({
       date: { $gte: dayStart, $lte: dayEnd }
@@ -978,7 +1459,7 @@ router.get('/availability/:date', async (req, res) => {
     res.json({
       success: true,
       date: formatDateAsYmdInIst(date),
-      bookings,
+      bookings: mergedBookings,
       blockedTimes
     });
   } catch (error) {
@@ -1027,7 +1508,8 @@ router.get('/settings', async (req, res) => {
         rentalTypes,
         bookingCategoryBindings: settings.bookingCategoryBindings || { pairs: [] },
         bookingModes,
-        gstConfig: settings.gstConfig || { enabled: false, rate: 0.18, displayName: 'GST' }
+        gstConfig: settings.gstConfig || { enabled: false, rate: 0.18, displayName: 'GST' },
+        classConfig: normalizeClassConfig(settings)
       }
     });
   } catch (error) {
@@ -1114,10 +1596,144 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
-// @route   PUT /api/bookings/:id/cancel
-// @desc    Cancel a booking
+// @route   POST /api/bookings/:id/class-lessons/:lessonId/request-slot
+// @desc    Student requests a specific date/time within their lesson's week
 // @access  Private
-router.put('/:id/cancel', protect, async (req, res) => {
+router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, res) => {
+    try {
+      const { id, lessonId } = req.params;
+      const { proposedDate, proposedStartTime, withdraw } = req.body || {};
+
+      const [booking, settings] = await Promise.all([
+        Booking.findById(id),
+        AdminSettings.getSettings()
+      ]);
+
+      if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+      if (String(booking.userId) !== String(req.user._id)) {
+        return res.status(403).json({ success: false, message: 'Not authorized' });
+      }
+      if (!booking.classSession?.isClassBooking) {
+        return res.status(400).json({ success: false, message: 'Not a class booking' });
+      }
+
+      const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+      const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+      if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found' });
+
+      const currentStatus = String(lesson.status || '').toUpperCase();
+      if (currentStatus === 'COMPLETED') return res.status(400).json({ success: false, message: 'Lesson already completed' });
+      if (currentStatus === 'CANCELLED') return res.status(400).json({ success: false, message: 'Lesson is cancelled' });
+
+      // Withdraw a pending request
+      if (withdraw) {
+        if (lesson.slotRequest && String(lesson.slotRequest.status || '') === 'PENDING') {
+          lesson.slotRequest.status = 'NONE';
+          lesson.slotRequest.requestedAt = null;
+          booking.markModified('classSession');
+          await booking.save();
+        }
+        return res.json({ success: true, message: 'Slot request withdrawn' });
+      }
+
+      // Validate proposed date is within same week as scheduledDate
+      const scheduledD = lesson.scheduledDate ? new Date(lesson.scheduledDate) : null;
+      const proposedD = parseDateOnlyToStartOfDay(proposedDate);
+      if (!proposedD) return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD.' });
+
+      if (scheduledD && !Number.isNaN(scheduledD.getTime())) {
+        const getMonday = (d) => { const day = new Date(d); const dow = day.getDay(); const diff = (dow === 0 ? -6 : 1 - dow); day.setDate(day.getDate() + diff); day.setHours(0,0,0,0); return day; };
+        const weekStart = getMonday(scheduledD);
+        const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6); weekEnd.setHours(23,59,59,999);
+        if (proposedD < weekStart || proposedD > weekEnd) {
+          return res.status(400).json({ success: false, message: 'Proposed date must be within the same week as the scheduled lesson' });
+        }
+      }
+
+      const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      const startTime = String(proposedStartTime || '').trim();
+      if (!timePattern.test(startTime)) return res.status(400).json({ success: false, message: 'Invalid start time. Use HH:mm.' });
+
+      const sessionDurationHours = Math.max(1, Number(settings?.classConfig?.sessionDurationHours || 1));
+      const startMins = startTime.split(':').reduce((h, m, i) => i === 0 ? Number(m) * 60 : h + Number(m), 0);
+      const endMins = startMins + sessionDurationHours * 60;
+      const endTime = `${String(Math.floor(endMins / 60) % 24).padStart(2, '0')}:${String(endMins % 60).padStart(2, '0')}`;
+
+      lesson.slotRequest = {
+        proposedDate: proposedD,
+        proposedStartTime: startTime,
+        proposedEndTime: endTime,
+        requestedAt: new Date(),
+        status: 'PENDING',
+        respondedAt: null,
+        responseNote: ''
+      };
+
+      booking.markModified('classSession');
+      await booking.save();
+
+      // Notify user and admin of new slot request
+      const proposedDateLabel = proposedD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+      const formatTime12 = (t) => { const [h, m] = String(t || '00:00').split(':').map(Number); const suf = h >= 12 ? 'PM' : 'AM'; return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${suf}`; };
+      const classItem = booking.classSession?.selectedClassItemName || booking.classSession?.instrument || 'Music Class';
+
+      try {
+        await sendEmail({
+          to: req.user.email,
+          subject: 'Slot Request Submitted - JamRoom',
+          html: `
+            <h2>Slot Request Received</h2>
+            <p>Hi ${req.user.name},</p>
+            <p>Your slot request has been submitted and is awaiting admin approval.</p>
+            <h3>Requested Slot:</h3>
+            <ul>
+              <li><strong>Class:</strong> ${classItem}</li>
+              <li><strong>Date:</strong> ${proposedDateLabel}</li>
+              <li><strong>Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
+            </ul>
+            <p>You will receive a confirmation email once the slot is approved.</p>
+          `
+        });
+      } catch (emailError) {
+        console.log('Slot request user email failed:', emailError.message);
+      }
+
+      try {
+        const adminSettings = settings;
+        const adminEmails = Array.isArray(adminSettings?.adminEmails) ? adminSettings.adminEmails : [];
+        for (const adminEmail of adminEmails) {
+          await sendEmail({
+            to: adminEmail,
+            subject: 'New Class Slot Request - JamRoom',
+            html: `
+              <h2>New Class Slot Request</h2>
+              <p>A student has submitted a slot request requiring your approval.</p>
+              <h3>Details:</h3>
+              <ul>
+                <li><strong>Student:</strong> ${req.user.name} (${req.user.email})</li>
+                <li><strong>Class:</strong> ${classItem}</li>
+                <li><strong>Requested Date:</strong> ${proposedDateLabel}</li>
+                <li><strong>Requested Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
+              </ul>
+              <p>Please review and approve or reject this slot request in the admin panel.</p>
+            `
+          });
+        }
+      } catch (emailError) {
+        console.log('Slot request admin email failed:', emailError.message);
+      }
+
+      res.json({ success: true, message: 'Slot request submitted. Awaiting admin approval.', booking });
+    } catch (error) {
+      console.error('Request slot error:', error);
+      res.status(500).json({ success: false, message: 'Server error submitting slot request' });
+    }
+  });
+
+  // @route   PUT /api/bookings/:id/cancel
+  // @desc    Cancel a booking
+  // @access  Private
+  router.put('/:id/cancel', protect, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
 

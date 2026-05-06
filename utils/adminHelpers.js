@@ -513,6 +513,23 @@ const sendUnifiedBookingConfirmationEmails = async ({
     amountPaid: booking.amountPaid
   });
   const dueAmount = Math.max(0, Number(booking.price || 0) - collectedAmount);
+  const classSession = booking?.classSession || {};
+  const classSessionHtml = classSession.isClassBooking
+    ? `
+          <li><strong>Class Instrument:</strong> ${classSession.instrument || 'Music'}</li>
+          <li><strong>Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument || 'N/A'}</li>
+          <li><strong>Class Location:</strong> ${classSession.location || 'N/A'}</li>
+          <li><strong>Plan:</strong> ${classSession.planMonths || 1} month(s)</li>
+          <li><strong>Plan Window:</strong> ${classSession.planStartDate ? formatBookingDisplayDate(classSession.planStartDate) : 'N/A'} to ${classSession.planEndDate ? formatBookingDisplayDate(classSession.planEndDate) : 'N/A'}</li>
+          <li><strong>Classes:</strong> ${classSession.classesPerMonth || 0} per month (${classSession.totalClassesPlanned || 0} total)</li>
+          <li><strong>Progress:</strong> ${classSession.completedClassesCount || 0}/${classSession.totalClassesPlanned || 0}</li>
+          <li><strong>Classes Remaining:</strong> ${classSession.classesRemainingAfterBooking ?? 0}</li>
+          <li><strong>Monthly Fee:</strong> ₹${classSession.monthlyFee || 0}</li>
+          <li><strong>Plan Fee:</strong> ₹${classSession.totalFeeBeforeDiscount || classSession.monthlyFee || 0}</li>
+          <li><strong>Discount:</strong> ₹${classSession.discountAmount || 0}</li>
+          <li><strong>Fee Due Now:</strong> ₹${classSession.monthlyFeeDueNow || 0}</li>
+        `
+    : '';
 
   const paymentMessageByStatus = (() => {
     if (booking.paymentStatus === 'PAID') {
@@ -559,6 +576,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
           <li><strong>Payment Status:</strong> ${booking.paymentStatus || 'PENDING'}</li>
           <li><strong>Amount Received:</strong> ₹${collectedAmount.toFixed(2)}</li>
           <li><strong>Outstanding:</strong> ₹${dueAmount.toFixed(2)}</li>
+          ${classSessionHtml}
           ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
         </ul>
         <p>A calendar invite is attached to this email.</p>
@@ -609,6 +627,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
               <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
               <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
               <li><strong>Price:</strong> ₹${booking.price}</li>
+              ${classSessionHtml}
               ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
             </ul>
           `,

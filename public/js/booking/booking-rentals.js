@@ -889,6 +889,245 @@ const getBookingCategoryOptions = () => {
         .filter(Boolean);
 };
 
+const getClassConfig = () => {
+    const source = settings?.classConfig || {};
+    const fallbackCategoryKeywords = ['class', 'guitar class', 'keyboard class', 'music class'];
+    const fallbackLocations = [String(settings?.studioName || 'Studio').trim()].filter(Boolean);
+    const fallbackPlanOptionsMonths = [1];
+
+    const categoryKeywords = Array.isArray(source.categoryKeywords) && source.categoryKeywords.length > 0
+        ? source.categoryKeywords
+        : fallbackCategoryKeywords;
+
+    const locations = Array.isArray(source.locations) && source.locations.length > 0
+        ? source.locations
+        : fallbackLocations;
+
+    const planOptionsMonths = (Array.isArray(source.planOptionsMonths) && source.planOptionsMonths.length > 0
+        ? source.planOptionsMonths
+        : fallbackPlanOptionsMonths)
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value >= 1 && value <= 24)
+        .sort((a, b) => a - b);
+
+    const multiMonthDiscounts = (Array.isArray(source.multiMonthDiscounts) ? source.multiMonthDiscounts : [])
+        .map((entry) => ({
+            months: Number(entry?.months),
+            discountPercent: Math.max(0, Number(entry?.discountPercent || 0)),
+            discountAmount: Math.max(0, Number(entry?.discountAmount || 0))
+        }))
+        .filter((entry) => Number.isFinite(entry.months) && entry.months >= 1 && entry.months <= 24)
+        .sort((a, b) => a.months - b.months);
+
+    return {
+        enabled: source.enabled !== false,
+        monthlyFee: Math.max(0, Number(source.monthlyFee || 2000)),
+        classesPerMonth: Math.max(1, Number(source.classesPerMonth || 4)),
+        weeksPerMonthWindow: Math.max(1, Number(source.weeksPerMonthWindow || 5)),
+        sessionDurationHours: Math.max(1, Number(source.sessionDurationHours || 1)),
+        allowOnlySingleClassItem: source.allowOnlySingleClassItem !== false,
+        planOptionsMonths,
+        multiMonthDiscounts,
+        categoryKeywords: categoryKeywords.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean),
+        locations: locations.map((value) => String(value || '').trim()).filter(Boolean)
+    };
+};
+
+const addDays = (dateValue, daysToAdd) => {
+    const result = new Date(dateValue);
+    result.setDate(result.getDate() + Number(daysToAdd || 0));
+    return result;
+};
+
+const formatYmd = (dateValue) => {
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getClassDiscountForMonths = (months, classConfig, totalFeeBeforeDiscount = 0) => {
+    const selectedMonths = Number(months);
+    if (!Number.isFinite(selectedMonths) || selectedMonths < 1) return 0;
+    const match = (Array.isArray(classConfig?.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [])
+        .find((entry) => Number(entry?.months) === selectedMonths);
+
+    if (match) {
+        const percent = Math.max(0, Number(match.discountPercent || 0));
+        if (percent > 0) {
+            return Math.round(Math.max(0, Number(totalFeeBeforeDiscount || 0)) * (percent / 100));
+        }
+
+        return Math.max(0, Number(match.discountAmount || 0));
+    }
+
+    return 0;
+};
+
+const refreshClassPlanInfoUI = () => {
+    const classPlanMonthsEl = document.getElementById('classPlanMonths');
+    const bookingDateEl = document.getElementById('bookingDate');
+    const infoTextEl = document.getElementById('classPlanInfoText');
+    const discountHintEl = document.getElementById('classDiscountHint');
+    if (!classPlanMonthsEl || !infoTextEl || !discountHintEl) return;
+
+    const classConfig = getClassConfig();
+    const planMonths = Math.max(1, Number(classPlanMonthsEl.value || 1));
+    const classesPerMonth = Math.max(1, Number(classConfig.classesPerMonth || 4));
+    const totalClasses = classesPerMonth * planMonths;
+    const totalBeforeDiscount = classConfig.monthlyFee * planMonths;
+    const discountAmount = getClassDiscountForMonths(planMonths, classConfig, totalBeforeDiscount);
+    const totalAfterDiscount = Math.max(0, totalBeforeDiscount - discountAmount);
+
+    const discountEntry = (Array.isArray(classConfig.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [])
+        .find((entry) => Number(entry?.months) === planMonths);
+    const discountPercent = discountEntry
+        ? Math.max(0, Number(discountEntry.discountPercent || 0))
+        : 0;
+
+    const startDate = bookingDateEl?.value ? new Date(`${bookingDateEl.value}T00:00:00`) : new Date();
+    const endDate = addDays(startDate, planMonths * classConfig.weeksPerMonthWindow * 7);
+
+    infoTextEl.textContent = `${classesPerMonth} classes/month (${totalClasses} total). Plan window: ${formatYmd(startDate)} to ${formatYmd(endDate)}.`;
+    discountHintEl.textContent = discountAmount > 0
+        ? `Discount applied: ${discountPercent}% (₹${discountAmount}). Payable now: ₹${totalAfterDiscount}.`
+        : `Plan fee: ₹${totalBeforeDiscount}.`;
+};
+
+const isClassBookingCategory = (categoryName) => {
+    const selectedCategory = String(categoryName || '').trim().toLowerCase();
+    if (!selectedCategory) return false;
+
+    const classConfig = getClassConfig();
+    if (!classConfig.enabled) return false;
+
+    return classConfig.categoryKeywords.some((keyword) => selectedCategory.includes(keyword));
+};
+
+const refreshClassLocationUI = () => {
+    const groupEl = document.getElementById('classLocationGroup');
+    const selectEl = document.getElementById('classLocation');
+    const classPlanMonthsGroupEl = document.getElementById('classPlanMonthsGroup');
+    const classPlanMonthsEl = document.getElementById('classPlanMonths');
+    const classPlanInfoGroupEl = document.getElementById('classPlanInfoGroup');
+    const classPreferredWeekdayGroupEl = document.getElementById('classPreferredWeekdayGroup');
+    const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+    const classPreferredStartTimeGroupEl = document.getElementById('classPreferredStartTimeGroup');
+    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+
+    if (!groupEl || !selectEl) return;
+
+    const classConfig = getClassConfig();
+    const shouldShow = isClassBookingCategory(bookingType);
+    const options = classConfig.locations;
+    const previousValue = String(selectEl.value || '').trim();
+
+    selectEl.innerHTML = [
+        '<option value="">Select class location</option>',
+        ...options.map((location) => `<option value="${location}">${location}</option>`)
+    ].join('');
+
+    if (previousValue && options.includes(previousValue)) {
+        selectEl.value = previousValue;
+    }
+
+    if (!shouldShow) {
+        groupEl.style.display = 'none';
+        groupEl.classList.add('booking-hidden-initial');
+        selectEl.required = false;
+        selectEl.value = '';
+
+        if (classPlanMonthsGroupEl) {
+            classPlanMonthsGroupEl.style.display = 'none';
+            classPlanMonthsGroupEl.classList.add('booking-hidden-initial');
+        }
+        if (classPlanMonthsEl) {
+            classPlanMonthsEl.required = false;
+            classPlanMonthsEl.value = '1';
+        }
+        if (classPlanInfoGroupEl) {
+            classPlanInfoGroupEl.style.display = 'none';
+            classPlanInfoGroupEl.classList.add('booking-hidden-initial');
+        }
+        if (classPreferredWeekdayGroupEl) {
+            classPreferredWeekdayGroupEl.style.display = 'none';
+            classPreferredWeekdayGroupEl.classList.add('booking-hidden-initial');
+        }
+        if (classPreferredWeekdayEl) {
+            classPreferredWeekdayEl.required = false;
+            classPreferredWeekdayEl.value = '';
+        }
+        if (classPreferredStartTimeGroupEl) {
+            classPreferredStartTimeGroupEl.style.display = 'none';
+            classPreferredStartTimeGroupEl.classList.add('booking-hidden-initial');
+        }
+        if (classPreferredStartTimeEl) {
+            classPreferredStartTimeEl.required = false;
+            classPreferredStartTimeEl.value = '';
+        }
+    } else {
+        groupEl.style.display = 'block';
+        groupEl.classList.remove('booking-hidden-initial');
+        selectEl.required = true;
+
+        if (classPlanMonthsEl) {
+            const selectedValue = String(classPlanMonthsEl.value || '').trim();
+            classPlanMonthsEl.innerHTML = classConfig.planOptionsMonths
+                .map((months) => `<option value="${months}">${months} Month${months > 1 ? 's' : ''}</option>`)
+                .join('');
+
+            if (selectedValue && classConfig.planOptionsMonths.includes(Number(selectedValue))) {
+                classPlanMonthsEl.value = selectedValue;
+            }
+
+            classPlanMonthsEl.required = true;
+        }
+
+        if (classPlanMonthsGroupEl) {
+            classPlanMonthsGroupEl.style.display = 'block';
+            classPlanMonthsGroupEl.classList.remove('booking-hidden-initial');
+        }
+        if (classPlanInfoGroupEl) {
+            classPlanInfoGroupEl.style.display = 'block';
+            classPlanInfoGroupEl.classList.remove('booking-hidden-initial');
+        }
+        if (classPreferredWeekdayGroupEl) {
+            classPreferredWeekdayGroupEl.style.display = 'block';
+            classPreferredWeekdayGroupEl.classList.remove('booking-hidden-initial');
+        }
+        if (classPreferredWeekdayEl) {
+            classPreferredWeekdayEl.required = true;
+        }
+        if (classPreferredStartTimeGroupEl) {
+            classPreferredStartTimeGroupEl.style.display = 'block';
+            classPreferredStartTimeGroupEl.classList.remove('booking-hidden-initial');
+        }
+        if (classPreferredStartTimeEl) {
+            classPreferredStartTimeEl.required = true;
+        }
+
+        refreshClassPlanInfoUI();
+    }
+
+    // For class bookings, hide end time (auto-set to start+1h) and rename start time label
+    const endTimeGroup = document.getElementById('endTimeGroup');
+    const startTimeLabel = document.getElementById('startTimeLabel');
+    const endTimeEl = document.getElementById('endTime');
+
+    if (endTimeGroup) {
+        endTimeGroup.style.display = shouldShow ? 'none' : '';
+    }
+    if (endTimeEl) {
+        endTimeEl.required = !shouldShow;
+    }
+    if (startTimeLabel) {
+        startTimeLabel.textContent = shouldShow ? 'Class Time*' : 'Start Time*';
+    }
+};
+
 const categorizeRentalItems = () => {
     const hourlyGroups = new Map();
     const perdayGroups = new Map();
@@ -1082,6 +1321,8 @@ const populateRentalTypes = () => {
     if (typeof window.refreshBookingTypeOptions === 'function') {
         window.refreshBookingTypeOptions();
     }
+
+    refreshClassLocationUI();
 };
 
 const setActiveBookingCategory = (categoryName) => {
@@ -1098,6 +1339,23 @@ const setActiveBookingCategory = (categoryName) => {
     populateRentalTypes();
 };
 
+const getJamRoomBaseItemForHourly = () => {
+    const jamRoomBaseKey = 'JamRoom_base';
+    const jamRoomBaseItem = rentalCatalog.hourly?.get(jamRoomBaseKey);
+    if (!jamRoomBaseItem) return null;
+
+    const jamRoomBaseDiv = document.querySelector('[data-rental-id="JamRoom_base"][data-rental-mode="hourly"]');
+    const jamRoomBaseCheckbox = jamRoomBaseDiv?.querySelector('.rental-checkbox');
+    if (!jamRoomBaseDiv || !jamRoomBaseCheckbox) return null;
+
+    return {
+        key: jamRoomBaseKey,
+        item: jamRoomBaseItem,
+        div: jamRoomBaseDiv,
+        checkbox: jamRoomBaseCheckbox
+    };
+};
+
 const toggleRental = (rentalKey, mode = 'hourly') => {
     const selectedMap = getMapForMode(mode);
     const item = rentalCatalog[mode]?.get(rentalKey);
@@ -1112,10 +1370,48 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
         return;
     }
 
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const classConfig = getClassConfig();
+    const isSingleClassSelectionMode = mode === 'hourly'
+        && classConfig.allowOnlySingleClassItem
+        && isClassBookingCategory(bookingType);
+    const isJamRoomHourlyFlow = mode === 'hourly' && String(activeBookingCategory || '').trim() === 'JamRoom';
+    const jamRoomBase = isJamRoomHourlyFlow ? getJamRoomBaseItemForHourly() : null;
+    const isJamRoomBaseToggle = Boolean(jamRoomBase && jamRoomBase.key === rentalKey);
+
     if (checkbox.checked) {
+        if (jamRoomBase && !isJamRoomBaseToggle && !jamRoomBase.checkbox.checked) {
+            jamRoomBase.checkbox.checked = true;
+            selectedMap.set(jamRoomBase.key, buildSelectedRentalEntry(jamRoomBase.item, jamRoomBase.key, 1));
+            jamRoomBase.div.classList.add('selected');
+        }
+
+        if (isSingleClassSelectionMode) {
+            selectedMap.forEach((_value, existingKey) => {
+                if (existingKey === rentalKey) return;
+
+                selectedMap.delete(existingKey);
+                const existingDiv = document.querySelector(`[data-rental-id="${existingKey}"][data-rental-mode="${mode}"]`);
+                const existingCheckbox = existingDiv?.querySelector('.rental-checkbox');
+                if (existingCheckbox) existingCheckbox.checked = false;
+                if (existingDiv) existingDiv.classList.remove('selected');
+            });
+        }
+
         selectedMap.set(rentalKey, buildSelectedRentalEntry(item, rentalKey, 1));
         rentalDiv.classList.add('selected');
     } else {
+        if (jamRoomBase && isJamRoomBaseToggle) {
+            const hasDependentSelections = [...selectedMap.keys()].some((selectedKey) => selectedKey !== jamRoomBase.key);
+            if (hasDependentSelections) {
+                checkbox.checked = true;
+                selectedMap.set(jamRoomBase.key, buildSelectedRentalEntry(item, rentalKey, 1));
+                rentalDiv.classList.add('selected');
+                showAlert('Base JamRoom must remain selected while other hourly items are selected.', 'error');
+                return;
+            }
+        }
+
         selectedMap.delete(rentalKey);
         rentalDiv.classList.remove('selected');
         const quantityDisplay = rentalDiv.querySelector('.quantity-display');
@@ -1199,6 +1495,8 @@ const loadSettings = async () => {
             if (typeof window.refreshBookingTypeOptions === 'function') {
                 window.refreshBookingTypeOptions();
             }
+
+            refreshClassLocationUI();
         } else {
             console.error('Failed to load settings:', data);
             showAlert('Failed to load booking settings. Please refresh the page.', 'error');
@@ -1248,3 +1546,8 @@ window.getBookingCategoryOptions = getBookingCategoryOptions;
 window.setActiveBookingCategory = setActiveBookingCategory;
 window.getBookingRentalDraftSnapshot = getBookingRentalDraftSnapshot;
 window.applyBookingRentalDraftSelection = applyBookingRentalDraftSelection;
+window.isClassBookingCategory = isClassBookingCategory;
+window.refreshClassLocationUI = refreshClassLocationUI;
+window.getClassConfig = getClassConfig;
+window.refreshClassPlanInfoUI = refreshClassPlanInfoUI;
+window.getClassDiscountForMonths = getClassDiscountForMonths;

@@ -324,6 +324,166 @@ const adminSettingsSchema = new mongoose.Schema({
       default: 'GST'
     }
   },
+  classConfig: {
+    enabled: {
+      type: Boolean,
+      default: true
+    },
+    monthlyFee: {
+      type: Number,
+      min: 0,
+      default: 2000
+    },
+    classesPerMonth: {
+      type: Number,
+      min: 1,
+      max: 31,
+      default: 4
+    },
+    weeksPerMonthWindow: {
+      type: Number,
+      min: 1,
+      max: 8,
+      default: 5
+    },
+    sessionDurationHours: {
+      type: Number,
+      min: 1,
+      max: 8,
+      default: 1
+    },
+    allowOnlySingleClassItem: {
+      type: Boolean,
+      default: true
+    },
+    planOptionsMonths: [{
+      type: Number,
+      min: 1,
+      max: 24
+    }],
+    multiMonthDiscounts: [{
+      months: {
+        type: Number,
+        min: 1,
+        max: 24,
+        required: true
+      },
+      discountPercent: {
+        type: Number,
+        min: 0,
+        max: 100,
+        default: 0
+      },
+      discountAmount: {
+        type: Number,
+        min: 0,
+        default: 0
+      }
+    }],
+    locations: [{
+      type: String,
+      trim: true
+    }],
+    categoryKeywords: [{
+      type: String,
+      trim: true,
+      lowercase: true
+    }],
+    itemKeywords: [{
+      type: String,
+      trim: true,
+      lowercase: true
+    }]
+  },
+  serviceGroupingConfig: {
+    defaultGroupKey: {
+      type: String,
+      trim: true,
+      default: 'studio'
+    },
+    groups: [{
+      key: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true
+      },
+      title: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      subtitle: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      icon: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      order: {
+        type: Number,
+        default: 100
+      }
+    }],
+    categoryRules: [{
+      groupKey: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true
+      },
+      title: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      description: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      order: {
+        type: Number,
+        default: 100
+      },
+      matchField: {
+        type: String,
+        enum: ['name', 'category', 'both'],
+        default: 'both'
+      },
+      keywords: [{
+        type: String,
+        trim: true,
+        lowercase: true
+      }]
+    }],
+    catalogAssignments: [{
+      groupKey: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true
+      },
+      assignmentType: {
+        type: String,
+        enum: ['category', 'subitem'],
+        default: 'category'
+      },
+      categoryName: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      itemName: {
+        type: String,
+        trim: true,
+        default: ''
+      }
+    }]
+  },
   updatedAt: {
     type: Date,
     default: Date.now
@@ -339,6 +499,162 @@ adminSettingsSchema.statics.getSettings = async function() {
     settings = await this.create({
       rentalTypes: [],
       adminEmails: ['admin@jamroom.com'],
+      classConfig: {
+        enabled: true,
+        monthlyFee: 2000,
+        classesPerMonth: 4,
+        weeksPerMonthWindow: 5,
+        sessionDurationHours: 1,
+        allowOnlySingleClassItem: true,
+        planOptionsMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        multiMonthDiscounts: [
+          { months: 2, discountPercent: 5, discountAmount: 0 },
+          { months: 3, discountPercent: 5, discountAmount: 0 },
+          { months: 4, discountPercent: 10, discountAmount: 0 },
+          { months: 5, discountPercent: 10, discountAmount: 0 },
+          { months: 6, discountPercent: 10, discountAmount: 0 },
+          { months: 7, discountPercent: 12.5, discountAmount: 0 },
+          { months: 8, discountPercent: 12.5, discountAmount: 0 },
+          { months: 9, discountPercent: 12.5, discountAmount: 0 },
+          { months: 10, discountPercent: 15, discountAmount: 0 },
+          { months: 11, discountPercent: 15, discountAmount: 0 },
+          { months: 12, discountPercent: 15, discountAmount: 0 }
+        ],
+        locations: ['Wakad Studio', 'Pimple Saudagar Studio'],
+        categoryKeywords: ['class', 'guitar class', 'keyboard class', 'music class'],
+        itemKeywords: ['guitar class', 'keyboard class', 'guitar lesson', 'keyboard lesson']
+      },
+      serviceGroupingConfig: {
+        defaultGroupKey: 'studio',
+        groups: [
+          {
+            key: 'studio',
+            title: 'Studio Usage',
+            subtitle: 'Room access, instruments, and in-studio equipment support',
+            icon: '🎸',
+            order: 10
+          },
+          {
+            key: 'production',
+            title: 'Production Services',
+            subtitle: 'Composition, arrangement, recording, and creative production support',
+            icon: '🎧',
+            order: 20
+          },
+          {
+            key: 'finishing',
+            title: 'Finishing & Delivery',
+            subtitle: 'Mixing, mastering, and final polish for release-ready output',
+            icon: '🎼',
+            order: 30
+          },
+          {
+            key: 'sound-design',
+            title: 'Sound Design',
+            subtitle: 'Foley, textures, and custom effects for cinematic or visual work',
+            icon: '🎬',
+            order: 40
+          }
+        ],
+        categoryRules: [
+          {
+            groupKey: 'studio',
+            title: 'JamRoom Studio',
+            description: 'Professional in-studio room usage with monitoring, setup support, and a comfortable recording environment.',
+            order: 10,
+            matchField: 'name',
+            keywords: ['jamroom', 'jam room', 'studio']
+          },
+          {
+            groupKey: 'studio',
+            title: 'Bass Guitar',
+            description: 'Live bass instrument support for rehearsals, jams, and recording sessions.',
+            order: 20,
+            matchField: 'both',
+            keywords: ['bass guitar']
+          },
+          {
+            groupKey: 'studio',
+            title: 'Keyboard',
+            description: 'Keyboard setup for composing, rehearsing, and recording melodic parts.',
+            order: 30,
+            matchField: 'both',
+            keywords: ['keyboard', 'piano']
+          },
+          {
+            groupKey: 'studio',
+            title: 'Studio Equipment',
+            description: 'Studio equipment support prepared for tracking, rehearsal, and live session needs.',
+            order: 40,
+            matchField: 'both',
+            keywords: ['guitar', 'amp', 'drum', 'mic', 'microphone', 'monitor', 'speaker', 'console', 'mixer']
+          },
+          {
+            groupKey: 'production',
+            title: 'Composition',
+            description: 'Original music composition crafted around your creative brief, mood, and structure.',
+            order: 50,
+            matchField: 'both',
+            keywords: ['composition']
+          },
+          {
+            groupKey: 'production',
+            title: 'Arrangement Enhancement',
+            description: 'Enhancing the music with additional instrument layers and a fuller arrangement.',
+            order: 60,
+            matchField: 'both',
+            keywords: ['arrangement layering']
+          },
+          {
+            groupKey: 'production',
+            title: 'Arrangement',
+            description: 'Structuring and refining the song so the production feels complete and performance-ready.',
+            order: 70,
+            matchField: 'both',
+            keywords: ['arrangement']
+          },
+          {
+            groupKey: 'production',
+            title: 'Production Service',
+            description: 'Hands-on recording and production support tailored to the session requirement.',
+            order: 80,
+            matchField: 'both',
+            keywords: ['recording', 'tracking', 'vocal', 'editing']
+          },
+          {
+            groupKey: 'finishing',
+            title: 'Stem Mastering',
+            description: 'Mastering from grouped stems for better tonal control, polish, and release-ready output.',
+            order: 90,
+            matchField: 'both',
+            keywords: ['stem mastering']
+          },
+          {
+            groupKey: 'finishing',
+            title: 'Mastering',
+            description: 'Final polish, loudness balance, and clarity tuning for a release-ready final version.',
+            order: 100,
+            matchField: 'both',
+            keywords: ['mastering']
+          },
+          {
+            groupKey: 'finishing',
+            title: 'Mixing',
+            description: 'Balancing vocals and instruments for clarity, space, punch, and a polished sound.',
+            order: 110,
+            matchField: 'both',
+            keywords: ['mix']
+          },
+          {
+            groupKey: 'sound-design',
+            title: 'Foley / Sound Design',
+            description: 'Custom sound effects and texture creation for scenes, visuals, or storytelling moments.',
+            order: 120,
+            matchField: 'both',
+            keywords: ['foley', 'sound effect', 'sfx']
+          }
+        ]
+      },
       whatsappNotifications: {
         enabled: true,
         businessNumber: '+919970011855',

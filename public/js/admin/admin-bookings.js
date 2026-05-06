@@ -79,6 +79,57 @@
         return 0;
     };
 
+    const notifyBookingAlert = (message, type = 'info') => {
+        const alertMessage = String(message || 'Action failed');
+        const alertType = String(type || 'info');
+        const depsAlert = state.loadDeps?.showAlert;
+
+        if (typeof depsAlert === 'function') {
+            if (depsAlert === window.showAlert || depsAlert.length <= 2) {
+                depsAlert(alertMessage, alertType);
+            } else {
+                depsAlert('bookingAlert', alertMessage, alertType);
+            }
+            return;
+        }
+
+        if (window.alertManager && typeof window.alertManager.show === 'function') {
+            window.alertManager.show(alertMessage, alertType);
+            return;
+        }
+
+        if (typeof window.showAlert === 'function') {
+            window.showAlert(alertMessage, alertType);
+            return;
+        }
+
+        alert(alertMessage);
+    };
+
+    const showBookingLoading = (message) => {
+        const depsLoader = state.loadDeps?.showLoading;
+        if (typeof depsLoader === 'function') {
+            depsLoader(message);
+            return;
+        }
+
+        if (typeof window.showLoading === 'function') {
+            window.showLoading(message);
+        }
+    };
+
+    const hideBookingLoading = () => {
+        const depsHideLoader = state.loadDeps?.hideLoading;
+        if (typeof depsHideLoader === 'function') {
+            depsHideLoader();
+            return;
+        }
+
+        if (typeof window.hideLoading === 'function') {
+            window.hideLoading();
+        }
+    };
+
     const state = {
         bookingsById: new Map(),
         allBookings: [],
@@ -94,7 +145,94 @@
         hasNextPage: false,
         hasPrevPage: false,
         searchDebounceTimer: null,
-        loadDeps: null
+        loadDeps: null,
+        classLessonContext: null
+    };
+
+    const getTodayYmd = () => {
+        const today = new Date();
+        return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    };
+
+    const normalizeTimeValue = (value) => {
+        const raw = String(value || '').trim();
+        const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return '';
+
+        const hours = Number(match[1]);
+        const minutes = Number(match[2]);
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+            return '';
+        }
+
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    };
+
+    const hideClassLessonCompletionModal = () => {
+        const modal = document.getElementById('classLessonCompletionModal');
+        if (modal) modal.classList.remove('show');
+        state.classLessonContext = null;
+    };
+
+    const openClassLessonCompletionModal = (bookingId, lessonId) => {
+        const deps = state.loadDeps;
+        const booking = state.bookingsById.get(String(bookingId || ''));
+        const lessons = Array.isArray(booking?.classSession?.lessons) ? booking.classSession.lessons : [];
+        const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+
+        if (!deps || !booking || !lesson) {
+            notifyBookingAlert('Unable to open class completion form. Please refresh and try again.', 'error');
+            return;
+        }
+
+        state.classLessonContext = {
+            bookingId: String(bookingId || ''),
+            lessonId: String(lessonId || '')
+        };
+
+        const titleEl = document.getElementById('classLessonCompletionTitle');
+        const summaryEl = document.getElementById('classLessonCompletionSummary');
+        const dateEl = document.getElementById('classCompletedDate');
+        const startTimeEl = document.getElementById('classCompletedStartTime');
+        const notesEl = document.getElementById('classCompletedNotes');
+        const detailsEl = document.getElementById('classCompletedDetails');
+
+        if (titleEl) {
+            titleEl.textContent = `Mark Class Completed - Week ${lesson?.weekNumber || lesson?.classNumber || 1}`;
+        }
+
+        if (summaryEl) {
+            const instrument = String(booking?.classSession?.instrument || 'Music').trim();
+            const student = String(booking?.userName || 'Student').trim();
+            const scheduledDate = lesson?.scheduledDate ? formatSimpleDate(lesson.scheduledDate) : 'N/A';
+            const scheduledStart = lesson?.scheduledStartTime || booking?.startTime || 'N/A';
+            const scheduledEnd = lesson?.scheduledEndTime || booking?.endTime || 'N/A';
+            summaryEl.innerHTML = `
+                <p><strong>Student:</strong> ${escapeHtml(student)}</p>
+                <p><strong>Instrument:</strong> ${escapeHtml(instrument)}</p>
+                <p><strong>Scheduled:</strong> ${escapeHtml(scheduledDate)} (${escapeHtml(scheduledStart)} - ${escapeHtml(scheduledEnd)})</p>
+            `;
+        }
+
+        const defaultDate = lesson?.scheduledDate
+            ? (() => {
+                const d = new Date(lesson.scheduledDate);
+                if (Number.isNaN(d.getTime())) return getTodayYmd();
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            })()
+            : getTodayYmd();
+
+        if (dateEl) dateEl.value = defaultDate;
+        if (startTimeEl) startTimeEl.value = normalizeTimeValue(lesson?.scheduledStartTime || booking?.startTime || '') || '';
+        if (notesEl) notesEl.value = String(lesson?.notes || '').trim();
+        if (detailsEl) detailsEl.value = String(lesson?.details || '').trim();
+
+        const modal = document.getElementById('classLessonCompletionModal');
+        if (modal) modal.classList.add('show');
+
+        setTimeout(() => {
+            if (dateEl) dateEl.focus();
+        }, 0);
     };
 
     const getRentalLineTotal = (booking, rental) => {
@@ -221,6 +359,137 @@
         `;
     };
 
+    const buildClassTrackingMarkup = (booking) => {
+        const classSession = booking?.classSession || {};
+        if (!classSession?.isClassBooking) {
+            return '';
+        }
+
+        const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
+        const fmtTime = state.formatTime || ((t) => t || 'N/A');
+        const pendingApprovalCount = lessons.filter((lesson) => String(lesson?.slotRequest?.status || 'NONE').toUpperCase() === 'PENDING').length;
+        const lessonLines = lessons.length > 0
+            ? lessons.map((lesson) => {
+                const lessonId = String(lesson?._id || '');
+                const status = String(lesson?.status || 'SCHEDULED').toUpperCase();
+                const statusClass = status === 'COMPLETED' ? 'completed' : status === 'CANCELLED' ? 'cancelled' : 'scheduled';
+                const statusLabel = status.charAt(0) + status.slice(1).toLowerCase();
+                const weekNum = lesson?.weekNumber || lesson?.classNumber || 1;
+                const scheduledDate = lesson?.scheduledDate ? formatSimpleDate(lesson.scheduledDate) : 'TBD';
+                const completionDate = lesson?.completedDate ? formatSimpleDate(lesson.completedDate) : null;
+                const completionTimeStr = lesson?.completedStartTime && lesson?.completedEndTime
+                    ? `${fmtTime(lesson.completedStartTime)} - ${fmtTime(lesson.completedEndTime)}`
+                    : null;
+                const headerDateStr = (() => {
+                    const src = status === 'COMPLETED' && lesson?.completedDate ? lesson.completedDate : lesson?.scheduledDate;
+                    if (!src) return null;
+                    const d = new Date(src);
+                    if (Number.isNaN(d.getTime())) return null;
+                    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+                })();
+                const slotReq = lesson?.slotRequest || {};
+                const slotReqStatus = String(slotReq.status || 'NONE').toUpperCase();
+                const hasPendingSlot = slotReqStatus === 'PENDING';
+                const slotReqHeaderBadge = hasPendingSlot
+                    ? ' <span class="lesson-status-badge lesson-status-scheduled lesson-status-pending-approval">Pending Approval</span>'
+                    : '';
+                const slotReqBlock = hasPendingSlot
+                    ? `<div class="lesson-slot-request lesson-slot-pending lesson-slot-request-admin">
+                           <p class="lesson-slot-request-title"><strong>Pending Approval</strong></p>
+                           <p><strong>Requested Slot:</strong> ${escapeHtml(slotReq.proposedDate ? formatSimpleDate(slotReq.proposedDate) : 'N/A')} at ${escapeHtml(slotReq.proposedStartTime || 'N/A')}${slotReq.proposedEndTime ? ` - ${escapeHtml(slotReq.proposedEndTime)}` : ''}</p>
+                           <div class="lesson-slot-request-actions">
+                               <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); approveSlotRequest('${booking._id}','${lessonId}')">Approve Slot</button>
+                               <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); rejectSlotRequest('${booking._id}','${lessonId}')">Reject Slot</button>
+                           </div>
+                       </div>`
+                    : '';
+
+                return `
+                    <li>
+                        <details class="lesson-accordion">
+                            <summary class="lesson-accordion-header">
+                                <span class="lesson-accordion-week">Week ${weekNum}${headerDateStr ? ` · ${headerDateStr}` : ''}${slotReqHeaderBadge}</span>
+                                <span class="lesson-status-badge lesson-status-${statusClass}">${statusLabel}</span>
+                            </summary>
+                            <div class="lesson-accordion-body">
+                                <p><strong>Scheduled:</strong> ${escapeHtml(scheduledDate)} (${escapeHtml(lesson?.scheduledStartTime || 'N/A')} – ${escapeHtml(lesson?.scheduledEndTime || 'N/A')})</p>
+                                ${status === 'COMPLETED'
+                                    ? `<p><strong>Completed on:</strong> ${escapeHtml(completionDate || 'N/A')}${completionTimeStr ? `, ${escapeHtml(completionTimeStr)}` : ''}</p>
+                                       ${lesson?.notes ? `<p><strong>Notes:</strong> ${escapeHtml(lesson.notes)}</p>` : ''}
+                                       ${lesson?.details ? `<p><strong>Details:</strong> ${escapeHtml(lesson.details)}</p>` : ''}`
+                                    : `<div style="display:flex;gap:6px;flex-wrap:wrap">
+                                           <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); markClassLessonCompleted('${booking._id}', '${lessonId}')">Mark Completed</button>
+                                           <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); cancelClassLesson('${booking._id}', '${lessonId}')">Cancel</button>
+                                       </div>${slotReqBlock}
+                                       <details class="lesson-slot-form" style="margin-top:8px;">
+                                           <summary style="cursor:pointer;font-size:0.85em;font-weight:600;color:var(--primary-color);list-style:none;display:inline-flex;align-items:center;gap:4px;">
+                                               📅 Book Slot (Admin)
+                                           </summary>
+                                           <div style="margin-top:8px;display:grid;gap:8px;">
+                                               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                                   <div class="form-group" style="margin-bottom:0;">
+                                                       <label style="margin-bottom:6px;">Date</label>
+                                                       <input type="date" class="admin-book-slot-date form-control input" data-booking="${booking._id}" data-lesson="${lessonId}" />
+                                                   </div>
+                                                   <div class="form-group" style="margin-bottom:0;">
+                                                       <label style="margin-bottom:6px;">Start Time</label>
+                                                       <select class="admin-book-slot-time">
+                                                           <option value="">Select time</option>
+                                                           <option value="09:00">9:00 AM</option>
+                                                           <option value="10:00">10:00 AM</option>
+                                                           <option value="11:00">11:00 AM</option>
+                                                           <option value="12:00">12:00 PM</option>
+                                                           <option value="13:00">1:00 PM</option>
+                                                           <option value="14:00">2:00 PM</option>
+                                                           <option value="15:00">3:00 PM</option>
+                                                           <option value="16:00">4:00 PM</option>
+                                                           <option value="17:00">5:00 PM</option>
+                                                           <option value="18:00">6:00 PM</option>
+                                                           <option value="19:00">7:00 PM</option>
+                                                           <option value="20:00">8:00 PM</option>
+                                                           <option value="21:00">9:00 PM</option>
+                                                           <option value="22:00">10:00 PM</option>
+                                                           <option value="23:00">11:00 PM</option>
+                                                       </select>
+                                                   </div>
+                                               </div>
+                                               <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); adminBookSlot('${booking._id}','${lessonId}', this)" style="width:100%;">Confirm Slot</button>
+                                           </div>
+                                       </details>`}
+                            </div>
+                        </details>
+                    </li>`;
+            }).join('')
+            : '<li style="padding:6px 12px;color:var(--text-color-light);">No lessons generated yet.</li>';
+
+        return `
+            <section class="booking-class-tracking">
+                <div class="booking-class-tracking-head">
+                    <h4>Class Tracking</h4>
+                    ${pendingApprovalCount > 0
+                        ? `<span class="booking-class-tracking-pill">${pendingApprovalCount} Pending Approval${pendingApprovalCount > 1 ? 's' : ''}</span>`
+                        : ''}
+                </div>
+                <div class="booking-kv-grid">
+                    <p><strong>Item:</strong> ${escapeHtml(classSession.selectedClassItemName || classSession.instrument || 'N/A')}</p>
+                    <p><strong>Location:</strong> ${escapeHtml(classSession.location || 'N/A')}</p>
+                    <p><strong>Plan:</strong> ${escapeHtml(String(classSession.planMonths || 1))} month(s)</p>
+                    <p><strong>Plan Window:</strong> ${classSession.planStartDate ? formatSimpleDate(classSession.planStartDate) : 'N/A'} to ${classSession.planEndDate ? formatSimpleDate(classSession.planEndDate) : 'N/A'}</p>
+                    <p><strong>Classes/Month:</strong> ${escapeHtml(String(classSession.classesPerMonth || 0))}</p>
+                    <p><strong>Total Planned:</strong> ${escapeHtml(String(classSession.totalClassesPlanned || 0))}</p>
+                    <p><strong>Completed:</strong> ${escapeHtml(String(classSession.completedClassesCount || 0))}</p>
+                    <p><strong>Remaining:</strong> ${escapeHtml(String(classSession.classesRemainingAfterBooking || 0))}</p>
+                    <p><strong>Plan Fee:</strong> ${formatCurrency(classSession.totalFeeBeforeDiscount || classSession.monthlyFee || 0)}</p>
+                    <p><strong>Payable:</strong> ${formatCurrency(classSession.totalFeeAfterDiscount || classSession.monthlyFeeDueNow || 0)}</p>
+                </div>
+                <div class="booking-requirements">
+                    <p><strong>Lessons:</strong></p>
+                    <ul class="lesson-accordion-list">${lessonLines}</ul>
+                </div>
+            </section>
+        `;
+    };
+
     const buildBookingDetailsMarkup = ({ booking, formatDate, formatTime, includeActions = true, context = 'modal' }) => {
         const isPerday = booking.bookingMode === 'perday';
         const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
@@ -296,6 +565,8 @@
                         </div>
                     </section>
 
+                    ${buildClassTrackingMarkup(booking)}
+
                     <section class="booking-expand-panel admin-theme-info-card booking-modal-theme-requirements">
                         <h4>Requirements</h4>
                         ${buildRequirementsMarkup(booking)}
@@ -342,6 +613,39 @@
         });
 
         modal.classList.add('show');
+
+        // Initialize Flatpickr for admin slot booking date pickers
+        setTimeout(() => {
+            initializeAdminSlotDatePickers();
+        }, 0);
+    };
+
+    const initializeAdminSlotDatePickers = () => {
+        if (typeof window.flatpickr !== 'function') {
+            return;
+        }
+
+        const dateInputs = document.querySelectorAll('.admin-book-slot-date');
+        dateInputs.forEach((inputEl) => {
+            if (inputEl.dataset.flatpickrBound === '1') {
+                return;
+            }
+
+            inputEl.dataset.flatpickrBound = '1';
+
+            window.flatpickr(inputEl, {
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'd M Y',
+                disableMobile: true,
+                minDate: 'today',
+                clickOpens: true,
+                onChange: () => {
+                    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        });
     };
 
     const buildPaginationMarkup = () => {
@@ -878,6 +1182,112 @@
         );
     };
 
+    const markClassLessonCompleted = async (bookingId, lessonId) => {
+        openClassLessonCompletionModal(bookingId, lessonId);
+    };
+
+    const cancelClassLesson = async (bookingId, lessonId) => {
+        const deps = state.loadDeps;
+        if (!deps?.apiUrl) {
+            alert('Unable to cancel lesson right now. Please refresh and try again.');
+            return;
+        }
+
+        if (!confirm('Cancel this lesson? This cannot be undone.')) return;
+
+        try {
+            showBookingLoading('Cancelling lesson...');
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${deps.apiUrl}/api/admin/bookings/${bookingId}/class-lessons/${lessonId}/cancel`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.message || 'Unable to cancel lesson');
+
+            notifyBookingAlert('Lesson cancelled.', 'success');
+            await loadBookings({ page: state.currentPage || 1, showLoader: false });
+            openBookingDetailsModal(bookingId);
+        } catch (error) {
+            notifyBookingAlert(error.message || 'Unable to cancel lesson', 'error');
+        } finally {
+            hideBookingLoading();
+        }
+    };
+
+    const submitClassLessonCompletion = async () => {
+        const deps = state.loadDeps;
+        if (!deps || !deps.apiUrl) {
+            alert('Unable to update class lesson right now. Please refresh and try again.');
+            return;
+        }
+
+        const context = state.classLessonContext;
+        if (!context?.bookingId || !context?.lessonId) {
+            notifyBookingAlert('Class lesson context is missing. Please try again.', 'error');
+            return;
+        }
+
+        const completedDateEl = document.getElementById('classCompletedDate');
+        const completedStartEl = document.getElementById('classCompletedStartTime');
+        const notesEl = document.getElementById('classCompletedNotes');
+        const detailsEl = document.getElementById('classCompletedDetails');
+
+        const completedDate = String(completedDateEl?.value || '').trim();
+        const completedStartTime = normalizeTimeValue(completedStartEl?.value || '');
+        const notes = String(notesEl?.value || '').trim();
+        const details = String(detailsEl?.value || '').trim();
+
+        if (!completedDate) {
+            notifyBookingAlert('Please select a valid completion date.', 'error');
+            completedDateEl?.focus();
+            return;
+        }
+
+        if (!completedStartTime) {
+            notifyBookingAlert('Please enter a valid start time (HH:mm).', 'error');
+            completedStartEl?.focus();
+            return;
+        }
+
+        try {
+            showBookingLoading('Updating class lesson...');
+
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${deps.apiUrl}/api/admin/bookings/${context.bookingId}/class-lessons/${context.lessonId}/complete`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    completedDate: String(completedDate || '').trim(),
+                    completedStartTime: String(completedStartTime || '').trim(),
+                    notes: String(notes || '').trim(),
+                    details: String(details || '').trim()
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.message || 'Unable to update class lesson');
+            }
+
+            hideClassLessonCompletionModal();
+            notifyBookingAlert('Class lesson marked completed.', 'success');
+            await loadBookings({ page: state.currentPage || 1, showLoader: false });
+            openBookingDetailsModal(context.bookingId);
+        } catch (error) {
+            notifyBookingAlert(error.message || 'Unable to mark class lesson completed', 'error');
+        } finally {
+            hideBookingLoading();
+        }
+    };
+
     const syncQuickPaymentForBookingModal = () => {
         const statusEl = document.getElementById('qpStatus');
         const amountEl = document.getElementById('qpAmountPaid');
@@ -1007,14 +1417,106 @@
     };
 
     window.AdminBookings = window.AdminBookings || {};
+        const approveSlotRequest = async (bookingId, lessonId) => {
+            const deps = state.loadDeps;
+            if (!deps?.apiUrl) { alert('Unable to approve slot. Please refresh.'); return; }
+            try {
+                showBookingLoading('Approving slot...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${deps.apiUrl}/api/admin/bookings/${bookingId}/class-lessons/${lessonId}/approve-slot`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({})
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.message || 'Unable to approve slot');
+                notifyBookingAlert('Slot request approved. Lesson updated.', 'success');
+                await loadBookings({ page: state.currentPage || 1, showLoader: false });
+                openBookingDetailsModal(bookingId);
+            } catch (error) {
+                notifyBookingAlert(error.message || 'Unable to approve slot', 'error');
+            } finally {
+                hideBookingLoading();
+            }
+        };
+
+        const rejectSlotRequest = async (bookingId, lessonId) => {
+            const deps = state.loadDeps;
+            if (!deps?.apiUrl) { alert('Unable to reject slot. Please refresh.'); return; }
+            const responseNote = prompt('Reason for rejection (optional):') ?? '';
+            if (responseNote === null) return; // cancelled
+            try {
+                showBookingLoading('Rejecting slot...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${deps.apiUrl}/api/admin/bookings/${bookingId}/class-lessons/${lessonId}/reject-slot`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ responseNote: String(responseNote || '').trim() })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.message || 'Unable to reject slot');
+                notifyBookingAlert('Slot request rejected.', 'success');
+                await loadBookings({ page: state.currentPage || 1, showLoader: false });
+                openBookingDetailsModal(bookingId);
+            } catch (error) {
+                notifyBookingAlert(error.message || 'Unable to reject slot', 'error');
+            } finally {
+                hideBookingLoading();
+            }
+        };
+
+        const adminBookSlot = async (bookingId, lessonId, triggerBtn) => {
+            const deps = state.loadDeps;
+            if (!deps?.apiUrl) { alert('Unable to book slot. Please refresh.'); return; }
+            const container = triggerBtn?.closest('details');
+            const dateInput = container?.querySelector('.admin-book-slot-date');
+            const timeSelect = container?.querySelector('.admin-book-slot-time');
+            const proposedDate = String(dateInput?.value || '').trim();
+            const proposedStartTime = String(timeSelect?.value || '').trim();
+            if (!proposedDate) { notifyBookingAlert('Please select a date.', 'error'); return; }
+            if (!proposedStartTime) { notifyBookingAlert('Please select a start time.', 'error'); return; }
+            try {
+                showBookingLoading('Booking slot...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${deps.apiUrl}/api/admin/bookings/${bookingId}/class-lessons/${lessonId}/book-slot`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ proposedDate, proposedStartTime })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data?.message || 'Unable to book slot');
+                notifyBookingAlert('Slot booked successfully. Calendar invite sent to student.', 'success');
+                await loadBookings({ page: state.currentPage || 1, showLoader: false });
+                openBookingDetailsModal(bookingId);
+            } catch (error) {
+                notifyBookingAlert(error.message || 'Unable to book slot', 'error');
+            } finally {
+                hideBookingLoading();
+            }
+        };
+
+        window.AdminBookings = window.AdminBookings || {};
     window.AdminBookings.loadBookings = loadBookings;
     window.AdminBookings.approveBooking = approveBooking;
     window.AdminBookings.rejectBooking = rejectBooking;
-    window.AdminBookings.syncQuickPaymentForBookingModal = syncQuickPaymentForBookingModal;
+    window.AdminBookings.markClassLessonCompleted = markClassLessonCompleted;
+    window.AdminBookings.cancelClassLesson = cancelClassLesson;
+    window.AdminBookings.submitClassLessonCompletion = submitClassLessonCompletion;
+    window.AdminBookings.approveSlotRequest = approveSlotRequest;
+    window.AdminBookings.rejectSlotRequest = rejectSlotRequest;
+    window.AdminBookings.adminBookSlot = adminBookSlot;
+    window.AdminBookings.hideClassLessonCompletionModal = hideClassLessonCompletionModal;
     window.AdminBookings.quickUpdateBookingPayment = quickUpdateBookingPayment;
     window.AdminBookings.openBookingDetailsModal = openBookingDetailsModal;
     window.AdminBookings.openBookingPaymentDetails = openBookingPaymentDetails;
     window.syncQuickPaymentForBookingModal = syncQuickPaymentForBookingModal;
     window.openBookingPaymentDetails = openBookingPaymentDetails;
     window.openBookingDetailsModal = openBookingDetailsModal;
+    window.markClassLessonCompleted = markClassLessonCompleted;
+    window.cancelClassLesson = cancelClassLesson;
+    window.submitClassLessonCompletion = submitClassLessonCompletion;
+    window.approveSlotRequest = approveSlotRequest;
+    window.rejectSlotRequest = rejectSlotRequest;
+    window.adminBookSlot = adminBookSlot;
+    window.hideClassLessonCompletionModal = hideClassLessonCompletionModal;
 })();

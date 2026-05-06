@@ -104,80 +104,110 @@ const QUOTATION_CHARGE_GROUPS = Object.freeze([
   })
 ]);
 
-const SERVICE_GROUP_META = Object.freeze({
-  studio: Object.freeze({
-    icon: '🎸',
-    title: 'Studio Usage',
-    subtitle: 'Room access, instruments, and in-studio equipment support'
-  }),
-  production: Object.freeze({
-    icon: '🎧',
-    title: 'Production Services',
-    subtitle: 'Composition, arrangement, recording, and creative production support'
-  }),
-  finishing: Object.freeze({
-    icon: '🎼',
-    title: 'Finishing & Delivery',
-    subtitle: 'Mixing, mastering, and final polish for release-ready output'
-  }),
-  'sound-design': Object.freeze({
-    icon: '🎬',
-    title: 'Sound Design',
-    subtitle: 'Foley, textures, and custom effects for cinematic or visual work'
-  })
-});
+const getServiceGroupingConfig = (config = {}) => {
+  const groups = (Array.isArray(config?.groups) ? config.groups : [])
+    .map((group, index) => ({
+      key: String(group?.key || '').trim().toLowerCase(),
+      icon: String(group?.icon || '').trim(),
+      title: String(group?.title || '').trim(),
+      subtitle: String(group?.subtitle || '').trim(),
+      order: Number.isFinite(Number(group?.order)) ? Number(group.order) : ((index + 1) * 10)
+    }))
+    .filter((group) => group.key && group.title)
+    .sort((left, right) => left.order - right.order);
 
-const SERVICE_GROUP_ORDER = Object.freeze(['studio', 'production', 'finishing', 'sound-design']);
+  const rules = (Array.isArray(config?.categoryRules) ? config.categoryRules : [])
+    .map((rule, index) => ({
+      groupKey: String(rule?.groupKey || '').trim().toLowerCase(),
+      title: String(rule?.title || '').trim(),
+      description: String(rule?.description || '').trim(),
+      order: Number.isFinite(Number(rule?.order)) ? Number(rule.order) : ((index + 1) * 10),
+      matchField: ['name', 'category', 'both'].includes(String(rule?.matchField || '').toLowerCase())
+        ? String(rule.matchField).toLowerCase()
+        : 'both',
+      keywords: (Array.isArray(rule?.keywords) ? rule.keywords : [])
+        .map((keyword) => String(keyword || '').trim().toLowerCase())
+        .filter(Boolean)
+    }))
+    .filter((rule) => rule.groupKey && rule.keywords.length > 0)
+    .sort((left, right) => left.order - right.order);
 
-const classifyServiceItem = (item = {}) => {
+  const catalogAssignments = (Array.isArray(config?.catalogAssignments) ? config.catalogAssignments : [])
+    .map((entry) => ({
+      groupKey: String(entry?.groupKey || '').trim().toLowerCase(),
+      assignmentType: String(entry?.assignmentType || '').trim().toLowerCase() === 'subitem' ? 'subitem' : 'category',
+      categoryName: String(entry?.categoryName || '').trim().toLowerCase(),
+      itemName: String(entry?.itemName || '').trim().toLowerCase()
+    }))
+    .filter((entry) => entry.groupKey && (entry.assignmentType === 'category' ? entry.categoryName : (entry.categoryName && entry.itemName)));
+
+  const defaultGroupKey = String(config?.defaultGroupKey || groups[0]?.key || 'studio').trim().toLowerCase();
+
+  return {
+    groups,
+    rules,
+    catalogAssignments,
+    defaultGroupKey,
+    groupKeys: groups.map((group) => group.key)
+  };
+};
+
+const classifyServiceItem = (item = {}, config = {}) => {
   const rawName = String(item?.name || '').trim();
   const rawCategory = String(item?.category || '').trim();
   const nameLower = rawName.toLowerCase();
   const categoryLower = rawCategory.toLowerCase();
-  const searchText = `${nameLower} ${categoryLower}`;
+  const normalizedConfig = getServiceGroupingConfig(config);
 
-  if (/jamroom|jam room/.test(nameLower) || /^studio$/.test(nameLower.trim())) {
-    return { groupKey: 'studio', title: rawName || 'JamRoom Studio', description: 'Professional in-studio room usage with monitoring, setup support, and a comfortable recording environment.', order: 10 };
+  // Priority 1: explicit catalog assignments (admin-managed, no duplication)
+  const matchedAssignment = normalizedConfig.catalogAssignments.find((entry) => {
+    if (entry.assignmentType === 'category') {
+      return entry.categoryName === categoryLower;
+    }
+    return entry.categoryName === categoryLower && entry.itemName === nameLower;
+  });
+
+  if (matchedAssignment) {
+    return {
+      groupKey: matchedAssignment.groupKey,
+      title: rawName || 'Service',
+      description: rawCategory
+        ? `${rawCategory} support tailored to your quotation requirements.`
+        : 'Professional service support tailored to your booking requirements.',
+      order: 5
+    };
   }
-  if (/bass guitar/.test(searchText)) {
-    return { groupKey: 'studio', title: rawName || 'Bass Guitar', description: 'Live bass instrument support for rehearsals, jams, and recording sessions.', order: 20 };
+
+  // Priority 2: legacy keyword rules
+  const matchedRule = normalizedConfig.rules.find((rule) => {
+    const searchText = rule.matchField === 'name'
+      ? nameLower
+      : rule.matchField === 'category'
+        ? categoryLower
+        : `${nameLower} ${categoryLower}`;
+
+    return rule.keywords.some((keyword) => searchText.includes(keyword));
+  });
+
+  if (matchedRule) {
+    return {
+      groupKey: matchedRule.groupKey,
+      title: rawName || matchedRule.title || 'Service',
+      description: matchedRule.description || 'Professional service support tailored to your booking requirements.',
+      order: matchedRule.order
+    };
   }
-  if (/keyboard|piano/.test(searchText)) {
-    return { groupKey: 'studio', title: rawName || 'Keyboard', description: 'Keyboard setup for composing, rehearsing, and recording melodic parts.', order: 30 };
-  }
-  if (/guitar|amp|drum|mic|microphone|monitor|speaker|console|mixer/.test(searchText)) {
-    return { groupKey: 'studio', title: rawName || 'Studio Equipment', description: 'Studio equipment support prepared for tracking, rehearsal, and live session needs.', order: 40 };
-  }
-  if (/studio/.test(categoryLower)) {
-    return { groupKey: 'studio', title: rawName || 'Studio Service', description: rawCategory ? `${rawCategory} support for your session.` : 'In-studio support for tracking, rehearsal, and recording.', order: 45 };
-  }
-  if (/composition/.test(searchText)) {
-    return { groupKey: 'production', title: rawName || 'Composition', description: 'Original music composition crafted around your creative brief, mood, and structure.', order: 50 };
-  }
-  if (/arrangement layering/.test(searchText)) {
-    return { groupKey: 'production', title: rawName || 'Arrangement Enhancement', description: 'Enhancing the music with additional instrument layers and a fuller arrangement.', order: 60 };
-  }
-  if (/arrangement/.test(searchText)) {
-    return { groupKey: 'production', title: rawName || 'Arrangement', description: 'Structuring and refining the song so the production feels complete and performance-ready.', order: 70 };
-  }
-  if (/recording|tracking|vocal|editing/.test(searchText)) {
-    return { groupKey: 'production', title: rawName || 'Production Service', description: 'Hands-on recording and production support tailored to the session requirement.', order: 80 };
-  }
-  if (/stem mastering/.test(searchText)) {
-    return { groupKey: 'finishing', title: rawName || 'Stem Mastering', description: 'Mastering from grouped stems for better tonal control, polish, and release-ready output.', order: 90 };
-  }
-  if (/mastering/.test(searchText)) {
-    return { groupKey: 'finishing', title: rawName || 'Mastering', description: 'Final polish, loudness balance, and clarity tuning for a release-ready final version.', order: 100 };
-  }
-  if (/mix/.test(searchText)) {
-    return { groupKey: 'finishing', title: rawName || 'Mixing', description: 'Balancing vocals and instruments for clarity, space, punch, and a polished sound.', order: 110 };
-  }
-  if (/foley|sound effect|sfx/.test(searchText)) {
-    return { groupKey: 'sound-design', title: rawName || 'Foley / Sound Design', description: 'Custom sound effects and texture creation for scenes, visuals, or storytelling moments.', order: 120 };
+
+  const resolvedRentalType = normalizeRentalType(item?.rentalType);
+  let fallbackGroupKey = normalizedConfig.defaultGroupKey;
+  if (['persession', 'pertrack'].includes(resolvedRentalType)) {
+    fallbackGroupKey = normalizedConfig.groupKeys.includes('production') ? 'production' : normalizedConfig.defaultGroupKey;
+  } else if (resolvedRentalType === 'perday') {
+    fallbackGroupKey = normalizedConfig.groupKeys.includes('perday-rentals') ? 'perday-rentals' : normalizedConfig.defaultGroupKey;
   }
 
   return {
-    groupKey: ['persession', 'pertrack'].includes(normalizeRentalType(item?.rentalType)) ? 'production' : 'studio',
+    groupKey: fallbackGroupKey,
     title: rawName || 'Custom Service',
     description: rawCategory
       ? `${rawCategory} support tailored to your quotation requirements.`
@@ -186,14 +216,22 @@ const classifyServiceItem = (item = {}) => {
   };
 };
 
-const buildServiceGroupSummary = (items = [], calculation = {}) => {
+const buildServiceGroupSummary = (items = [], calculation = {}, config = {}) => {
+  const normalizedConfig = getServiceGroupingConfig(config);
+  const groupMetaMap = new Map(normalizedConfig.groups.map((group) => [group.key, group]));
+  const groupOrder = normalizedConfig.groups.map((group) => group.key);
   const map = new Map();
 
   (Array.isArray(items) ? items : []).forEach((item) => {
-    const meta = classifyServiceItem(item);
-    const groupMeta = SERVICE_GROUP_META[meta.groupKey] || SERVICE_GROUP_META.production;
+    const meta = classifyServiceItem(item, normalizedConfig);
+    const groupMeta = groupMetaMap.get(meta.groupKey) || groupMetaMap.get(normalizedConfig.defaultGroupKey) || {
+      key: normalizedConfig.defaultGroupKey,
+      icon: '',
+      title: 'Services',
+      subtitle: 'Booking services'
+    };
     const group = map.get(meta.groupKey) || {
-      key: meta.groupKey,
+      key: groupMeta.key,
       icon: groupMeta.icon,
       title: groupMeta.title,
       subtitle: groupMeta.subtitle,
@@ -225,7 +263,7 @@ const buildServiceGroupSummary = (items = [], calculation = {}) => {
     map.set(meta.groupKey, group);
   });
 
-  return SERVICE_GROUP_ORDER
+  return groupOrder
     .map((key) => map.get(key))
     .filter(Boolean)
     .map((group) => ({
@@ -242,7 +280,17 @@ module.exports = {
   getQuotationBillingLabel,
   getQuotationItemAmount,
   getQuotationChargeGroups,
-  getServiceGroupMeta: () => ({ ...SERVICE_GROUP_META }),
+  getServiceGroupMeta: (config = {}) => {
+    const normalizedConfig = getServiceGroupingConfig(config);
+    return normalizedConfig.groups.reduce((acc, group) => {
+      acc[group.key] = {
+        icon: group.icon,
+        title: group.title,
+        subtitle: group.subtitle
+      };
+      return acc;
+    }, {});
+  },
   classifyServiceItem,
   buildServiceGroupSummary
 };

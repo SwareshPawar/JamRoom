@@ -48,9 +48,54 @@
                 <form id="bookingForm">
                     <div class="form-group">
                         <label for="bookingTypeSelect">Catalog*</label>
-                        <select id="bookingTypeSelect" required>
-                            <option value="">Loading booking catalog...</option>
+                        <div class="booking-type-combobox" id="bookingTypeCombobox">
+                            <input id="bookingTypeSelect" placeholder="Search and select catalog" autocomplete="off" required aria-autocomplete="list" aria-expanded="false" aria-controls="bookingTypeDropdown">
+                            <button type="button" id="bookingTypeToggle" class="booking-type-toggle" aria-label="Show catalog options" title="Show catalog options">
+                                <span aria-hidden="true">▾</span>
+                            </button>
+                            <div id="bookingTypeDropdown" class="booking-type-dropdown" hidden></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group booking-hidden-initial" id="classLocationGroup">
+                        <label for="classLocation">Class Location*</label>
+                        <select id="classLocation">
+                            <option value="">Select class location</option>
                         </select>
+                        <small class="field-help">Select location for class bookings.</small>
+                    </div>
+
+                    <div class="form-group booking-hidden-initial" id="classPlanMonthsGroup">
+                        <label for="classPlanMonths">Class Plan Duration*</label>
+                        <select id="classPlanMonths">
+                            <option value="1">1 Month</option>
+                        </select>
+                        <small class="field-help" id="classDiscountHint">Discounts apply for long-term plans.</small>
+                    </div>
+
+                    <div class="form-group booking-hidden-initial" id="classPlanInfoGroup">
+                        <div class="field-help" id="classPlanInfoText">4 classes per month. Plan schedule will be generated after booking.</div>
+                    </div>
+
+                    <div class="form-group booking-hidden-initial" id="classPreferredWeekdayGroup">
+                        <label for="classPreferredWeekday">Preferred Weekly Class Day*</label>
+                        <select id="classPreferredWeekday">
+                            <option value="">Select preferred day</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                        <small class="field-help">This sets the default weekly class day for your plan.</small>
+                    </div>
+
+                    <div class="form-group booking-hidden-initial" id="classPreferredStartTimeGroup">
+                        <label for="classPreferredStartTime">Preferred Class Start Time*</label>
+                        <input type="time" id="classPreferredStartTime" step="1800">
+                        <small class="field-help">Default class timing saved with your booking. You can request changes later.</small>
                     </div>
 
                     <div id="hourlyBookingBlock" class="booking-flow-block">
@@ -74,14 +119,14 @@
 
                     <div class="time-container">
                         <div class="form-group">
-                            <label for="startTime">Start Time*</label>
+                            <label for="startTime" id="startTimeLabel">Start Time*</label>
                             <select id="startTime" required disabled>
                                 <option value="">Select date first</option>
                             </select>
                             <div id="startTimeLoading" class="loading-text start-time-loading">Loading available times...</div>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="endTimeGroup">
                             <label for="endTime">End Time*</label>
                             <select id="endTime" required disabled>
                                 <option value="">Select start time first</option>

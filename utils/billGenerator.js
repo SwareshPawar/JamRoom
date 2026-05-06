@@ -59,6 +59,35 @@ const buildCatalogRentalTypeMap = (settings = {}) => {
   return map;
 };
 
+// Maps item name (lowercase) → original-case catalog category name.
+// Top-level rental types map to themselves; sub-items map to their parent category.
+// This is used to populate the `category` field on booking rental items so that
+// classifyServiceItem can match them against catalogAssignment rules.
+const buildCatalogItemCategoryMap = (settings = {}) => {
+  const map = new Map();
+  const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+
+  rentalTypes.forEach((type) => {
+    const originalCategoryName = String(type?.name || '').trim();
+    const categoryKey = normalizeNameKey(originalCategoryName);
+
+    // Top-level rental type: the item IS the category
+    if (categoryKey && !map.has(categoryKey)) {
+      map.set(categoryKey, originalCategoryName);
+    }
+
+    // Sub-items: their category is the parent rental type name
+    const subItems = Array.isArray(type?.subItems) ? type.subItems : [];
+    subItems.forEach((subItem) => {
+      const itemKey = normalizeNameKey(subItem?.name);
+      if (!itemKey || map.has(itemKey)) return;
+      map.set(itemKey, originalCategoryName);
+    });
+  });
+
+  return map;
+};
+
 const enrichBookingRentalsWithCatalogTypes = (booking, settings = {}) => {
   const plainBooking = toPlainBooking(booking);
 
@@ -67,24 +96,28 @@ const enrichBookingRentalsWithCatalogTypes = (booking, settings = {}) => {
   }
 
   const rentalTypeMap = buildCatalogRentalTypeMap(settings);
-  if (rentalTypeMap.size === 0) {
+  const categoryMap = buildCatalogItemCategoryMap(settings);
+
+  if (rentalTypeMap.size === 0 && categoryMap.size === 0) {
     return plainBooking;
   }
 
   const enrichedRentals = plainBooking.rentals.map((rental) => {
+    const itemKey = normalizeNameKey(rental?.name);
     const existingType = normalizeRentalType(rental?.rentalType);
-    if (existingType) {
-      return rental;
-    }
+    const existingCategory = String(rental?.category || '').trim();
 
-    const matchedType = rentalTypeMap.get(normalizeNameKey(rental?.name)) || '';
-    if (!matchedType) {
+    const matchedType = !existingType ? (rentalTypeMap.get(itemKey) || '') : '';
+    const matchedCategory = !existingCategory ? (categoryMap.get(itemKey) || '') : '';
+
+    if (!matchedType && !matchedCategory) {
       return rental;
     }
 
     return {
       ...rental,
-      rentalType: matchedType
+      ...(matchedType ? { rentalType: matchedType } : {}),
+      ...(matchedCategory ? { category: matchedCategory } : {})
     };
   });
 
@@ -421,7 +454,8 @@ const buildQuotationPresentationData = (data, settings) => {
 
   const serviceGroups = buildServiceGroupSummary(
     Array.isArray(data?.rentals) ? data.rentals : [],
-    data?.calculation || {}
+    data?.calculation || {},
+    settings?.serviceGroupingConfig || {}
   ).map((group) => ({
     ...group,
     subtotalLabel: formatCurrency(group.subtotal),

@@ -1062,3 +1062,114 @@ This cleanup transformed the JamRoom application from a collection of redundant 
 ---
 
 *Document Version: 2.1 | Last Updated: March 8, 2026 (Includes UI tracking ownership and shared nav/header consistency updates)*
+
+---
+
+## 🛠 PDF BILL SECTIONS — ADMIN-MANAGED GROUPING (May 2026)
+
+### Overview
+
+PDF bills are now fully driven by admin-configured section assignments rather than hardcoded keyword rules. Admins can define sections (e.g., "Studio Usage", "Music Classes"), assign catalog items to each section, and all generated PDFs — quotations, booking bills, and admin downloads — will respect those assignments.
+
+---
+
+### New Admin UI: PDF Bill Sections Tab
+
+**Location:** Admin → Settings → 📄 PDF Sections tab
+
+**Features:**
+- Create/remove sections with key, icon, title, subtitle, and sort order
+- Assign catalog items (whole categories or individual sub-items) to each section
+- No duplication: once a category or sub-item is assigned to a section it is hidden from all other pickers
+- Category↔sub-item conflict prevention: assigning a whole category hides its sub-items and vice versa
+- Default section selector for items that don't match any assignment
+
+**Stored in:** `AdminSettings.serviceGroupingConfig` — fields: `defaultGroupKey`, `groups[]`, `categoryRules[]`, `catalogAssignments[]`
+
+---
+
+### Schema — `catalogAssignments` (added to `AdminSettings`)
+
+```js
+catalogAssignments: [{
+  groupKey: String,          // section key, e.g. 'studio'
+  assignmentType: String,    // 'category' | 'subitem'
+  categoryName: String,      // catalog rental type name
+  itemName: String           // sub-item name (only for assignmentType='subitem')
+}]
+```
+
+---
+
+### Classification Priority
+
+`classifyServiceItem()` in both `utils/shared/quotationBilling.js` and `public/js/shared/quotation-billing.js` applies rules in this order:
+
+1. **Explicit catalog assignments** (`catalogAssignments`) — highest priority, admin-managed
+2. **Legacy keyword rules** (`categoryRules`) — fallback if no assignment matches
+3. **`rentalType`-based default** — `persession`/`pertrack` → `production`, else `defaultGroupKey`
+
+---
+
+### Rental Item Enrichment (Booking Bills)
+
+Booking rental items stored in MongoDB carry only `name`, `price`, `quantity`, `rentalType` — no `category` field. Without `category`, catalog assignment matching would silently fail.
+
+**Fix in `utils/billGenerator.js`:**
+- Added `buildCatalogItemCategoryMap(settings)` — maps item name (lowercase) → parent catalog category name
+- `enrichBookingRentalsWithCatalogTypes()` now also populates `category` on each rental item from this map before the HTML template is called
+- Applied to all server-side PDF paths: user download, admin download, email-attached bill
+
+---
+
+### Class Plan Booking Category Resolution
+
+Class plan bookings build a synthetic service item from `classSession`. Previously the item always had `category: 'Class Plans'` (a hardcoded string that never exists in the catalog), causing it to always fall into the default section.
+
+**Fix in `utils/pdfHTMLTemplate.js` and `public/js/pdfHTMLTemplate.js`:**
+- Added `resolveClassItemCategory(itemName)` — searches `settings.rentalTypes` for the catalog category that contains the class item name (e.g. "Keyboard" resolves to its parent category)
+- Class plan item now uses the resolved category, so PDF section assignments on catalog items apply correctly to class bookings
+
+**Resolution order:**
+1. `classSession.itemCategory` (if stored)
+2. Catalog lookup by `selectedClassItemName || instrument`
+3. Fallback: `'Class Plans'`
+
+---
+
+### `showAlert` Arrow Function Fix
+
+**File:** `public/admin.html` (~line 1210)
+
+**Bug:** `showAlert` was an arrow function using `arguments.length` to detect whether it was called as `showAlert(elementId, message, type)` (3-arg legacy) or `showAlert(message, type)` (2-arg). Arrow functions do not bind `arguments` — this threw `ReferenceError: arguments is not defined` on every settings save.
+
+**Fix:** Renamed third param to `typeArg` (no default). Detection now uses `typeArg !== undefined`:
+```js
+const showAlert = (elementIdOrMessage, messageOrType, typeArg) => {
+    const isThreeArg = typeArg !== undefined;
+    const message = isThreeArg ? messageOrType : elementIdOrMessage;
+    const alertType = isThreeArg ? (typeArg || 'info') : (messageOrType || 'info');
+    if (window.alertManager) {
+        window.alertManager.show(String(message || ''), String(alertType || 'info'));
+    }
+};
+```
+
+---
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `public/admin.html` | Added 📄 PDF Sections settings tab; fixed `showAlert` arrow function |
+| `models/AdminSettings.js` | Added `catalogAssignments` subdoc to `serviceGroupingConfig` schema |
+| `utils/shared/quotationBilling.js` | `classifyServiceItem` uses catalog assignments as priority 1 |
+| `public/js/shared/quotation-billing.js` | Same as server version (UMD browser build kept in sync) |
+| `utils/billGenerator.js` | `buildCatalogItemCategoryMap` + enriches rental `category` field before PDF generation |
+| `utils/pdfHTMLTemplate.js` | Class plan item resolves category from catalog instead of hardcoded `'Class Plans'` |
+| `public/js/pdfHTMLTemplate.js` | Same fix as server template |
+| `public/css/pages/admin.css` | Added PDF Sections tab styles using design system tokens |
+
+---
+
+*Document Version: 2.2 | Last Updated: May 6, 2026 (PDF Bill Sections admin UI, catalog-driven grouping, booking/class enrichment, showAlert fix)*

@@ -21,6 +21,8 @@ const setSubmitButtonLoading = (submitBtn, isLoading, loadingText = 'Creating Bo
 
 const BOOKING_DRAFT_STORAGE_KEY = 'jamroom_booking_form_draft_v1';
 const BOOKING_DRAFT_MAX_AGE_MS = 1000 * 60 * 60 * 24;
+const BOOKING_CATALOG_PREF_STORAGE_KEY = 'jamroom_booking_catalog_pref_v1';
+let bookingTypeOptionsCache = [];
 let bookingDraftSaveTimer = null;
 let isRestoringBookingDraft = false;
 let hasDraftLifecycleBinding = false;
@@ -45,25 +47,147 @@ const clearBookingFormDraft = () => {
     localStorage.removeItem(BOOKING_DRAFT_STORAGE_KEY);
 };
 
+const getCatalogPreference = () => {
+    const parsed = parseDraftJSON(localStorage.getItem(BOOKING_CATALOG_PREF_STORAGE_KEY));
+    if (!parsed || typeof parsed !== 'object') {
+        return { lastSelected: '', recentSelections: [] };
+    }
+
+    const lastSelected = String(parsed.lastSelected || '').trim();
+    const recentSelections = Array.isArray(parsed.recentSelections)
+        ? parsed.recentSelections.map((value) => String(value || '').trim()).filter(Boolean)
+        : [];
+
+    return { lastSelected, recentSelections };
+};
+
+const saveCatalogPreference = (preference) => {
+    try {
+        localStorage.setItem(BOOKING_CATALOG_PREF_STORAGE_KEY, JSON.stringify(preference));
+    } catch (error) {
+        console.warn('Failed to persist catalog preference:', error);
+    }
+};
+
+const getWeekdayLabelFromYmd = (ymd) => {
+    const value = String(ymd || '').trim();
+    if (!value) return '';
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+};
+
+const recordCatalogSelection = (catalogValue) => {
+    const normalizedValue = String(catalogValue || '').trim();
+    if (!normalizedValue) return;
+
+    const preference = getCatalogPreference();
+    const dedupedRecent = [
+        normalizedValue,
+        ...preference.recentSelections.filter((value) => value !== normalizedValue)
+    ].slice(0, 10);
+
+    saveCatalogPreference({
+        lastSelected: normalizedValue,
+        recentSelections: dedupedRecent
+    });
+};
+
+const getBookingTypeOptionValues = () => {
+    return bookingTypeOptionsCache
+        .map((option) => String(option?.value || '').trim())
+        .filter(Boolean);
+};
+
+const isKnownBookingTypeValue = (value) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return false;
+    return getBookingTypeOptionValues().includes(normalized);
+};
+
+const setBookingTypeDropdownOpen = (isOpen) => {
+    const combobox = document.getElementById('bookingTypeCombobox');
+    const dropdown = document.getElementById('bookingTypeDropdown');
+    const input = document.getElementById('bookingTypeSelect');
+    if (!combobox || !dropdown || !input) return;
+
+    dropdown.hidden = !isOpen;
+    combobox.classList.toggle('is-open', isOpen);
+    input.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+};
+
+const renderBookingTypeSelectOptions = ({ query = '' } = {}) => {
+    const bookingTypeDropdown = document.getElementById('bookingTypeDropdown');
+    if (!bookingTypeDropdown) return;
+
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const filteredOptions = normalizedQuery
+        ? bookingTypeOptionsCache.filter((option) => {
+            const value = String(option?.value || '').toLowerCase();
+            const label = String(option?.label || option?.value || '').toLowerCase();
+            return label.includes(normalizedQuery) || value.includes(normalizedQuery);
+        })
+        : bookingTypeOptionsCache;
+
+    if (filteredOptions.length === 0) {
+        bookingTypeDropdown.innerHTML = '<div class="booking-type-dropdown-empty">No matching catalog found</div>';
+        return;
+    }
+
+    bookingTypeDropdown.innerHTML = filteredOptions
+        .map((option) => `
+            <button type="button" class="booking-type-option" data-value="${option.value}">
+                <span class="booking-type-option-label">${option.label}</span>
+            </button>
+        `)
+        .join('');
+};
+
 const refreshBookingTypeOptions = () => {
     const bookingTypeSelect = document.getElementById('bookingTypeSelect');
-    if (!bookingTypeSelect || typeof window.getBookingCategoryOptions !== 'function') return [];
+    const bookingTypeDropdown = document.getElementById('bookingTypeDropdown');
+    if (!bookingTypeSelect || !bookingTypeDropdown || typeof window.getBookingCategoryOptions !== 'function') return [];
 
-    const options = window.getBookingCategoryOptions();
+    const preference = getCatalogPreference();
+    const options = [...window.getBookingCategoryOptions()].sort((a, b) => {
+        const aValue = String(a?.value || '').trim();
+        const bValue = String(b?.value || '').trim();
+
+        const aIsLast = aValue && aValue === preference.lastSelected;
+        const bIsLast = bValue && bValue === preference.lastSelected;
+        if (aIsLast !== bIsLast) return aIsLast ? -1 : 1;
+
+        const aRecentIndex = preference.recentSelections.indexOf(aValue);
+        const bRecentIndex = preference.recentSelections.indexOf(bValue);
+        const aRecentRank = aRecentIndex === -1 ? Number.MAX_SAFE_INTEGER : aRecentIndex;
+        const bRecentRank = bRecentIndex === -1 ? Number.MAX_SAFE_INTEGER : bRecentIndex;
+        if (aRecentRank !== bRecentRank) return aRecentRank - bRecentRank;
+
+        return String(a?.label || aValue).localeCompare(String(b?.label || bValue));
+    });
     const currentValue = String(bookingTypeSelect.value || '').trim();
-    const nextValue = currentValue || options[0]?.value || '';
+    const nextValue = currentValue || preference.lastSelected || options[0]?.value || '';
 
-    bookingTypeSelect.innerHTML = [
-        '<option value="">Select booking type</option>',
-        ...options.map((option) => `<option value="${option.value}">${option.label}</option>`)
-    ].join('');
+    bookingTypeOptionsCache = options.map((option) => ({
+        value: String(option?.value || '').trim(),
+        label: String(option?.label || option?.value || '').trim()
+    })).filter((option) => option.value);
 
-    bookingTypeSelect.disabled = options.length === 0;
-    if (nextValue && options.some((option) => option.value === nextValue)) {
+    renderBookingTypeSelectOptions();
+
+    bookingTypeSelect.disabled = bookingTypeOptionsCache.length === 0;
+    if (nextValue && isKnownBookingTypeValue(nextValue)) {
         bookingTypeSelect.value = nextValue;
+    }
+
+    if (nextValue && options.some((option) => option.value === nextValue)) {
         if (typeof window.setActiveBookingCategory === 'function') {
             window.setActiveBookingCategory(nextValue);
         }
+    }
+
+    if (typeof window.refreshClassLocationUI === 'function') {
+        window.refreshClassLocationUI();
     }
 
     return options;
@@ -76,9 +200,17 @@ const collectBookingFormDraft = () => {
     const bandName = document.getElementById('bandName')?.value || '';
     const notes = document.getElementById('notes')?.value || '';
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const classLocation = document.getElementById('classLocation')?.value || '';
+    const classPlanMonths = document.getElementById('classPlanMonths')?.value || '1';
+    const classPreferredWeekday = document.getElementById('classPreferredWeekday')?.value || '';
+    const classPreferredStartTime = document.getElementById('classPreferredStartTime')?.value || '';
 
     const hasDraftValues =
         !!bookingType.trim() ||
+        !!classLocation.trim() ||
+        !!classPreferredWeekday.trim() ||
+        !!classPreferredStartTime.trim() ||
+        String(classPlanMonths || '1').trim() !== '1' ||
         !!bandName.trim() ||
         !!notes.trim();
 
@@ -91,6 +223,10 @@ const collectBookingFormDraft = () => {
         savedAt: Date.now(),
         bookingMode,
         bookingType,
+        classLocation,
+        classPreferredWeekday,
+        classPreferredStartTime,
+        classPlanMonths,
         bandName,
         notes
     };
@@ -157,12 +293,39 @@ const restoreBookingFormDraft = async () => {
         const bookingTypeEl = document.getElementById('bookingTypeSelect');
         if (bookingTypeEl && typeof parsedDraft.bookingType === 'string') {
             const savedBookingType = parsedDraft.bookingType.trim();
-            if (savedBookingType && bookingTypeEl.querySelector(`option[value="${savedBookingType}"]`)) {
+            if (savedBookingType && isKnownBookingTypeValue(savedBookingType)) {
                 bookingTypeEl.value = savedBookingType;
                 if (typeof window.setActiveBookingCategory === 'function') {
                     window.setActiveBookingCategory(savedBookingType);
                 }
             }
+        }
+
+        const classLocationEl = document.getElementById('classLocation');
+        if (classLocationEl && typeof parsedDraft.classLocation === 'string') {
+            classLocationEl.value = parsedDraft.classLocation;
+        }
+
+        const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+        if (classPreferredWeekdayEl && typeof parsedDraft.classPreferredWeekday === 'string') {
+            classPreferredWeekdayEl.value = parsedDraft.classPreferredWeekday;
+        }
+
+        const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+        if (classPreferredStartTimeEl && typeof parsedDraft.classPreferredStartTime === 'string') {
+            classPreferredStartTimeEl.value = parsedDraft.classPreferredStartTime;
+        }
+
+        const classPlanMonthsEl = document.getElementById('classPlanMonths');
+        if (classPlanMonthsEl && typeof parsedDraft.classPlanMonths === 'string') {
+            classPlanMonthsEl.value = parsedDraft.classPlanMonths;
+        }
+
+        if (typeof window.refreshClassLocationUI === 'function') {
+            window.refreshClassLocationUI();
+        }
+        if (typeof window.refreshClassPlanInfoUI === 'function') {
+            window.refreshClassPlanInfoUI();
         }
 
         const today = getTodayDateString();
@@ -334,7 +497,7 @@ const buildBookingFormPayload = () => {
 
     const { rentalsArray, subtotal } = buildRentalsForSubmission(duration);
 
-    const adjustedSubtotal = bookingMode === 'perday'
+    let adjustedSubtotal = bookingMode === 'perday'
         ? rentalsArray.reduce((sum, rental) => {
             const rentalType = String(rental?.rentalType || 'inhouse').toLowerCase();
             const qty = Math.max(1, Number(rental?.quantity || 1));
@@ -348,16 +511,56 @@ const buildBookingFormPayload = () => {
         }, 0)
         : subtotal;
 
+    const bookingType = document.getElementById('bookingTypeSelect')?.value.trim() || '';
+    const classLocation = document.getElementById('classLocation')?.value.trim() || '';
+    const classPreferredWeekday = document.getElementById('classPreferredWeekday')?.value.trim() || '';
+    const classPreferredStartTime = document.getElementById('classPreferredStartTime')?.value.trim() || '';
+    const classPlanMonths = Math.max(1, Number(document.getElementById('classPlanMonths')?.value || 1));
+    const isClassBookingCategory = typeof window.isClassBookingCategory === 'function'
+        ? window.isClassBookingCategory(bookingType)
+        : false;
+
+    if (!bookingType) {
+        throw new Error('Please select a booking type from the booking catalog.');
+    }
+
+    if (!isKnownBookingTypeValue(bookingType)) {
+        throw new Error('Please select a valid catalog from the dropdown suggestions.');
+    }
+
+    if (isClassBookingCategory && !classLocation) {
+        throw new Error('Please select class location for class booking.');
+    }
+
+    if (isClassBookingCategory && !classPreferredWeekday) {
+        throw new Error('Please select preferred weekly class day.');
+    }
+
+    if (isClassBookingCategory && !classPreferredStartTime) {
+        throw new Error('Please select preferred class start time.');
+    }
+
+    if (isClassBookingCategory && rentalsArray.length !== 1) {
+        throw new Error('Please select exactly one class item for class booking.');
+    }
+
+    if (isClassBookingCategory) {
+        const classConfig = typeof window.getClassConfig === 'function'
+            ? window.getClassConfig()
+            : { monthlyFee: Number(window.adminSettings?.classConfig?.monthlyFee || 0), multiMonthDiscounts: [] };
+        const monthlyFee = Math.max(0, Number(classConfig.monthlyFee || 0));
+        const totalBeforeDiscount = monthlyFee * classPlanMonths;
+        const discountAmount = typeof window.getClassDiscountForMonths === 'function'
+            ? window.getClassDiscountForMonths(classPlanMonths, classConfig, totalBeforeDiscount)
+            : 0;
+        adjustedSubtotal = Math.max(0, totalBeforeDiscount - discountAmount);
+    }
+
     const gstEnabled = window.adminSettings?.gstConfig?.enabled || false;
     const gstRate = window.adminSettings?.gstConfig?.rate || 0.18;
 
     const taxAmount = gstEnabled ? Math.round(adjustedSubtotal * gstRate) : 0;
     const totalAmount = adjustedSubtotal + taxAmount;
-    const bookingType = document.getElementById('bookingTypeSelect')?.value.trim() || '';
-
-    if (!bookingType) {
-        throw new Error('Please select a booking type from the booking catalog.');
-    }
 
     return {
         formData: {
@@ -371,6 +574,10 @@ const buildBookingFormPayload = () => {
             subtotal: adjustedSubtotal,
             taxAmount,
             totalAmount,
+            classLocation: isClassBookingCategory ? classLocation : undefined,
+            classPreferredWeekday: isClassBookingCategory ? classPreferredWeekday : undefined,
+            classPreferredStartTime: isClassBookingCategory ? classPreferredStartTime : undefined,
+            classPlanMonths: isClassBookingCategory ? classPlanMonths : undefined,
             bandName: document.getElementById('bandName')?.value || '',
             notes: document.getElementById('notes')?.value || '',
             perDayStartDate: bookingMode === 'perday' ? perDayStartDate : undefined,
@@ -411,6 +618,26 @@ const resetBookingFormState = () => {
 
     if (priceDisplay) {
         priceDisplay.style.display = 'none';
+    }
+
+    const classLocationEl = document.getElementById('classLocation');
+    if (classLocationEl) {
+        classLocationEl.value = '';
+    }
+
+    const classPlanMonthsEl = document.getElementById('classPlanMonths');
+    if (classPlanMonthsEl) {
+        classPlanMonthsEl.value = '1';
+    }
+
+    const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+    if (classPreferredWeekdayEl) {
+        classPreferredWeekdayEl.value = '';
+    }
+
+    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+    if (classPreferredStartTimeEl) {
+        classPreferredStartTimeEl.value = '';
     }
 
     if (typeof window.resetBookingRentalState === 'function') {
@@ -504,12 +731,26 @@ const bindBookingDateChange = (bookingDateEl) => {
             window.currentAvailabilityData = null;
         }
 
+        if (typeof window.refreshClassPlanInfoUI === 'function') {
+            window.refreshClassPlanInfoUI();
+        }
         updatePriceDisplay();
     };
 
     const onDateChange = async (e) => {
         const selectedDate = (e?.target?.value || bookingDateEl.value || '').trim();
         await handleDateSelection(selectedDate);
+
+        const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+        const isClass = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
+        if (isClass) {
+            const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+            const preferredLabel = getWeekdayLabelFromYmd(selectedDate);
+            if (classPreferredWeekdayEl && preferredLabel && !classPreferredWeekdayEl.value) {
+                classPreferredWeekdayEl.value = preferredLabel;
+            }
+        }
+
         scheduleBookingFormDraftSave();
     };
 
@@ -529,12 +770,225 @@ const initBookingFormHandlers = () => {
     }
 
     const bookingTypeEl = document.getElementById('bookingTypeSelect');
-    if (bookingTypeEl) {
-        bookingTypeEl.addEventListener('change', () => {
-            const selectedCategory = bookingTypeEl.value;
-            if (typeof window.setActiveBookingCategory === 'function') {
-                window.setActiveBookingCategory(selectedCategory);
+    const bookingTypeDropdownEl = document.getElementById('bookingTypeDropdown');
+    const bookingTypeToggleEl = document.getElementById('bookingTypeToggle');
+    if (bookingTypeEl && bookingTypeDropdownEl) {
+        let isSelectingFromDropdown = false;
+        let highlightedOptionIndex = -1;
+
+        const getDropdownOptionButtons = () => {
+            return Array.from(bookingTypeDropdownEl.querySelectorAll('.booking-type-option'));
+        };
+
+        const setHighlightedOption = (nextIndex) => {
+            const optionButtons = getDropdownOptionButtons();
+            if (optionButtons.length === 0) {
+                highlightedOptionIndex = -1;
+                return;
             }
+
+            const boundedIndex = Math.max(0, Math.min(nextIndex, optionButtons.length - 1));
+            highlightedOptionIndex = boundedIndex;
+
+            optionButtons.forEach((button, index) => {
+                button.classList.toggle('is-active', index === boundedIndex);
+            });
+
+            optionButtons[boundedIndex].scrollIntoView({ block: 'nearest' });
+        };
+
+        const selectHighlightedOption = () => {
+            const optionButtons = getDropdownOptionButtons();
+            const activeButton = optionButtons[highlightedOptionIndex];
+            if (!activeButton) return false;
+
+            const selectedValue = String(activeButton.dataset.value || '').trim();
+            if (!selectedValue) return false;
+
+            bookingTypeEl.value = selectedValue;
+            handleBookingTypeChange({ strict: true });
+            setBookingTypeDropdownOpen(false);
+            highlightedOptionIndex = -1;
+            return true;
+        };
+
+        const handleBookingTypeChange = ({ strict = false } = {}) => {
+            const selectedCategory = String(bookingTypeEl.value || '').trim();
+            if (isKnownBookingTypeValue(selectedCategory) && typeof window.setActiveBookingCategory === 'function') {
+                window.setActiveBookingCategory(selectedCategory);
+                recordCatalogSelection(selectedCategory);
+            }
+
+            if (strict && selectedCategory && !isKnownBookingTypeValue(selectedCategory)) {
+                bookingTypeEl.value = '';
+                showAlert('Please select a catalog from dropdown suggestions only.', 'error');
+            }
+
+            // Restore full suggestion list after selection/validation.
+            renderBookingTypeSelectOptions();
+
+            if (typeof window.refreshClassLocationUI === 'function') {
+                window.refreshClassLocationUI();
+            }
+            if (typeof window.refreshClassPlanInfoUI === 'function') {
+                window.refreshClassPlanInfoUI();
+            }
+            updatePriceDisplay();
+            scheduleBookingFormDraftSave();
+        };
+
+        bookingTypeEl.addEventListener('input', () => {
+            const term = String(bookingTypeEl.value || '').trim();
+            renderBookingTypeSelectOptions({ query: term });
+            setBookingTypeDropdownOpen(true);
+            highlightedOptionIndex = -1;
+
+            if (isKnownBookingTypeValue(term)) {
+                handleBookingTypeChange();
+            }
+        });
+
+        bookingTypeEl.addEventListener('change', () => {
+            handleBookingTypeChange({ strict: true });
+        });
+
+        bookingTypeEl.addEventListener('focus', () => {
+            renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+            setBookingTypeDropdownOpen(true);
+            highlightedOptionIndex = -1;
+        });
+
+        bookingTypeDropdownEl.addEventListener('mousedown', () => {
+            isSelectingFromDropdown = true;
+        });
+
+        bookingTypeDropdownEl.addEventListener('mousemove', (event) => {
+            const optionButton = event.target.closest('.booking-type-option');
+            if (!optionButton) return;
+            const optionButtons = getDropdownOptionButtons();
+            const index = optionButtons.indexOf(optionButton);
+            if (index >= 0) {
+                setHighlightedOption(index);
+            }
+        });
+
+        bookingTypeDropdownEl.addEventListener('click', (event) => {
+            const optionButton = event.target.closest('.booking-type-option');
+            if (!optionButton) return;
+
+            const selectedValue = String(optionButton.dataset.value || '').trim();
+            if (!selectedValue) return;
+
+            bookingTypeEl.value = selectedValue;
+            handleBookingTypeChange({ strict: true });
+            setBookingTypeDropdownOpen(false);
+            highlightedOptionIndex = -1;
+            isSelectingFromDropdown = false;
+        });
+
+        if (bookingTypeToggleEl) {
+            bookingTypeToggleEl.addEventListener('click', () => {
+                const willOpen = bookingTypeDropdownEl.hidden;
+                renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+                setBookingTypeDropdownOpen(willOpen);
+                highlightedOptionIndex = -1;
+                if (willOpen) bookingTypeEl.focus();
+            });
+        }
+
+        document.addEventListener('click', (event) => {
+            const combobox = document.getElementById('bookingTypeCombobox');
+            if (!combobox) return;
+            if (!combobox.contains(event.target)) {
+                setBookingTypeDropdownOpen(false);
+                highlightedOptionIndex = -1;
+            }
+        });
+
+        bookingTypeEl.addEventListener('blur', () => {
+            if (isSelectingFromDropdown) {
+                isSelectingFromDropdown = false;
+                return;
+            }
+            handleBookingTypeChange({ strict: true });
+            setBookingTypeDropdownOpen(false);
+            highlightedOptionIndex = -1;
+        });
+
+        bookingTypeEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                setBookingTypeDropdownOpen(false);
+                highlightedOptionIndex = -1;
+            }
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (bookingTypeDropdownEl.hidden) {
+                    renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+                    setBookingTypeDropdownOpen(true);
+                }
+                setHighlightedOption(highlightedOptionIndex < 0 ? 0 : highlightedOptionIndex + 1);
+                return;
+            }
+
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (bookingTypeDropdownEl.hidden) {
+                    renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+                    setBookingTypeDropdownOpen(true);
+                }
+                const optionButtons = getDropdownOptionButtons();
+                const startIndex = highlightedOptionIndex < 0 ? optionButtons.length - 1 : highlightedOptionIndex - 1;
+                setHighlightedOption(startIndex);
+                return;
+            }
+
+            if (event.key === ' ' && !bookingTypeDropdownEl.hidden) {
+                if (selectHighlightedOption()) {
+                    event.preventDefault();
+                }
+                return;
+            }
+
+            if (event.key === 'Enter' && !bookingTypeDropdownEl.hidden && highlightedOptionIndex >= 0) {
+                if (selectHighlightedOption()) {
+                    event.preventDefault();
+                }
+                return;
+            }
+
+        });
+    }
+
+    const classLocationEl = document.getElementById('classLocation');
+    if (classLocationEl) {
+        classLocationEl.addEventListener('change', () => {
+            scheduleBookingFormDraftSave();
+        });
+    }
+
+    const classPlanMonthsEl = document.getElementById('classPlanMonths');
+    if (classPlanMonthsEl) {
+        classPlanMonthsEl.addEventListener('change', () => {
+            if (typeof window.refreshClassPlanInfoUI === 'function') {
+                window.refreshClassPlanInfoUI();
+            }
+            updatePriceDisplay();
+            scheduleBookingFormDraftSave();
+        });
+    }
+
+    const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
+    if (classPreferredWeekdayEl) {
+        classPreferredWeekdayEl.addEventListener('change', () => {
+            scheduleBookingFormDraftSave();
+        });
+    }
+
+    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+    if (classPreferredStartTimeEl) {
+        classPreferredStartTimeEl.addEventListener('change', () => {
             scheduleBookingFormDraftSave();
         });
     }
@@ -542,7 +996,35 @@ const initBookingFormHandlers = () => {
     const startTimeEl = document.getElementById('startTime');
     if (startTimeEl) {
         startTimeEl.addEventListener('change', () => {
-            populateEndTimeSlots();
+            const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+            const isClass = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
+            if (isClass && startTimeEl.value) {
+                // Auto-set end time based on class session duration configured in admin settings
+                const classConfig = typeof window.getClassConfig === 'function' ? window.getClassConfig() : { sessionDurationHours: 1 };
+                const sessionDurationHours = Math.max(1, Number(classConfig.sessionDurationHours || 1));
+                const [h, m] = startTimeEl.value.split(':').map(Number);
+                const endHour = (h + sessionDurationHours) % 24;
+                const endTimeVal = `${String(endHour).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+                const endTimeEl = document.getElementById('endTime');
+                if (endTimeEl) {
+                    let opt = endTimeEl.querySelector(`option[value="${endTimeVal}"]`);
+                    if (!opt) {
+                        opt = document.createElement('option');
+                        opt.value = endTimeVal;
+                        opt.textContent = endTimeVal;
+                        endTimeEl.appendChild(opt);
+                    }
+                    endTimeEl.value = endTimeVal;
+                    endTimeEl.disabled = false;
+                }
+
+                const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
+                if (classPreferredStartTimeEl && !classPreferredStartTimeEl.value) {
+                    classPreferredStartTimeEl.value = startTimeEl.value;
+                }
+            } else {
+                populateEndTimeSlots();
+            }
             updatePriceDisplay();
             scheduleBookingFormDraftSave();
         });

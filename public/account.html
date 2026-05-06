@@ -24,6 +24,7 @@
     <!-- Account-specific styles -->
     
     <link rel="stylesheet" href="/css/pages/account.css">
+    <link rel="stylesheet" href="/css/pages/booking.css">
 
 </head>
 <body>
@@ -73,9 +74,13 @@
 
             <!-- Bookings Tab -->
             <div id="bookings" class="tab-pane">
-                <h2>My Bookings</h2>
-                <div id="bookingsList">
-                    <div class="loading">Loading bookings...</div>
+                <div class="section">
+                    <div class="section-header">
+                        <h2>My Bookings</h2>
+                    </div>
+                    <div id="bookingsList" class="bookings-list">
+                        <div class="loading">Loading bookings...</div>
+                    </div>
                 </div>
             </div>
 
@@ -201,6 +206,43 @@
             }
         }
 
+        function formatDate(dateStr) {
+            if (window.JamRoomUtils) {
+                return window.JamRoomUtils.formatDate(dateStr, 'DD Mon YYYY');
+            }
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-IN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        function formatTime(time) {
+            if (window.JamRoomUtils) {
+                return window.JamRoomUtils.formatTime(time);
+            }
+            if (!time) return 'N/A';
+            const [hours, minutes] = time.split(':');
+            const hour = parseInt(hours, 10);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes} ${ampm}`;
+        }
+
+        function showLoadingOverlay(message = 'Processing...') {
+            if (window.JamRoomUtils) {
+                window.JamRoomUtils.showLoading(document.body, message);
+            }
+        }
+
+        function hideLoadingOverlay() {
+            if (window.JamRoomUtils) {
+                window.JamRoomUtils.hideLoading(document.body);
+            }
+        }
+
         // Load user profile
         async function loadProfile() {
             try {
@@ -253,62 +295,13 @@
 
         // Load user bookings
         async function loadBookings() {
-            try {
-                const response = await fetch(`${API_URL}/api/profile/bookings`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    const getCollectedAmount = (booking) => {
-                        const total = Number(booking.price || 0);
-                        const status = String(booking.paymentStatus || '').toUpperCase();
-                        const paid = Number(booking.amountPaid || 0);
-
-                        if (status === 'PAID') return Math.max(0, total);
-                        if (status === 'PARTIAL') return Math.max(0, Math.min(total, paid));
-                        return 0;
-                    };
-
-                    const bookingsHtml = data.bookings.length > 0 ? 
-                        data.bookings.map(booking => {
-                            const collected = getCollectedAmount(booking);
-                            const outstanding = Math.max(0, Number(booking.price || 0) - collected);
-                            return `
-                            <div class="booking-card">
-                                <div class="booking-header">
-                                    <strong>${new Date(booking.date).toLocaleDateString('en-IN')} - ${booking.startTime} to ${booking.endTime}</strong>
-                                    <div>
-                                        <span class="status-badge status-${booking.bookingStatus.toLowerCase()}">${booking.bookingStatus}</span>
-                                        <span class="status-badge status-${booking.paymentStatus.toLowerCase()}">${booking.paymentStatus}</span>
-                                    </div>
-                                </div>
-                                <p><strong>Duration:</strong> ${booking.duration} hour(s)</p>
-                                <p><strong>Amount:</strong> ₹${booking.price}</p>
-                                <p><strong>Amount Received:</strong> ₹${collected}</p>
-                                <p><strong>Outstanding:</strong> ₹${outstanding}</p>
-                                ${booking.paymentStatus !== 'PAID' ? '<p><strong>Payment Note:</strong> Please clear the pending JamRoom payment before your session.</p>' : ''}
-                                ${booking.bandName ? `<p><strong>Band:</strong> ${booking.bandName}</p>` : ''}
-                                ${booking.rentals && booking.rentals.length > 0 ? 
-                                    `<p><strong>Rentals:</strong> ${booking.rentals.map(r => r.name).join(', ')}</p>` : ''}
-                                <p><strong>Booked:</strong> ${new Date(booking.createdAt).toLocaleDateString('en-IN')}</p>
-                            </div>
-                        `;
-                        }).join('') : 
-                        '<p>No bookings found. <a href="/booking.html">Create your first booking!</a></p>';
-
-                    document.getElementById('bookingsList').innerHTML = bookingsHtml;
-                    document.getElementById('bookingsList').setAttribute('data-loaded', 'true');
-                } else {
-                    showAlert(data.message || 'Failed to load bookings');
-                }
-            } catch (error) {
-                console.error('Load bookings error:', error);
-                showAlert('Error loading bookings');
+            if (typeof window.loadMyBookings === 'function') {
+                await window.loadMyBookings();
+                document.getElementById('bookingsList').setAttribute('data-loaded', 'true');
+                return;
             }
+
+            showAlert('Booking module not loaded. Please refresh and try again.');
         }
 
         // Update profile
@@ -633,6 +626,9 @@
     </script>
         </div> <!-- container -->
     </div> <!-- app-container -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="/js/client-pdf-generator.js"></script>
+    <script src="/js/booking/booking-bookings.js"></script>
     <script src="/js/shared/pwa-install.js"></script>
 </body>
 </html>

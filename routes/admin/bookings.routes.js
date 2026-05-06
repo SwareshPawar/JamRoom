@@ -394,20 +394,23 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
 
     const displayDate = formatBookingDisplayDate(booking.date);
 
-    const calendarInvite = generateCalendarInvite({
-      title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
-      description: `Booking confirmed for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
-      location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
-      startDate: formatDateAsYmdInIst(new Date(booking.date)),
-      startTime: booking.startTime,
-      endTime: booking.endTime,
-      attendees: [booking.userEmail, ...adminNotificationEmails],
-      studioName: settings.studioName || 'Swar JamRoom',
-      uid: booking.calendarUid,
-      sequence: booking.calendarSequence,
-      method: 'REQUEST',
-      status: 'CONFIRMED'
-    });
+    // Class bookings don't get a calendar invite on approval — individual slot invites are sent per completed lesson
+    const calendarInvite = booking.classSession?.isClassBooking
+      ? null
+      : generateCalendarInvite({
+          title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
+          description: `Booking confirmed for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
+          location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
+          startDate: formatDateAsYmdInIst(new Date(booking.date)),
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          attendees: [booking.userEmail, ...adminNotificationEmails],
+          studioName: settings.studioName || 'Swar JamRoom',
+          uid: booking.calendarUid,
+          sequence: booking.calendarSequence,
+          method: 'REQUEST',
+          status: 'CONFIRMED'
+        });
 
     await sendUnifiedBookingConfirmationEmails({
       settings,
@@ -423,7 +426,8 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
           date: displayDate,
           startTime: booking.startTime,
           endTime: booking.endTime,
-          totalAmount: booking.price
+          totalAmount: booking.price,
+          classSession: booking.classSession
         });
       } catch (whatsappError) {
         console.log('Customer WhatsApp confirmation failed:', whatsappError.message);
@@ -441,7 +445,8 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
         totalAmount: booking.price,
         bookingId: booking._id,
         bandName: booking.bandName,
-        paymentStatus: booking.paymentStatus
+        paymentStatus: booking.paymentStatus,
+        classSession: booking.classSession
       }, settings.whatsappNotifications);
     } catch (whatsappError) {
       console.log('Staff WhatsApp notifications failed:', whatsappError.message);
@@ -458,6 +463,446 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       success: false,
       message: 'Server error approving booking'
     });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/complete
+// @desc    Mark a class lesson as completed with notes/details
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/complete', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const {
+      completedDate,
+      completedStartTime,
+      notes,
+      details
+    } = req.body || {};
+
+    const [booking, settings] = await Promise.all([
+      Booking.findById(id),
+      AdminSettings.getSettings()
+    ]);
+    const sessionDurationHours = Math.max(1, Number(settings?.classConfig?.sessionDurationHours || 1));
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    if (!booking.classSession?.isClassBooking) {
+      return res.status(400).json({
+        success: false,
+        message: 'This booking is not a class plan booking'
+      });
+    }
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) {
+      return res.status(404).json({
+        success: false,
+        message: 'Class lesson not found'
+      });
+    }
+
+    if (String(lesson.status || '').toUpperCase() === 'COMPLETED') {
+      return res.status(400).json({
+        success: false,
+        message: 'This class lesson is already marked as completed'
+      });
+    }
+
+    const normalizedCompletedDate = parseDateInputToStartOfDay(completedDate);
+    if (!normalizedCompletedDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid completed date. Please use YYYY-MM-DD format.'
+      });
+    }
+
+    const startTimeValue = String(completedStartTime || lesson.scheduledStartTime || '').trim();
+    const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (!timePattern.test(startTimeValue)) {
+      return res.status(400).json({ success: false, message: 'Invalid start time format. Use HH:mm.' });
+    }
+    const startMins = startTimeValue.split(':').reduce((h, m, i) => i === 0 ? Number(m) * 60 : h + Number(m), 0);
+    const endMins = startMins + sessionDurationHours * 60;
+    const endTimeValue = `${String(Math.floor(endMins / 60) % 24).padStart(2, '0')}:${String(endMins % 60).padStart(2, '0')}`;
+
+    lesson.status = 'COMPLETED';
+    lesson.completedAt = new Date();
+    lesson.completedDate = normalizedCompletedDate;
+    lesson.completedStartTime = startTimeValue;
+    lesson.completedEndTime = endTimeValue;
+    lesson.notes = String(notes || '').trim();
+    lesson.details = String(details || '').trim();
+    lesson.completedBy = req.user._id;
+
+    const completedClassesCount = lessons.filter((entry) => String(entry?.status || '').toUpperCase() === 'COMPLETED').length;
+    const totalClassesPlanned = Math.max(0, Number(booking.classSession.totalClassesPlanned || lessons.length || 0));
+
+    booking.classSession.completedClassesCount = completedClassesCount;
+    booking.classSession.classesRemainingAfterBooking = Math.max(0, totalClassesPlanned - completedClassesCount);
+    booking.markModified('classSession');
+
+    await booking.save();
+
+    res.json({
+      success: true,
+      message: 'Class lesson marked as completed',
+      booking
+    });
+  } catch (error) {
+    console.error('Complete class lesson error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating class lesson status'
+    });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/cancel
+// @desc    Cancel a class lesson
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/cancel', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const { reason } = req.body || {};
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (!booking.classSession?.isClassBooking) {
+      return res.status(400).json({ success: false, message: 'This booking is not a class plan booking' });
+    }
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) {
+      return res.status(404).json({ success: false, message: 'Class lesson not found' });
+    }
+
+    const currentStatus = String(lesson.status || '').toUpperCase();
+    if (currentStatus === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'This class lesson is already cancelled' });
+    }
+    if (currentStatus === 'COMPLETED') {
+      return res.status(400).json({ success: false, message: 'Cannot cancel a lesson that is already completed' });
+    }
+
+    lesson.status = 'CANCELLED';
+    lesson.notes = String(reason || lesson.notes || '').trim();
+
+    const completedClassesCount = lessons.filter((entry) => String(entry?.status || '').toUpperCase() === 'COMPLETED').length;
+    const totalClassesPlanned = Math.max(0, Number(booking.classSession.totalClassesPlanned || lessons.length || 0));
+    booking.classSession.completedClassesCount = completedClassesCount;
+    booking.classSession.classesRemainingAfterBooking = Math.max(0, totalClassesPlanned - completedClassesCount);
+    booking.markModified('classSession');
+
+    await booking.save();
+
+    res.json({ success: true, message: 'Class lesson cancelled', booking });
+  } catch (error) {
+    console.error('Cancel class lesson error:', error);
+    res.status(500).json({ success: false, message: 'Server error cancelling class lesson' });
+  }
+});
+
+// @route   POST /api/admin/bookings/:id/send-ebill
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/approve-slot
+// @desc    Approve a student's slot request — updates scheduledDate/Time
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const { responseNote } = req.body || {};
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (!booking.classSession?.isClassBooking) return res.status(400).json({ success: false, message: 'Not a class booking' });
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found' });
+
+    if (!lesson.slotRequest || String(lesson.slotRequest.status || '') !== 'PENDING') {
+      return res.status(400).json({ success: false, message: 'No pending slot request for this lesson' });
+    }
+
+    lesson.scheduledDate = lesson.slotRequest.proposedDate;
+    lesson.scheduledStartTime = lesson.slotRequest.proposedStartTime;
+    lesson.scheduledEndTime = lesson.slotRequest.proposedEndTime;
+    lesson.slotRequest.status = 'APPROVED';
+    lesson.slotRequest.respondedAt = new Date();
+    lesson.slotRequest.responseNote = String(responseNote || '').trim();
+
+    booking.markModified('classSession');
+    await booking.save();
+
+    // Send calendar invite + approval email to user and admins
+    try {
+      const settings = await AdminSettings.getSettings();
+      const classItem = booking.classSession?.selectedClassItemName || booking.classSession?.instrument || 'Music Class';
+      const slotDateStr = formatDateAsYmdInIst(new Date(lesson.scheduledDate));
+      const startTime = lesson.scheduledStartTime;
+      const endTime = lesson.scheduledEndTime;
+      const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
+      let calendarInvite = null;
+      try {
+        calendarInvite = generateCalendarInvite({
+          title: `${settings.studioName || 'Swar JamRoom'} – ${classItem} Class`,
+          description: `Class slot confirmed for ${booking.userName || ''}`,
+          location: booking.classSession?.location || settings.studioAddress || 'Swar JamRoom & Music Studio',
+          startDate: slotDateStr,
+          startTime,
+          endTime,
+          attendees: [booking.userEmail, ...adminNotificationEmails].filter(Boolean),
+          studioName: settings.studioName || 'Swar JamRoom',
+          uid: `lesson-${booking._id}-${id}@${process.env.CALENDAR_UID_DOMAIN || 'jamroom.local'}`,
+          sequence: 0,
+          method: 'REQUEST',
+          status: 'CONFIRMED'
+        });
+      } catch (calErr) {
+        console.log('Lesson calendar invite generation failed:', calErr.message);
+      }
+
+      const formatTime12 = (t) => { const [h, m] = String(t || '00:00').split(':').map(Number); const suf = h >= 12 ? 'PM' : 'AM'; return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${suf}`; };
+      const slotDateLabel = new Date(lesson.scheduledDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+      const calAttachment = calendarInvite ? [{ filename: 'class-slot.ics', content: calendarInvite, contentType: 'text/calendar; charset=utf-8; method=REQUEST' }] : [];
+
+      await sendEmail({
+        to: booking.userEmail,
+        subject: `Class Slot Approved – ${classItem} | JamRoom`,
+        html: `
+          <h2>🎵 Class Slot Confirmed</h2>
+          <p>Hi ${booking.userName || 'Student'},</p>
+          <p>Your slot request has been approved! Here are your confirmed class details:</p>
+          <h3>Slot Details:</h3>
+          <ul>
+            <li><strong>Class:</strong> ${classItem}</li>
+            <li><strong>Date:</strong> ${slotDateLabel}</li>
+            <li><strong>Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
+          </ul>
+          ${calendarInvite ? '<p>A calendar invite is attached — add it to your calendar to get a reminder.</p>' : ''}
+          <p>See you at the session!</p>
+        `,
+        attachments: calAttachment
+      });
+
+      for (const adminEmail of adminNotificationEmails) {
+        if (normalizeEmail(adminEmail) === normalizeEmail(booking.userEmail)) continue;
+        try {
+          await sendEmail({
+            to: adminEmail,
+            subject: `Class Slot Approved – ${booking.userName || 'Student'} | JamRoom`,
+            html: `
+              <h2>Class Slot Approved</h2>
+              <p>Slot request approved by ${req.user.name}.</p>
+              <ul>
+                <li><strong>Student:</strong> ${booking.userName || 'N/A'} (${booking.userEmail || 'N/A'})</li>
+                <li><strong>Class:</strong> ${classItem}</li>
+                <li><strong>Date:</strong> ${slotDateLabel}</li>
+                <li><strong>Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
+              </ul>
+            `,
+            attachments: calAttachment
+          });
+        } catch (adminEmailErr) {
+          console.log(`Admin slot approval email failed for ${adminEmail}:`, adminEmailErr.message);
+        }
+      }
+    } catch (notifyErr) {
+      console.log('Slot approval notification failed:', notifyErr.message);
+    }
+
+    res.json({ success: true, message: 'Slot request approved', booking });
+  } catch (error) {
+    console.error('Approve slot error:', error);
+    res.status(500).json({ success: false, message: 'Server error approving slot' });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/reject-slot
+// @desc    Reject a student's slot request
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/reject-slot', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const { responseNote } = req.body || {};
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (!booking.classSession?.isClassBooking) return res.status(400).json({ success: false, message: 'Not a class booking' });
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found' });
+
+    if (!lesson.slotRequest || String(lesson.slotRequest.status || '') !== 'PENDING') {
+      return res.status(400).json({ success: false, message: 'No pending slot request for this lesson' });
+    }
+
+    lesson.slotRequest.status = 'REJECTED';
+    lesson.slotRequest.respondedAt = new Date();
+    lesson.slotRequest.responseNote = String(responseNote || '').trim();
+
+    booking.markModified('classSession');
+    await booking.save();
+    res.json({ success: true, message: 'Slot request rejected', booking });
+  } catch (error) {
+    console.error('Reject slot error:', error);
+    res.status(500).json({ success: false, message: 'Server error rejecting slot' });
+  }
+});
+
+// @route   PUT /api/admin/bookings/:id/class-lessons/:lessonId/book-slot
+// @desc    Admin directly books/assigns a slot for a lesson (no pending approval needed)
+// @access  Private/Admin
+router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, async (req, res) => {
+  try {
+    const { id, lessonId } = req.params;
+    const { proposedDate, proposedStartTime } = req.body || {};
+
+    const [booking, settings] = await Promise.all([
+      Booking.findById(id),
+      AdminSettings.getSettings()
+    ]);
+
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (!booking.classSession?.isClassBooking) return res.status(400).json({ success: false, message: 'Not a class booking' });
+
+    const lessons = Array.isArray(booking.classSession.lessons) ? booking.classSession.lessons : [];
+    const lesson = lessons.find((entry) => String(entry?._id) === String(lessonId));
+    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found' });
+
+    const currentStatus = String(lesson.status || '').toUpperCase();
+    if (currentStatus === 'COMPLETED') return res.status(400).json({ success: false, message: 'Lesson already completed' });
+    if (currentStatus === 'CANCELLED') return res.status(400).json({ success: false, message: 'Lesson is cancelled' });
+
+    const parseDateOnlyToStartOfDay = (raw) => {
+      if (!raw) return null;
+      const s = String(raw).trim();
+      const match = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0, 0);
+    };
+
+    const proposedD = parseDateOnlyToStartOfDay(proposedDate);
+    if (!proposedD) return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD.' });
+
+    const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    const startTime = String(proposedStartTime || '').trim();
+    if (!timePattern.test(startTime)) return res.status(400).json({ success: false, message: 'Invalid start time. Use HH:mm.' });
+
+    const sessionDurationHours = Math.max(1, Number(settings?.classConfig?.sessionDurationHours || 1));
+    const startMins = startTime.split(':').reduce((acc, v, i) => i === 0 ? Number(v) * 60 : acc + Number(v), 0);
+    const endMins = startMins + sessionDurationHours * 60;
+    const endTime = `${String(Math.floor(endMins / 60) % 24).padStart(2, '0')}:${String(endMins % 60).padStart(2, '0')}`;
+
+    // Directly approve — admin is assigning the slot
+    lesson.scheduledDate = proposedD;
+    lesson.scheduledStartTime = startTime;
+    lesson.scheduledEndTime = endTime;
+    lesson.slotRequest = {
+      proposedDate: proposedD,
+      proposedStartTime: startTime,
+      proposedEndTime: endTime,
+      requestedAt: new Date(),
+      status: 'APPROVED',
+      respondedAt: new Date(),
+      responseNote: `Booked by admin (${req.user.name})`
+    };
+
+    booking.markModified('classSession');
+    await booking.save();
+
+    // Send calendar invite + notification to user and admins
+    try {
+      const classItem = booking.classSession?.selectedClassItemName || booking.classSession?.instrument || 'Music Class';
+      const slotDateStr = formatDateAsYmdInIst(proposedD);
+      const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
+      let calendarInvite = null;
+      try {
+        calendarInvite = generateCalendarInvite({
+          title: `${settings.studioName || 'Swar JamRoom'} – ${classItem} Class`,
+          description: `Class slot booked for ${booking.userName || ''}`,
+          location: booking.classSession?.location || settings.studioAddress || 'Swar JamRoom & Music Studio',
+          startDate: slotDateStr,
+          startTime,
+          endTime,
+          attendees: [booking.userEmail, ...adminNotificationEmails].filter(Boolean),
+          studioName: settings.studioName || 'Swar JamRoom',
+          uid: `lesson-${booking._id}-${lessonId}@${process.env.CALENDAR_UID_DOMAIN || 'jamroom.local'}`,
+          sequence: 0,
+          method: 'REQUEST',
+          status: 'CONFIRMED'
+        });
+      } catch (calErr) {
+        console.log('Lesson calendar invite generation failed:', calErr.message);
+      }
+
+      const formatTime12 = (t) => { const [h, m] = String(t || '00:00').split(':').map(Number); const suf = h >= 12 ? 'PM' : 'AM'; return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${suf}`; };
+      const slotDateLabel = proposedD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+      const calAttachment = calendarInvite ? [{ filename: 'class-slot.ics', content: calendarInvite, contentType: 'text/calendar; charset=utf-8; method=REQUEST' }] : [];
+
+      try {
+        await sendEmail({
+          to: booking.userEmail,
+          subject: `Class Slot Booked – ${classItem} | JamRoom`,
+          html: `
+            <h2>🎵 Class Slot Confirmed</h2>
+            <p>Hi ${booking.userName || 'Student'},</p>
+            <p>Your class slot has been booked by the studio team.</p>
+            <h3>Slot Details:</h3>
+            <ul>
+              <li><strong>Class:</strong> ${classItem}</li>
+              <li><strong>Date:</strong> ${slotDateLabel}</li>
+              <li><strong>Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
+            </ul>
+            ${calendarInvite ? '<p>A calendar invite is attached — add it to your calendar to get a reminder.</p>' : ''}
+            <p>See you at the session!</p>
+          `,
+          attachments: calAttachment
+        });
+      } catch (userEmailErr) {
+        console.log('User slot booking email failed:', userEmailErr.message);
+      }
+
+      for (const adminEmail of adminNotificationEmails) {
+        if (normalizeEmail(adminEmail) === normalizeEmail(booking.userEmail)) continue;
+        try {
+          await sendEmail({
+            to: adminEmail,
+            subject: `Class Slot Booked – ${booking.userName || 'Student'} | JamRoom`,
+            html: `
+              <h2>Class Slot Booked by Admin</h2>
+              <p>Slot assigned by ${req.user.name}.</p>
+              <ul>
+                <li><strong>Student:</strong> ${booking.userName || 'N/A'} (${booking.userEmail || 'N/A'})</li>
+                <li><strong>Class:</strong> ${classItem}</li>
+                <li><strong>Date:</strong> ${slotDateLabel}</li>
+                <li><strong>Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
+              </ul>
+            `,
+            attachments: calAttachment
+          });
+        } catch (adminEmailErr) {
+          console.log(`Admin slot booking email failed for ${adminEmail}:`, adminEmailErr.message);
+        }
+      }
+    } catch (notifyErr) {
+      console.log('Slot booking notification failed:', notifyErr.message);
+    }
+
+    res.json({ success: true, message: 'Slot booked successfully', booking });
+  } catch (error) {
+    console.error('Admin book-slot error:', error);
+    res.status(500).json({ success: false, message: 'Server error booking slot' });
   }
 });
 

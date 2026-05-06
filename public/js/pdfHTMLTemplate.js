@@ -162,9 +162,59 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         perdayDays: perDayDays
     };
     const serviceGroupingUtils = getServiceGroupingUtils();
-    const groupedServices = (booking.rentals && booking.rentals.length > 0)
-        ? serviceGroupingUtils.buildServiceGroupSummary(booking.rentals, billingCalculation)
+    const classSession = booking?.classSession && typeof booking.classSession === 'object'
+        ? booking.classSession
+        : null;
+    const isClassPlanBooking = Boolean(classSession?.isClassBooking);
+    const classPlanMonths = Math.max(1, Number(classSession?.planMonths || 1));
+    const classPlanBaseFee = Math.max(0, Number(classSession?.totalFeeBeforeDiscount || subtotal) || 0);
+    const classPlanDiscount = Math.max(0, Number(classSession?.discountAmount || 0) || 0);
+    // For class plan bookings, look up the real catalog category for the class item
+    // so that catalogAssignment-based PDF section rules can match it correctly.
+    const resolveClassItemCategory = (itemName) => {
+        const nameLower = String(itemName || '').trim().toLowerCase();
+        if (!nameLower || !Array.isArray(settings?.rentalTypes)) return null;
+        for (const rt of settings.rentalTypes) {
+            if (rt.deletedAt) continue;
+            const catName = String(rt?.name || '').trim();
+            if (catName.toLowerCase() === nameLower) return catName;
+            if (Array.isArray(rt.subItems)) {
+                for (const si of rt.subItems) {
+                    if (si.deletedAt) continue;
+                    if (String(si?.name || '').trim().toLowerCase() === nameLower) return catName;
+                }
+            }
+        }
+        return null;
+    };
+
+    const classItemName = classSession?.itemName || classSession?.selectedClassItemName || classSession?.instrument || 'Music Classes';
+    const classItemCategory = classSession?.itemCategory
+        || resolveClassItemCategory(classItemName)
+        || 'Class Plans';
+
+    const groupedServiceItems = isClassPlanBooking
+        ? [{
+            id: classSession?.itemId || 'class-plan',
+            name: classItemName,
+            category: classItemCategory,
+            description: `${classPlanMonths} month plan${classSession?.location ? ` at ${classSession.location}` : ''}`,
+            rentalType: 'persession',
+            quantity: 1,
+            quantityEnabled: true,
+            price: classPlanBaseFee
+        }]
+        : (Array.isArray(booking.rentals) ? booking.rentals : []);
+    const groupedServices = groupedServiceItems.length > 0
+        ? serviceGroupingUtils.buildServiceGroupSummary(groupedServiceItems, billingCalculation, settings?.serviceGroupingConfig || {})
         : [];
+
+    const classPlanFeeRow = isClassPlanBooking
+        ? `<div class="total-row"><span>Class Plan Fee (${classPlanMonths} month${classPlanMonths > 1 ? 's' : ''})</span><strong>&#8377;${classPlanBaseFee.toFixed(2)}</strong></div>`
+        : '';
+    const classPlanDiscountRow = isClassPlanBooking && classPlanDiscount > 0
+        ? `<div class="total-row"><span>Class Plan Discount</span><strong>-&#8377;${classPlanDiscount.toFixed(2)}</strong></div>`
+        : '';
 
     const adjustmentValue = Number.isFinite(Number(booking?.priceAdjustmentValue))
         ? Number(booking.priceAdjustmentValue)
@@ -187,7 +237,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
             ? `Partial payment recorded. Kindly settle the remaining balance of &#8377;${outstandingAmount.toFixed(2)} before your scheduled slot.`
             : `Payment is currently pending. Kindly complete the payment of &#8377;${outstandingAmount.toFixed(2)} before your scheduled studio slot.`;
 
-    const serviceGroupSections = (booking.rentals && booking.rentals.length > 0)
+    const serviceGroupSections = groupedServiceItems.length > 0
         ? groupedServices.map((group) => {
             const groupSubtotal = Number(group.subtotal || 0);
             const rows = group.items.map((item) => {
@@ -368,6 +418,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
 
         <section class="totals-card">
             <h3>Pricing Summary</h3>
+            ${classPlanFeeRow}
+            ${classPlanDiscountRow}
             <div class="total-row"><span>Subtotal</span><strong>&#8377;${subtotal.toFixed(2)}</strong></div>
             ${gstRow}
             ${adjustmentRow}
