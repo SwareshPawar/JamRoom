@@ -203,13 +203,11 @@ const collectBookingFormDraft = () => {
     const classLocation = document.getElementById('classLocation')?.value || '';
     const classPlanMonths = document.getElementById('classPlanMonths')?.value || '1';
     const classPreferredWeekday = document.getElementById('classPreferredWeekday')?.value || '';
-    const classPreferredStartTime = document.getElementById('classPreferredStartTime')?.value || '';
 
     const hasDraftValues =
         !!bookingType.trim() ||
         !!classLocation.trim() ||
         !!classPreferredWeekday.trim() ||
-        !!classPreferredStartTime.trim() ||
         String(classPlanMonths || '1').trim() !== '1' ||
         !!bandName.trim() ||
         !!notes.trim();
@@ -225,7 +223,6 @@ const collectBookingFormDraft = () => {
         bookingType,
         classLocation,
         classPreferredWeekday,
-        classPreferredStartTime,
         classPlanMonths,
         bandName,
         notes
@@ -309,11 +306,6 @@ const restoreBookingFormDraft = async () => {
         const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
         if (classPreferredWeekdayEl && typeof parsedDraft.classPreferredWeekday === 'string') {
             classPreferredWeekdayEl.value = parsedDraft.classPreferredWeekday;
-        }
-
-        const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
-        if (classPreferredStartTimeEl && typeof parsedDraft.classPreferredStartTime === 'string') {
-            classPreferredStartTimeEl.value = parsedDraft.classPreferredStartTime;
         }
 
         const classPlanMonthsEl = document.getElementById('classPlanMonths');
@@ -514,7 +506,7 @@ const buildBookingFormPayload = () => {
     const bookingType = document.getElementById('bookingTypeSelect')?.value.trim() || '';
     const classLocation = document.getElementById('classLocation')?.value.trim() || '';
     const classPreferredWeekday = document.getElementById('classPreferredWeekday')?.value.trim() || '';
-    const classPreferredStartTime = document.getElementById('classPreferredStartTime')?.value.trim() || '';
+    const classPreferredStartTime = document.getElementById('startTime')?.value.trim() || '';
     const classPlanMonths = Math.max(1, Number(document.getElementById('classPlanMonths')?.value || 1));
     const isClassBookingCategory = typeof window.isClassBookingCategory === 'function'
         ? window.isClassBookingCategory(bookingType)
@@ -537,7 +529,7 @@ const buildBookingFormPayload = () => {
     }
 
     if (isClassBookingCategory && !classPreferredStartTime) {
-        throw new Error('Please select preferred class start time.');
+        throw new Error('Please select class time.');
     }
 
     if (isClassBookingCategory && rentalsArray.length !== 1) {
@@ -633,11 +625,6 @@ const resetBookingFormState = () => {
     const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
     if (classPreferredWeekdayEl) {
         classPreferredWeekdayEl.value = '';
-    }
-
-    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
-    if (classPreferredStartTimeEl) {
-        classPreferredStartTimeEl.value = '';
     }
 
     if (typeof window.resetBookingRentalState === 'function') {
@@ -821,7 +808,11 @@ const initBookingFormHandlers = () => {
 
             if (strict && selectedCategory && !isKnownBookingTypeValue(selectedCategory)) {
                 bookingTypeEl.value = '';
-                showAlert('Please select a catalog from dropdown suggestions only.', 'error');
+                renderBookingTypeSelectOptions();
+                if (typeof window.refreshClassLocationUI === 'function') {
+                    window.refreshClassLocationUI();
+                }
+                return;
             }
 
             // Restore full suggestion list after selection/validation.
@@ -858,8 +849,11 @@ const initBookingFormHandlers = () => {
             highlightedOptionIndex = -1;
         });
 
-        bookingTypeDropdownEl.addEventListener('mousedown', () => {
-            isSelectingFromDropdown = true;
+        bookingTypeDropdownEl.addEventListener('mousedown', (event) => {
+            // Prevent input from losing focus when clicking inside the dropdown.
+            // This stops the blur event from firing mid-selection, which would
+            // clear the typed search text before the click handler can set the value.
+            event.preventDefault();
         });
 
         bookingTypeDropdownEl.addEventListener('mousemove', (event) => {
@@ -986,13 +980,6 @@ const initBookingFormHandlers = () => {
         });
     }
 
-    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
-    if (classPreferredStartTimeEl) {
-        classPreferredStartTimeEl.addEventListener('change', () => {
-            scheduleBookingFormDraftSave();
-        });
-    }
-
     const startTimeEl = document.getElementById('startTime');
     if (startTimeEl) {
         startTimeEl.addEventListener('change', () => {
@@ -1016,11 +1003,6 @@ const initBookingFormHandlers = () => {
                     }
                     endTimeEl.value = endTimeVal;
                     endTimeEl.disabled = false;
-                }
-
-                const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
-                if (classPreferredStartTimeEl && !classPreferredStartTimeEl.value) {
-                    classPreferredStartTimeEl.value = startTimeEl.value;
                 }
             } else {
                 populateEndTimeSlots();
