@@ -19,10 +19,8 @@ const updatePriceDisplay = () => {
 
     const bookingMode = window.getBookingMode ? window.getBookingMode() : 'hourly';
 
-    // Get duration
-    const startTime = document.getElementById('startTime')?.value;
-    const endTime = document.getElementById('endTime')?.value;
-    const duration = startTime && endTime ? calculateDuration(startTime, endTime) : 1;
+    // Flat-rate session booking: hourly mode uses one session (1h window internally).
+    const duration = 1;
 
     const perDayInfo = window.getPerDayBookingInfo
         ? window.getPerDayBookingInfo()
@@ -151,19 +149,8 @@ const updatePriceDisplay = () => {
     priceDisplay.style.display = 'block';
 };
 
-// Calculate duration between start and end time
-const calculateDuration = (startTime, endTime) => {
-    const [startHour, startMin] = startTime.split(':').map(Number);
-    let [endHour, endMin] = endTime.split(':').map(Number);
-
-    // Handle midnight (00:00) as 24:00
-    if (endHour === 0) endHour = 24;
-
-    const startMinutes = startHour * 60 + startMin;
-    const endMinutes = endHour * 60 + endMin;
-
-    return Math.max(1, Math.ceil((endMinutes - startMinutes) / 60));
-};
+// Retained for compatibility with older call sites.
+const calculateDuration = () => 1;
 
 // Expose for cross-file usage and compatibility.
 window.updatePriceDisplay = updatePriceDisplay;

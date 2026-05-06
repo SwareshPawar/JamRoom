@@ -500,7 +500,11 @@ const getPerdayBookedItemQuantities = async ({
   requestEndDate,
   requestStartTime,
   requestEndTime,
-  excludeBookingId = null
+  excludeBookingId = null,
+  // Optional: set of normalized item-name keys known to be per-day inventory.
+  // When provided the function also scans inhouse/hourly bookings for those same
+  // item names so shared physical inventory is correctly tracked across both modes.
+  perdayInventoryNameKeys = null
 }) => {
   const requestStartDateTime = parseDateTime(requestStartDate, requestStartTime);
   const requestEndDateTime = parseDateTime(requestEndDate, requestEndTime);
@@ -509,33 +513,63 @@ const getPerdayBookedItemQuantities = async ({
     return new Map();
   }
 
-  const query = {
-    bookingStatus: 'CONFIRMED',
-    $and: [
-      buildPerdayInventoryModeFilter(),
+  const dateRangeFilter = {
+    $or: [
       {
-        $or: [
-          {
-            perDayStartDate: { $lte: new Date(`${requestEndDate}T23:59:59.999`) },
-            perDayEndDate: { $gte: new Date(`${requestStartDate}T00:00:00.000`) }
-          },
-          {
-            date: {
-              $gte: new Date(`${requestStartDate}T00:00:00.000`),
-              $lte: new Date(`${requestEndDate}T23:59:59.999`)
-            }
-          }
-        ]
+        perDayStartDate: { $lte: new Date(`${requestEndDate}T23:59:59.999`) },
+        perDayEndDate: { $gte: new Date(`${requestStartDate}T00:00:00.000`) }
+      },
+      {
+        date: {
+          $gte: new Date(`${requestStartDate}T00:00:00.000`),
+          $lte: new Date(`${requestEndDate}T23:59:59.999`)
+        }
       }
     ]
   };
 
-  if (excludeBookingId) {
-    query._id = { $ne: excludeBookingId };
+  // Clause 1: existing per-day mode bookings (by mode, rental type, or date fields)
+  const perdayModeQuery = {
+    bookingStatus: 'CONFIRMED',
+    $and: [buildPerdayInventoryModeFilter(), dateRangeFilter]
+  };
+  if (excludeBookingId) perdayModeQuery._id = { $ne: excludeBookingId };
+
+  // Clause 2: inhouse/hourly bookings that reference per-day inventory items by name
+  // (same physical instrument booked in a studio session)
+  let inhouseQuery = null;
+  if (perdayInventoryNameKeys && perdayInventoryNameKeys.size > 0) {
+    const namesList = [...perdayInventoryNameKeys];
+    inhouseQuery = {
+      bookingStatus: 'CONFIRMED',
+      $and: [
+        // Exclude per-day mode bookings (already counted above)
+        {
+          $nor: [
+            { bookingMode: 'perday' },
+            { rentals: { $elemMatch: { rentalType: 'perday' } } },
+            { perDayStartDate: { $exists: true, $ne: null } }
+          ]
+        },
+        {
+          'rentals.name': {
+            $in: namesList.map((k) => new RegExp(`^${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'))
+          }
+        },
+        dateRangeFilter
+      ]
+    };
+    if (excludeBookingId) inhouseQuery._id = { $ne: excludeBookingId };
   }
 
-  const candidateBookings = await Booking.find(query)
-    .select('bookingMode date perDayStartDate perDayEndDate startTime endTime rentals');
+  const [perdayBookings, inhouseBookings] = await Promise.all([
+    Booking.find(perdayModeQuery).select('bookingMode date perDayStartDate perDayEndDate startTime endTime rentals'),
+    inhouseQuery
+      ? Booking.find(inhouseQuery).select('bookingMode date perDayStartDate perDayEndDate startTime endTime rentals')
+      : Promise.resolve([])
+  ]);
+
+  const candidateBookings = [...perdayBookings, ...inhouseBookings];
 
   const bookedItems = new Map();
 
@@ -548,21 +582,20 @@ const getPerdayBookedItemQuantities = async ({
     const bookingStartDateTime = applyTimeToDateObject(bookingStartDate, bookingStartTime);
     const bookingEndDateTime = applyTimeToDateObject(bookingEndDate, bookingEndTime);
 
-    if (!bookingStartDateTime || !bookingEndDateTime) {
-      continue;
-    }
-
-    if (!rangesOverlap(requestStartDateTime, requestEndDateTime, bookingStartDateTime, bookingEndDateTime)) {
-      continue;
-    }
+    if (!bookingStartDateTime || !bookingEndDateTime) continue;
+    if (!rangesOverlap(requestStartDateTime, requestEndDateTime, bookingStartDateTime, bookingEndDateTime)) continue;
 
     const rentals = Array.isArray(booking.rentals) ? booking.rentals : [];
     rentals.forEach((rental) => {
-      const rentalType = String(rental?.rentalType || '').toLowerCase();
-      if (rentalType !== 'perday') return;
-
       const rentalNameKey = normalizeRentalName(rental?.name);
       if (!rentalNameKey) return;
+
+      const rentalType = String(rental?.rentalType || '').toLowerCase();
+      // For perday-mode bookings count only per-day type rentals; for inhouse bookings
+      // count items that are in the per-day inventory (tracked by name).
+      const isFromPerdayMode = perdayBookings.includes(booking);
+      if (isFromPerdayMode && rentalType !== 'perday') return;
+      if (!isFromPerdayMode && perdayInventoryNameKeys && !perdayInventoryNameKeys.has(rentalNameKey)) return;
 
       const qty = Math.max(1, Number(rental?.quantity || 1));
       bookedItems.set(rentalNameKey, (bookedItems.get(rentalNameKey) || 0) + qty);
@@ -633,6 +666,7 @@ router.post('/', protect, async (req, res) => {
     let effectiveEndTime = normalizedMode === 'perday'
       ? String(perDayReturnTime || endTime || '')
       : String(endTime || '');
+    const requestedDurationHours = Math.max(1, Number(duration) || 1);
 
     if (!rentals || !Array.isArray(rentals) || rentals.length === 0) {
       return res.status(400).json({
@@ -642,12 +676,15 @@ router.post('/', protect, async (req, res) => {
     }
 
     if (normalizedMode === 'hourly') {
-      if (!date || !effectiveStartTime || !effectiveEndTime || !duration) {
+      if (!date || !effectiveStartTime) {
         return res.status(400).json({
           success: false,
-          message: 'Please provide date, startTime, endTime and duration for hourly booking'
+          message: 'Please provide date and startTime for hourly booking'
         });
       }
+
+      // Session bookings are start-time based; use default/internal duration.
+      effectiveEndTime = calculateEndTime(effectiveStartTime, requestedDurationHours);
     } else {
       if (!perDayStartDate || !perDayEndDate || !effectiveStartTime || !effectiveEndTime) {
         return res.status(400).json({
@@ -715,8 +752,7 @@ router.post('/', protect, async (req, res) => {
       effectiveEndTime = calculateEndTime(effectiveStartTime, classConfig.sessionDurationHours);
     }
 
-    const parsedDuration = Number(duration);
-    const classDurationHours = isClassBooking ? classConfig.sessionDurationHours : parsedDuration;
+    const classDurationHours = isClassBooking ? classConfig.sessionDurationHours : requestedDurationHours;
     const durationForPricing = normalizedMode === 'hourly' ? classDurationHours : 1;
 
     // Validate duration for hourly mode
@@ -1117,7 +1153,8 @@ router.post('/', protect, async (req, res) => {
       notes,
       classSession,
       paymentStatus: 'PENDING',
-      bookingStatus: 'PENDING'
+      // Admin-created bookings (admin using booking form on behalf of student) are auto-confirmed
+      bookingStatus: req.user?.role === 'admin' ? 'CONFIRMED' : 'PENDING'
     });
 
     // Format date for display
@@ -1220,7 +1257,7 @@ router.post('/', protect, async (req, res) => {
           date: displayDate,
           startTime: effectiveStartTime,
           endTime: effectiveEndTime,
-          duration: normalizedMode === 'perday' ? computedPerDayHours : duration,
+          duration: normalizedMode === 'perday' ? computedPerDayHours : durationForPricing,
           totalAmount: calculatedTotalAmount,
           upiId: settings.upiId,
           upiName: resolvedUpiName,
@@ -1369,20 +1406,66 @@ router.get('/availability/perday-items', async (req, res) => {
       });
     }
 
+    // Build set of per-day catalog item name keys so the inventory check can also
+    // catch inhouse bookings that use the same physical instruments.
+    const settings = await AdminSettings.getSettings();
+    const perdayInventoryNameKeys = new Set();
+    const perdayCatalogItems = []; // [{name, maxQuantity}] for the response
+    (Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : []).forEach((cat) => {
+      const catRentalType = String(cat?.rentalType || '').toLowerCase().trim().replace(/[\s_-]+/g, '');
+      const subItems = Array.isArray(cat?.subItems) ? cat.subItems : [];
+      const collectItem = (item) => {
+        const itemRentalType = String(item?.rentalType || catRentalType || '').toLowerCase().trim().replace(/[\s_-]+/g, '');
+        if (itemRentalType !== 'perday') return;
+        const nameKey = String(item?.name || '').trim().toLowerCase();
+        if (!nameKey) return;
+        perdayInventoryNameKeys.add(nameKey);
+        perdayCatalogItems.push({
+          name: String(item.name || '').trim(),
+          nameKey,
+          maxQuantity: Math.max(1, Number(item?.maxQuantity || 1))
+        });
+      };
+      if (subItems.length > 0) {
+        subItems.forEach(collectItem);
+      } else {
+        collectItem(cat);
+      }
+    });
+
     const bookedItemQuantities = await getPerdayBookedItemQuantities({
       requestStartDate: startDate,
       requestEndDate: endDate,
       requestStartTime: pickupTime,
-      requestEndTime: returnTime
+      requestEndTime: returnTime,
+      perdayInventoryNameKeys: perdayInventoryNameKeys.size > 0 ? perdayInventoryNameKeys : null
     });
 
     const bookedItemQuantitiesObj = Object.fromEntries(bookedItemQuantities.entries());
-    const unavailableItems = Object.keys(bookedItemQuantitiesObj);
+
+    // An item is unavailable if its booked quantity >= its max (catalog) quantity.
+    // Items with maxQuantity=1 (the common case) become unavailable as soon as qty>=1.
+    const unavailableItems = perdayCatalogItems
+      .filter((ci) => (bookedItemQuantitiesObj[ci.nameKey] || 0) >= ci.maxQuantity)
+      .map((ci) => ci.nameKey);
+
+    // Also include any item not in current catalog but found in bookings (legacy items).
+    Object.keys(bookedItemQuantitiesObj).forEach((key) => {
+      if (!unavailableItems.includes(key)) {
+        const catalogEntry = perdayCatalogItems.find((ci) => ci.nameKey === key);
+        const maxQty = catalogEntry ? catalogEntry.maxQuantity : 1;
+        if ((bookedItemQuantitiesObj[key] || 0) >= maxQty) {
+          unavailableItems.push(key);
+        }
+      }
+    });
 
     return res.json({
       success: true,
       unavailableItems,
-      bookedItemQuantities: bookedItemQuantitiesObj
+      bookedItemQuantities: bookedItemQuantitiesObj,
+      // Send full catalog list so frontend can show ALL items with availability status
+      catalogItems: perdayCatalogItems
     });
   } catch (error) {
     console.error('Get per-day item availability error:', error);

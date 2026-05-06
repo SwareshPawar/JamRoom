@@ -10,14 +10,6 @@ const PAYMENT_SECTION_HTML = `
     <h3>💳 Payment Options</h3>
     <div class="payment-methods">
         <div class="payment-method">
-            <h4>📱 Pay with UPI App</h4>
-            <p><strong>Amount:</strong> <span id="upiAmount"></span></p>
-            <button id="payWithUPI" class="payment-btn primary">Open UPI App &amp; Pay</button>
-            <button id="payWithPhonePe" class="payment-btn secondary">Open PhonePe</button>
-            <button id="payWithGPay" class="payment-btn secondary">Copy UPI Link</button>
-            <small class="payment-note-text">PhonePe and universal UPI launch supported, with copy/share and QR fallback.</small>
-        </div>
-        <div class="payment-method">
             <h4>📋 Copy Payment Details</h4>
             <div class="payment-info">
                 <strong>UPI ID:</strong> <span id="upiId"></span>
@@ -74,7 +66,6 @@ const renderBookingPaymentSection = (bookingResponse) => {
     };
 
     setText('upiId', upiId);
-    setText('upiAmount', `₹${amount}`);
     setText('upiAmountCopy', `₹${amount}`);
     setText('upiName', upiName);
 
@@ -105,56 +96,11 @@ const renderBookingPaymentSection = (bookingResponse) => {
         });
     };
 
-    const sharePaymentLink = async () => {
-        if (paymentManager && navigator.share) {
-            paymentManager.sharePaymentLink(upiLink, 'UPI app');
-            return;
-        }
-
-        const shareText = `UPI payment for JamRoom booking\nUPI ID: ${upiId}\nAmount: ₹${amount}\nLink: ${upiLink}`;
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: 'JamRoom UPI Payment',
-                    text: shareText
-                });
-                return;
-            } catch (error) {
-                if (error && error.name === 'AbortError') {
-                    return;
-                }
-            }
-        }
-        copyValue(upiLink, 'UPI payment link copied to clipboard!');
-    };
-
     const bindClick = (id, handler) => {
         const button = document.getElementById(id);
         if (!button) return;
         button.onclick = handler;
     };
-
-    bindClick('payWithUPI', () => {
-        if (paymentManager && typeof paymentManager.tryOpenUPIApp === 'function') {
-            paymentManager.tryOpenUPIApp(upiLink, 'UPI app');
-            return;
-        }
-
-        window.location.href = upiLink;
-    });
-
-    bindClick('payWithPhonePe', () => {
-        if (paymentManager && typeof paymentManager.openPhonePe === 'function') {
-            paymentManager.openPhonePe(upiLink);
-            return;
-        }
-
-        sharePaymentLink();
-    });
-
-    bindClick('payWithGPay', () => {
-        copyValue(upiLink, 'UPI payment link copied to clipboard!');
-    });
 
     bindClick('copyUpiId', () => {
         copyValue(upiId, 'UPI ID copied to clipboard!');

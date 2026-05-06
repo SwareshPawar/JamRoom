@@ -1943,7 +1943,7 @@ details[open] > .lesson-accordion-header::after {
 
 @media (max-width: 480px) {
     .main-nav .nav-links {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .main-nav .nav-link {
@@ -1989,7 +1989,7 @@ details[open] > .lesson-accordion-header::after {
 
 @media (max-width: 360px) {
     .main-nav .nav-links {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .app-header-actions-primary {

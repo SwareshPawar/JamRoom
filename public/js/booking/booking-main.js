@@ -194,5 +194,116 @@
 
         initBookingDatePickers();
 
+        // Custom dropdown for #startTime — prevents native popup overflowing viewport
+        const initStartTimeCustomDropdown = () => {
+            const select = document.getElementById('startTime');
+            const trigger = document.getElementById('startTimeTrigger');
+            const display = document.getElementById('startTimeDisplay');
+            if (!select || !trigger || !display) return;
+
+            // Panel appended to body for free fixed positioning
+            const panel = document.createElement('div');
+            panel.className = 'time-custom-panel';
+            panel.setAttribute('role', 'listbox');
+            panel.style.display = 'none';
+            document.body.appendChild(panel);
+
+            let isOpen = false;
+
+            const updateDisplay = () => {
+                const opt = select.options[select.selectedIndex];
+                display.textContent = (opt && opt.value) ? opt.textContent : (select.options[0]?.textContent || 'Pick time');
+            };
+
+            const syncPanelOptions = () => {
+                panel.innerHTML = '';
+                Array.from(select.options).forEach((opt) => {
+                    const li = document.createElement('div');
+                    li.className = 'time-custom-option' + (opt.value === select.value && opt.value ? ' selected' : '');
+                    li.textContent = opt.textContent;
+                    if (!opt.value) li.dataset.placeholder = '1';
+                    li.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        if (!opt.value) return;
+                        select.value = opt.value;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                        updateDisplay();
+                        closePanel();
+                    });
+                    panel.appendChild(li);
+                });
+            };
+
+            const positionPanel = () => {
+                const rect = trigger.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom - 8;
+                const spaceAbove = rect.top - 8;
+                const maxH = Math.min(260, Math.max(spaceBelow, spaceAbove) - 4);
+
+                panel.style.width = rect.width + 'px';
+                panel.style.left = rect.left + 'px';
+                panel.style.maxHeight = maxH + 'px';
+
+                if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+                    panel.style.top = (rect.bottom + 4) + 'px';
+                    panel.style.bottom = '';
+                } else {
+                    panel.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+                    panel.style.top = '';
+                }
+            };
+
+            const openPanel = () => {
+                if (trigger.disabled || isOpen) return;
+                syncPanelOptions();
+                positionPanel();
+                panel.style.display = 'block';
+                trigger.setAttribute('aria-expanded', 'true');
+                isOpen = true;
+            };
+
+            const closePanel = () => {
+                panel.style.display = 'none';
+                trigger.setAttribute('aria-expanded', 'false');
+                isOpen = false;
+            };
+
+            trigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                isOpen ? closePanel() : openPanel();
+            });
+
+            document.addEventListener('mousedown', (e) => {
+                if (isOpen && !panel.contains(e.target) && e.target !== trigger) {
+                    closePanel();
+                }
+            });
+
+            // Sync trigger disabled state with select
+            const disabledObserver = new MutationObserver(() => {
+                trigger.disabled = select.disabled;
+                if (select.disabled) closePanel();
+                updateDisplay();
+            });
+            disabledObserver.observe(select, { attributes: true, attributeFilter: ['disabled'] });
+
+            // Sync display when select value changes externally
+            select.addEventListener('change', updateDisplay);
+
+            // Watch for innerHTML changes (option repopulation)
+            const optionsObserver = new MutationObserver(() => {
+                updateDisplay();
+                if (isOpen) { syncPanelOptions(); positionPanel(); }
+            });
+            optionsObserver.observe(select, { childList: true, subtree: true });
+
+            window.addEventListener('resize', () => { if (isOpen) positionPanel(); });
+            window.addEventListener('scroll', () => { if (isOpen) positionPanel(); }, true);
+
+            updateDisplay();
+        };
+
+        initStartTimeCustomDropdown();
+
         // Initialize
         checkAuth();

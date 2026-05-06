@@ -21,13 +21,16 @@
     };
 
     const init = async () => {
-        const user = await requireAuthUser();
-        if (!user) return;
+        if (window.JamRoomUtils) window.JamRoomUtils.showLoading('Navigating...');
+        try {
+            const user = await requireAuthUser();
+            if (!user) return;
 
-        if (typeof window.loadLessonTrackerBookings === 'function') {
-            await window.loadLessonTrackerBookings();
-        } else if (typeof window.loadMyBookings === 'function') {
-            await window.loadMyBookings({ classOnly: true });
+            if (typeof window.loadMyBookings === 'function') {
+                await window.loadMyBookings({ classOnly: true, trackerMode: true });
+            }
+        } finally {
+            if (window.JamRoomUtils) window.JamRoomUtils.hideLoading();
         }
     };
 

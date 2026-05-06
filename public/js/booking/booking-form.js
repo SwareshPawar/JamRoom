@@ -354,15 +354,6 @@ const restoreBookingFormDraft = async () => {
             if (startTimeEl) {
                 startTimeEl.value = '';
             }
-
-            if (typeof populateEndTimeSlots === 'function') {
-                populateEndTimeSlots();
-            }
-
-            const endTimeEl = document.getElementById('endTime');
-            if (endTimeEl) {
-                endTimeEl.value = '';
-            }
         } else {
             if (perdayStartDateEl) {
                 perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -439,7 +430,6 @@ const buildBookingFormPayload = () => {
     const bookingMode = window.getBookingMode ? window.getBookingMode() : 'hourly';
 
     let startTime;
-    let endTime;
     let duration;
     let bookingDate;
     let perDayStartDate;
@@ -469,22 +459,36 @@ const buildBookingFormPayload = () => {
 
         bookingDate = perDayStartDate;
         startTime = perDayPickupTime;
-        endTime = perDayReturnTime;
         duration = perDayDays * 24;
     } else {
+        const bookingTypeForScheduleRule = document.getElementById('bookingTypeSelect')?.value.trim() || '';
+        const isPerTrackBookingCategory = typeof window.isPerTrackBookingCategory === 'function'
+            ? window.isPerTrackBookingCategory(bookingTypeForScheduleRule)
+            : false;
+
         startTime = document.getElementById('startTime')?.value;
-        endTime = document.getElementById('endTime')?.value;
         bookingDate = document.getElementById('bookingDate')?.value;
 
+        if (!isPerTrackBookingCategory) {
+            if (!bookingDate) {
+                throw new Error('Please select a booking date.');
+            }
+
+            if (!startTime) {
+                throw new Error('Please select a valid start time.');
+            }
+        }
+
         if (!bookingDate) {
-            throw new Error('Please select a booking date.');
+            bookingDate = getTodayDateString();
         }
 
-        if (!startTime || !endTime) {
-            throw new Error('Please select valid start and end times.');
+        if (!startTime) {
+            startTime = '09:00';
         }
 
-        duration = calculateDuration(startTime, endTime);
+        // Flat-rate session booking: one session per booking.
+        duration = 1;
     }
 
     const { rentalsArray, subtotal } = buildRentalsForSubmission(duration);
@@ -560,7 +564,6 @@ const buildBookingFormPayload = () => {
             rentalType: bookingType,
             date: bookingDate,
             startTime,
-            endTime,
             duration,
             rentals: rentalsArray,
             subtotal: adjustedSubtotal,
@@ -598,14 +601,24 @@ const resetBookingFormState = () => {
 
     const perdayStartDateEl = document.getElementById('perdayStartDate');
     if (perdayStartDateEl) {
-        perdayStartDateEl.value = today;
-        perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        if (perdayStartDateEl._flatpickr) {
+            perdayStartDateEl._flatpickr.clear();
+            perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+            perdayStartDateEl.value = '';
+            perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
 
     const perdayEndDateEl = document.getElementById('perdayEndDate');
     if (perdayEndDateEl) {
-        perdayEndDateEl.value = today;
-        perdayEndDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        if (perdayEndDateEl._flatpickr) {
+            perdayEndDateEl._flatpickr.clear();
+            perdayEndDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+            perdayEndDateEl.value = '';
+            perdayEndDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
 
     if (priceDisplay) {
@@ -695,27 +708,24 @@ const bindBookingDateChange = (bookingDateEl) => {
 
         previousDateValue = selectedDate;
         const startTimeSelect = document.getElementById('startTime');
-        const endTimeSelect = document.getElementById('endTime');
 
-        if (startTimeSelect && endTimeSelect) {
-            startTimeSelect.innerHTML = '<option value="">Select date first</option>';
-            endTimeSelect.innerHTML = '<option value="">Select start time first</option>';
+        if (startTimeSelect) {
+            startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
             startTimeSelect.disabled = true;
-            endTimeSelect.disabled = true;
 
             if (selectedDate) {
                 await loadAvailability(selectedDate);
             } else {
                 const timeline = document.getElementById('referenceTimeline');
                 if (timeline) {
-                    timeline.innerHTML = '<div class="loading-text">Select a date to view availability</div>';
+                    timeline.innerHTML = '<div class="loading-text">Pick date to view.</div>';
                 }
                 window.currentAvailabilityData = null;
             }
         } else {
             const timeline = document.getElementById('referenceTimeline');
             if (timeline) {
-                timeline.innerHTML = '<div class="loading-text">Select a date to view availability</div>';
+                timeline.innerHTML = '<div class="loading-text">Pick date to view.</div>';
             }
             window.currentAvailabilityData = null;
         }
@@ -728,9 +738,13 @@ const bindBookingDateChange = (bookingDateEl) => {
 
     const onDateChange = async (e) => {
         const selectedDate = (e?.target?.value || bookingDateEl.value || '').trim();
-        await handleDateSelection(selectedDate);
-
         const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+        const isPerTrack = typeof window.isPerTrackBookingCategory === 'function' && window.isPerTrackBookingCategory(bookingType);
+
+        if (!isPerTrack) {
+            await handleDateSelection(selectedDate);
+        }
+
         const isClass = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
         if (isClass) {
             const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
@@ -985,38 +999,6 @@ const initBookingFormHandlers = () => {
     const startTimeEl = document.getElementById('startTime');
     if (startTimeEl) {
         startTimeEl.addEventListener('change', () => {
-            const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-            const isClass = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
-            if (isClass && startTimeEl.value) {
-                // Auto-set end time based on class session duration configured in admin settings
-                const classConfig = typeof window.getClassConfig === 'function' ? window.getClassConfig() : { sessionDurationHours: 1 };
-                const sessionDurationHours = Math.max(1, Number(classConfig.sessionDurationHours || 1));
-                const [h, m] = startTimeEl.value.split(':').map(Number);
-                const endHour = (h + sessionDurationHours) % 24;
-                const endTimeVal = `${String(endHour).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
-                const endTimeEl = document.getElementById('endTime');
-                if (endTimeEl) {
-                    let opt = endTimeEl.querySelector(`option[value="${endTimeVal}"]`);
-                    if (!opt) {
-                        opt = document.createElement('option');
-                        opt.value = endTimeVal;
-                        opt.textContent = endTimeVal;
-                        endTimeEl.appendChild(opt);
-                    }
-                    endTimeEl.value = endTimeVal;
-                    endTimeEl.disabled = false;
-                }
-            } else {
-                populateEndTimeSlots();
-            }
-            updatePriceDisplay();
-            scheduleBookingFormDraftSave();
-        });
-    }
-
-    const endTimeEl = document.getElementById('endTime');
-    if (endTimeEl) {
-        endTimeEl.addEventListener('change', () => {
             updatePriceDisplay();
             scheduleBookingFormDraftSave();
         });

@@ -28,6 +28,13 @@
 - **Shared Navigation Pattern**: Render header/nav via `public/js/shared/navigation.js` into `#navigationContainer`; do not handcraft page-specific nav variants.
 - **Header Action Pattern**: Keep theme/logout/tests controls in `.app-header-actions`; keep primary route links in `.main-nav .nav-links`.
 - **Theme Pattern**: Use `public/js/shared/theme.js` and tokenized styles in `public/css/shared.css`; avoid page-local hardcoded theme colors.
+- **Per-Track No-Schedule Pattern**: Categories with `rentalType: 'pertrack'` and no binding to a session/inhouse category bypass all date/time/availability UI. Use `isPerTrackBookingCategory()` as the single guard; do not duplicate the check inline.
+- **Per-Track + Session Binding Rule**: A per-track category bound (either direction) to `persession`/`inhouse` in `bookingCategoryBindings.pairs` is treated as a session-context item and requires date/time like any hourly booking.
+- **Time Slot Source Pattern**: `buildTimeSlots(startHour, endHour)` in `booking-availability.js` is the single source of truth for studio hourly slots. Do not redeclare a slots array in other files; read from `window.allTimeSlots` instead.
+- **Select Overflow Pattern**: Native `<select>` popups cannot be constrained by CSS. For dropdowns that overflow viewport on mobile, hide the native select and overlay a `position:fixed` custom panel (see `#startTime` / `initStartTimeCustomDropdown()` in `booking-main.js`). For list-box style fields, `size` attribute + `max-height` CSS is acceptable (see `#perdayPickupTime`).
+- **Route Segregation Pattern (May 2026)**: Separate user intents at the route level rather than expanding a single page. `booking.html` = create only. `my-bookings.html` = history + actions. `lesson-tracker.html` = class-only tracker. Never add history/tracker modules back to `booking.html`.
+- **Context-Safe Module Pattern**: Any JS module loaded on more than one page (e.g. `booking-bookings.js`) must null-guard DOM lookups and exit gracefully when page-specific containers are absent. Do not assume Book Now form context when the module is reused on Account/My Bookings/Lesson Tracker.
+- **Experience Role Pattern (Planned)**: Use `experienceRoles[]` on the User model for UX branching; never overload the `role` auth field with UI behaviour. Role-based navigation and layout changes should read from `experienceRoles`, not `role`.
 
 ---
 

@@ -35,12 +35,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Initialize booking page
 async function initializeBookingPage() {
+    // Use the unified JamRoomUtils loader (same style as nav 'Navigating...' overlay)
+    if (window.JamRoomUtils) {
+        window.JamRoomUtils.showLoading('Navigating...');
+    } else {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.classList.add('show');
+    }
+
     try {
         // Check authentication
         const authResult = await checkAuth();
         if (!authResult) return;
 
-        // Load settings and bookings
+        // Load settings (fetches catalog/rental config)
         await loadSettings();
 
         if (typeof window.restoreBookingFormDraft === 'function') {
@@ -54,6 +62,13 @@ async function initializeBookingPage() {
     } catch (error) {
         console.error('Failed to initialize booking page:', error);
         showAlert('Failed to initialize page. Please refresh.', 'error');
+    } finally {
+        // Hide loader (both unified and fallback static overlay)
+        if (window.JamRoomUtils) {
+            window.JamRoomUtils.hideLoading();
+        }
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.classList.remove('show');
     }
 }
 

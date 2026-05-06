@@ -2,23 +2,9 @@
  * Booking history and billing actions module.
  */
 
-const slotRequestTimeSlots = [
-    { value: '09:00', label: '9:00 AM', hour: 9 },
-    { value: '10:00', label: '10:00 AM', hour: 10 },
-    { value: '11:00', label: '11:00 AM', hour: 11 },
-    { value: '12:00', label: '12:00 PM', hour: 12 },
-    { value: '13:00', label: '1:00 PM', hour: 13 },
-    { value: '14:00', label: '2:00 PM', hour: 14 },
-    { value: '15:00', label: '3:00 PM', hour: 15 },
-    { value: '16:00', label: '4:00 PM', hour: 16 },
-    { value: '17:00', label: '5:00 PM', hour: 17 },
-    { value: '18:00', label: '6:00 PM', hour: 18 },
-    { value: '19:00', label: '7:00 PM', hour: 19 },
-    { value: '20:00', label: '8:00 PM', hour: 20 },
-    { value: '21:00', label: '9:00 PM', hour: 21 },
-    { value: '22:00', label: '10:00 PM', hour: 22 },
-    { value: '23:00', label: '11:00 PM', hour: 23 }
-];
+// Time slots declared once in booking-availability.js (window.allTimeSlots).
+// booking-availability.js must be loaded before this file.
+const getSlotRequestTimeSlots = () => window.allTimeSlots || [];
 
 const slotRequestAvailabilityCache = new Map();
 
@@ -195,7 +181,7 @@ const loadSlotRequestTimeOptions = async (dateInputEl) => {
 
         const todayLocal = getSlotRequestLocalDateString(new Date());
         const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-        const availableSlots = slotRequestTimeSlots.filter((slot) => {
+        const availableSlots = getSlotRequestTimeSlots().filter((slot) => {
             if (selectedDate === todayLocal && (slot.hour * 60) <= currentMinutes) {
                 return false;
             }
@@ -267,11 +253,110 @@ const initSlotRequestDatePickers = () => {
     });
 };
 
+// ─── Shared helper: build lesson row HTML (used by both render modes) ────────
+const buildLessonRowHTML = (lesson, bookingId) => {
+    const status = String(lesson?.status || 'SCHEDULED').toUpperCase();
+    const statusClass = status === 'COMPLETED' ? 'completed' : status === 'CANCELLED' ? 'cancelled' : 'scheduled';
+    const statusLabel = status.charAt(0) + status.slice(1).toLowerCase();
+    const weekNum = lesson?.weekNumber || lesson?.classNumber || 1;
+    const scheduledDate = lesson?.scheduledDate ? formatBookingDate(lesson.scheduledDate) : 'TBD';
+    const completionDate = lesson?.completedDate ? formatBookingDate(lesson.completedDate) : null;
+    const completionTime = lesson?.completedStartTime && lesson?.completedEndTime
+        ? `${formatBookingTime(lesson.completedStartTime)} - ${formatBookingTime(lesson.completedEndTime)}`
+        : null;
+    const headerDateStr = (() => {
+        const src = status === 'COMPLETED' && lesson?.completedDate ? lesson.completedDate : lesson?.scheduledDate;
+        if (!src) return null;
+        const d = new Date(src);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    })();
+    const slotReq = lesson?.slotRequest || {};
+    const slotReqStatus = String(slotReq.status || 'NONE').toUpperCase();
+    const slotReqHeaderBadge = slotReqStatus === 'PENDING'
+        ? ` <span class="lesson-status-badge lesson-status-scheduled" style="font-size:0.7em;">Slot Pending</span>`
+        : '';
+    const getWeekRange = (d) => {
+        if (!d) return null;
+        const dt = new Date(d);
+        if (Number.isNaN(dt.getTime())) return null;
+        const dow = dt.getDay();
+        const diff = dow === 0 ? -6 : 1 - dow;
+        const mon = new Date(dt); mon.setDate(dt.getDate() + diff); mon.setHours(0,0,0,0);
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+        const fmt = (x) => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+        return { min: fmt(mon), max: fmt(sun) };
+    };
+    const weekRange = status === 'SCHEDULED' ? getWeekRange(lesson?.scheduledDate) : null;
+    const lessonIdStr = String(lesson?._id || '');
+
+    let slotRequestSection = '';
+    if (status === 'SCHEDULED') {
+        if (slotReqStatus === 'PENDING') {
+            const pDate = slotReq.proposedDate ? new Date(slotReq.proposedDate).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}) : '';
+            slotRequestSection = `<div class="lesson-slot-request lesson-slot-pending">
+                <p><strong>Slot request pending approval</strong></p>
+                <p>Requested: ${pDate} at ${slotReq.proposedStartTime || 'N/A'} (${slotReq.proposedEndTime || ''})</p>
+                <button class="btn btn-sm btn-secondary" onclick="cancelSlotRequest('${bookingId}','${lessonIdStr}',this)">Withdraw Request</button>
+            </div>`;
+        } else if (slotReqStatus === 'REJECTED') {
+            slotRequestSection = `<div class="lesson-slot-request lesson-slot-rejected">
+                <p><strong>Slot request was rejected.</strong>${slotReq.responseNote ? ` Note: ${slotReq.responseNote}` : ''} You can submit a new request.</p>
+            </div>`;
+        } else if (slotReqStatus === 'APPROVED') {
+            slotRequestSection = `<p style="color:var(--success-color);font-size:0.85em">✔ Slot confirmed by admin</p>`;
+        }
+        if (slotReqStatus !== 'PENDING') {
+            const minDate = weekRange?.min || '';
+            const maxDate = weekRange?.max || '';
+            slotRequestSection += `<details class="lesson-slot-form">
+                <summary class="btn btn-sm btn-primary lesson-slot-trigger">Request Slot</summary>
+                <div class="lesson-slot-form-panel">
+                    <div class="field-help">Pick a date within this lesson week, then choose from available JamRoom time slots.</div>
+                    <div class="time-container lesson-slot-time-container">
+                        <div class="form-group lesson-slot-field">
+                            <label><strong>Date</strong></label>
+                            <input type="date" class="slot-req-date" min="${minDate}" max="${maxDate}">
+                        </div>
+                        <div class="form-group lesson-slot-field">
+                            <label><strong>Start Time</strong></label>
+                            <select class="slot-req-time" disabled>
+                                <option value="">Select a date first</option>
+                            </select>
+                            <div class="loading-text start-time-loading slot-req-time-loading">Loading available times...</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-success lesson-slot-submit" onclick="submitSlotRequest('${bookingId}','${lessonIdStr}',this)">Submit Request</button>
+                </div>
+            </details>`;
+        }
+    }
+
+    return `
+        <li>
+            <details class="lesson-accordion">
+                <summary class="lesson-accordion-header">
+                    <span class="lesson-accordion-week">Week ${weekNum}${headerDateStr ? ` · ${headerDateStr}` : ''}${slotReqHeaderBadge}</span>
+                    <span class="lesson-status-badge lesson-status-${statusClass}">${statusLabel}</span>
+                </summary>
+                <div class="lesson-accordion-body">
+                    <p><strong>Scheduled:</strong> ${scheduledDate} (${formatBookingTime(lesson?.scheduledStartTime || '') || 'N/A'} – ${formatBookingTime(lesson?.scheduledEndTime || '') || 'N/A'})</p>
+                    ${status === 'COMPLETED' && completionDate ? `<p><strong>Completed on:</strong> ${completionDate}${completionTime ? `, ${completionTime}` : ''}</p>` : ''}
+                    ${lesson?.notes ? `<p><strong>Notes:</strong> ${lesson.notes}</p>` : ''}
+                    ${lesson?.details ? `<p><strong>Details:</strong> ${lesson.details}</p>` : ''}
+                    ${slotRequestSection}
+                </div>
+            </details>
+        </li>
+    `;
+};
+
 // Load user's bookings
 const loadMyBookings = async (options = {}) => {
     const loadingEl = document.getElementById('bookingsLoading');
     const bookingsEl = document.getElementById('bookingsList');
     const classOnly = options?.classOnly === true;
+    const trackerMode = options?.trackerMode === true; // Lesson Tracker page: focused lesson view
 
     if (!loadingEl && !bookingsEl) {
         return;
@@ -312,224 +397,178 @@ const loadMyBookings = async (options = {}) => {
         }
 
         let html = '';
-        bookings.forEach(booking => {
-            const isPerday = booking.bookingMode === 'perday';
-            const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
-            const perDayRange = (booking.perDayStartDate && booking.perDayEndDate)
-                ? `${formatBookingDate(booking.perDayStartDate)} to ${formatBookingDate(booking.perDayEndDate)}`
-                : formatBookingDate(booking.date);
-            const perDayTimeRange = `${formatBookingTime(booking.startTime)} to ${formatBookingTime(booking.endTime)}`;
 
-            const statusClass = booking.bookingStatus.toLowerCase();
-            const rentalsDisplay = booking.rentals && booking.rentals.length > 0
-                ? booking.rentals.filter(r => r && r.name && r.quantity !== undefined && r.price !== undefined)
-                    .map(r => {
-                        const rentalType = String(r.rentalType || 'inhouse').toLowerCase();
-                        const days = isPerday ? perDayDays : 1;
-                        const amount = (isPerday || rentalType === 'perday')
-                            ? (r.price * r.quantity * days)
-                            : (rentalType === 'persession' || rentalType === 'pertrack')
-                                ? (r.price * r.quantity)
-                                : (r.price * r.quantity * (booking.duration || 1));
-                        return `<li>${r.name} × ${r.quantity} - ₹${amount}</li>`;
-                    }).join('')
-                : `<li>${booking.rentalType || 'Unknown rental'}</li>`;
+        if (trackerMode) {
+            // ── TRACKER MODE: class-focused cards, always expanded, lessons as primary ──
+            bookings.forEach(booking => {
+                const classSession = booking.classSession || {};
+                if (!classSession.isClassBooking) return;
 
-            const bookingDateLine = isPerday
-                ? `<p><strong>📅 Per-day Range:</strong> ${perDayRange} (${perDayDays} day(s))</p>`
-                : `<p><strong>📅 Date:</strong> ${formatBookingDate(booking.date)}</p>`;
+                const statusClass = booking.bookingStatus.toLowerCase();
+                const completed = Number(classSession.completedClassesCount || 0);
+                const total = Number(classSession.totalClassesPlanned || 0);
+                const remaining = classSession.classesRemainingAfterBooking ?? (total - completed);
+                const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+                const planStart = classSession.planStartDate ? formatBookingDate(classSession.planStartDate) : 'N/A';
+                const planEnd = classSession.planEndDate ? formatBookingDate(classSession.planEndDate) : 'N/A';
 
-            const bookingTimeLine = isPerday
-                ? `<p><strong>🕐 Pick-up/Return:</strong> ${perDayTimeRange}</p>`
-                : `<p><strong>🕐 Time:</strong> ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)} (${booking.duration}h)</p>`;
+                const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
+                const lessonRowsHTML = lessons.length > 0
+                    ? lessons.map((lesson) => buildLessonRowHTML(lesson, booking._id)).join('')
+                    : '';
 
-            const classSession = booking.classSession || {};
-
-            const bookingItemNames = booking.rentals && booking.rentals.length > 0
-                ? booking.rentals
-                    .filter((rental) => rental && rental.name)
-                    .map((rental) => rental.name)
-                : [];
-            const bookingSummaryTitle = classSession.isClassBooking
-                ? (classSession.selectedClassItemName || classSession.instrument || 'Music Class')
-                : (bookingItemNames.length > 0
-                    ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2} more` : ''}`
-                    : (booking.rentalType || 'Booking'));
-            const bookingSummaryMeta = isPerday
-                ? `${perDayRange} | ${perDayTimeRange}`
-                : `${formatBookingDate(booking.date)} | ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}`;
-            const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
-            const lessonRows = lessons.length > 0
-                ? lessons.map((lesson) => {
-                    const status = String(lesson?.status || 'SCHEDULED').toUpperCase();
-                    const statusClass = status === 'COMPLETED' ? 'completed' : status === 'CANCELLED' ? 'cancelled' : 'scheduled';
-                    const statusLabel = status.charAt(0) + status.slice(1).toLowerCase();
-                    const weekNum = lesson?.weekNumber || lesson?.classNumber || 1;
-                    const scheduledDate = lesson?.scheduledDate ? formatBookingDate(lesson.scheduledDate) : 'TBD';
-                    const completionDate = lesson?.completedDate ? formatBookingDate(lesson.completedDate) : null;
-                    const completionTime = lesson?.completedStartTime && lesson?.completedEndTime
-                        ? `${formatBookingTime(lesson.completedStartTime)} - ${formatBookingTime(lesson.completedEndTime)}`
-                        : null;
-                    const headerDateStr = (() => {
-                        const src = status === 'COMPLETED' && lesson?.completedDate ? lesson.completedDate : lesson?.scheduledDate;
-                        if (!src) return null;
-                        const d = new Date(src);
-                        if (Number.isNaN(d.getTime())) return null;
-                        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-                    })();
-                    // Slot request badge for header
-                    const slotReq = lesson?.slotRequest || {};
-                    const slotReqStatus = String(slotReq.status || 'NONE').toUpperCase();
-                    const slotReqHeaderBadge = slotReqStatus === 'PENDING'
-                        ? ` <span class="lesson-status-badge lesson-status-scheduled" style="font-size:0.7em;">Slot Pending</span>`
-                        : '';
-
-                    // Determine week date range for the date input
-                    const getWeekRange = (d) => {
-                        if (!d) return null;
-                        const dt = new Date(d);
-                        if (Number.isNaN(dt.getTime())) return null;
-                        const dow = dt.getDay();
-                        const diff = dow === 0 ? -6 : 1 - dow;
-                        const mon = new Date(dt); mon.setDate(dt.getDate() + diff); mon.setHours(0,0,0,0);
-                        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-                        const fmt = (x) => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
-                        return { min: fmt(mon), max: fmt(sun) };
-                    };
-                    const weekRange = status === 'SCHEDULED' ? getWeekRange(lesson?.scheduledDate) : null;
-
-                    // Build slot request section
-                    let slotRequestSection = '';
-                    if (status === 'SCHEDULED') {
-                        const bookingId = booking._id;
-                        const lessonIdStr = String(lesson?._id || '');
-                        if (slotReqStatus === 'PENDING') {
-                            const pDate = slotReq.proposedDate ? new Date(slotReq.proposedDate).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}) : '';
-                            slotRequestSection = `<div class="lesson-slot-request lesson-slot-pending">
-                                <p><strong>Slot request pending approval</strong></p>
-                                <p>Requested: ${pDate} at ${slotReq.proposedStartTime || 'N/A'} (${slotReq.proposedEndTime || ''})</p>
-                                <button class="btn btn-sm btn-secondary" onclick="cancelSlotRequest('${bookingId}','${lessonIdStr}',this)">Withdraw Request</button>
-                            </div>`;
-                        } else if (slotReqStatus === 'REJECTED') {
-                            slotRequestSection = `<div class="lesson-slot-request lesson-slot-rejected">
-                                <p><strong>Slot request was rejected.</strong>${slotReq.responseNote ? ` Note: ${slotReq.responseNote}` : ''} You can submit a new request.</p>
-                            </div>`;
-                        } else if (slotReqStatus === 'APPROVED') {
-                            slotRequestSection = `<p style="color:var(--success-color);font-size:0.85em">✔ Slot confirmed by admin</p>`;
-                        }
-                        if (slotReqStatus !== 'PENDING') {
-                            const minDate = weekRange?.min || '';
-                            const maxDate = weekRange?.max || '';
-                            slotRequestSection += `<details class="lesson-slot-form">
-                                <summary class="btn btn-sm btn-primary lesson-slot-trigger">Request Slot</summary>
-                                <div class="lesson-slot-form-panel">
-                                    <div class="field-help">Pick a date within this lesson week, then choose from available JamRoom time slots.</div>
-                                    <div class="time-container lesson-slot-time-container">
-                                        <div class="form-group lesson-slot-field">
-                                            <label><strong>Date</strong></label>
-                                            <input type="date" class="slot-req-date" min="${minDate}" max="${maxDate}">
-                                        </div>
-                                        <div class="form-group lesson-slot-field">
-                                            <label><strong>Start Time</strong></label>
-                                            <select class="slot-req-time" disabled>
-                                                <option value="">Select a date first</option>
-                                            </select>
-                                            <div class="loading-text start-time-loading slot-req-time-loading">Loading available times...</div>
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-sm btn-success lesson-slot-submit" onclick="submitSlotRequest('${bookingId}','${lessonIdStr}',this)">Submit Request</button>
-                                </div>
-                            </details>`;
-                        }
-                    }
-
-                    return `
-                        <li>
-                            <details class="lesson-accordion">
-                                <summary class="lesson-accordion-header">
-                                    <span class="lesson-accordion-week">Week ${weekNum}${headerDateStr ? ` · ${headerDateStr}` : ''}${slotReqHeaderBadge}</span>
-                                    <span class="lesson-status-badge lesson-status-${statusClass}">${statusLabel}</span>
-                                </summary>
-                                <div class="lesson-accordion-body">
-                                    <p><strong>Scheduled:</strong> ${scheduledDate} (${formatBookingTime(lesson?.scheduledStartTime || '') || 'N/A'} – ${formatBookingTime(lesson?.scheduledEndTime || '') || 'N/A'})</p>
-                                    ${status === 'COMPLETED' && completionDate ? `<p><strong>Completed on:</strong> ${completionDate}${completionTime ? `, ${completionTime}` : ''}</p>` : ''}
-                                    ${lesson?.notes ? `<p><strong>Notes:</strong> ${lesson.notes}</p>` : ''}
-                                    ${lesson?.details ? `<p><strong>Details:</strong> ${lesson.details}</p>` : ''}
-                                    ${slotRequestSection}
-                                </div>
-                            </details>
-                        </li>
-                    `;
-                }).join('')
-                : '';
-
-            const classSessionDetails = classSession.isClassBooking
-                ? `
-                    <p><strong>🎓 Class Instrument:</strong> ${classSession.instrument || 'Music'}</p>
-                    <p><strong>🎼 Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument || 'N/A'}</p>
-                    <p><strong>📍 Class Location:</strong> ${classSession.location || 'N/A'}</p>
-                    <p><strong>🗓️ Default Weekly Slot:</strong> ${(classSession.preferredWeekday || 'N/A')} ${classSession.preferredStartTime ? `at ${formatBookingTime(classSession.preferredStartTime)}` : ''}</p>
-                    <p><strong>📅 Plan Window:</strong> ${classSession.planStartDate ? formatBookingDate(classSession.planStartDate) : 'N/A'} to ${classSession.planEndDate ? formatBookingDate(classSession.planEndDate) : 'N/A'}</p>
-                    <p><strong>📚 Classes:</strong> ${classSession.classesPerMonth || 0}/month, ${classSession.totalClassesPlanned || 0} total</p>
-                    <p><strong>✅ Progress:</strong> ${classSession.completedClassesCount || 0}/${classSession.totalClassesPlanned || 0} completed (${classSession.classesRemainingAfterBooking ?? 0} remaining)</p>
-                    <p><strong>💳 Fee:</strong> ₹${classSession.totalFeeBeforeDiscount || classSession.monthlyFee || 0} | <strong>Discount:</strong> ₹${classSession.discountAmount || 0} | <strong>Paid:</strong> ₹${classSession.totalFeeAfterDiscount || classSession.monthlyFeeDueNow || 0}</p>
-                `
-                : '';
-
-            const classSessionBlock = classSession.isClassBooking
-                ? `
-                    <div class="booking-class-tabs">
-                        <div class="booking-class-tab-list" role="tablist" aria-label="Class booking sections">
-                            <button type="button" class="booking-class-tab active" data-tab-target="details" onclick="switchBookingClassTab(this, 'details')">Class Details</button>
-                            <button type="button" class="booking-class-tab" data-tab-target="tracker" onclick="switchBookingClassTab(this, 'tracker')">Lesson Tracker</button>
-                        </div>
-                        <div class="booking-class-tab-panel active" data-tab-panel="details">
-                            ${classSessionDetails}
-                        </div>
-                        <div class="booking-class-tab-panel" data-tab-panel="tracker" hidden>
-                            ${lessonRows
-                                ? `<ul class="lesson-accordion-list">${lessonRows}</ul>`
-                                : '<p class="booking-empty-message booking-empty-padded">No lesson tracker entries yet.</p>'}
-                        </div>
-                    </div>
-                `
-                : '';
-
-            html += `
-                <details class="booking-card booking-card-collapsible ${statusClass}">
-                    <summary class="booking-card-summary">
-                        <div class="booking-card-summary-primary">
-                            <h4 class="booking-card-title">${bookingSummaryTitle}</h4>
-                            <p class="booking-card-summary-meta">${bookingSummaryMeta}</p>
-                        </div>
-                        <div class="booking-card-summary-side">
+                html += `
+                    <div class="tracker-plan-card booking-card ${statusClass}">
+                        <div class="tracker-plan-header">
+                            <div class="tracker-plan-title-block">
+                                <h3 class="tracker-plan-title">🎓 ${classSession.selectedClassItemName || classSession.instrument || 'Music Class'}</h3>
+                                <span class="tracker-plan-meta">📍 ${classSession.location || 'N/A'} &nbsp;·&nbsp; 🗓️ ${classSession.preferredWeekday || 'N/A'}${classSession.preferredStartTime ? ` at ${formatBookingTime(classSession.preferredStartTime)}` : ''}</span>
+                                <span class="tracker-plan-meta">📅 ${planStart} → ${planEnd}</span>
+                            </div>
                             <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
-                            <strong class="booking-card-summary-total">₹${booking.price}</strong>
                         </div>
-                    </summary>
-                    <div class="booking-card-body">
-                        <p><strong>📝 Items:</strong></p>
-                        <ul class="booking-rentals-list">${rentalsDisplay}</ul>
-                        ${bookingDateLine}
-                        ${bookingTimeLine}
-                        ${classSessionBlock}
-                        <p><strong>💰 Total:</strong> ₹${booking.price}
-                            ${booking.subtotal !== undefined && booking.taxAmount !== undefined
-                            ? `<small>(Subtotal: ₹${booking.subtotal} + Tax: ₹${booking.taxAmount})</small>` : ''}
-                        </p>
-                        ${booking.bandName ? `<p><strong>🎵 Band:</strong> ${booking.bandName}</p>` : ''}
-                        <div class="booking-actions-row">
-                            ${booking.bookingStatus === 'PENDING'
-                            ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger">Cancel Booking</button>`
-                            : ''}
-                            ${(booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
-                            ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary" title="Download Bill PDF">📄 Download Bill</button>`
-                            : ''}
+                        <div class="tracker-progress-bar-wrap">
+                            <div class="tracker-progress-bar" style="width:${progressPct}%"></div>
+                        </div>
+                        <div class="tracker-progress-stats">
+                            <span>✅ ${completed} completed</span>
+                            <span>📚 ${remaining} remaining</span>
+                            <span>Total: ${total}</span>
+                        </div>
+                        <div class="tracker-lessons">
+                            ${lessons.length > 0
+                                ? `<ul class="lesson-accordion-list">${lessonRowsHTML}</ul>`
+                                : '<p class="booking-empty-message booking-empty-padded">No lesson entries yet.</p>'}
                         </div>
                     </div>
-                </details>
-            `;
-        });
+                `;
+            });
+        } else {
+            // ── MY BOOKINGS MODE: full booking cards with class details tab ──────────
+            bookings.forEach(booking => {
+                const isPerday = booking.bookingMode === 'perday';
+                const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
+                const perDayRange = (booking.perDayStartDate && booking.perDayEndDate)
+                    ? `${formatBookingDate(booking.perDayStartDate)} to ${formatBookingDate(booking.perDayEndDate)}`
+                    : formatBookingDate(booking.date);
+                const perDayTimeRange = `${formatBookingTime(booking.startTime)} to ${formatBookingTime(booking.endTime)}`;
+                const statusClass = booking.bookingStatus.toLowerCase();
+                const rentalsDisplay = booking.rentals && booking.rentals.length > 0
+                    ? booking.rentals.filter(r => r && r.name && r.quantity !== undefined && r.price !== undefined)
+                        .map(r => {
+                            const rentalType = String(r.rentalType || 'inhouse').toLowerCase();
+                            const days = isPerday ? perDayDays : 1;
+                            const amount = (isPerday || rentalType === 'perday')
+                                ? (r.price * r.quantity * days)
+                                : (rentalType === 'persession' || rentalType === 'pertrack')
+                                    ? (r.price * r.quantity)
+                                    : (r.price * r.quantity * (booking.duration || 1));
+                            return `<li>${r.name} × ${r.quantity}${amount > 0 ? ` — ₹${amount}` : ''}</li>`;
+                        }).join('')
+                    : `<li>${booking.rentalType || 'Unknown rental'}</li>`;
+
+                const bookingDateLine = isPerday
+                    ? `<p><strong>📅 Per-day Range:</strong> ${perDayRange} (${perDayDays} day(s))</p>`
+                    : `<p><strong>📅 Date:</strong> ${formatBookingDate(booking.date)}</p>`;
+                const bookingTimeLine = isPerday
+                    ? `<p><strong>🕐 Pick-up/Return:</strong> ${perDayTimeRange}</p>`
+                    : `<p><strong>🕐 Time:</strong> ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)} (${booking.duration}h)</p>`;
+
+                const classSession = booking.classSession || {};
+                const bookingItemNames = booking.rentals && booking.rentals.length > 0
+                    ? booking.rentals.filter((r) => r && r.name).map((r) => r.name)
+                    : [];
+                const bookingSummaryTitle = classSession.isClassBooking
+                    ? (classSession.selectedClassItemName || classSession.instrument || 'Music Class')
+                    : (bookingItemNames.length > 0
+                        ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2} more` : ''}`
+                        : (booking.rentalType || 'Booking'));
+                const bookingSummaryMeta = isPerday
+                    ? `${perDayRange} | ${perDayTimeRange}`
+                    : `${formatBookingDate(booking.date)} | ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}`;
+
+                // Class progress badge shown inline in summary
+                const classSummaryBadge = classSession.isClassBooking
+                    ? (() => {
+                        const done = Number(classSession.completedClassesCount || 0);
+                        const tot = Number(classSession.totalClassesPlanned || 0);
+                        return `<span class="booking-class-progress-badge">${done}/${tot} classes</span>`;
+                    })()
+                    : '';
+
+                const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
+                const lessonRowsHTML = lessons.length > 0
+                    ? lessons.map((lesson) => buildLessonRowHTML(lesson, booking._id)).join('')
+                    : '';
+
+                const classSessionDetails = classSession.isClassBooking
+                    ? `
+                        <p><strong>🎓 Instrument:</strong> ${classSession.instrument || 'Music'}</p>
+                        <p><strong>🎼 Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument || 'N/A'}</p>
+                        <p><strong>📍 Location:</strong> ${classSession.location || 'N/A'}</p>
+                        <p><strong>🗓️ Weekly Slot:</strong> ${(classSession.preferredWeekday || 'N/A')} ${classSession.preferredStartTime ? `at ${formatBookingTime(classSession.preferredStartTime)}` : ''}</p>
+                        <p><strong>📅 Plan Window:</strong> ${classSession.planStartDate ? formatBookingDate(classSession.planStartDate) : 'N/A'} → ${classSession.planEndDate ? formatBookingDate(classSession.planEndDate) : 'N/A'}</p>
+                        <p><strong>📚 Classes:</strong> ${classSession.classesPerMonth || 0}/month, ${classSession.totalClassesPlanned || 0} total</p>
+                        <p><strong>✅ Progress:</strong> ${classSession.completedClassesCount || 0}/${classSession.totalClassesPlanned || 0} completed (${classSession.classesRemainingAfterBooking ?? 0} remaining)</p>
+                        <p><strong>💳 Fee:</strong> ₹${classSession.totalFeeBeforeDiscount || classSession.monthlyFee || 0} | <strong>Discount:</strong> ₹${classSession.discountAmount || 0} | <strong>Paid:</strong> ₹${classSession.totalFeeAfterDiscount || classSession.monthlyFeeDueNow || 0}</p>
+                    `
+                    : '';
+
+                const classSessionBlock = classSession.isClassBooking
+                    ? `
+                        <div class="booking-class-tabs">
+                            <div class="booking-class-tab-list" role="tablist" aria-label="Class booking sections">
+                                <button type="button" class="booking-class-tab active" data-tab-target="details" onclick="switchBookingClassTab(this, 'details')">Class Details</button>
+                                <button type="button" class="booking-class-tab" data-tab-target="tracker" onclick="switchBookingClassTab(this, 'tracker')">Lesson Tracker</button>
+                            </div>
+                            <div class="booking-class-tab-panel active" data-tab-panel="details">
+                                ${classSessionDetails}
+                            </div>
+                            <div class="booking-class-tab-panel" data-tab-panel="tracker" hidden>
+                                ${lessons.length > 0
+                                    ? `<ul class="lesson-accordion-list">${lessonRowsHTML}</ul>`
+                                    : '<p class="booking-empty-message booking-empty-padded">No lesson tracker entries yet.</p>'}
+                            </div>
+                        </div>
+                    `
+                    : '';
+
+                html += `
+                    <details class="booking-card booking-card-collapsible ${statusClass}">
+                        <summary class="booking-card-summary">
+                            <div class="booking-card-summary-primary">
+                                <h4 class="booking-card-title">${bookingSummaryTitle}${classSummaryBadge}</h4>
+                                <p class="booking-card-summary-meta">${bookingSummaryMeta}</p>
+                            </div>
+                            <div class="booking-card-summary-side">
+                                <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
+                                <strong class="booking-card-summary-total">₹${booking.price}</strong>
+                            </div>
+                        </summary>
+                        <div class="booking-card-body">
+                            <p><strong>📝 Items:</strong></p>
+                            <ul class="booking-rentals-list">${rentalsDisplay}</ul>
+                            ${bookingDateLine}
+                            ${bookingTimeLine}
+                            ${classSessionBlock}
+                            <p><strong>💰 Total:</strong> ₹${booking.price}
+                                ${booking.subtotal !== undefined && booking.taxAmount !== undefined
+                                ? `<small>(Subtotal: ₹${booking.subtotal} + Tax: ₹${booking.taxAmount})</small>` : ''}
+                            </p>
+                            ${booking.bandName ? `<p><strong>🎵 Band:</strong> ${booking.bandName}</p>` : ''}
+                            <div class="booking-actions-row">
+                                ${booking.bookingStatus === 'PENDING'
+                                ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger">Cancel Booking</button>`
+                                : ''}
+                                ${(booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
+                                ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary" title="Download Bill PDF">📄 Download Bill</button>`
+                                : ''}
+                            </div>
+                        </div>
+                    </details>
+                `;
+            });
+        }
 
         if (bookingsEl) {
             bookingsEl.innerHTML = html || '<p class="booking-empty-message">No valid bookings found</p>';

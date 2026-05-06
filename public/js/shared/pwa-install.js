@@ -13,9 +13,15 @@
   // ── Service-worker registration ──────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw-booking.js').catch(function (err) {
-        console.warn('[PWA] SW registration failed:', err);
-      });
+      navigator.serviceWorker.register('/sw-booking.js', { updateViaCache: 'none' })
+        .then(function (registration) {
+          if (registration && typeof registration.update === 'function') {
+            registration.update().catch(function () {});
+          }
+        })
+        .catch(function (err) {
+          console.warn('[PWA] SW registration failed:', err);
+        });
     });
   }
 

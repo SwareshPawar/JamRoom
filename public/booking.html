@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="/css/pages/booking.css">
 
 </head>
-<body>
+<body class="booking-preload">
     <div class="app-container">
         <!-- Navigation will be rendered here by NavigationManager -->
         <div id="navigationContainer"></div>
@@ -35,16 +35,16 @@
             <!-- Booking Form -->
             <div class="section" id="bookingSection">
                 <div class="section-header">
-                    <h2>New Booking</h2>
+                    <h2>Book</h2>
                 </div>
                 <div class="section-content">
                 <!-- Note: Alert now handled by shared AlertManager -->
 
                 <form id="bookingForm">
-                    <div class="form-group">
+                    <div class="form-group booking-row">
                         <label for="bookingTypeSelect">Catalog*</label>
                         <div class="booking-type-combobox" id="bookingTypeCombobox">
-                            <input id="bookingTypeSelect" placeholder="Search and select catalog" autocomplete="off" required aria-autocomplete="list" aria-expanded="false" aria-controls="bookingTypeDropdown">
+                            <input id="bookingTypeSelect" placeholder="Select catalog" autocomplete="off" required aria-autocomplete="list" aria-expanded="false" aria-controls="bookingTypeDropdown">
                             <button type="button" id="bookingTypeToggle" class="booking-type-toggle" aria-label="Show catalog options" title="Show catalog options">
                                 <span aria-hidden="true">▾</span>
                             </button>
@@ -52,30 +52,30 @@
                         </div>
                     </div>
 
-                    <div class="form-group booking-hidden-initial" id="classLocationGroup">
-                        <label for="classLocation">Class Location*</label>
+                    <div class="form-group booking-hidden-initial booking-row" id="classLocationGroup">
+                        <label for="classLocation">Location*</label>
                         <select id="classLocation">
-                            <option value="">Select class location</option>
+                            <option value="">Select location</option>
                         </select>
-                        <small class="field-help">Select location for class bookings.</small>
+                        <small class="field-help">Class location.</small>
                     </div>
 
-                    <div class="form-group booking-hidden-initial" id="classPlanMonthsGroup">
-                        <label for="classPlanMonths">Class Plan Duration*</label>
+                    <div class="form-group booking-hidden-initial booking-row" id="classPlanMonthsGroup">
+                        <label for="classPlanMonths">Plan*</label>
                         <select id="classPlanMonths">
                             <option value="1">1 Month</option>
                         </select>
-                        <small class="field-help" id="classDiscountHint">Discounts apply for long-term plans.</small>
+                        <small class="field-help" id="classDiscountHint">Longer plans save more.</small>
                     </div>
 
                     <div class="form-group booking-hidden-initial" id="classPlanInfoGroup">
-                        <div class="field-help" id="classPlanInfoText">4 classes per month. Plan schedule will be generated after booking.</div>
+                        <div class="field-help" id="classPlanInfoText">4 classes/month. Schedule is auto-generated.</div>
                     </div>
 
-                    <div class="form-group booking-hidden-initial" id="classPreferredWeekdayGroup">
-                        <label for="classPreferredWeekday">Preferred Weekly Class Day*</label>
+                    <div class="form-group booking-hidden-initial booking-row" id="classPreferredWeekdayGroup">
+                        <label for="classPreferredWeekday">Weekday*</label>
                         <select id="classPreferredWeekday">
-                            <option value="">Select preferred day</option>
+                            <option value="">Select day</option>
                             <option value="Monday">Monday</option>
                             <option value="Tuesday">Tuesday</option>
                             <option value="Wednesday">Wednesday</option>
@@ -84,47 +84,46 @@
                             <option value="Saturday">Saturday</option>
                             <option value="Sunday">Sunday</option>
                         </select>
-                        <small class="field-help">This sets the default weekly class day for your plan.</small>
+                        <small class="field-help">Default weekly day.</small>
                     </div>
 
                     <div id="hourlyBookingBlock" class="booking-flow-block">
-                    <div class="form-group">
-                        <label for="bookingDate">Select Date*</label>
+                    <div class="form-group booking-row" id="hourlyDateGroup">
+                        <label for="bookingDate">Date*</label>
                         <input type="date" id="bookingDate" required>
                     </div>
 
                     <!-- Reference View - Schedule for selected date -->
-                    <div class="reference-view" aria-live="polite">
+                    <div class="reference-view" id="hourlyAvailabilityView" aria-live="polite">
                         <div class="reference-view-head">
-                            <h3 class="reference-view-title">Availability for Selected Date</h3>
+                            <h3 class="reference-view-title">Availability</h3>
                         </div>
 
                         <div class="reference-view-body">
                             <div id="referenceTimeline" class="timeline">
-                                <div class="booking-theme-status booking-theme-status-muted">Select a date to view availability</div>
+                                <div class="booking-theme-status booking-theme-status-muted">Pick date to view.</div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="time-container">
-                        <div class="form-group">
-                            <label for="startTime" id="startTimeLabel">Start Time*</label>
-                            <select id="startTime" required disabled>
-                                <option value="">Select date first</option>
-                            </select>
-                            <div id="startTimeLoading" class="loading-text start-time-loading">Loading available times...</div>
-                        </div>
-
-                        <div class="form-group" id="endTimeGroup">
-                            <label for="endTime">End Time*</label>
-                            <select id="endTime" required disabled>
-                                <option value="">Select start time first</option>
-                            </select>
+                    <div class="time-container" id="hourlyTimeContainer">
+                        <div class="form-group booking-row">
+                            <label for="startTime" id="startTimeLabel">Time*</label>
+                            <div class="time-custom-select" id="startTimeCustom">
+                                <button type="button" class="time-custom-trigger" id="startTimeTrigger" disabled aria-haspopup="listbox" aria-expanded="false">
+                                    <span id="startTimeDisplay">Pick date first</span>
+                                    <span class="time-custom-caret" aria-hidden="true"></span>
+                                </button>
+                                <select id="startTime" required disabled aria-hidden="true" tabindex="-1">
+                                    <option value="">Pick date first</option>
+                                </select>
+                            </div>
+                            <div id="startTimeLoading" class="loading-text start-time-loading">Loading...</div>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label>Hourly Rentals (By Category)*</label>
+                        <label>Hourly Items*</label>
                         <div id="rentalsList" class="rentals-container">
                             <!-- Rental items will be populated here -->
                         </div>
@@ -132,14 +131,15 @@
                     </div>
 
                     <div id="perdayBookingBlock" class="booking-flow-block booking-hidden-initial">
-                        <div class="form-group">
-                            <label for="perdayStartDate">Pickup Date*</label>
+                        <div class="perday-compact-fields">
+                        <div class="form-group booking-inline-field">
+                            <label for="perdayStartDate">Pickup*</label>
                             <input type="date" id="perdayStartDate" disabled>
                         </div>
-                        <div class="form-group">
-                            <label for="perdayPickupTime">Pick-up Time*</label>
-                            <select id="perdayPickupTime" disabled>
-                                <option value="" selected>Select pick-up time</option>
+                        <div class="form-group booking-inline-field">
+                            <label for="perdayPickupTime">Pick Time*</label>
+                            <select id="perdayPickupTime" size="5" disabled>
+                                <option value="" selected>Select time</option>
                                 <option value="08:00">8:00 AM</option>
                                 <option value="09:00">9:00 AM</option>
                                 <option value="10:00">10:00 AM</option>
@@ -158,17 +158,32 @@
                                 <option value="23:00">11:00 PM</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="perdayEndDate">Return Date*</label>
+                        <div class="form-group booking-inline-field">
+                            <label for="perdayEndDate">Return*</label>
                             <input type="date" id="perdayEndDate" disabled>
                         </div>
-                        <div class="form-group perday-return-hidden">
+                        <div class="form-group booking-inline-field">
                             <label for="perdayReturnTime">Return Time*</label>
-                            <input type="hidden" id="perdayReturnTime" value="">
-                            <small id="perdayDaysInfo" class="field-help">Return time auto-matches pick-up time.</small>
+                            <input type="time" id="perdayReturnTime" disabled>
+                            <small id="perdayDaysInfo" class="field-help">Return time matches pickup time.</small>
                         </div>
+
+                        </div>
+
+                        <!-- Per-day availability reference panel (shown after dates are picked) -->
+                        <div class="reference-view" id="perdayReferenceView" aria-live="polite">
+                            <div class="reference-view-head">
+                                <h3 class="reference-view-title">Availability</h3>
+                            </div>
+                            <div class="reference-view-body">
+                                <div id="perdayAvailabilityTimeline" class="timeline">
+                                        <div class="booking-theme-status booking-theme-status-muted">Pick time to view.</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-group">
-                            <label>Per Day Rentals (By Category)*</label>
+                                <label>Per-Day Items*</label>
                             <div id="perdayRentalsList" class="rentals-container">
                                 <!-- Per-day rental items will be populated here -->
                             </div>
@@ -189,14 +204,14 @@
                                     <span id="taxAmount">₹0</span>
                                 </div>
                                 <div class="total">
-                                    <span><strong>Total Amount:</strong></span>
+                                    <span><strong>Total:</strong></span>
                                     <span id="totalPrice"><strong>₹0</strong></span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary booking-submit-btn">Book Now</button>
+                    <button type="submit" class="btn btn-primary booking-submit-btn">Book</button>
                 </form>
                 </div>
             </div>
@@ -204,7 +219,26 @@
         </div>
     </div>
 
-    <!-- Loading overlay - required by booking JavaScript -->
+    <script>
+        (() => {
+            const PRELOAD_CLASS = 'booking-preload';
+            let isRevealed = false;
+
+            const revealBookingPage = () => {
+                if (isRevealed || !document.body) return;
+                isRevealed = true;
+                document.body.classList.remove(PRELOAD_CLASS);
+            };
+
+            document.addEventListener('jamroom:navigation-rendered', revealBookingPage, { once: true });
+            window.addEventListener('load', revealBookingPage, { once: true });
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(revealBookingPage, 1200);
+            }, { once: true });
+        })();
+    </script>
+
+    <!-- Loading overlay - fallback for non-JamRoomUtils contexts -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-content">
             <div class="loader"></div>

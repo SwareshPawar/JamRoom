@@ -21,11 +21,16 @@
     };
 
     const init = async () => {
-        const user = await requireAuthUser();
-        if (!user) return;
+        if (window.JamRoomUtils) window.JamRoomUtils.showLoading('Navigating...');
+        try {
+            const user = await requireAuthUser();
+            if (!user) return;
 
-        if (typeof window.loadMyBookings === 'function') {
-            await window.loadMyBookings();
+            if (typeof window.loadMyBookings === 'function') {
+                await window.loadMyBookings();
+            }
+        } finally {
+            if (window.JamRoomUtils) window.JamRoomUtils.hideLoading();
         }
     };
 

@@ -683,7 +683,111 @@ EMAIL_REPLY_TO=support@jamroom.com
 - Signed value is persisted as `priceAdjustmentValue` and final total is computed as `subtotal + taxAmount + signedAdjustment`.
 - Adjustment details are shown in admin booking detail/table views and included in PDF/eBill summaries.
 
-### Latest Changes (January 2026)
+---
+
+### Latest Changes (May 2026)
+
+#### 1. Book Now / My Bookings / Lesson Tracker — Route Segregation (Phase 1 Complete)
+**Goal**: Reduce initial load cost of `booking.html` by removing embedded booking history and class tracker. Separate creation intent from management intent at the route level.
+
+**New Pages Added**:
+| Page | Path | Responsibility |
+|---|---|---|
+| My Bookings | `/my-bookings.html` | Booking history, billing/PDF actions, class tracker entry |
+| Lesson Tracker | `/lesson-tracker.html` | Class-only filtered booking view, lesson status and follow-up actions |
+
+**New JS Modules Added**:
+- `public/js/booking/my-bookings-main.js` — bootstrap for My Bookings page; calls `window.loadMyBookings()`.
+- `public/js/booking/lesson-tracker-main.js` — bootstrap for Lesson Tracker page; calls `window.loadLessonTrackerBookings()`.
+
+**New CSS Added**:
+- `public/css/pages/my-bookings.css` — page-scoped layout styles for My Bookings.
+
+**Changes to Existing Files**:
+- `public/booking.html`: removed My Bookings section markup and `booking-bookings.js` include; updated to single-column creation-only layout.
+- `public/js/booking/booking-bookings.js`: hardened to be context-safe — exits gracefully when booking-form DOM elements are absent; safe to reuse on Account, My Bookings, and Lesson Tracker pages without Book Now context.
+- `public/js/booking/booking-bookings.js`: added `loadMyBookings(options)` with optional class-only filter for Lesson Tracker use.
+- `public/js/shared/navigation.js`: added `/my-bookings.html` route detection and active-link support.
+
+**Architecture Rule**:
+- `booking.html` owns: booking create form, availability, pricing preview, payment reveal after submit.
+- `my-bookings.html` owns: history list, booking actions (cancel/pay/bill), class tracker entry.
+- `lesson-tracker.html` owns: class-only bookings, lesson status, follow-up actions.
+- Neither `my-bookings.html` nor `lesson-tracker.html` should load booking-creation dependencies.
+
+**Phase 2+ (Pending)**:
+- Admin route segregation: `admin.html` → lightweight dashboard shell + dedicated feature pages (`admin-bookings.html`, `admin-users.html`, `admin-settings.html`, etc.).
+- Book Now internal split: defer per-day/class/payment modules until the relevant flow is active.
+- Full plan: `docs/plans/ADMIN_BOOKNOW_SEGREGATION_MIGRATION_PLAN.md`.
+
+---
+
+#### 2. User Role And Role-Aware UI — Migration Plan Established
+**Goal**: Introduce multi-value experience roles so the UI can adapt to class students, JamRoom booking users, per-day renters, and band representatives without changing the existing authorization model.
+
+**Model Design**:
+- `role` field (`user | admin`) on `User` model is unchanged and remains the source of auth authorization.
+- New fields proposed to add to `User` model:
+  - `experienceRoles: [String]` — multi-value, enum-based (e.g. `jamroom_booking`, `music_class_student`, `equipment_rental_customer`, `band_representative`).
+  - `primaryExperienceRole: String` — optional; drives default landing and tab ordering.
+  - `roleAssignments: [{ code, status, source, assignedAt, notes }]` — tracks how roles were assigned.
+  - `rolePreferences: { defaultLanding, showRoleQuickLinks, preferredDashboard }` — optional personalization settings.
+
+**Assignment Flows Planned**:
+- Registration: optional role self-selection.
+- My Account: role update UI.
+- Admin Users: admin role assignment.
+- Backfill: infer from existing booking data (`classSession.isClassBooking`, `bookingMode`, `rentals[].rentalType`).
+
+**Implementation Status**: Plan established, implementation not yet started. Full plan: `docs/plans/USER_ROLE_UI_MIGRATION_PLAN.md`.
+
+**Key Constraint**: Keep `role` untouched for auth in Phase 1. Add `experienceRoles` additively without renaming or removing existing auth fields.
+
+---
+
+#### 3. Per-Track Booking Category — No Date/Time/Availability Flow
+**Added**:
+- Categories with `rentalType: 'pertrack'` that have **no binding** to a session/inhouse category now skip the hourly scheduling UI entirely.
+- Added `isPerTrackBookingCategory(categoryName)` in `booking-rentals.js` — returns `true` only when the category is `pertrack` AND is not bound to any `persession`/`inhouse` category via `bookingCategoryBindings.pairs`.
+- Added `refreshHourlySchedulingVisibility()` — hides `#hourlyDateGroup`, `#hourlyAvailabilityView`, `#hourlyTimeContainer` and clears required/disabled states when per-track applies.
+- `populateStartTimeSlots()`, `loadAvailability()`, `displayAvailability()` all short-circuit for per-track with a "No schedule needed" message.
+- `buildBookingFormPayload()` skips date/time validation for per-track; sends backend-safe fallbacks (`date=today`, `startTime='09:00'`).
+- `bindBookingDateChange()` skips availability loading for per-track.
+- Added IDs to booking.html hourly blocks: `hourlyDateGroup`, `hourlyAvailabilityView`, `hourlyTimeContainer`.
+
+**Rule**: If a per-track category is bound to a session/inhouse category in a binding pair (either side), it operates within that session context and **still requires date/time**.
+
+#### 2. Time Slot Unification — Single Source of Truth
+**Updated**:
+- Removed duplicate `slotRequestTimeSlots` array from `booking-bookings.js` (was identical to `allTimeSlots` in `booking-availability.js`).
+- Replaced static `allTimeSlots` array in `booking-availability.js` with `buildTimeSlots(startHour, endHour)` generator function.
+- Default call `buildTimeSlots()` produces 09:00–23:00 hourly slots — matches previous static array exactly.
+- `buildTimeSlots` exposed as `window.buildTimeSlots`; allows future studio-hours-driven slot generation.
+- `booking-bookings.js` now reads via `getSlotRequestTimeSlots()` → `window.allTimeSlots`.
+- Added `booking-availability.js` load before `booking-bookings.js` on `account.html` and `my-bookings.html` to ensure `window.allTimeSlots` is defined.
+- Past-time filtering, availability filtering, class/per-track short-circuits all unchanged.
+
+#### 3. Custom Time Dropdown for `#startTime` — Viewport-Safe
+**Added**:
+- Native `<select id="startTime">` popup cannot be constrained via CSS (browser-controlled); it was overflowing the viewport on mobile.
+- Implemented custom dropdown overlay in `booking-main.js` (`initStartTimeCustomDropdown()`):
+  - Native select kept but hidden (`opacity:0; pointer-events:none`) — all existing JS (`.innerHTML`, `.value`, `.disabled`, `.required`, `change` events) works unchanged.
+  - Visible trigger button (`#startTimeTrigger`) shows current value and caret.
+  - Dropdown panel appended to `document.body` with `position: fixed`.
+  - Positions below the trigger; auto-flips above if more space is available above.
+  - `max-height` capped at 260px with scroll; never overflows viewport.
+  - `MutationObserver` syncs disabled state and option repopulation from existing JS.
+  - `change` events on the hidden select keep `display` text in sync.
+- Styled via `.time-custom-select`, `.time-custom-trigger`, `.time-custom-panel`, `.time-custom-option` in `booking.css`.
+
+**Pattern**: For any `<select>` whose native popup overflows viewport on mobile, use this hidden-select + fixed-panel overlay pattern rather than `size` attribute (which renders as a list box, not a dropdown).
+
+#### 4. Per-Day Pickup Time — Scrollable List Box
+**Updated**:
+- `#perdayPickupTime` has 16 static options; on small screens the native popup also overflowed.
+- Added `size="5"` attribute to render it as a visible scrollable list instead of a popup dropdown.
+- CSS `#perdayPickupTime[size]` caps height at 160px, sets `width:100%`, `box-sizing:border-box`, `overflow-y:auto`.
+- Past-time disabling from `setPerDayInputConstraints()` continues to work (disabled options appear greyed in the list).
 
 #### 1. Calendar Location Fix
 **Issue**: Calendar invites showing "Your Studio Address Here" instead of actual address

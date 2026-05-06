@@ -70,6 +70,9 @@
             const amount = isPerDay
                 ? Number(item?.perdayPrice || item?.price || 0)
                 : Number(item?.price || 0);
+
+            if (amount === 0) return '';
+
             const priceLabel = formatInr(amount);
 
             if (priceLabel === 'Included') {
