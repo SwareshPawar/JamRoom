@@ -47,7 +47,9 @@ async function initializeBookingPage() {
             await window.restoreBookingFormDraft();
         }
 
-        await loadMyBookings();
+        if (typeof window.loadMyBookings === 'function') {
+            await window.loadMyBookings();
+        }
 
     } catch (error) {
         console.error('Failed to initialize booking page:', error);

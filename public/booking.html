@@ -18,13 +18,8 @@
     <script src="/js/shared/utils.js"></script>
     <script src="/js/shared/alerts.js"></script>
     <script src="/js/shared/auth.js"></script>
-    <script src="/js/shared/forms.js"></script>
     <script src="/js/shared/payment.js"></script>
-    <script src="/js/shared/data.js"></script>
     <script src="/js/shared/navigation.js"></script>
-    
-    <!-- Client-side PDF Generation -->
-    <script src="/js/client-pdf-generator.js"></script>
     
     <!-- Booking-specific styles -->
     
@@ -203,64 +198,9 @@
 
                     <button type="submit" class="btn btn-primary booking-submit-btn">Book Now</button>
                 </form>
-
-                <div id="upiSection" class="upi-section">
-                    <h3>💳 Payment Options</h3>
-                    
-                    <div class="payment-methods">
-                        <!-- UPI Payment -->
-                        <div class="payment-method">
-                            <h4>📱 Pay with UPI App</h4>
-                            <p><strong>Amount:</strong> <span id="upiAmount"></span></p>
-                            <button id="payWithUPI" class="payment-btn primary">Open UPI App & Pay</button>
-                            <button id="payWithPhonePe" class="payment-btn secondary">Open PhonePe</button>
-                            <button id="payWithGPay" class="payment-btn secondary">Copy UPI Link</button>
-                            <small class="payment-note-text">PhonePe and universal UPI launch supported, with copy/share and QR fallback.</small>
-                        </div>
-                        
-                        <!-- Copy UPI Details -->
-                        <div class="payment-method">
-                            <h4>📋 Copy Payment Details</h4>
-                            <div class="payment-info">
-                                <strong>UPI ID:</strong> <span id="upiId"></span>
-                                <button id="copyUpiId" class="payment-btn copy">Copy UPI ID</button>
-                            </div>
-                            <div class="payment-info">
-                                <strong>Amount:</strong> <span id="upiAmountCopy"></span>
-                                <button id="copyAmount" class="payment-btn copy">Copy Amount</button>
-                            </div>
-                            <div class="payment-info">
-                                <strong>Name:</strong> <span id="upiName"></span>
-                            </div>
-                        </div>
-                        
-                        <!-- QR Code (for desktop users) -->
-                        <div class="payment-divider">
-                            <span>or scan QR code (for desktop users)</span>
-                        </div>
-                        
-                        <div class="qr-section">
-                            <img id="upiQR" alt="UPI QR Code">
-                            <small class="payment-note-text payment-note-tight">Scan with any UPI app</small>
-                        </div>
-                    </div>
-                    
-                    <button onclick="document.getElementById('upiSection').classList.remove('show')" class="btn btn-secondary payment-close-btn">Close</button>
-                    <a id="paymentGuideLink" href="/payment-info.html" class="btn btn-primary payment-guide-btn">Open Payment Guide</a>
-                </div>
                 </div>
             </div>
 
-            <!-- My Bookings -->
-            <div class="section" id="myBookingsSection">
-                <div class="section-header">
-                    <h2>My Bookings</h2>
-                </div>
-                <div class="section-content">
-                    <div id="bookingsLoading" class="loading-text">Loading...</div>
-                    <div id="bookingsList" class="bookings-list booking-hidden-initial"></div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -274,7 +214,6 @@
 
         <script src="/js/booking/booking-auth.js"></script>
         <script src="/js/booking/booking-availability.js"></script>
-        <script src="/js/booking/booking-bookings.js"></script>
         <script src="/js/booking/booking-pricing.js"></script>
         <script src="/js/booking/booking-rentals.js"></script>
         <script src="/js/booking/booking-api.js"></script>

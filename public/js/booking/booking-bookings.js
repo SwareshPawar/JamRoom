@@ -22,6 +22,100 @@ const slotRequestTimeSlots = [
 
 const slotRequestAvailabilityCache = new Map();
 
+const resolveApiUrl = () => {
+    if (typeof API_URL === 'string' && API_URL.trim()) {
+        return API_URL;
+    }
+
+    if (typeof window !== 'undefined' && window.location?.origin) {
+        return window.location.origin;
+    }
+
+    return '';
+};
+
+const showBookingAlert = (message, type = 'info') => {
+    if (typeof window.showAlert === 'function') {
+        window.showAlert(message, type);
+        return;
+    }
+
+    if (window.alertManager && typeof window.alertManager.show === 'function') {
+        window.alertManager.show(String(message || ''), type);
+        return;
+    }
+
+    if (type === 'error') {
+        console.error(message);
+    } else {
+        console.log(message);
+    }
+};
+
+const formatBookingDate = (dateValue) => {
+    if (typeof window.formatDate === 'function') {
+        return window.formatDate(dateValue);
+    }
+
+    if (window.JamRoomUtils && typeof window.JamRoomUtils.formatDate === 'function') {
+        return window.JamRoomUtils.formatDate(dateValue, 'DD Mon YYYY');
+    }
+
+    const parsedDate = new Date(dateValue);
+    if (Number.isNaN(parsedDate.getTime())) return 'N/A';
+
+    return parsedDate.toLocaleDateString('en-IN', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+};
+
+const formatBookingTime = (timeValue) => {
+    if (typeof window.formatTime === 'function') {
+        return window.formatTime(timeValue);
+    }
+
+    if (window.JamRoomUtils && typeof window.JamRoomUtils.formatTime === 'function') {
+        return window.JamRoomUtils.formatTime(timeValue);
+    }
+
+    const normalizedTime = String(timeValue || '').trim();
+    const [hours, minutes] = normalizedTime.split(':');
+    const hourNum = Number(hours);
+
+    if (!Number.isInteger(hourNum) || !minutes) {
+        return 'N/A';
+    }
+
+    const ampm = hourNum >= 12 ? 'PM' : 'AM';
+    const displayHour = hourNum % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+};
+
+const showBookingLoadingOverlay = (message) => {
+    if (typeof window.showLoadingOverlay === 'function') {
+        window.showLoadingOverlay(message);
+        return;
+    }
+
+    if (window.JamRoomUtils && typeof window.JamRoomUtils.showLoading === 'function') {
+        window.JamRoomUtils.showLoading(document.body, message || 'Processing...');
+    }
+};
+
+const hideBookingLoadingOverlay = () => {
+    if (typeof window.hideLoadingOverlay === 'function') {
+        window.hideLoadingOverlay();
+        return;
+    }
+
+    if (window.JamRoomUtils && typeof window.JamRoomUtils.hideLoading === 'function') {
+        window.JamRoomUtils.hideLoading(document.body);
+    }
+};
+
 const getSlotRequestLocalDateString = (date = new Date()) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -54,7 +148,8 @@ const fetchSlotRequestAvailability = async (date) => {
     }
 
     const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/bookings/availability/${date}`, {
+    const apiBase = resolveApiUrl();
+    const res = await fetch(`${apiBase}/api/bookings/availability/${date}`, {
         headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -118,7 +213,7 @@ const loadSlotRequestTimeOptions = async (dateInputEl) => {
         timeSelect.disabled = false;
     } catch (error) {
         timeSelect.innerHTML = '<option value="">Error loading times</option>';
-        showAlert(error.message || 'Unable to load time options', 'error');
+        showBookingAlert(error.message || 'Unable to load time options', 'error');
     } finally {
         if (loadingEl) loadingEl.style.display = 'none';
     }
@@ -173,9 +268,14 @@ const initSlotRequestDatePickers = () => {
 };
 
 // Load user's bookings
-const loadMyBookings = async () => {
+const loadMyBookings = async (options = {}) => {
     const loadingEl = document.getElementById('bookingsLoading');
     const bookingsEl = document.getElementById('bookingsList');
+    const classOnly = options?.classOnly === true;
+
+    if (!loadingEl && !bookingsEl) {
+        return;
+    }
 
     if (loadingEl) {
         loadingEl.style.display = 'none';
@@ -190,26 +290,35 @@ const loadMyBookings = async () => {
 
     try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/api/bookings/my-bookings`, {
+        const apiBase = resolveApiUrl();
+        const res = await fetch(`${apiBase}/api/bookings/my-bookings`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const data = await res.json();
 
-        if (data.bookings.length === 0) {
-            document.getElementById('bookingsList').innerHTML =
-                '<p class="booking-empty-message">No bookings yet</p>';
+        const allBookings = Array.isArray(data.bookings) ? data.bookings : [];
+        const bookings = classOnly
+            ? allBookings.filter((entry) => entry?.classSession?.isClassBooking)
+            : allBookings;
+
+        if (bookings.length === 0) {
+            if (bookingsEl) {
+                bookingsEl.innerHTML = classOnly
+                    ? '<p class="booking-empty-message">No class bookings available for lesson tracking yet.</p>'
+                    : '<p class="booking-empty-message">No bookings yet</p>';
+            }
             return;
         }
 
         let html = '';
-        data.bookings.forEach(booking => {
+        bookings.forEach(booking => {
             const isPerday = booking.bookingMode === 'perday';
             const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
             const perDayRange = (booking.perDayStartDate && booking.perDayEndDate)
-                ? `${formatDate(booking.perDayStartDate)} to ${formatDate(booking.perDayEndDate)}`
-                : formatDate(booking.date);
-            const perDayTimeRange = `${formatTime(booking.startTime)} to ${formatTime(booking.endTime)}`;
+                ? `${formatBookingDate(booking.perDayStartDate)} to ${formatBookingDate(booking.perDayEndDate)}`
+                : formatBookingDate(booking.date);
+            const perDayTimeRange = `${formatBookingTime(booking.startTime)} to ${formatBookingTime(booking.endTime)}`;
 
             const statusClass = booking.bookingStatus.toLowerCase();
             const rentalsDisplay = booking.rentals && booking.rentals.length > 0
@@ -228,11 +337,11 @@ const loadMyBookings = async () => {
 
             const bookingDateLine = isPerday
                 ? `<p><strong>📅 Per-day Range:</strong> ${perDayRange} (${perDayDays} day(s))</p>`
-                : `<p><strong>📅 Date:</strong> ${formatDate(booking.date)}</p>`;
+                : `<p><strong>📅 Date:</strong> ${formatBookingDate(booking.date)}</p>`;
 
             const bookingTimeLine = isPerday
                 ? `<p><strong>🕐 Pick-up/Return:</strong> ${perDayTimeRange}</p>`
-                : `<p><strong>🕐 Time:</strong> ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)} (${booking.duration}h)</p>`;
+                : `<p><strong>🕐 Time:</strong> ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)} (${booking.duration}h)</p>`;
 
             const classSession = booking.classSession || {};
 
@@ -248,7 +357,7 @@ const loadMyBookings = async () => {
                     : (booking.rentalType || 'Booking'));
             const bookingSummaryMeta = isPerday
                 ? `${perDayRange} | ${perDayTimeRange}`
-                : `${formatDate(booking.date)} | ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`;
+                : `${formatBookingDate(booking.date)} | ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}`;
             const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
             const lessonRows = lessons.length > 0
                 ? lessons.map((lesson) => {
@@ -256,10 +365,10 @@ const loadMyBookings = async () => {
                     const statusClass = status === 'COMPLETED' ? 'completed' : status === 'CANCELLED' ? 'cancelled' : 'scheduled';
                     const statusLabel = status.charAt(0) + status.slice(1).toLowerCase();
                     const weekNum = lesson?.weekNumber || lesson?.classNumber || 1;
-                    const scheduledDate = lesson?.scheduledDate ? formatDate(lesson.scheduledDate) : 'TBD';
-                    const completionDate = lesson?.completedDate ? formatDate(lesson.completedDate) : null;
+                    const scheduledDate = lesson?.scheduledDate ? formatBookingDate(lesson.scheduledDate) : 'TBD';
+                    const completionDate = lesson?.completedDate ? formatBookingDate(lesson.completedDate) : null;
                     const completionTime = lesson?.completedStartTime && lesson?.completedEndTime
-                        ? `${formatTime(lesson.completedStartTime)} - ${formatTime(lesson.completedEndTime)}`
+                        ? `${formatBookingTime(lesson.completedStartTime)} - ${formatBookingTime(lesson.completedEndTime)}`
                         : null;
                     const headerDateStr = (() => {
                         const src = status === 'COMPLETED' && lesson?.completedDate ? lesson.completedDate : lesson?.scheduledDate;
@@ -342,7 +451,7 @@ const loadMyBookings = async () => {
                                     <span class="lesson-status-badge lesson-status-${statusClass}">${statusLabel}</span>
                                 </summary>
                                 <div class="lesson-accordion-body">
-                                    <p><strong>Scheduled:</strong> ${scheduledDate} (${formatTime(lesson?.scheduledStartTime || '') || 'N/A'} – ${formatTime(lesson?.scheduledEndTime || '') || 'N/A'})</p>
+                                    <p><strong>Scheduled:</strong> ${scheduledDate} (${formatBookingTime(lesson?.scheduledStartTime || '') || 'N/A'} – ${formatBookingTime(lesson?.scheduledEndTime || '') || 'N/A'})</p>
                                     ${status === 'COMPLETED' && completionDate ? `<p><strong>Completed on:</strong> ${completionDate}${completionTime ? `, ${completionTime}` : ''}</p>` : ''}
                                     ${lesson?.notes ? `<p><strong>Notes:</strong> ${lesson.notes}</p>` : ''}
                                     ${lesson?.details ? `<p><strong>Details:</strong> ${lesson.details}</p>` : ''}
@@ -359,8 +468,8 @@ const loadMyBookings = async () => {
                     <p><strong>🎓 Class Instrument:</strong> ${classSession.instrument || 'Music'}</p>
                     <p><strong>🎼 Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument || 'N/A'}</p>
                     <p><strong>📍 Class Location:</strong> ${classSession.location || 'N/A'}</p>
-                    <p><strong>🗓️ Default Weekly Slot:</strong> ${(classSession.preferredWeekday || 'N/A')} ${classSession.preferredStartTime ? `at ${formatTime(classSession.preferredStartTime)}` : ''}</p>
-                    <p><strong>📅 Plan Window:</strong> ${classSession.planStartDate ? formatDate(classSession.planStartDate) : 'N/A'} to ${classSession.planEndDate ? formatDate(classSession.planEndDate) : 'N/A'}</p>
+                    <p><strong>🗓️ Default Weekly Slot:</strong> ${(classSession.preferredWeekday || 'N/A')} ${classSession.preferredStartTime ? `at ${formatBookingTime(classSession.preferredStartTime)}` : ''}</p>
+                    <p><strong>📅 Plan Window:</strong> ${classSession.planStartDate ? formatBookingDate(classSession.planStartDate) : 'N/A'} to ${classSession.planEndDate ? formatBookingDate(classSession.planEndDate) : 'N/A'}</p>
                     <p><strong>📚 Classes:</strong> ${classSession.classesPerMonth || 0}/month, ${classSession.totalClassesPlanned || 0} total</p>
                     <p><strong>✅ Progress:</strong> ${classSession.completedClassesCount || 0}/${classSession.totalClassesPlanned || 0} completed (${classSession.classesRemainingAfterBooking ?? 0} remaining)</p>
                     <p><strong>💳 Fee:</strong> ₹${classSession.totalFeeBeforeDiscount || classSession.monthlyFee || 0} | <strong>Discount:</strong> ₹${classSession.discountAmount || 0} | <strong>Paid:</strong> ₹${classSession.totalFeeAfterDiscount || classSession.monthlyFeeDueNow || 0}</p>
@@ -422,7 +531,9 @@ const loadMyBookings = async () => {
             `;
         });
 
-        document.getElementById('bookingsList').innerHTML = html || '<p class="booking-empty-message">No valid bookings found</p>';
+        if (bookingsEl) {
+            bookingsEl.innerHTML = html || '<p class="booking-empty-message">No valid bookings found</p>';
+        }
         initSlotRequestDatePickers();
     } catch (error) {
         console.error('Load bookings error:', error);
@@ -448,18 +559,19 @@ const submitSlotRequest = async (bookingId, lessonId, btnEl) => {
         const proposedStartTime = timeInput?.value?.trim();
 
         if (!proposedDate) {
-            showAlert('Please select a date.', 'error');
+            showBookingAlert('Please select a date.', 'error');
             return;
         }
 
         if (!proposedStartTime) {
-            showAlert('Please select a start time.', 'error');
+            showBookingAlert('Please select a start time.', 'error');
             return;
         }
 
         if (btnEl) btnEl.disabled = true;
         const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/api/bookings/${bookingId}/class-lessons/${lessonId}/request-slot`, {
+        const apiBase = resolveApiUrl();
+        const res = await fetch(`${apiBase}/api/bookings/${bookingId}/class-lessons/${lessonId}/request-slot`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -470,10 +582,10 @@ const submitSlotRequest = async (bookingId, lessonId, btnEl) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || 'Failed to submit slot request');
 
-        showAlert(data.message || 'Slot request submitted!', 'success');
+        showBookingAlert(data.message || 'Slot request submitted!', 'success');
         await loadMyBookings();
     } catch (error) {
-        showAlert(error.message || 'Failed to submit slot request', 'error');
+        showBookingAlert(error.message || 'Failed to submit slot request', 'error');
         if (btnEl) btnEl.disabled = false;
     }
 };
@@ -485,7 +597,8 @@ const cancelSlotRequest = async (bookingId, lessonId, btnEl) => {
     try {
         if (btnEl) btnEl.disabled = true;
         const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/api/bookings/${bookingId}/class-lessons/${lessonId}/request-slot`, {
+        const apiBase = resolveApiUrl();
+        const res = await fetch(`${apiBase}/api/bookings/${bookingId}/class-lessons/${lessonId}/request-slot`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -496,10 +609,10 @@ const cancelSlotRequest = async (bookingId, lessonId, btnEl) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || 'Failed to withdraw request');
 
-        showAlert(data.message || 'Slot request withdrawn.', 'success');
+        showBookingAlert(data.message || 'Slot request withdrawn.', 'success');
         await loadMyBookings();
     } catch (error) {
-        showAlert(error.message || 'Failed to withdraw request', 'error');
+        showBookingAlert(error.message || 'Failed to withdraw request', 'error');
         if (btnEl) btnEl.disabled = false;
     }
 };
@@ -509,35 +622,37 @@ const cancelBooking = async (bookingId) => {
     if (!confirm('Are you sure you want to cancel this booking?')) return;
 
     try {
-        showLoadingOverlay('Cancelling booking...');
+        showBookingLoadingOverlay('Cancelling booking...');
         const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/api/bookings/${bookingId}/cancel`, {
+        const apiBase = resolveApiUrl();
+        const res = await fetch(`${apiBase}/api/bookings/${bookingId}/cancel`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (!res.ok) throw new Error('Failed to cancel booking');
 
-        showAlert('Booking cancelled successfully', 'success');
+        showBookingAlert('Booking cancelled successfully', 'success');
         await loadMyBookings();
     } catch (error) {
-        showAlert(error.message || 'Failed to cancel booking', 'error');
+        showBookingAlert(error.message || 'Failed to cancel booking', 'error');
     } finally {
-        hideLoadingOverlay();
+        hideBookingLoadingOverlay();
     }
 };
 
 // Download PDF bill for user
 const downloadUserPDF = async (bookingId) => {
     try {
-        showLoadingOverlay('Generating your bill PDF...');
+        showBookingLoadingOverlay('Generating your bill PDF...');
 
         const token = localStorage.getItem('token');
 
         // First, try server-side PDF generation
         try {
             console.log('Attempting server-side PDF generation...');
-            const res = await fetch(`${API_URL}/api/bookings/${bookingId}/download-pdf`, {
+            const apiBase = resolveApiUrl();
+            const res = await fetch(`${apiBase}/api/bookings/${bookingId}/download-pdf`, {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -556,7 +671,7 @@ const downloadUserPDF = async (bookingId) => {
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
 
-                showAlert('Your bill PDF has been downloaded successfully!', 'success');
+                showBookingAlert('Your bill PDF has been downloaded successfully!', 'success');
                 return; // Success, exit early
             }
 
@@ -568,14 +683,16 @@ const downloadUserPDF = async (bookingId) => {
             console.log('Server-side PDF generation failed, trying client-side...', serverError.message);
 
             // Fallback to client-side PDF generation
-            showLoadingOverlay('Server unavailable, generating PDF locally...');
+            showBookingLoadingOverlay('Server unavailable, generating PDF locally...');
+
+            const apiBase = resolveApiUrl();
 
             // Get booking data and admin settings for client-side generation
             const [bookingRes, settingsRes] = await Promise.all([
-                fetch(`${API_URL}/api/bookings/${bookingId}`, {
+                fetch(`${apiBase}/api/bookings/${bookingId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
-                fetch(`${API_URL}/api/admin/debug-settings`, {
+                fetch(`${apiBase}/api/admin/debug-settings`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
             ]);
@@ -593,8 +710,12 @@ const downloadUserPDF = async (bookingId) => {
             }
 
             // Generate PDF on client-side
-            await generatePDFClient(bookingData.booking, settingsData);
-            showAlert('Your bill PDF has been downloaded successfully! (Generated locally)', 'success');
+            if (typeof window.generatePDFClient !== 'function') {
+                throw new Error('generatePDFClient is not defined');
+            }
+
+            await window.generatePDFClient(bookingData.booking, settingsData);
+            showBookingAlert('Your bill PDF has been downloaded successfully! (Generated locally)', 'success');
         }
 
     } catch (error) {
@@ -614,9 +735,9 @@ const downloadUserPDF = async (bookingId) => {
             userMessage = 'Unable to generate PDF. Please try again or contact support if the problem persists.';
         }
 
-        showAlert(userMessage, 'error');
+        showBookingAlert(userMessage, 'error');
     } finally {
-        hideLoadingOverlay();
+        hideBookingLoadingOverlay();
     }
 };
 
@@ -645,3 +766,4 @@ window.cancelSlotRequest = cancelSlotRequest;
 window.cancelBooking = cancelBooking;
 window.downloadUserPDF = downloadUserPDF;
 window.switchBookingClassTab = switchBookingClassTab;
+window.loadLessonTrackerBookings = () => loadMyBookings({ classOnly: true });

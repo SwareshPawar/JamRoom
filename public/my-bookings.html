@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings - Swar Jamroom Studio</title>
+    <meta name="theme-color" content="#38bdf8">
+    <script src="/js/shared/theme.js"></script>
+
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/jamroom-192.png">
+
+    <link rel="stylesheet" href="/css/shared.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="/css/pages/booking.css">
+    <link rel="stylesheet" href="/css/pages/my-bookings.css">
+
+    <script src="/js/shared/utils.js"></script>
+    <script src="/js/shared/alerts.js"></script>
+    <script src="/js/shared/auth.js"></script>
+    <script src="/js/shared/navigation.js"></script>
+    <script src="/js/client-pdf-generator.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div id="navigationContainer"></div>
+
+        <div class="main-content my-bookings-main-content">
+            <div class="section" id="myBookingsPageSection">
+                <div class="section-header section-header-with-action">
+                    <h2>My Bookings</h2>
+                    <a href="/lesson-tracker.html" class="btn btn-secondary btn-sm">Open Lesson Tracker</a>
+                </div>
+                <div class="section-content">
+                    <div id="bookingsLoading" class="loading-text">Loading...</div>
+                    <div id="bookingsList" class="bookings-list booking-hidden-initial"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loader"></div>
+            <div id="loadingMessage">Loading...</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="/js/booking/booking-bookings.js"></script>
+    <script src="/js/booking/my-bookings-main.js"></script>
+    <script src="/js/shared/pwa-install.js"></script>
+</body>
+</html>

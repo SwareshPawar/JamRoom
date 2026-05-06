@@ -668,7 +668,9 @@ const handleBookingFormSubmit = async (e) => {
 
         clearBookingFormDraft();
         resetBookingFormState();
-        await loadMyBookings();
+        if (typeof window.loadMyBookings === 'function') {
+            await window.loadMyBookings();
+        }
         if (submittedMode === 'hourly') {
             await loadAvailability(formData.date);
         }

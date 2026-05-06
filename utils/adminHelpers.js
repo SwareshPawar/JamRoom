@@ -579,7 +579,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
           ${classSessionHtml}
           ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
         </ul>
-        <p>A calendar invite is attached to this email.</p>
+        ${calendarInvite ? '<p>A calendar invite is attached to this email.</p>' : ''}
         ${paymentMessageByStatus}
         <p>Looking forward to seeing you at ${studioLabel}!</p>
         <div style="background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:8px;padding:12px 16px;margin:16px 0;">
@@ -592,11 +592,11 @@ const sendUnifiedBookingConfirmationEmails = async ({
         </div>
         ${customerExtraHtml}
       `,
-      attachments: [{
+      ...(calendarInvite ? { attachments: [{
         filename: 'booking.ics',
         content: calendarInvite,
         contentType: 'text/calendar; charset=utf-8; method=REQUEST'
-      }]
+      }] } : {})
     });
   } catch (emailError) {
     console.log('Customer confirmation email failed:', emailError.message);
@@ -631,11 +631,11 @@ const sendUnifiedBookingConfirmationEmails = async ({
               ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
             </ul>
           `,
-          attachments: [{
+          ...(calendarInvite ? { attachments: [{
             filename: 'booking.ics',
             content: calendarInvite,
             contentType: 'text/calendar; charset=utf-8; method=REQUEST'
-          }]
+          }] } : {})
         });
       } catch (recipientEmailError) {
         console.log(`Admin/staff notification email failed for ${adminEmail}:`, recipientEmailError.message);

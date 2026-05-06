@@ -12,6 +12,7 @@ let perdaySelectedRange = null;
 let perdayAvailabilityRequestSeq = 0;
 let availableBookingModes = ['hourly', 'perday'];
 let activeBookingCategory = '';
+let perdayConstraintsInitialized = false;
 
 const bookingCategoryModeMap = new Map();
 
@@ -592,7 +593,13 @@ const switchBookingMode = (mode) => {
     }
 
     if (currentBookingMode === 'perday') {
-        fetchPerdayItemAvailability();
+        // B1: Lazily initialise per-day input constraints on first switch to per-day mode.
+        if (!perdayConstraintsInitialized) {
+            perdayConstraintsInitialized = true;
+            setPerDayInputConstraints();
+        } else {
+            fetchPerdayItemAvailability();
+        }
     }
 
     if (typeof updatePriceDisplay === 'function') {
@@ -1486,14 +1493,11 @@ const loadSettings = async () => {
             settings = data.settings;
             window.adminSettings = settings;
 
-            setPerDayInputConstraints();
             populateRentalTypes();
             bindBookingModeControls();
             if (typeof window.refreshBookingTypeOptions === 'function') {
                 window.refreshBookingTypeOptions();
             }
-
-            refreshClassLocationUI();
         } else {
             console.error('Failed to load settings:', data);
             showAlert('Failed to load booking settings. Please refresh the page.', 'error');

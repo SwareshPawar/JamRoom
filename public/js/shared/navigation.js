@@ -54,6 +54,8 @@ class NavigationManager {
         const path = window.location.pathname;
         if (path === '/' || path === '/index.html') return 'home';
         if (path === '/booking.html') return 'booking';
+        if (path === '/my-bookings.html') return 'my-bookings';
+        if (path === '/lesson-tracker.html') return 'lesson-tracker';
         if (path === '/catalog.html') return 'catalog';
         if (path === '/admin.html') return 'admin';
         if (path === '/account.html') return 'account';
@@ -129,6 +131,15 @@ class NavigationManager {
             class: `nav-link ${this.isCurrentHref('/booking.html') ? 'active' : ''}`.trim(),
             id: 'bookingNavLink'
         });
+
+        if (this.isAuthenticated) {
+            links.push({
+                href: '/my-bookings.html',
+                text: '🧾 My Bookings',
+                class: `nav-link ${this.isCurrentHref('/my-bookings.html') ? 'active' : ''}`.trim(),
+                id: 'myBookingsNavLink'
+            });
+        }
 
         links.push({
             href: '/catalog.html',

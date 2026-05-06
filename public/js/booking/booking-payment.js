@@ -1,9 +1,65 @@
 /**
  * Booking payment UI module.
  * Renders UPI details and wires payment action buttons.
+ * B3: Payment section HTML is injected on-demand — it does not exist in the
+ * initial DOM, keeping the booking-create page lighter on first load.
  */
 
+const PAYMENT_SECTION_HTML = `
+<div id="upiSection" class="upi-section">
+    <h3>💳 Payment Options</h3>
+    <div class="payment-methods">
+        <div class="payment-method">
+            <h4>📱 Pay with UPI App</h4>
+            <p><strong>Amount:</strong> <span id="upiAmount"></span></p>
+            <button id="payWithUPI" class="payment-btn primary">Open UPI App &amp; Pay</button>
+            <button id="payWithPhonePe" class="payment-btn secondary">Open PhonePe</button>
+            <button id="payWithGPay" class="payment-btn secondary">Copy UPI Link</button>
+            <small class="payment-note-text">PhonePe and universal UPI launch supported, with copy/share and QR fallback.</small>
+        </div>
+        <div class="payment-method">
+            <h4>📋 Copy Payment Details</h4>
+            <div class="payment-info">
+                <strong>UPI ID:</strong> <span id="upiId"></span>
+                <button id="copyUpiId" class="payment-btn copy">Copy UPI ID</button>
+            </div>
+            <div class="payment-info">
+                <strong>Amount:</strong> <span id="upiAmountCopy"></span>
+                <button id="copyAmount" class="payment-btn copy">Copy Amount</button>
+            </div>
+            <div class="payment-info">
+                <strong>Name:</strong> <span id="upiName"></span>
+            </div>
+        </div>
+        <div class="payment-divider">
+            <span>or scan QR code (for desktop users)</span>
+        </div>
+        <div class="qr-section">
+            <img id="upiQR" alt="UPI QR Code">
+            <small class="payment-note-text payment-note-tight">Scan with any UPI app</small>
+        </div>
+    </div>
+    <button id="closeUpiSection" class="btn btn-secondary payment-close-btn">Close</button>
+    <a id="paymentGuideLink" href="/payment-info.html" class="btn btn-primary payment-guide-btn">Open Payment Guide</a>
+</div>`;
+
+const injectPaymentSection = () => {
+    if (document.getElementById('upiSection')) return;
+
+    const container = document.querySelector('.section-content') || document.querySelector('.main-content') || document.body;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = PAYMENT_SECTION_HTML.trim();
+    const section = wrapper.firstElementChild;
+    container.appendChild(section);
+
+    section.querySelector('#closeUpiSection')?.addEventListener('click', () => {
+        section.classList.remove('show');
+    });
+};
+
 const renderBookingPaymentSection = (bookingResponse) => {
+    injectPaymentSection();
+
     if (!bookingResponse || !bookingResponse.upiDetails) {
         return;
     }
