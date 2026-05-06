@@ -1014,8 +1014,6 @@ const refreshClassLocationUI = () => {
     const classPlanInfoGroupEl = document.getElementById('classPlanInfoGroup');
     const classPreferredWeekdayGroupEl = document.getElementById('classPreferredWeekdayGroup');
     const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
-    const classPreferredStartTimeGroupEl = document.getElementById('classPreferredStartTimeGroup');
-    const classPreferredStartTimeEl = document.getElementById('classPreferredStartTime');
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
 
     if (!groupEl || !selectEl) return;
@@ -1060,14 +1058,6 @@ const refreshClassLocationUI = () => {
             classPreferredWeekdayEl.required = false;
             classPreferredWeekdayEl.value = '';
         }
-        if (classPreferredStartTimeGroupEl) {
-            classPreferredStartTimeGroupEl.style.display = 'none';
-            classPreferredStartTimeGroupEl.classList.add('booking-hidden-initial');
-        }
-        if (classPreferredStartTimeEl) {
-            classPreferredStartTimeEl.required = false;
-            classPreferredStartTimeEl.value = '';
-        }
     } else {
         groupEl.style.display = 'block';
         groupEl.classList.remove('booking-hidden-initial');
@@ -1101,12 +1091,19 @@ const refreshClassLocationUI = () => {
         if (classPreferredWeekdayEl) {
             classPreferredWeekdayEl.required = true;
         }
-        if (classPreferredStartTimeGroupEl) {
-            classPreferredStartTimeGroupEl.style.display = 'block';
-            classPreferredStartTimeGroupEl.classList.remove('booking-hidden-initial');
-        }
-        if (classPreferredStartTimeEl) {
-            classPreferredStartTimeEl.required = true;
+        // Pre-populate startTime with all class time slots (no availability filter needed)
+        const startTimeSelectEl = document.getElementById('startTime');
+        if (startTimeSelectEl) {
+            const prevVal = startTimeSelectEl.value;
+            startTimeSelectEl.innerHTML = '<option value="">Select class time</option>';
+            (window.allTimeSlots || []).forEach(slot => {
+                const opt = document.createElement('option');
+                opt.value = slot.value;
+                opt.textContent = slot.label;
+                startTimeSelectEl.appendChild(opt);
+            });
+            startTimeSelectEl.disabled = false;
+            if (prevVal) startTimeSelectEl.value = prevVal;
         }
 
         refreshClassPlanInfoUI();

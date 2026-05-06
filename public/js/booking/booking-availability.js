@@ -72,6 +72,21 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         return;
     }
 
+    // For class bookings, show all time slots without availability filtering
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    if (typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType)) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        startTimeSelect.innerHTML = '<option value="">Select class time</option>';
+        allTimeSlots.forEach(slot => {
+            const option = document.createElement('option');
+            option.value = slot.value;
+            option.textContent = slot.label;
+            startTimeSelect.appendChild(option);
+        });
+        startTimeSelect.disabled = false;
+        return;
+    }
+
     // Show loading state
     if (loadingEl) {
         loadingEl.style.display = 'block';
@@ -430,6 +445,7 @@ const displayAvailability = (data) => {
 };
 
 // Expose for cross-file calls and compatibility.
+window.allTimeSlots = allTimeSlots;
 window.populateStartTimeSlots = populateStartTimeSlots;
 window.populateEndTimeSlots = populateEndTimeSlots;
 window.populateTimeSlots = populateTimeSlots;
