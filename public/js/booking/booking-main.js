@@ -110,6 +110,16 @@
                 return;
             }
 
+            const syncBookingDatePickerViewportState = (instance) => {
+                if (!instance?.calendarContainer) {
+                    return;
+                }
+
+                const isMobileViewport = window.innerWidth <= 768;
+                instance.calendarContainer.classList.toggle('booking-date-calendar', true);
+                instance.calendarContainer.classList.toggle('booking-date-calendar-mobile', isMobileViewport);
+            };
+
             const dateInputIds = ['bookingDate', 'perdayStartDate', 'perdayEndDate'];
 
             dateInputIds.forEach((inputId) => {
@@ -125,12 +135,25 @@
                     altInput: true,
                     altFormat: 'd M Y',
                     disableMobile: true,
+                    appendTo: document.body,
                     minDate: inputEl.min || 'today',
                     clickOpens: !inputEl.disabled,
                     onReady: (_selectedDates, _dateStr, instance) => {
+                        syncBookingDatePickerViewportState(instance);
                         if (instance.altInput) {
                             instance.altInput.disabled = inputEl.disabled;
+                            instance.altInput.classList.add('booking-date-alt-input');
+                            instance.set('positionElement', instance.altInput);
+                        } else {
+                            instance.set('positionElement', inputEl);
                         }
+                    },
+                    onOpen: (_selectedDates, _dateStr, instance) => {
+                        syncBookingDatePickerViewportState(instance);
+                        document.body.classList.add('booking-date-picker-open');
+                    },
+                    onClose: () => {
+                        document.body.classList.remove('booking-date-picker-open');
                     },
                     onChange: () => {
                         inputEl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -148,6 +171,10 @@
                 disabledObserver.observe(inputEl, {
                     attributes: true,
                     attributeFilter: ['disabled']
+                });
+
+                window.addEventListener('resize', () => {
+                    syncBookingDatePickerViewportState(picker);
                 });
             });
         };
