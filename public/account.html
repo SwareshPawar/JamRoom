@@ -11,6 +11,7 @@
     
     <!-- Shared CSS -->
     <link rel="stylesheet" href="/css/shared.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     
     <!-- Shared JavaScript Modules -->
     <script src="/js/shared/utils.js"></script>
@@ -619,6 +620,11 @@
         // Initialize shared modules and load profile
         document.addEventListener('DOMContentLoaded', () => {
             console.log('👤 Account Page: Shared modules initialized');
+            
+            // Show loading placeholder in navigation before auth check
+            if (window.NavigationManager) {
+                window.NavigationManager.showLoadingPlaceholder('navigationContainer');
+            }
             
             // Load user profile
             loadProfile();

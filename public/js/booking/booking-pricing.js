@@ -70,11 +70,15 @@ const updatePriceDisplay = () => {
 
         const quantityText = displayQuantity > 1 ? ` x${displayQuantity}` : '';
         const hourText = showHourMultiplier && duration > 1 ? ` x${duration}h` : '';
+        const metaText = `${quantityText}${hourText}`;
 
         selectedRentalsHTML += `
             <div class="rental-item">
-                <span>${rental.name}${quantityText}${hourText}</span>
-                <span>₹${itemTotal}</span>
+                <span class="rental-item-main">
+                    <span class="rental-item-name">${rental.name}</span>
+                    ${metaText ? `<span class="rental-item-meta">${metaText.trim()}</span>` : ''}
+                </span>
+                <span class="rental-item-total">₹${itemTotal}</span>
             </div>
         `;
     });

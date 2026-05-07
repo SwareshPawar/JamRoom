@@ -35,6 +35,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Initialize booking page
 async function initializeBookingPage() {
+    // Show loading placeholder in navigation before auth check
+    if (window.NavigationManager) {
+        window.NavigationManager.showLoadingPlaceholder('navigationContainer');
+    }
+
     // Use the unified JamRoomUtils loader (same style as nav 'Navigating...' overlay)
     if (window.JamRoomUtils) {
         window.JamRoomUtils.showLoading('Navigating...');

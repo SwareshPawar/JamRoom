@@ -39,6 +39,18 @@ const hasFutureStartSlotsForToday = (selectedDate) => {
 let availabilityRequestSeq = 0;
 let activeAvailabilityController = null;
 
+const setHourlyAvailabilityVisibility = (isVisible) => {
+    const view = document.getElementById('hourlyAvailabilityView');
+    if (!view) return;
+    view.hidden = !isVisible;
+};
+
+const setPerdayAvailabilityVisibility = (isVisible) => {
+    const view = document.getElementById('perdayReferenceView');
+    if (!view) return;
+    view.hidden = !isVisible;
+};
+
 // Populate start time slots based on selected date and availability
 const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     const startTimeSelect = document.getElementById('startTime');
@@ -214,14 +226,17 @@ const populateTimeSlots = async () => {
 // Load availability reference for selected date
 const loadAvailability = async (date) => {
     const container = document.getElementById('referenceTimeline');
+    const startTimeSelect = document.getElementById('startTime');
+    const startTimeLoadingEl = document.getElementById('startTimeLoading');
 
     // For per-track bookings: date/time availability is not needed.
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
     if (typeof window.isPerTrackBookingCategory === 'function' && window.isPerTrackBookingCategory(bookingType)) {
         await populateStartTimeSlots('', null);
         if (container) {
-            container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No schedule needed for per-track.</div>';
+            container.innerHTML = '';
         }
+        setHourlyAvailabilityVisibility(false);
         window.currentAvailabilityData = null;
         return;
     }
@@ -231,14 +246,16 @@ const loadAvailability = async (date) => {
         // Keep class time dropdown functional while bypassing hourly conflict API.
         await populateStartTimeSlots(date, null);
         if (container) {
-            container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">Weekly class mode. No date slots.</div>';
+            container.innerHTML = '';
         }
+        setHourlyAvailabilityVisibility(false);
         window.currentAvailabilityData = null;
         return;
     }
 
     if (!container) {
         await populateStartTimeSlots(date, null);
+        setHourlyAvailabilityVisibility(false);
         return;
     }
 
@@ -248,9 +265,26 @@ const loadAvailability = async (date) => {
             activeAvailabilityController.abort();
             activeAvailabilityController = null;
         }
-        container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">Pick date to view.</div>';
+        container.innerHTML = '';
+        setHourlyAvailabilityVisibility(false);
         window.currentAvailabilityData = null;
+
+        if (startTimeSelect) {
+            startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+            startTimeSelect.disabled = true;
+        }
+        if (startTimeLoadingEl) {
+            startTimeLoadingEl.style.display = 'none';
+        }
         return;
+    }
+
+    if (startTimeSelect) {
+        startTimeSelect.innerHTML = '<option value="">Loading available slots...</option>';
+        startTimeSelect.disabled = true;
+    }
+    if (startTimeLoadingEl) {
+        startTimeLoadingEl.style.display = 'block';
     }
 
     const requestId = ++availabilityRequestSeq;
@@ -259,7 +293,8 @@ const loadAvailability = async (date) => {
         activeAvailabilityController.abort();
     }
 
-    container.innerHTML = '<div class="booking-theme-status booking-theme-status-loading">Loading...</div>';
+    container.innerHTML = '';
+    setHourlyAvailabilityVisibility(false);
 
     let timeoutId;
     const controller = new AbortController();
@@ -306,10 +341,11 @@ const loadAvailability = async (date) => {
         console.error('Error loading availability:', error);
 
         if (error.name === 'AbortError') {
-            container.innerHTML = '<div class="booking-theme-status booking-theme-status-danger">Request timed out. Try again.</div>';
+            container.innerHTML = '';
         } else {
-            container.innerHTML = '<div class="booking-theme-status booking-theme-status-danger">Failed to load schedule. Please try again.</div>';
+            container.innerHTML = '';
         }
+        setHourlyAvailabilityVisibility(false);
 
         // Clear availability data on error
         window.currentAvailabilityData = null;
@@ -319,6 +355,10 @@ const loadAvailability = async (date) => {
     } finally {
         if (timeoutId) {
             clearTimeout(timeoutId);
+        }
+
+        if (startTimeLoadingEl) {
+            startTimeLoadingEl.style.display = 'none';
         }
 
         if (requestId === availabilityRequestSeq && activeAvailabilityController === controller) {
@@ -336,54 +376,49 @@ const displayAvailability = (data) => {
     // For per-track bookings the hourly timeline is not meaningful.
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
     if (typeof window.isPerTrackBookingCategory === 'function' && window.isPerTrackBookingCategory(bookingType)) {
-        container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No schedule needed for per-track.</div>';
+        container.innerHTML = '';
+        setHourlyAvailabilityVisibility(false);
         return;
     }
 
     // For class bookings the hourly timeline is not meaningful — show a class-specific message.
     if (typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType)) {
-        container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">Weekly class mode. No date slots.</div>';
+        container.innerHTML = '';
+        setHourlyAvailabilityVisibility(false);
         return;
     }
 
-    if (data.bookings.length === 0 && data.blockedTimes.length === 0) {
+    const bookings = Array.isArray(data?.bookings) ? data.bookings : [];
+    const blockedTimes = Array.isArray(data?.blockedTimes) ? data.blockedTimes : [];
+
+    if (bookings.length === 0 && blockedTimes.length === 0) {
         if (!hasFutureStartSlotsForToday(selectedDate)) {
             container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No slots left today. Choose another date.</div>';
+            setHourlyAvailabilityVisibility(true);
             return;
         }
 
         container.innerHTML = '<div class="booking-theme-status booking-theme-status-success">All time slots available for this date.</div>';
+        setHourlyAvailabilityVisibility(true);
         return;
     }
 
-    let html = '';
+    const confirmedBookings = bookings.filter((booking) => booking.bookingStatus === 'CONFIRMED');
+    const pendingBookings = bookings.filter((booking) => booking.bookingStatus !== 'CONFIRMED');
 
-    // Show bookings with simplified information for users
-    data.bookings.forEach(booking => {
-        const isConfirmed = booking.bookingStatus === 'CONFIRMED';
-        const statusText = booking.bookingStatus === 'CONFIRMED' ? 'Booked' : 'Pending';
-        const statusClass = isConfirmed ? 'timeline-status-confirmed' : 'timeline-status-pending';
-        const itemStateClass = isConfirmed ? 'timeline-booking-confirmed' : 'timeline-booking-pending';
+    const summaryParts = [];
+    if (confirmedBookings.length > 0) summaryParts.push(`${confirmedBookings.length} booked`);
+    if (blockedTimes.length > 0) summaryParts.push(`${blockedTimes.length} blocked`);
+    if (pendingBookings.length > 0) summaryParts.push(`${pendingBookings.length} pending`);
 
-        html += `
-            <div class="timeline-item booked ${itemStateClass}">
-                <strong>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</strong>
-                <span class="timeline-status-label ${statusClass}">${statusText}</span>
-            </div>
-        `;
-    });
+    const hasHardConflicts = confirmedBookings.length > 0 || blockedTimes.length > 0;
+    const summaryClass = hasHardConflicts ? 'booking-theme-status-warning' : 'booking-theme-status-muted';
+    const summaryText = summaryParts.length > 0
+        ? `Availability summary: ${summaryParts.join(', ')}.`
+        : 'No schedule items.';
 
-    // Show blocked times
-    data.blockedTimes.forEach(blocked => {
-        html += `
-            <div class="timeline-item blocked">
-                <strong>${formatTime(blocked.startTime)} - ${formatTime(blocked.endTime)}</strong>
-                <span class="timeline-status-label timeline-status-unavailable">Unavailable</span>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html || '<div class="booking-theme-status booking-theme-status-muted">No schedule items</div>';
+    container.innerHTML = `<div class="booking-theme-status ${summaryClass}">${summaryText}</div>`;
+    setHourlyAvailabilityVisibility(true);
 };
 
 const getPerdayAvailabilityEmptyMessage = () => {
@@ -422,17 +457,20 @@ const displayPerdayAvailability = ({ unavailableItems = [], bookedItemQuantities
     if (!container) return;
 
     if (loading) {
+        setPerdayAvailabilityVisibility(true);
         container.innerHTML = '<div class="booking-theme-status booking-theme-status-loading">Checking availability...</div>';
         return;
     }
 
     if (error) {
+        setPerdayAvailabilityVisibility(true);
         container.innerHTML = `<div class="booking-theme-status booking-theme-status-danger">${error}</div>`;
         return;
     }
 
     if (catalogItems.length === 0) {
-        container.innerHTML = `<div class="booking-theme-status booking-theme-status-muted">${getPerdayAvailabilityEmptyMessage()}</div>`;
+        setPerdayAvailabilityVisibility(false);
+        container.innerHTML = '';
         return;
     }
 
@@ -466,6 +504,7 @@ const displayPerdayAvailability = ({ unavailableItems = [], bookedItemQuantities
             ? 'All per-day items are booked for this range. Choose different dates.'
             : 'Some items are unavailable for the selected range.';
 
+    setPerdayAvailabilityVisibility(true);
     container.innerHTML = `<div class="booking-theme-status ${summaryClass}">${summaryText}</div>${html}`;
 };
 

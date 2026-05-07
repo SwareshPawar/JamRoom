@@ -194,11 +194,36 @@
 
         initBookingDatePickers();
 
-        // Custom dropdown for #startTime — prevents native popup overflowing viewport
-        const initStartTimeCustomDropdown = () => {
-            const select = document.getElementById('startTime');
-            const trigger = document.getElementById('startTimeTrigger');
-            const display = document.getElementById('startTimeDisplay');
+        const populateTimeSelectOptions = (selectId, placeholderText) => {
+            const select = document.getElementById(selectId);
+            if (!select) {
+                return;
+            }
+
+            const previousValue = select.value;
+            select.innerHTML = `<option value="">${placeholderText}</option>`;
+            (window.allTimeSlots || []).forEach((slot) => {
+                const option = document.createElement('option');
+                option.value = slot.value;
+                option.textContent = slot.label;
+                select.appendChild(option);
+            });
+
+            if (previousValue && Array.from(select.options).some((option) => option.value === previousValue)) {
+                select.value = previousValue;
+            }
+        };
+
+        const initPerdayTimeSelects = () => {
+            populateTimeSelectOptions('perdayPickupTime', 'Select time');
+            populateTimeSelectOptions('perdayReturnTime', 'Return time matches pickup time');
+        };
+
+        // Reusable custom dropdown for booking time fields.
+        const bindCustomTimeSelect = ({ selectId, triggerId, displayId, defaultText }) => {
+            const select = document.getElementById(selectId);
+            const trigger = document.getElementById(triggerId);
+            const display = document.getElementById(displayId);
             if (!select || !trigger || !display) return;
 
             // Panel appended to body for free fixed positioning
@@ -212,7 +237,7 @@
 
             const updateDisplay = () => {
                 const opt = select.options[select.selectedIndex];
-                display.textContent = (opt && opt.value) ? opt.textContent : (select.options[0]?.textContent || 'Pick time');
+                display.textContent = (opt && opt.value) ? opt.textContent : (select.options[0]?.textContent || defaultText);
             };
 
             const syncPanelOptions = () => {
@@ -274,17 +299,27 @@
             });
 
             document.addEventListener('mousedown', (e) => {
-                if (isOpen && !panel.contains(e.target) && e.target !== trigger) {
+                if (isOpen && !panel.contains(e.target) && !trigger.contains(e.target)) {
                     closePanel();
                 }
             });
 
             // Sync trigger disabled state with select
-            const disabledObserver = new MutationObserver(() => {
+            const refreshTriggerState = () => {
                 trigger.disabled = select.disabled;
                 if (select.disabled) closePanel();
                 updateDisplay();
-            });
+            };
+
+            select._refreshCustomTimeDropdown = () => {
+                updateDisplay();
+                if (isOpen) {
+                    syncPanelOptions();
+                    positionPanel();
+                }
+            };
+
+            const disabledObserver = new MutationObserver(refreshTriggerState);
             disabledObserver.observe(select, { attributes: true, attributeFilter: ['disabled'] });
 
             // Sync display when select value changes externally
@@ -295,15 +330,33 @@
                 updateDisplay();
                 if (isOpen) { syncPanelOptions(); positionPanel(); }
             });
-            optionsObserver.observe(select, { childList: true, subtree: true });
+            optionsObserver.observe(select, { childList: true, subtree: true, characterData: true });
 
             window.addEventListener('resize', () => { if (isOpen) positionPanel(); });
             window.addEventListener('scroll', () => { if (isOpen) positionPanel(); }, true);
 
-            updateDisplay();
+            refreshTriggerState();
         };
 
-        initStartTimeCustomDropdown();
+        initPerdayTimeSelects();
+        bindCustomTimeSelect({
+            selectId: 'startTime',
+            triggerId: 'startTimeTrigger',
+            displayId: 'startTimeDisplay',
+            defaultText: 'Pick time'
+        });
+        bindCustomTimeSelect({
+            selectId: 'perdayPickupTime',
+            triggerId: 'perdayPickupTimeTrigger',
+            displayId: 'perdayPickupTimeDisplay',
+            defaultText: 'Select time'
+        });
+        bindCustomTimeSelect({
+            selectId: 'perdayReturnTime',
+            triggerId: 'perdayReturnTimeTrigger',
+            displayId: 'perdayReturnTimeDisplay',
+            defaultText: 'Return time matches pickup time'
+        });
 
         // Initialize
         checkAuth();

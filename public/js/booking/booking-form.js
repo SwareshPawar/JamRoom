@@ -717,15 +717,23 @@ const bindBookingDateChange = (bookingDateEl) => {
                 await loadAvailability(selectedDate);
             } else {
                 const timeline = document.getElementById('referenceTimeline');
+                const availabilityView = document.getElementById('hourlyAvailabilityView');
                 if (timeline) {
-                    timeline.innerHTML = '<div class="loading-text">Pick date to view.</div>';
+                    timeline.innerHTML = '';
+                }
+                if (availabilityView) {
+                    availabilityView.hidden = true;
                 }
                 window.currentAvailabilityData = null;
             }
         } else {
             const timeline = document.getElementById('referenceTimeline');
+            const availabilityView = document.getElementById('hourlyAvailabilityView');
             if (timeline) {
-                timeline.innerHTML = '<div class="loading-text">Pick date to view.</div>';
+                timeline.innerHTML = '';
+            }
+            if (availabilityView) {
+                availabilityView.hidden = true;
             }
             window.currentAvailabilityData = null;
         }
@@ -861,6 +869,18 @@ const initBookingFormHandlers = () => {
 
         bookingTypeEl.addEventListener('focus', () => {
             renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+            setBookingTypeDropdownOpen(true);
+            highlightedOptionIndex = -1;
+        });
+
+        bookingTypeEl.addEventListener('click', () => {
+            if (bookingTypeEl.disabled) {
+                return;
+            }
+
+            bookingTypeEl.value = '';
+            handleBookingTypeChange();
+            renderBookingTypeSelectOptions();
             setBookingTypeDropdownOpen(true);
             highlightedOptionIndex = -1;
         });

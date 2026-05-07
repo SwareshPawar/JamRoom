@@ -18,6 +18,7 @@
     <script src="/js/shared/auth.js"></script>
     <script src="/js/shared/data.js"></script>
     <script src="/js/shared/navigation.js"></script>
+    <script src="/js/shared/lazy-loader.js"></script>
     
     <!-- Page-specific styles -->
     
@@ -97,6 +98,7 @@
 
         document.addEventListener('DOMContentLoaded', async function() {
             let hasRequestedInstagramProcess = false;
+            let instagramLoaded = false;
 
             const renderHomeHeroUserBar = (user) => {
                 const bar = document.getElementById('homeHeroUserBar');
@@ -116,12 +118,11 @@
                 `;
             };
 
-            // Render guest navigation immediately, then upgrade auth state in the background.
-            window.NavigationManager.init(null);
-            window.NavigationManager.render('navigationContainer');
+            // Show loading state first, wait for auth status before rendering navigation
+            window.NavigationManager.showLoadingPlaceholder('navigationContainer');
             renderHomeHeroUserBar(null);
 
-            // Fetch and render Instagram embeds from admin settings
+            // Lazy load Instagram embeds when section becomes visible
             async function loadInstagramEmbeds() {
                 try {
                     const res = await fetch('/api/bookings/instagram-embeds');
@@ -270,20 +271,43 @@
                 }, 9000);
             };
 
-            loadInstagramEmbeds();
+            // Set up lazy loading for Instagram section - only load when visible
+            const instagramShowcase = document.getElementById('instagramShowcase');
+            if (instagramShowcase && typeof LazyLoader !== 'undefined') {
+                LazyLoader.observeElement(instagramShowcase, async () => {
+                    if (instagramLoaded) return;
+                    instagramLoaded = true;
+
+                    try {
+                        await loadInstagramEmbeds();
+                        await LazyLoader.loadInstagramSDK();
+                    } catch (error) {
+                        console.error('Failed to load Instagram:', error);
+                    }
+                }, { rootMargin: '200px' });
+            }
 
             try {
                 const user = await getCurrentUser();
                 if (user) {
-                    window.NavigationManager.updateAuth(user, 'navigationContainer');
+                    window.NavigationManager.init(user);
+                    window.NavigationManager.render('navigationContainer');
                     renderHomeHeroUserBar(user);
+                } else {
+                    // No user, render guest navigation
+                    window.NavigationManager.init(null);
+                    window.NavigationManager.render('navigationContainer');
+                    renderHomeHeroUserBar(null);
                 }
             } catch (error) {
                 console.error('Home initialization failed:', error);
+                // On error, fall back to guest nav
+                window.NavigationManager.init(null);
+                window.NavigationManager.render('navigationContainer');
+                renderHomeHeroUserBar(null);
             }
         });
     </script>
-    <script async src="https://www.instagram.com/embed.js"></script>
     <script src="/js/shared/pwa-install.js"></script>
 </body>
 </html>

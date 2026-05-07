@@ -21,6 +21,11 @@
     };
 
     const init = async () => {
+        // Show loading placeholder before auth check
+        if (window.NavigationManager && typeof window.NavigationManager.showLoadingPlaceholder === 'function') {
+            window.NavigationManager.showLoadingPlaceholder('navigationContainer');
+        }
+
         if (window.JamRoomUtils) window.JamRoomUtils.showLoading('Navigating...');
         try {
             const user = await requireAuthUser();

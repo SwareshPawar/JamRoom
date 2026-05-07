@@ -607,6 +607,10 @@ const syncPerDayReturnWithPickup = () => {
     if (!pickupInput || !returnInput) return;
 
     returnInput.value = pickupInput.value || '';
+    if (typeof returnInput._refreshCustomTimeDropdown === 'function') {
+        returnInput._refreshCustomTimeDropdown();
+    }
+    returnInput.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
 const toggleBookingModeFields = (mode) => {
@@ -746,6 +750,10 @@ const setPerDayInputConstraints = () => {
             placeholderOption.textContent = hasEnabledTime
                 ? 'Select time'
                 : 'No time slots available today';
+        }
+
+        if (typeof pickupInput._refreshCustomTimeDropdown === 'function') {
+            pickupInput._refreshCustomTimeDropdown();
         }
     };
 

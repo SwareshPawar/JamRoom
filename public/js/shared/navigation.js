@@ -27,8 +27,70 @@ class NavigationManager {
         }
     }
 
+    hasStoredToken() {
+        return !!localStorage.getItem('token');
+    }
+
+    getStoredUser() {
+        try {
+            const raw = localStorage.getItem('jamroom_user') || localStorage.getItem('user');
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    getTokenPayload() {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return null;
+            const parts = token.split('.');
+            if (parts.length < 2 || !parts[1]) return null;
+
+            const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const padded = base64 + '='.repeat((4 - (base64.length % 4 || 4)) % 4);
+            const decoded = atob(padded);
+            const payload = JSON.parse(decoded);
+            return payload && typeof payload === 'object' ? payload : null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    getBootstrapUserFromStorage() {
+        if (!this.hasStoredToken()) {
+            return null;
+        }
+
+        const storedUser = this.getStoredUser();
+        if (storedUser) {
+            return storedUser;
+        }
+
+        const payload = this.getTokenPayload();
+        if (!payload) {
+            return null;
+        }
+
+        const role = String(payload.role || payload.userRole || '').toLowerCase();
+        const name = payload.name || payload.username || payload.email || 'User';
+        return {
+            name,
+            email: payload.email || '',
+            role: role || 'user',
+            isAdmin: role === 'admin'
+        };
+    }
+
     scheduleGuestFallback(containerId = 'navigationContainer', delayMs = 1400) {
         this.clearBootstrapFallbackTimer();
+
+        // When a token exists, auth-protected navigation should not flash guest links.
+        if (this.hasStoredToken()) {
+            return;
+        }
 
         this.bootstrapFallbackTimer = setTimeout(() => {
             const container = document.getElementById(containerId);
@@ -64,6 +126,17 @@ class NavigationManager {
         if (path === '/register.html') return 'register';
         if (path === '/reset-password.html') return 'reset-password';
         return 'unknown';
+    }
+
+    shouldStartCollapsed() {
+        const stored = sessionStorage.getItem('jamroom_nav_collapsed');
+        if (stored === '1') return true;
+        if (stored === '0') return false;
+        return this.currentPage !== 'home';
+    }
+
+    setNavCollapsedState(isCollapsed) {
+        sessionStorage.setItem('jamroom_nav_collapsed', isCollapsed ? '1' : '0');
     }
 
     isCurrentHref(href) {
@@ -120,14 +193,16 @@ class NavigationManager {
 
         links.push({
             href: '/',
-            text: '🏠 Home',
+            icon: '🏠',
+            label: 'Home',
             class: `nav-link ${this.isCurrentHref('/') ? 'active' : ''}`.trim(),
             id: 'homeNavLink'
         });
 
         links.push({
             href: '/booking.html',
-            text: '📅 Book Now',
+            icon: '📅',
+            label: 'Book Now',
             class: `nav-link ${this.isCurrentHref('/booking.html') ? 'active' : ''}`.trim(),
             id: 'bookingNavLink'
         });
@@ -135,7 +210,8 @@ class NavigationManager {
         if (this.isAuthenticated) {
             links.push({
                 href: '/my-bookings.html',
-                text: '🧾 My Bookings',
+                icon: '🧾',
+                label: 'My Bookings',
                 class: `nav-link ${this.isCurrentHref('/my-bookings.html') ? 'active' : ''}`.trim(),
                 id: 'myBookingsNavLink'
             });
@@ -143,14 +219,16 @@ class NavigationManager {
 
         links.push({
             href: '/catalog.html',
-            text: '📋 Catalog',
+            icon: '📋',
+            label: 'Catalog',
             class: `nav-link ${this.isCurrentHref('/catalog.html') ? 'active' : ''}`.trim(),
             id: 'catalogNavLink'
         });
 
         links.push({
             href: '/payment-info.html',
-            text: '💳 Payment Info',
+            icon: '💳',
+            label: 'Payment Info',
             class: `nav-link ${this.isCurrentHref('/payment-info.html') ? 'active' : ''}`.trim(),
             id: 'paymentNavLink'
         });
@@ -158,7 +236,8 @@ class NavigationManager {
         if (this.isAuthenticated) {
             links.push({
                 href: '/account.html',
-                text: '👤 My Account',
+                icon: '👤',
+                label: 'My Account',
                 class: `nav-link ${this.isCurrentHref('/account.html') ? 'active' : ''}`.trim(),
                 id: 'accountNavLink'
             });
@@ -167,7 +246,8 @@ class NavigationManager {
         if (this.isAuthenticated && this.user?.role === 'admin') {
             links.push({
                 href: '/admin.html',
-                text: '🎛️ Admin Panel',
+                icon: '🎛️',
+                label: 'Admin Panel',
                 class: `nav-link ${this.isCurrentHref('/admin.html') ? 'active' : ''}`.trim(),
                 id: 'adminNavLink'
             });
@@ -263,23 +343,22 @@ class NavigationManager {
      * Generate navigation HTML
      */
     generateHTML() {
+            const startsCollapsed = this.shouldStartCollapsed();
         const mainLinks = this.getMainLinks();
         const headerActions = this.getHeaderActions();
         const displayName = this.isAuthenticated
             ? this.escapeHtml(this.user?.name || this.user?.email || 'User')
-            : '';
-        const showHomeAddress = this.currentPage === 'home';
-        const homeAddressHtml = showHomeAddress
-            ? '<p class="app-brand-address">Zen Business Center, Bhumkar Chowk Rd, Wakad, Pune</p>'
             : '';
         const greetingHtml = this.isAuthenticated && this.currentPage !== 'home'
             ? `<p class="app-header-greeting">Hi, ${displayName}</p>`
             : '';
 
         // Generate main links HTML
-        const mainLinksHTML = mainLinks.map(link => 
-            `<a href="${link.href}" class="${link.class}" id="${link.id}">${link.text}</a>`
-        ).join('\n                ');
+        const mainLinksHTML = mainLinks.map((link) => {
+            const labelText = this.escapeHtml(link.label || link.text || 'Link');
+            const iconText = this.escapeHtml(link.icon || '•');
+            return `<a href="${link.href}" class="${link.class}" id="${link.id}"><span class="nav-link-icon" aria-hidden="true">${iconText}</span><span class="nav-link-label">${labelText}</span></a>`;
+        }).join('\n                ');
 
         // Generate header actions HTML
         const headerActionsHTML = headerActions.map(item => {
@@ -296,8 +375,8 @@ class NavigationManager {
         return `
             <div class="app-header">
                 <div class="app-brand">
+                    <img src="/icons/jamroom-192.png" alt="Swar JamRoom logo" class="app-brand-logo" loading="eager" decoding="async">
                     <h1>🎸Swar JamRoom & Music Studio</h1>
-                    ${homeAddressHtml}
                 </div>
                 <div class="app-header-actions">
                     ${greetingHtml}
@@ -306,7 +385,8 @@ class NavigationManager {
                     </div>
                 </div>
             </div>
-            <div class="main-nav" role="navigation" aria-label="Primary navigation">
+            <div class="main-nav ${startsCollapsed ? 'is-collapsed' : ''}" role="navigation" aria-label="Primary navigation">
+                <button type="button" class="main-nav-toggle" id="mainNavToggle" aria-expanded="${startsCollapsed ? 'false' : 'true'}" aria-controls="mainNavLinks">☰ Menu</button>
                 <div class="nav-links">
                     ${mainLinksHTML}
                 </div>
@@ -423,9 +503,25 @@ class NavigationManager {
     addEventListeners() {
         // Handle navigation link clicks
         document.addEventListener('click', (e) => {
+            if (e.target.matches('.main-nav-toggle, .main-nav-toggle *')) {
+                const nav = document.querySelector('.main-nav');
+                const btn = document.getElementById('mainNavToggle');
+                if (!nav || !btn) return;
+
+                const nextCollapsed = !nav.classList.contains('is-collapsed');
+                nav.classList.toggle('is-collapsed', nextCollapsed);
+                btn.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
+                this.setNavCollapsedState(nextCollapsed);
+                return;
+            }
+
             if (e.target.matches('.nav-link, .nav-link *')) {
                 const link = e.target.closest('.nav-link');
                 if (link) {
+                    const href = link.getAttribute('href') || '';
+                    const isHome = href === '/' || href === '/index.html';
+                    this.setNavCollapsedState(!isHome);
+
                     // Add loading state if needed
                     if (window.JamRoomUtils) {
                         window.JamRoomUtils.showLoading('Navigating...');
@@ -444,8 +540,33 @@ class NavigationManager {
             return;
         }
 
+        const toggleButton = document.getElementById('mainNavToggle');
+        if (toggleButton) {
+            toggleButton.setAttribute('aria-controls', 'mainNavLinks');
+        }
+
+        const links = nav.querySelector('.nav-links');
+        if (links) {
+            links.id = 'mainNavLinks';
+        }
+
         const syncMobileState = () => {
             nav.classList.toggle('mobile-nav', window.innerWidth <= 768);
+
+            const isMobile = window.innerWidth <= 768;
+            if (!isMobile) {
+                nav.classList.remove('is-collapsed');
+                if (toggleButton) {
+                    toggleButton.setAttribute('aria-expanded', 'true');
+                }
+                return;
+            }
+
+            const collapsed = this.shouldStartCollapsed();
+            nav.classList.toggle('is-collapsed', collapsed);
+            if (toggleButton) {
+                toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            }
         };
 
         syncMobileState();
@@ -458,9 +579,15 @@ window.NavigationManager = new NavigationManager();
 
 // Auto-initialization
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.NavigationManager && typeof window.NavigationManager.showLoadingPlaceholder === 'function') {
-        window.NavigationManager.showLoadingPlaceholder('navigationContainer');
-        window.NavigationManager.scheduleGuestFallback('navigationContainer', 1400);
+    if (window.NavigationManager) {
+        const bootstrapUser = window.NavigationManager.getBootstrapUserFromStorage();
+        if (bootstrapUser) {
+            window.NavigationManager.init(bootstrapUser);
+            window.NavigationManager.render('navigationContainer');
+        } else if (typeof window.NavigationManager.showLoadingPlaceholder === 'function') {
+            window.NavigationManager.showLoadingPlaceholder('navigationContainer');
+            window.NavigationManager.scheduleGuestFallback('navigationContainer', 1400);
+        }
     }
 
     // Initialize responsive behavior
@@ -478,6 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener('load', () => {
     if (!window.NavigationManager) return;
+    if (window.NavigationManager.hasStoredToken()) return;
     window.NavigationManager.scheduleGuestFallback('navigationContainer', 250);
 });
 
