@@ -94,6 +94,107 @@
     margin: 0 4px 4px 0;
 }
 
+.status-paid {
+    background: color-mix(in srgb, var(--success-color) 18%, transparent);
+    color: var(--text-color);
+}
+
+.status-partial {
+    background: color-mix(in srgb, var(--info-color) 18%, transparent);
+    color: var(--text-color);
+}
+
+.user-booking-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: grid;
+    place-items: center;
+    padding: 12px;
+}
+
+.user-booking-modal[hidden] {
+    display: none !important;
+}
+
+.user-booking-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 14, 28, 0.55);
+    backdrop-filter: blur(3px);
+}
+
+.user-booking-modal-dialog {
+    position: relative;
+    width: min(920px, calc(100vw - 20px));
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--surface-elevated);
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.35);
+    padding: 14px;
+}
+
+.user-booking-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.user-booking-modal-head h3 {
+    margin: 0;
+}
+
+.user-booking-modal-close {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-1);
+    color: var(--text-color);
+    font-size: 1.3rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+}
+
+.user-booking-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.user-booking-modal-panel {
+    border: 1px solid var(--border-color-light);
+    border-radius: 10px;
+    padding: 10px;
+    background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1));
+}
+
+.user-booking-modal-panel h4 {
+    margin: 0 0 8px;
+}
+
+.user-booking-modal-panel p {
+    margin: 4px 0;
+}
+
+.user-booking-modal-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.user-booking-modal-list li {
+    margin: 4px 0;
+}
+
+body.user-booking-modal-open {
+    overflow: hidden;
+}
+
 /* ── Tracker-mode plan card ─────────────────────────────────────────────── */
 .tracker-plan-card {
     background: var(--surface-elevated);
@@ -186,5 +287,19 @@
 
     .bookings-user-table {
         min-width: 680px;
+    }
+
+    .user-booking-modal {
+        padding: 8px;
+    }
+
+    .user-booking-modal-dialog {
+        width: min(100%, calc(100vw - 10px));
+        max-height: calc(100vh - 10px);
+        padding: 10px;
+    }
+
+    .user-booking-modal-grid {
+        grid-template-columns: 1fr;
     }
 }

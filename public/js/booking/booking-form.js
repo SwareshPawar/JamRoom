@@ -354,6 +354,11 @@ const restoreBookingFormDraft = async () => {
             if (startTimeEl) {
                 startTimeEl.value = '';
             }
+
+            const endTimeEl = document.getElementById('endTime');
+            if (endTimeEl) {
+                endTimeEl.value = '';
+            }
         } else {
             if (perdayStartDateEl) {
                 perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
@@ -430,6 +435,7 @@ const buildBookingFormPayload = () => {
     const bookingMode = window.getBookingMode ? window.getBookingMode() : 'hourly';
 
     let startTime;
+    let endTime;
     let duration;
     let bookingDate;
     let perDayStartDate;
@@ -459,17 +465,22 @@ const buildBookingFormPayload = () => {
 
         bookingDate = perDayStartDate;
         startTime = perDayPickupTime;
+        endTime = perDayReturnTime;
         duration = perDayDays * 24;
     } else {
         const bookingTypeForScheduleRule = document.getElementById('bookingTypeSelect')?.value.trim() || '';
-        const isPerTrackBookingCategory = typeof window.isPerTrackBookingCategory === 'function'
-            ? window.isPerTrackBookingCategory(bookingTypeForScheduleRule)
+        const isFlatRateBookingCategory = typeof window.isFlatRateSessionBookingCategory === 'function'
+            ? window.isFlatRateSessionBookingCategory(bookingTypeForScheduleRule)
+            : false;
+        const isClassBookingCategory = typeof window.isClassBookingCategory === 'function'
+            ? window.isClassBookingCategory(bookingTypeForScheduleRule)
             : false;
 
         startTime = document.getElementById('startTime')?.value;
+        endTime = document.getElementById('endTime')?.value;
         bookingDate = document.getElementById('bookingDate')?.value;
 
-        if (!isPerTrackBookingCategory) {
+        if (!isFlatRateBookingCategory) {
             if (!bookingDate) {
                 throw new Error('Please select a booking date.');
             }
@@ -477,18 +488,36 @@ const buildBookingFormPayload = () => {
             if (!startTime) {
                 throw new Error('Please select a valid start time.');
             }
+
+            if (!isClassBookingCategory && !endTime) {
+                throw new Error('Please select a valid end time.');
+            }
         }
 
         if (!bookingDate) {
             bookingDate = getTodayDateString();
         }
 
-        if (!startTime) {
+        if (!startTime && !isFlatRateBookingCategory) {
             startTime = '09:00';
         }
 
-        // Flat-rate session booking: one session per booking.
-        duration = 1;
+        if (isFlatRateBookingCategory) {
+            startTime = startTime || '09:00';
+            endTime = endTime || startTime;
+            duration = 1;
+        } else if (isClassBookingCategory) {
+            endTime = '';
+            duration = 1;
+        } else {
+            duration = typeof window.calculateDuration === 'function'
+                ? window.calculateDuration(startTime, endTime)
+                : 1;
+
+            if (!Number.isFinite(duration) || duration < 1) {
+                throw new Error('End time must be later than start time.');
+            }
+        }
     }
 
     const { rentalsArray, subtotal } = buildRentalsForSubmission(duration);
@@ -564,6 +593,7 @@ const buildBookingFormPayload = () => {
             rentalType: bookingType,
             date: bookingDate,
             startTime,
+            endTime,
             duration,
             rentals: rentalsArray,
             subtotal: adjustedSubtotal,
@@ -708,10 +738,21 @@ const bindBookingDateChange = (bookingDateEl) => {
 
         previousDateValue = selectedDate;
         const startTimeSelect = document.getElementById('startTime');
+        const endTimeSelect = document.getElementById('endTime');
 
         if (startTimeSelect) {
             startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
             startTimeSelect.disabled = true;
+            startTimeSelect.value = '';
+
+            if (endTimeSelect) {
+                endTimeSelect.innerHTML = '<option value="">Pick start time first</option>';
+                endTimeSelect.disabled = true;
+                endTimeSelect.value = '';
+                if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+                    endTimeSelect._refreshCustomTimeDropdown();
+                }
+            }
 
             if (selectedDate) {
                 await loadAvailability(selectedDate);
@@ -747,9 +788,9 @@ const bindBookingDateChange = (bookingDateEl) => {
     const onDateChange = async (e) => {
         const selectedDate = (e?.target?.value || bookingDateEl.value || '').trim();
         const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-        const isPerTrack = typeof window.isPerTrackBookingCategory === 'function' && window.isPerTrackBookingCategory(bookingType);
+        const isFlatRate = typeof window.isFlatRateSessionBookingCategory === 'function' && window.isFlatRateSessionBookingCategory(bookingType);
 
-        if (!isPerTrack) {
+        if (!isFlatRate) {
             await handleDateSelection(selectedDate);
         }
 
@@ -1019,6 +1060,18 @@ const initBookingFormHandlers = () => {
     const startTimeEl = document.getElementById('startTime');
     if (startTimeEl) {
         startTimeEl.addEventListener('change', () => {
+            if (typeof window.populateEndTimeSlots === 'function') {
+                const selectedDate = document.getElementById('bookingDate')?.value || '';
+                window.populateEndTimeSlots(startTimeEl.value || '', selectedDate, window.currentAvailabilityData || null);
+            }
+            updatePriceDisplay();
+            scheduleBookingFormDraftSave();
+        });
+    }
+
+    const endTimeEl = document.getElementById('endTime');
+    if (endTimeEl) {
+        endTimeEl.addEventListener('change', () => {
             updatePriceDisplay();
             scheduleBookingFormDraftSave();
         });

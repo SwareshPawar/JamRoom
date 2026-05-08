@@ -18,9 +18,11 @@ const updatePriceDisplay = () => {
     }
 
     const bookingMode = window.getBookingMode ? window.getBookingMode() : 'hourly';
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
 
-    // Flat-rate session booking: hourly mode uses one session (1h window internally).
-    const duration = 1;
+    const duration = bookingMode === 'hourly'
+        ? calculateDuration()
+        : 1;
 
     const perDayInfo = window.getPerDayBookingInfo
         ? window.getPerDayBookingInfo()
@@ -37,11 +39,13 @@ const updatePriceDisplay = () => {
         let itemTotal;
         let displayQuantity;
         let showHourMultiplier = false;
+        let showDayMultiplier = false;
 
         if (bookingMode === 'perday' || rental.rentalType === 'perday') {
             // Per-day rentals: charged by selected day range.
             itemTotal = rental.price * rental.quantity * perDayDays;
             displayQuantity = rental.quantity;
+            showDayMultiplier = true;
         } else if (rental.rentalType === 'persession' || rental.rentalType === 'pertrack') {
             // Per-session rentals: charged once per booking session.
             itemTotal = rental.price * rental.quantity;
@@ -70,7 +74,8 @@ const updatePriceDisplay = () => {
 
         const quantityText = displayQuantity > 1 ? ` x${displayQuantity}` : '';
         const hourText = showHourMultiplier && duration > 1 ? ` x${duration}h` : '';
-        const metaText = `${quantityText}${hourText}`;
+    const dayText = showDayMultiplier && perDayDays > 0 ? ` x${perDayDays}d` : '';
+    const metaText = `${quantityText}${hourText}${dayText}`;
 
         selectedRentalsHTML += `
             <div class="rental-item">
@@ -84,7 +89,6 @@ const updatePriceDisplay = () => {
     });
 
     // For class bookings, override pricing with monthly fee from config
-    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
     const isClassBooking = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
     if (isClassBooking) {
         const classConfig = typeof window.getClassConfig === 'function'
@@ -153,8 +157,44 @@ const updatePriceDisplay = () => {
     priceDisplay.style.display = 'block';
 };
 
-// Retained for compatibility with older call sites.
-const calculateDuration = () => 1;
+const calculateDuration = (startTimeOverride, endTimeOverride) => {
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const isFlatRateBooking = typeof window.isFlatRateSessionBookingCategory === 'function'
+        ? window.isFlatRateSessionBookingCategory(bookingType)
+        : false;
+    const isClassBooking = typeof window.isClassBookingCategory === 'function'
+        ? window.isClassBookingCategory(bookingType)
+        : false;
+
+    if (isFlatRateBooking || isClassBooking) {
+        return 1;
+    }
+
+    const startTime = String(startTimeOverride || document.getElementById('startTime')?.value || '').trim();
+    const endTime = String(endTimeOverride || document.getElementById('endTime')?.value || '').trim();
+
+    if (!startTime || !endTime) {
+        return 1;
+    }
+
+    const toMinutes = (timeValue) => {
+        const [hourPart, minutePart] = String(timeValue || '').split(':');
+        const hours = Number(hourPart);
+        const minutes = Number(minutePart);
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+            return NaN;
+        }
+        return (hours * 60) + minutes;
+    };
+
+    const startMinutes = toMinutes(startTime);
+    const endMinutes = toMinutes(endTime);
+    if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || endMinutes <= startMinutes) {
+        return 1;
+    }
+
+    return Math.max(1, Math.ceil((endMinutes - startMinutes) / 60));
+};
 
 // Expose for cross-file usage and compatibility.
 window.updatePriceDisplay = updatePriceDisplay;

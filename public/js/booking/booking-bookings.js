@@ -7,6 +7,7 @@
 const getSlotRequestTimeSlots = () => window.allTimeSlots || [];
 
 const slotRequestAvailabilityCache = new Map();
+const myBookingsById = new Map();
 
 const resolveApiUrl = () => {
     if (typeof API_URL === 'string' && API_URL.trim()) {
@@ -36,6 +37,182 @@ const showBookingAlert = (message, type = 'info') => {
     } else {
         console.log(message);
     }
+};
+
+const escapeBookingHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const normalizePaymentStatus = (statusValue) => {
+    const normalized = String(statusValue || '').toUpperCase();
+    if (['PENDING', 'PARTIAL', 'PAID'].includes(normalized)) {
+        return normalized;
+    }
+    return 'PENDING';
+};
+
+const getBookingPaymentSnapshot = (booking) => {
+    const total = Math.max(0, Number(booking?.price || 0));
+    const paymentStatus = normalizePaymentStatus(booking?.paymentStatus);
+    const amountPaidRaw = Number.isFinite(Number(booking?.amountPaid)) ? Number(booking.amountPaid) : 0;
+
+    const paid = paymentStatus === 'PAID'
+        ? total
+        : paymentStatus === 'PARTIAL'
+            ? Math.max(0, Math.min(total, amountPaidRaw))
+            : 0;
+    const remaining = Math.max(0, total - paid);
+
+    return { paymentStatus, total, paid, remaining };
+};
+
+const formatBookingCurrency = (value) => {
+    const numeric = Number(value || 0);
+    return `₹${Number.isFinite(numeric) ? numeric.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0'}`;
+};
+
+const ensureUserBookingModalStyles = () => {
+    if (document.getElementById('userBookingModalStyles')) {
+        return;
+    }
+
+    const styleEl = document.createElement('style');
+    styleEl.id = 'userBookingModalStyles';
+    styleEl.textContent = `
+        .status-paid { background: color-mix(in srgb, var(--success-color) 18%, transparent); color: var(--text-color); }
+        .status-partial { background: color-mix(in srgb, var(--info-color) 18%, transparent); color: var(--text-color); }
+        .user-booking-modal { position: fixed; inset: 0; z-index: 12000; display: grid; place-items: center; padding: 12px; }
+        .user-booking-modal[hidden] { display: none !important; }
+        .user-booking-modal-backdrop { position: absolute; inset: 0; background: rgba(10, 14, 28, 0.55); backdrop-filter: blur(3px); }
+        .user-booking-modal-dialog { position: relative; width: min(920px, calc(100vw - 20px)); max-height: calc(100vh - 20px); overflow-y: auto; border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface-elevated); box-shadow: 0 24px 56px rgba(0,0,0,0.35); padding: 14px; }
+        .user-booking-modal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .user-booking-modal-head h3 { margin: 0; }
+        .user-booking-modal-close { width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--surface-1); color: var(--text-color); font-size: 1.3rem; cursor: pointer; display: grid; place-items: center; }
+        .user-booking-modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .user-booking-modal-panel { border: 1px solid var(--border-color-light); border-radius: 10px; padding: 10px; background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1)); }
+        .user-booking-modal-panel h4 { margin: 0 0 8px; }
+        .user-booking-modal-panel p { margin: 4px 0; }
+        .user-booking-modal-list { margin: 0; padding-left: 18px; }
+        .user-booking-modal-list li { margin: 4px 0; }
+        body.user-booking-modal-open { overflow: hidden; }
+        @media (max-width: 768px) {
+            .user-booking-modal { padding: 8px; }
+            .user-booking-modal-dialog { width: min(100%, calc(100vw - 10px)); max-height: calc(100vh - 10px); padding: 10px; }
+            .user-booking-modal-grid { grid-template-columns: 1fr; }
+        }
+    `;
+    document.head.appendChild(styleEl);
+};
+
+const ensureUserBookingDetailsModal = () => {
+    ensureUserBookingModalStyles();
+
+    if (document.getElementById('userBookingDetailsModal')) {
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+        <div id="userBookingDetailsModal" class="user-booking-modal" role="dialog" aria-modal="true" aria-labelledby="userBookingDetailsTitle" hidden>
+            <div class="user-booking-modal-backdrop"></div>
+            <div class="user-booking-modal-dialog">
+                <div class="user-booking-modal-head">
+                    <h3 id="userBookingDetailsTitle">Booking Details</h3>
+                    <button type="button" id="closeUserBookingDetailsBtn" class="user-booking-modal-close" aria-label="Close booking details">×</button>
+                </div>
+                <div id="userBookingDetailsBody" class="user-booking-modal-body"></div>
+            </div>
+        </div>
+    `.trim();
+
+    const modal = wrapper.firstElementChild;
+    document.body.appendChild(modal);
+
+    const closeModal = () => {
+        modal.hidden = true;
+        document.body.classList.remove('user-booking-modal-open');
+    };
+
+    modal.querySelector('#closeUserBookingDetailsBtn')?.addEventListener('click', closeModal);
+    modal.querySelector('.user-booking-modal-backdrop')?.addEventListener('click', closeModal);
+    document.addEventListener('keydown', (event) => {
+        if (!modal.hidden && event.key === 'Escape') {
+            closeModal();
+        }
+    });
+
+    modal._closeUserBookingModal = closeModal;
+};
+
+const openUserBookingDetails = (bookingId) => {
+    ensureUserBookingDetailsModal();
+
+    const modal = document.getElementById('userBookingDetailsModal');
+    const body = document.getElementById('userBookingDetailsBody');
+    const booking = myBookingsById.get(String(bookingId || ''));
+    if (!modal || !body || !booking) return;
+
+    const isPerday = booking.bookingMode === 'perday';
+    const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
+    const payment = getBookingPaymentSnapshot(booking);
+    const bookingStatus = String(booking.bookingStatus || 'N/A');
+    const isRejectedBooking = bookingStatus.toUpperCase() === 'REJECTED';
+    const paymentBadgeClass = payment.paymentStatus.toLowerCase();
+    const statusBadgeClass = bookingStatus.toLowerCase();
+    const rentalItems = Array.isArray(booking.rentals) ? booking.rentals : [];
+    const rentalsMarkup = rentalItems.length > 0
+        ? `<ul class="user-booking-modal-list">${rentalItems.map((rental) => `<li>${escapeBookingHtml(rental?.name || 'Item')} x ${Math.max(1, Number(rental?.quantity) || 1)}</li>`).join('')}</ul>`
+        : '<p class="booking-empty-message">No items available.</p>';
+
+    const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
+        ? `${formatBookingDate(booking.perDayStartDate)} to ${formatBookingDate(booking.perDayEndDate)}`
+        : formatBookingDate(booking.date);
+    const timeText = isPerday
+        ? `${formatBookingTime(booking.startTime)} to ${formatBookingTime(booking.endTime)}`
+        : `${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}`;
+
+    const paymentDetailsMarkup = isRejectedBooking
+        ? ''
+        : `
+                <p><strong>Payment:</strong> <span class="status-badge status-${escapeBookingHtml(paymentBadgeClass)}">${escapeBookingHtml(payment.paymentStatus)}</span></p>
+                <p><strong>Paid:</strong> ${formatBookingCurrency(payment.paid)}</p>
+                <p><strong>Remaining:</strong> ${formatBookingCurrency(payment.remaining)}</p>
+            `;
+
+    body.innerHTML = `
+        <div class="user-booking-modal-grid">
+            <section class="user-booking-modal-panel">
+                <h4>Status</h4>
+                <p><strong>Booking:</strong> <span class="status-badge status-${escapeBookingHtml(statusBadgeClass)}">${escapeBookingHtml(bookingStatus)}</span></p>
+                ${paymentDetailsMarkup}
+            </section>
+            <section class="user-booking-modal-panel">
+                <h4>Schedule</h4>
+                <p><strong>Booking ID:</strong> ${escapeBookingHtml(booking._id || 'N/A')}</p>
+                <p><strong>Date/Range:</strong> ${dateText}</p>
+                <p><strong>Time:</strong> ${timeText}</p>
+                <p><strong>Duration:</strong> ${isPerday ? `${perDayDays} day(s)` : `${Math.max(1, Number(booking.duration) || 1)} hour(s)`}</p>
+            </section>
+            <section class="user-booking-modal-panel">
+                <h4>Pricing</h4>
+                <p><strong>Subtotal:</strong> ${formatBookingCurrency(booking.subtotal)}</p>
+                <p><strong>Tax:</strong> ${formatBookingCurrency(booking.taxAmount)}</p>
+                <p><strong>Total:</strong> ${formatBookingCurrency(booking.price)}</p>
+                <p><strong>Payment Ref:</strong> ${escapeBookingHtml(booking.paymentReference || 'N/A')}</p>
+            </section>
+            <section class="user-booking-modal-panel">
+                <h4>Items</h4>
+                ${rentalsMarkup}
+                ${booking.notes ? `<p><strong>Notes:</strong> ${escapeBookingHtml(booking.notes)}</p>` : ''}
+            </section>
+        </div>
+    `;
+
+    modal.hidden = false;
+    document.body.classList.add('user-booking-modal-open');
 };
 
 const formatBookingDate = (dateValue) => {
@@ -393,6 +570,13 @@ const loadMyBookings = async (options = {}) => {
             ? allBookings.filter((entry) => entry?.classSession?.isClassBooking)
             : allBookings;
 
+        myBookingsById.clear();
+        bookings.forEach((booking) => {
+            if (booking?._id) {
+                myBookingsById.set(String(booking._id), booking);
+            }
+        });
+
         if (bookings.length === 0) {
             if (bookingsEl) {
                 bookingsEl.innerHTML = classOnly
@@ -456,6 +640,9 @@ const loadMyBookings = async (options = {}) => {
                 const isPerday = booking.bookingMode === 'perday';
                 const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
                 const statusClass = String(booking.bookingStatus || '').toLowerCase();
+                const isRejectedBooking = String(booking.bookingStatus || '').toUpperCase() === 'REJECTED';
+                const paymentSnapshot = getBookingPaymentSnapshot(booking);
+                const paymentStatusClass = String(paymentSnapshot.paymentStatus || 'pending').toLowerCase();
                 const bookingItemNames = booking.rentals && booking.rentals.length > 0
                     ? booking.rentals.filter((r) => r && r.name).map((r) => r.name)
                     : [];
@@ -474,6 +661,7 @@ const loadMyBookings = async (options = {}) => {
                     : `${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}<br><small>${Math.max(1, Number(booking.duration) || 1)}h</small>`;
 
                 const actionButtons = [
+                    `<button onclick="openUserBookingDetails('${booking._id}')" class="btn btn-primary btn-sm">Details</button>`,
                     booking.bookingStatus === 'PENDING'
                         ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger btn-sm">Cancel</button>`
                         : '',
@@ -491,7 +679,16 @@ const loadMyBookings = async (options = {}) => {
                         </td>
                         <td>${dateText}</td>
                         <td>${timeText}</td>
-                        <td><span class="status-badge status-${statusClass}">${booking.bookingStatus || 'N/A'}</span></td>
+                        <td>
+                            <span class="status-badge status-${statusClass}">${booking.bookingStatus || 'N/A'}</span><br>
+                            ${isRejectedBooking
+                                ? ''
+                                : `<small>
+                                    <span class="status-badge status-${paymentStatusClass}">${paymentSnapshot.paymentStatus}</span>
+                                    &nbsp;Paid: ${formatBookingCurrency(paymentSnapshot.paid)}<br>
+                                    Remaining: ${formatBookingCurrency(paymentSnapshot.remaining)}
+                                </small>`}
+                        </td>
                         <td><strong>₹${Number(booking.price || 0)}</strong></td>
                         <td class="bookings-user-actions">${actionButtons || '<small>N/A</small>'}</td>
                     </tr>
@@ -749,3 +946,4 @@ window.cancelBooking = cancelBooking;
 window.downloadUserPDF = downloadUserPDF;
 window.switchBookingClassTab = switchBookingClassTab;
 window.loadLessonTrackerBookings = () => loadMyBookings({ classOnly: true });
+window.openUserBookingDetails = openUserBookingDetails;

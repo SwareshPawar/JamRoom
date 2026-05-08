@@ -1174,45 +1174,134 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     }
 }
 
-.upi-section {
-    background: var(--surface-1);
-    padding: 20px;
-    border-radius: 8px;
-    margin-top: 20px;
-    text-align: center;
-    display: none;
+.booking-payment-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: grid;
+    place-items: center;
+    padding: 16px;
 }
 
-.upi-section.show { display: block; }
+.booking-payment-modal[hidden] {
+    display: none !important;
+}
+
+.booking-payment-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 10, 20, 0.58);
+    backdrop-filter: blur(4px);
+}
+
+.booking-payment-dialog {
+    position: relative;
+    width: min(780px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    border-radius: 14px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 94%, white 6%) 0%, var(--surface-1) 100%);
+    border: 1px solid color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+    padding: 16px;
+}
+
+.booking-payment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.booking-payment-header h3 {
+    margin: 0;
+}
+
+.booking-payment-close {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-elevated);
+    color: var(--text-color);
+    font-size: 1.35rem;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+}
+
+.booking-payment-close:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.booking-payment-subtitle {
+    margin: 0 0 12px;
+    color: var(--text-color-light);
+}
+
+.booking-payment-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.payment-summary-item {
+    border: 1px solid color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+    background: color-mix(in srgb, var(--primary-color) 8%, var(--surface-1));
+    border-radius: 10px;
+    padding: 10px;
+    display: grid;
+    gap: 4px;
+}
+
+.payment-summary-label {
+    color: var(--text-color-light);
+    font-size: 0.86rem;
+}
 
 .payment-methods {
     display: grid;
-    gap: 15px;
-    margin: 20px 0;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    gap: 12px;
+    margin: 0;
 }
 
 .payment-method {
     background: var(--surface-elevated);
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px;
     transition: var(--transition-normal);
+    text-align: left;
 }
 
 .payment-method:hover {
     border-color: var(--primary-color);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+}
+
+.payment-method h4 {
+    margin: 0 0 10px;
 }
 
 .payment-btn {
     width: 100%;
-    padding: 12px;
-    margin: 5px 0;
+    padding: 10px 12px;
+    margin: 0;
     border: none;
     border-radius: 6px;
     font-weight: 500;
     cursor: pointer;
     transition: var(--transition-normal);
+    text-align: center;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .payment-btn.primary {
@@ -1244,13 +1333,24 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 }
 
 .payment-info {
-    background: color-mix(in srgb, var(--info-color) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--info-color) 35%, transparent);
+    background: color-mix(in srgb, var(--info-color) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--info-color) 24%, transparent);
     border-radius: 6px;
-    padding: 10px;
-    margin: 10px 0;
-    font-family: monospace;
+    padding: 8px 10px;
+    margin: 0;
     word-break: break-all;
+    display: grid;
+    gap: 2px;
+}
+
+.payment-info-label {
+    color: var(--text-color-light);
+    font-size: 0.8rem;
+}
+
+.payment-info-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 600;
 }
 
 .payment-note-text {
@@ -1263,49 +1363,49 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     margin-top: 0;
 }
 
-.payment-close-btn {
-    margin-top: 20px;
+.payment-actions {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
 }
 
+.booking-payment-footer {
+    margin-top: 14px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.payment-close-btn,
 .payment-guide-btn {
-    margin-top: 20px;
-    margin-left: 8px;
+    margin: 0;
 }
 
-.payment-divider {
-    margin: 20px 0;
-    text-align: center;
-    position: relative;
-}
-
-.payment-divider::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: var(--border-color);
-}
-
-.payment-divider span {
-    background: var(--surface-1);
-    padding: 0 15px;
-    color: var(--text-color-light);
-    font-size: 0.9em;
-    display: inline-block;
-    max-width: 100%;
-    overflow-wrap: anywhere;
+.qr-panel {
+    display: grid;
+    align-content: start;
 }
 
 .qr-section {
-    margin-top: 15px;
+    margin-top: 0;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
 }
 
 .qr-section img {
-    max-width: 200px;
-    margin: 10px auto;
+    width: min(210px, 100%);
+    max-width: 210px;
+    margin: 0 auto;
     display: block;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    padding: 6px;
+}
+
+body.booking-payment-open {
+    overflow: hidden;
 }
 
 .reference-view {
@@ -1786,10 +1886,32 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     .price-display,
     .booking-card,
     .payment-method,
-    .payment-info,
-    .upi-section {
+    .payment-info {
         padding: 8px;
         margin-bottom: 8px;
+    }
+
+    .booking-payment-modal {
+        padding: 10px;
+    }
+
+    .booking-payment-dialog {
+        width: min(100%, 100vw - 12px);
+        max-height: calc(100vh - 12px);
+        padding: 12px;
+    }
+
+    .booking-payment-summary,
+    .payment-methods {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-payment-footer {
+        flex-direction: column-reverse;
+    }
+
+    .booking-payment-footer .btn {
+        width: 100%;
     }
 
     .booking-theme-status {

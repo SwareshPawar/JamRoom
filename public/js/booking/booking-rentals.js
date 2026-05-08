@@ -623,6 +623,7 @@ const toggleBookingModeFields = (mode) => {
 
     const bookingDateInput = document.getElementById('bookingDate');
     const startTimeInput = document.getElementById('startTime');
+    const endTimeInput = document.getElementById('endTime');
     const perdayStart = document.getElementById('perdayStartDate');
     const perdayEnd = document.getElementById('perdayEndDate');
     const perdayPickup = document.getElementById('perdayPickupTime');
@@ -635,6 +636,13 @@ const toggleBookingModeFields = (mode) => {
             startTimeInput.disabled = true;
         } else {
             startTimeInput.disabled = !bookingDateInput?.value;
+        }
+    }
+
+    if (endTimeInput) {
+        endTimeInput.disabled = true;
+        if (isPerday) {
+            endTimeInput.value = '';
         }
     }
 
@@ -664,7 +672,7 @@ const switchBookingMode = (mode) => {
     if (currentBookingMode === 'hourly') {
         const selectedDate = document.getElementById('bookingDate')?.value;
         const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-        if (!isPerTrackBookingCategory(bookingType) && selectedDate && typeof loadAvailability === 'function') {
+        if (!isFlatRateSessionBookingCategory(bookingType) && selectedDate && typeof loadAvailability === 'function') {
             loadAvailability(selectedDate);
         }
 
@@ -764,8 +772,10 @@ const setPerDayInputConstraints = () => {
     setDateInputMinValue(endInput, getMinReturnDate());
     updatePickupTimeConstraints();
 
-    const handlePerdayDateUpdate = () => {
-        updatePickupTimeConstraints();
+    const handlePerdayDateUpdate = ({ recomputePickupConstraints = false } = {}) => {
+        if (recomputePickupConstraints) {
+            updatePickupTimeConstraints();
+        }
         refreshPerDayDaysInfo();
         if (currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
             updatePriceDisplay();
@@ -794,10 +804,12 @@ const setPerDayInputConstraints = () => {
         }
 
         syncPerDayReturnWithPickup();
-        handlePerdayDateUpdate();
+        handlePerdayDateUpdate({ recomputePickupConstraints: true });
     });
 
-    endInput.addEventListener('change', handlePerdayDateUpdate);
+    endInput.addEventListener('change', () => {
+        handlePerdayDateUpdate({ recomputePickupConstraints: false });
+    });
 
     pickupInput.addEventListener('change', handlePickupTimeUpdate);
 
@@ -1148,28 +1160,51 @@ const isPerTrackBookingCategory = (categoryName) => {
     return true;
 };
 
+const isFlatRateSessionBookingCategory = (categoryName) => {
+    const selectedCategory = String(categoryName || '').trim();
+    if (!selectedCategory) return false;
+
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+    const matchedType = rentalTypes.find((type) => String(type?.name || '').trim() === selectedCategory);
+    if (!matchedType) return false;
+
+    const rentalTypeToken = getCategoryRentalType(matchedType);
+    return rentalTypeToken === 'pertrack' || rentalTypeToken === 'persession';
+};
+
 const refreshHourlySchedulingVisibility = () => {
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-    const shouldHideHourlySchedule = currentBookingMode === 'hourly' && isPerTrackBookingCategory(bookingType);
+    const isFlatRateCategory = isFlatRateSessionBookingCategory(bookingType);
+    const isClassCategory = isClassBookingCategory(bookingType);
+    const shouldHideHourlySchedule = currentBookingMode === 'hourly' && isFlatRateCategory;
+    const shouldHideEndTimeOnly = currentBookingMode === 'hourly' && !shouldHideHourlySchedule && isClassCategory;
 
     const hourlyDateGroup = document.getElementById('hourlyDateGroup');
     const hourlyAvailabilityView = document.getElementById('hourlyAvailabilityView');
     const hourlyTimeContainer = document.getElementById('hourlyTimeContainer');
+    const hourlyEndTimeGroup = document.getElementById('hourlyEndTimeGroup');
     const bookingDateInput = document.getElementById('bookingDate');
     const startTimeInput = document.getElementById('startTime');
+    const endTimeInput = document.getElementById('endTime');
     const startTimeLabel = document.getElementById('startTimeLabel');
+    const endTimeLabel = document.getElementById('endTimeLabel');
     const timeline = document.getElementById('referenceTimeline');
 
     if (hourlyDateGroup) hourlyDateGroup.style.display = shouldHideHourlySchedule ? 'none' : '';
     if (hourlyAvailabilityView) hourlyAvailabilityView.style.display = shouldHideHourlySchedule ? 'none' : '';
     if (hourlyTimeContainer) hourlyTimeContainer.style.display = shouldHideHourlySchedule ? 'none' : '';
+    if (hourlyEndTimeGroup) hourlyEndTimeGroup.style.display = shouldHideEndTimeOnly ? 'none' : '';
 
     if (startTimeLabel) {
         if (shouldHideHourlySchedule) {
-            startTimeLabel.textContent = 'Track*';
+            startTimeLabel.textContent = 'Track/Session*';
         } else {
-            startTimeLabel.textContent = isClassBookingCategory(bookingType) ? 'Class Time*' : 'Time*';
+            startTimeLabel.textContent = isClassCategory ? 'Class Time*' : 'Start Time*';
         }
+    }
+
+    if (endTimeLabel) {
+        endTimeLabel.textContent = 'End Time*';
     }
 
     if (shouldHideHourlySchedule) {
@@ -1179,8 +1214,16 @@ const refreshHourlySchedulingVisibility = () => {
             startTimeInput.disabled = true;
             startTimeInput.value = '';
         }
+        if (endTimeInput) {
+            endTimeInput.required = false;
+            endTimeInput.disabled = true;
+            endTimeInput.value = '';
+            if (typeof endTimeInput._refreshCustomTimeDropdown === 'function') {
+                endTimeInput._refreshCustomTimeDropdown();
+            }
+        }
         if (timeline) {
-            timeline.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No schedule needed for per-track.</div>';
+            timeline.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No time schedule needed for track/session pricing.</div>';
         }
         window.currentAvailabilityData = null;
         return;
@@ -1190,6 +1233,18 @@ const refreshHourlySchedulingVisibility = () => {
     if (startTimeInput) {
         startTimeInput.required = true;
         startTimeInput.disabled = !bookingDateInput?.value;
+    }
+    if (endTimeInput) {
+        endTimeInput.required = !shouldHideEndTimeOnly;
+        if (shouldHideEndTimeOnly) {
+            endTimeInput.disabled = true;
+            endTimeInput.value = '';
+        } else {
+            endTimeInput.disabled = !startTimeInput?.value;
+        }
+        if (typeof endTimeInput._refreshCustomTimeDropdown === 'function') {
+            endTimeInput._refreshCustomTimeDropdown();
+        }
     }
 };
 
@@ -1300,7 +1355,7 @@ const refreshClassLocationUI = () => {
     const startTimeLabel = document.getElementById('startTimeLabel');
 
     if (startTimeLabel) {
-        startTimeLabel.textContent = shouldShow ? 'Class Time*' : 'Time*';
+        startTimeLabel.textContent = shouldShow ? 'Class Time*' : 'Start Time*';
     }
 
     refreshHourlySchedulingVisibility();
@@ -1727,3 +1782,4 @@ window.getClassConfig = getClassConfig;
 window.refreshClassPlanInfoUI = refreshClassPlanInfoUI;
 window.getClassDiscountForMonths = getClassDiscountForMonths;
 window.isPerTrackBookingCategory = isPerTrackBookingCategory;
+window.isFlatRateSessionBookingCategory = isFlatRateSessionBookingCategory;

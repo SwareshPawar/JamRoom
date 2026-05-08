@@ -493,6 +493,8 @@
     const buildBookingDetailsMarkup = ({ booking, formatDate, formatTime, includeActions = true, context = 'modal' }) => {
         const isPerday = booking.bookingMode === 'perday';
         const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
+        const normalizedBookingStatus = String(booking?.bookingStatus || '').toUpperCase();
+        const isRejectedBooking = normalizedBookingStatus === 'REJECTED';
         const userName = booking.userId?.name || booking.userName || 'N/A';
         const userEmail = booking.userId?.email || booking.userEmail || 'N/A';
         const userMobile = booking.userMobile || 'N/A';
@@ -515,8 +517,11 @@
         const amountPaidFromBooking = Number.isFinite(Number(booking?.amountPaid))
             ? Number(booking.amountPaid)
             : (normalizedPaymentStatus === 'PAID' ? totalAmount : 0);
-        const collectedAmount = getCollectedAmount(booking);
-        const outstandingAmount = Math.max(0, Number(booking?.price || 0) - collectedAmount);
+        const collectedAmount = isRejectedBooking ? 0 : getCollectedAmount(booking);
+        const outstandingAmount = isRejectedBooking ? 0 : Math.max(0, Number(booking?.price || 0) - collectedAmount);
+        const paymentStatusText = isRejectedBooking
+            ? 'Not Applicable (Rejected)'
+            : normalizedPaymentStatus;
 
         return `
             <div class="booking-expand-body booking-modal-body">
@@ -532,9 +537,9 @@
                             <p><strong>Created:</strong> ${formatDateTime(booking.createdAt)}</p>
                             <p><strong>Updated:</strong> ${formatDateTime(booking.updatedAt)}</p>
                             <p><strong>Booking Status:</strong> ${escapeHtml(booking.bookingStatus || 'N/A')}</p>
-                            <p><strong>Payment Status:</strong> ${escapeHtml(booking.paymentStatus || 'N/A')}</p>
-                            <p><strong>Amount Received:</strong> ${formatCurrency(collectedAmount)}</p>
-                            <p><strong>Outstanding:</strong> ${formatCurrency(outstandingAmount)}</p>
+                            <p><strong>Payment Status:</strong> ${escapeHtml(paymentStatusText)}</p>
+                            <p><strong>Amount Received:</strong> ${isRejectedBooking ? 'N/A' : formatCurrency(collectedAmount)}</p>
+                            <p><strong>Outstanding:</strong> ${isRejectedBooking ? 'N/A' : formatCurrency(outstandingAmount)}</p>
                             <p><strong>Payment Ref:</strong> ${escapeHtml(booking.paymentReference || 'N/A')}</p>
                             <p><strong>Payment Note:</strong> ${escapeHtml(booking.paymentNote || 'N/A')}</p>
                         </div>
@@ -816,6 +821,8 @@
 
             const statusClass = String(booking.bookingStatus || '').toLowerCase();
             const paymentStatusClass = String(booking.paymentStatus || 'pending').toLowerCase();
+            const normalizedBookingStatus = String(booking.bookingStatus || '').toUpperCase();
+            const showPaymentBadge = normalizedBookingStatus !== 'REJECTED';
             const userName = booking.userId?.name || booking.userName || 'N/A';
             const userEmail = booking.userId?.email || booking.userEmail || 'N/A';
             const createdDate = booking.createdAt ? formatDateTime(booking.createdAt) : 'N/A';
@@ -844,8 +851,9 @@
                     </td>
                     <td>
                         <span class="status-badge status-${statusClass}">${escapeHtml(booking.bookingStatus || 'N/A')}</span>
-                        /
-                        <span class="status-badge status-${paymentStatusClass}">${escapeHtml(booking.paymentStatus || 'PENDING')}</span>
+                        ${showPaymentBadge
+                            ? `/ <span class="status-badge status-${paymentStatusClass}">${escapeHtml(booking.paymentStatus || 'PENDING')}</span>`
+                            : ''}
                     </td>
                     <td><small>${escapeHtml(createdDate)}</small></td>
                     <td>${buildBookingActionsMarkup(booking, { context: 'table', includeView: true })}</td>

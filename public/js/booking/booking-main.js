@@ -346,6 +346,12 @@
             defaultText: 'Pick time'
         });
         bindCustomTimeSelect({
+            selectId: 'endTime',
+            triggerId: 'endTimeTrigger',
+            displayId: 'endTimeDisplay',
+            defaultText: 'Pick start time first'
+        });
+        bindCustomTimeSelect({
             selectId: 'perdayPickupTime',
             triggerId: 'perdayPickupTimeTrigger',
             displayId: 'perdayPickupTimeDisplay',

@@ -51,6 +51,34 @@ const setPerdayAvailabilityVisibility = (isVisible) => {
     view.hidden = !isVisible;
 };
 
+const getHourlyUnavailableRanges = (availabilityData) => {
+    const unavailableRanges = [];
+
+    if (availabilityData && Array.isArray(availabilityData.bookings)) {
+        availabilityData.bookings.forEach((booking) => {
+            if (booking.bookingStatus === 'CONFIRMED') {
+                unavailableRanges.push({
+                    start: booking.startTime,
+                    end: booking.endTime,
+                    type: 'booking'
+                });
+            }
+        });
+    }
+
+    if (availabilityData && Array.isArray(availabilityData.blockedTimes)) {
+        availabilityData.blockedTimes.forEach((blocked) => {
+            unavailableRanges.push({
+                start: blocked.startTime,
+                end: blocked.endTime,
+                type: 'blocked'
+            });
+        });
+    }
+
+    return unavailableRanges;
+};
+
 // Populate start time slots based on selected date and availability
 const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     const startTimeSelect = document.getElementById('startTime');
@@ -60,12 +88,13 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         return;
     }
 
-    // Per-track bookings do not require slot picking.
+    // Flat-rate track/session bookings do not require slot picking.
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-    if (typeof window.isPerTrackBookingCategory === 'function' && window.isPerTrackBookingCategory(bookingType)) {
+    if (typeof window.isFlatRateSessionBookingCategory === 'function' && window.isFlatRateSessionBookingCategory(bookingType)) {
         if (loadingEl) loadingEl.style.display = 'none';
         startTimeSelect.innerHTML = '<option value="">No time needed</option>';
         startTimeSelect.disabled = true;
+        populateEndTimeSlots('', selectedDate, null);
         return;
     }
 
@@ -80,6 +109,7 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
             startTimeSelect.appendChild(option);
         });
         startTimeSelect.disabled = false;
+        populateEndTimeSlots(startTimeSelect.value || '', selectedDate, null);
         return;
     }
 
@@ -93,6 +123,7 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
 
     if (!selectedDate) {
         startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+        populateEndTimeSlots('', selectedDate, null);
         if (loadingEl) {
             loadingEl.style.display = 'none';
         }
@@ -105,32 +136,7 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
 
-        // Get booked and blocked time ranges
-        const unavailableRanges = [];
-
-        // Only confirmed bookings block new slot selection.
-        if (availabilityData && availabilityData.bookings) {
-            availabilityData.bookings.forEach(booking => {
-                if (booking.bookingStatus === 'CONFIRMED') {
-                    unavailableRanges.push({
-                        start: booking.startTime,
-                        end: booking.endTime,
-                        type: 'booking'
-                    });
-                }
-            });
-        }
-
-        // Add blocked times to unavailable ranges
-        if (availabilityData && availabilityData.blockedTimes) {
-            availabilityData.blockedTimes.forEach(blocked => {
-                unavailableRanges.push({
-                    start: blocked.startTime,
-                    end: blocked.endTime,
-                    type: 'blocked'
-                });
-            });
-        }
+        const unavailableRanges = getHourlyUnavailableRanges(availabilityData);
 
         // Reset and populate start time options
         startTimeSelect.innerHTML = '<option value="">Pick time</option>';
@@ -173,9 +179,12 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
             startTimeSelect.disabled = false;
         }
 
+        populateEndTimeSlots(startTimeSelect.value || '', selectedDate, availabilityData);
+
     } catch (error) {
         console.error('Error populating time slots:', error);
         startTimeSelect.innerHTML = '<option value="">Error loading times</option>';
+        populateEndTimeSlots('', selectedDate, null);
     } finally {
         if (loadingEl) {
             loadingEl.style.display = 'none';
@@ -205,8 +214,133 @@ const isTimeSlotUnavailable = (timeSlot, unavailableRanges) => {
     });
 };
 
-// Backward compatibility no-op: session bookings no longer use end-time input.
-const populateEndTimeSlots = () => {};
+const populateEndTimeSlots = (selectedStartTime, selectedDate, availabilityData = window.currentAvailabilityData) => {
+    const endTimeSelect = document.getElementById('endTime');
+    if (!endTimeSelect) {
+        return;
+    }
+
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const isFlatRateCategory = typeof window.isFlatRateSessionBookingCategory === 'function'
+        ? window.isFlatRateSessionBookingCategory(bookingType)
+        : false;
+    const isClassCategory = typeof window.isClassBookingCategory === 'function'
+        ? window.isClassBookingCategory(bookingType)
+        : false;
+
+    if (isFlatRateCategory) {
+        endTimeSelect.innerHTML = '<option value="">No time needed</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+        if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+            endTimeSelect._refreshCustomTimeDropdown();
+        }
+        return;
+    }
+
+    if (isClassCategory) {
+        endTimeSelect.innerHTML = '<option value="">Auto based on class duration</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+        if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+            endTimeSelect._refreshCustomTimeDropdown();
+        }
+        return;
+    }
+
+    if (!selectedDate) {
+        endTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+        if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+            endTimeSelect._refreshCustomTimeDropdown();
+        }
+        return;
+    }
+
+    if (!selectedStartTime) {
+        endTimeSelect.innerHTML = '<option value="">Pick start time first</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+        if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+            endTimeSelect._refreshCustomTimeDropdown();
+        }
+        return;
+    }
+
+    const unavailableRanges = getHourlyUnavailableRanges(availabilityData);
+    const selectedStartMinutes = timeToMinutes(selectedStartTime);
+
+    endTimeSelect.innerHTML = '<option value="">Pick end time</option>';
+
+    allTimeSlots.forEach((slot) => {
+        if (timeToMinutes(slot.value) <= selectedStartMinutes) {
+            return;
+        }
+
+        if (isHourlyRangeUnavailable(selectedStartTime, slot.value, unavailableRanges)) {
+            return;
+        }
+
+        const option = document.createElement('option');
+        option.value = slot.value;
+        option.textContent = slot.label;
+        endTimeSelect.appendChild(option);
+    });
+
+    const hasChoices = endTimeSelect.options.length > 1;
+    if (!hasChoices) {
+        endTimeSelect.innerHTML = '<option value="">No valid end times</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+    } else {
+        endTimeSelect.disabled = false;
+        if (endTimeSelect.value) {
+            const hasExisting = Array.from(endTimeSelect.options).some((option) => option.value === endTimeSelect.value);
+            if (!hasExisting) {
+                endTimeSelect.value = '';
+            }
+        }
+    }
+
+    if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+        endTimeSelect._refreshCustomTimeDropdown();
+    }
+};
+
+const timeToMinutes = (value) => {
+    const [hours, minutes] = String(value || '').split(':').map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        return -1;
+    }
+    return (hours * 60) + minutes;
+};
+
+const isHourlyRangeUnavailable = (rangeStart, rangeEnd, unavailableRanges) => {
+    const requestStart = timeToMinutes(rangeStart);
+    let requestEnd = timeToMinutes(rangeEnd);
+    if (requestStart < 0 || requestEnd < 0) {
+        return true;
+    }
+
+    if (requestEnd <= requestStart) {
+        requestEnd += 24 * 60;
+    }
+
+    return unavailableRanges.some((range) => {
+        const rangeStartMin = timeToMinutes(range.start);
+        let rangeEndMin = timeToMinutes(range.end);
+        if (rangeStartMin < 0 || rangeEndMin < 0) {
+            return false;
+        }
+
+        if (rangeEndMin <= rangeStartMin) {
+            rangeEndMin += 24 * 60;
+        }
+
+        return requestStart < rangeEndMin && requestEnd > rangeStartMin;
+    });
+};
 
 // Legacy function for backward compatibility
 const populateTimeSlots = async () => {
@@ -229,9 +363,9 @@ const loadAvailability = async (date) => {
     const startTimeSelect = document.getElementById('startTime');
     const startTimeLoadingEl = document.getElementById('startTimeLoading');
 
-    // For per-track bookings: date/time availability is not needed.
+    // For flat-rate track/session bookings: date/time availability is not needed.
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-    if (typeof window.isPerTrackBookingCategory === 'function' && window.isPerTrackBookingCategory(bookingType)) {
+    if (typeof window.isFlatRateSessionBookingCategory === 'function' && window.isFlatRateSessionBookingCategory(bookingType)) {
         await populateStartTimeSlots('', null);
         if (container) {
             container.innerHTML = '';
@@ -273,6 +407,7 @@ const loadAvailability = async (date) => {
             startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
             startTimeSelect.disabled = true;
         }
+        populateEndTimeSlots('', '', null);
         if (startTimeLoadingEl) {
             startTimeLoadingEl.style.display = 'none';
         }
@@ -373,9 +508,9 @@ const displayAvailability = (data) => {
     if (!container) return;
     const selectedDate = document.getElementById('bookingDate')?.value || '';
 
-    // For per-track bookings the hourly timeline is not meaningful.
+    // For flat-rate track/session bookings the hourly timeline is not meaningful.
     const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-    if (typeof window.isPerTrackBookingCategory === 'function' && window.isPerTrackBookingCategory(bookingType)) {
+    if (typeof window.isFlatRateSessionBookingCategory === 'function' && window.isFlatRateSessionBookingCategory(bookingType)) {
         container.innerHTML = '';
         setHourlyAvailabilityVisibility(false);
         return;
