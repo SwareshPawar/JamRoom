@@ -204,8 +204,8 @@ body {
     color: var(--text-inverse);
     padding: 24px 22px;
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: center;
     gap: 14px;
     min-width: 0;
 }
@@ -214,13 +214,26 @@ body {
     margin: 0;
     font-size: clamp(1.3rem, 1.8vw, 1.9rem);
     overflow-wrap: anywhere;
+    text-align: center;
 }
 
 .app-brand {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 6px;
     min-width: 0;
+}
+
+.app-brand-logo {
+    width: 54px;
+    height: 54px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--text-inverse) 32%, transparent);
+    background: color-mix(in srgb, var(--text-inverse) 18%, transparent);
+    padding: 4px;
+    object-fit: contain;
+    margin: 0 auto;
 }
 
 .app-subtitle {
@@ -304,6 +317,10 @@ body {
     min-width: 0;
 }
 
+.main-nav-toggle {
+    display: none;
+}
+
 .nav-links {
     display: flex;
     align-items: center;
@@ -320,9 +337,10 @@ body {
     color: var(--text-color);
     text-decoration: none;
     padding: 9px 12px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     min-height: 42px;
     border-radius: var(--radius-md);
     transition: var(--transition-normal);
@@ -331,6 +349,15 @@ body {
     background: var(--surface-elevated);
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+.nav-link-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.nav-link-label {
+    line-height: 1.15;
 }
 
 .nav-link:hover,
@@ -1623,22 +1650,26 @@ textarea:disabled {
     .app-header {
         padding: 10px;
         flex-direction: column;
-        align-items: stretch;
+        align-items: center;
         gap: 8px;
         overflow-x: clip;
     }
 
     .app-header h1 {
-        font-size: 1.02rem;
-        line-height: 1.2;
+        font-size: 1.22rem;
+        line-height: 1.25;
+        text-align: center;
     }
 
     .app-brand {
-        gap: 5px;
+        align-items: center;
+        gap: 6px;
     }
 
-    .app-brand-address {
-        font-size: 0.8rem;
+    .app-brand-logo {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto;
     }
 
     .app-subtitle {
@@ -1792,6 +1823,25 @@ details[open] > .lesson-accordion-header::after {
         border-top: 1px solid color-mix(in srgb, var(--primary-color) 28%, transparent);
     }
 
+    .main-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 42px;
+        padding: 8px 10px;
+        border: 1px solid var(--border-color-light);
+        border-radius: var(--radius-md);
+        background: var(--surface-elevated);
+        color: var(--text-color);
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .main-nav.is-collapsed .nav-links {
+        display: none;
+    }
+
     .main-nav .nav-links {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1943,7 +1993,7 @@ details[open] > .lesson-accordion-header::after {
 
 @media (max-width: 480px) {
     .main-nav .nav-links {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .main-nav .nav-link {
@@ -1987,9 +2037,37 @@ details[open] > .lesson-accordion-header::after {
     }
 }
 
+@media (max-width: 768px) and (orientation: portrait) {
+    .main-nav .nav-links {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .main-nav .nav-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 76px;
+        padding: 10px 8px;
+        border-radius: 12px;
+        text-align: center;
+    }
+
+    .main-nav .nav-link .nav-link-icon {
+        font-size: 1.15rem;
+    }
+
+    .main-nav .nav-link .nav-link-label {
+        font-size: 0.8rem;
+        line-height: 1.2;
+    }
+}
+
 @media (max-width: 360px) {
     .main-nav .nav-links {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .app-header-actions-primary {

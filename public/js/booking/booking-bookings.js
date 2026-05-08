@@ -2,25 +2,282 @@
  * Booking history and billing actions module.
  */
 
-const slotRequestTimeSlots = [
-    { value: '09:00', label: '9:00 AM', hour: 9 },
-    { value: '10:00', label: '10:00 AM', hour: 10 },
-    { value: '11:00', label: '11:00 AM', hour: 11 },
-    { value: '12:00', label: '12:00 PM', hour: 12 },
-    { value: '13:00', label: '1:00 PM', hour: 13 },
-    { value: '14:00', label: '2:00 PM', hour: 14 },
-    { value: '15:00', label: '3:00 PM', hour: 15 },
-    { value: '16:00', label: '4:00 PM', hour: 16 },
-    { value: '17:00', label: '5:00 PM', hour: 17 },
-    { value: '18:00', label: '6:00 PM', hour: 18 },
-    { value: '19:00', label: '7:00 PM', hour: 19 },
-    { value: '20:00', label: '8:00 PM', hour: 20 },
-    { value: '21:00', label: '9:00 PM', hour: 21 },
-    { value: '22:00', label: '10:00 PM', hour: 22 },
-    { value: '23:00', label: '11:00 PM', hour: 23 }
-];
+// Time slots declared once in booking-availability.js (window.allTimeSlots).
+// booking-availability.js must be loaded before this file.
+const getSlotRequestTimeSlots = () => window.allTimeSlots || [];
 
 const slotRequestAvailabilityCache = new Map();
+const myBookingsById = new Map();
+
+const resolveApiUrl = () => {
+    if (typeof API_URL === 'string' && API_URL.trim()) {
+        return API_URL;
+    }
+
+    if (typeof window !== 'undefined' && window.location?.origin) {
+        return window.location.origin;
+    }
+
+    return '';
+};
+
+const showBookingAlert = (message, type = 'info') => {
+    if (typeof window.showAlert === 'function') {
+        window.showAlert(message, type);
+        return;
+    }
+
+    if (window.alertManager && typeof window.alertManager.show === 'function') {
+        window.alertManager.show(String(message || ''), type);
+        return;
+    }
+
+    if (type === 'error') {
+        console.error(message);
+    } else {
+        console.log(message);
+    }
+};
+
+const escapeBookingHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const normalizePaymentStatus = (statusValue) => {
+    const normalized = String(statusValue || '').toUpperCase();
+    if (['PENDING', 'PARTIAL', 'PAID'].includes(normalized)) {
+        return normalized;
+    }
+    return 'PENDING';
+};
+
+const getBookingPaymentSnapshot = (booking) => {
+    const total = Math.max(0, Number(booking?.price || 0));
+    const paymentStatus = normalizePaymentStatus(booking?.paymentStatus);
+    const amountPaidRaw = Number.isFinite(Number(booking?.amountPaid)) ? Number(booking.amountPaid) : 0;
+
+    const paid = paymentStatus === 'PAID'
+        ? total
+        : paymentStatus === 'PARTIAL'
+            ? Math.max(0, Math.min(total, amountPaidRaw))
+            : 0;
+    const remaining = Math.max(0, total - paid);
+
+    return { paymentStatus, total, paid, remaining };
+};
+
+const formatBookingCurrency = (value) => {
+    const numeric = Number(value || 0);
+    return `₹${Number.isFinite(numeric) ? numeric.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0'}`;
+};
+
+const ensureUserBookingModalStyles = () => {
+    if (document.getElementById('userBookingModalStyles')) {
+        return;
+    }
+
+    const styleEl = document.createElement('style');
+    styleEl.id = 'userBookingModalStyles';
+    styleEl.textContent = `
+        .status-paid { background: color-mix(in srgb, var(--success-color) 18%, transparent); color: var(--text-color); }
+        .status-partial { background: color-mix(in srgb, var(--info-color) 18%, transparent); color: var(--text-color); }
+        .user-booking-modal { position: fixed; inset: 0; z-index: 12000; display: grid; place-items: center; padding: 12px; }
+        .user-booking-modal[hidden] { display: none !important; }
+        .user-booking-modal-backdrop { position: absolute; inset: 0; background: rgba(10, 14, 28, 0.55); backdrop-filter: blur(3px); }
+        .user-booking-modal-dialog { position: relative; width: min(920px, calc(100vw - 20px)); max-height: calc(100vh - 20px); overflow-y: auto; border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface-elevated); box-shadow: 0 24px 56px rgba(0,0,0,0.35); padding: 14px; }
+        .user-booking-modal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .user-booking-modal-head h3 { margin: 0; }
+        .user-booking-modal-close { width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--surface-1); color: var(--text-color); font-size: 1.3rem; cursor: pointer; display: grid; place-items: center; }
+        .user-booking-modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .user-booking-modal-panel { border: 1px solid var(--border-color-light); border-radius: 10px; padding: 10px; background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1)); }
+        .user-booking-modal-panel h4 { margin: 0 0 8px; }
+        .user-booking-modal-panel p { margin: 4px 0; }
+        .user-booking-modal-list { margin: 0; padding-left: 18px; }
+        .user-booking-modal-list li { margin: 4px 0; }
+        body.user-booking-modal-open { overflow: hidden; }
+        @media (max-width: 768px) {
+            .user-booking-modal { padding: 8px; }
+            .user-booking-modal-dialog { width: min(100%, calc(100vw - 10px)); max-height: calc(100vh - 10px); padding: 10px; }
+            .user-booking-modal-grid { grid-template-columns: 1fr; }
+        }
+    `;
+    document.head.appendChild(styleEl);
+};
+
+const ensureUserBookingDetailsModal = () => {
+    ensureUserBookingModalStyles();
+
+    if (document.getElementById('userBookingDetailsModal')) {
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+        <div id="userBookingDetailsModal" class="user-booking-modal" role="dialog" aria-modal="true" aria-labelledby="userBookingDetailsTitle" hidden>
+            <div class="user-booking-modal-backdrop"></div>
+            <div class="user-booking-modal-dialog">
+                <div class="user-booking-modal-head">
+                    <h3 id="userBookingDetailsTitle">Booking Details</h3>
+                    <button type="button" id="closeUserBookingDetailsBtn" class="user-booking-modal-close" aria-label="Close booking details">×</button>
+                </div>
+                <div id="userBookingDetailsBody" class="user-booking-modal-body"></div>
+            </div>
+        </div>
+    `.trim();
+
+    const modal = wrapper.firstElementChild;
+    document.body.appendChild(modal);
+
+    const closeModal = () => {
+        modal.hidden = true;
+        document.body.classList.remove('user-booking-modal-open');
+    };
+
+    modal.querySelector('#closeUserBookingDetailsBtn')?.addEventListener('click', closeModal);
+    modal.querySelector('.user-booking-modal-backdrop')?.addEventListener('click', closeModal);
+    document.addEventListener('keydown', (event) => {
+        if (!modal.hidden && event.key === 'Escape') {
+            closeModal();
+        }
+    });
+
+    modal._closeUserBookingModal = closeModal;
+};
+
+const openUserBookingDetails = (bookingId) => {
+    ensureUserBookingDetailsModal();
+
+    const modal = document.getElementById('userBookingDetailsModal');
+    const body = document.getElementById('userBookingDetailsBody');
+    const booking = myBookingsById.get(String(bookingId || ''));
+    if (!modal || !body || !booking) return;
+
+    const isPerday = booking.bookingMode === 'perday';
+    const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
+    const payment = getBookingPaymentSnapshot(booking);
+    const bookingStatus = String(booking.bookingStatus || 'N/A');
+    const isRejectedBooking = bookingStatus.toUpperCase() === 'REJECTED';
+    const paymentBadgeClass = payment.paymentStatus.toLowerCase();
+    const statusBadgeClass = bookingStatus.toLowerCase();
+    const rentalItems = Array.isArray(booking.rentals) ? booking.rentals : [];
+    const rentalsMarkup = rentalItems.length > 0
+        ? `<ul class="user-booking-modal-list">${rentalItems.map((rental) => `<li>${escapeBookingHtml(rental?.name || 'Item')} x ${Math.max(1, Number(rental?.quantity) || 1)}</li>`).join('')}</ul>`
+        : '<p class="booking-empty-message">No items available.</p>';
+
+    const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
+        ? `${formatBookingDate(booking.perDayStartDate)} to ${formatBookingDate(booking.perDayEndDate)}`
+        : formatBookingDate(booking.date);
+    const timeText = isPerday
+        ? `${formatBookingTime(booking.startTime)} to ${formatBookingTime(booking.endTime)}`
+        : `${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}`;
+
+    const paymentDetailsMarkup = isRejectedBooking
+        ? ''
+        : `
+                <p><strong>Payment:</strong> <span class="status-badge status-${escapeBookingHtml(paymentBadgeClass)}">${escapeBookingHtml(payment.paymentStatus)}</span></p>
+                <p><strong>Paid:</strong> ${formatBookingCurrency(payment.paid)}</p>
+                <p><strong>Remaining:</strong> ${formatBookingCurrency(payment.remaining)}</p>
+            `;
+
+    body.innerHTML = `
+        <div class="user-booking-modal-grid">
+            <section class="user-booking-modal-panel">
+                <h4>Status</h4>
+                <p><strong>Booking:</strong> <span class="status-badge status-${escapeBookingHtml(statusBadgeClass)}">${escapeBookingHtml(bookingStatus)}</span></p>
+                ${paymentDetailsMarkup}
+            </section>
+            <section class="user-booking-modal-panel">
+                <h4>Schedule</h4>
+                <p><strong>Booking ID:</strong> ${escapeBookingHtml(booking._id || 'N/A')}</p>
+                <p><strong>Date/Range:</strong> ${dateText}</p>
+                <p><strong>Time:</strong> ${timeText}</p>
+                <p><strong>Duration:</strong> ${isPerday ? `${perDayDays} day(s)` : `${Math.max(1, Number(booking.duration) || 1)} hour(s)`}</p>
+            </section>
+            <section class="user-booking-modal-panel">
+                <h4>Pricing</h4>
+                <p><strong>Subtotal:</strong> ${formatBookingCurrency(booking.subtotal)}</p>
+                <p><strong>Tax:</strong> ${formatBookingCurrency(booking.taxAmount)}</p>
+                <p><strong>Total:</strong> ${formatBookingCurrency(booking.price)}</p>
+                <p><strong>Payment Ref:</strong> ${escapeBookingHtml(booking.paymentReference || 'N/A')}</p>
+            </section>
+            <section class="user-booking-modal-panel">
+                <h4>Items</h4>
+                ${rentalsMarkup}
+                ${booking.notes ? `<p><strong>Notes:</strong> ${escapeBookingHtml(booking.notes)}</p>` : ''}
+            </section>
+        </div>
+    `;
+
+    modal.hidden = false;
+    document.body.classList.add('user-booking-modal-open');
+};
+
+const formatBookingDate = (dateValue) => {
+    if (typeof window.formatDate === 'function') {
+        return window.formatDate(dateValue);
+    }
+
+    if (window.JamRoomUtils && typeof window.JamRoomUtils.formatDate === 'function') {
+        return window.JamRoomUtils.formatDate(dateValue, 'DD Mon YYYY');
+    }
+
+    const parsedDate = new Date(dateValue);
+    if (Number.isNaN(parsedDate.getTime())) return 'N/A';
+
+    return parsedDate.toLocaleDateString('en-IN', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+};
+
+const formatBookingTime = (timeValue) => {
+    if (typeof window.formatTime === 'function') {
+        return window.formatTime(timeValue);
+    }
+
+    if (window.JamRoomUtils && typeof window.JamRoomUtils.formatTime === 'function') {
+        return window.JamRoomUtils.formatTime(timeValue);
+    }
+
+    const normalizedTime = String(timeValue || '').trim();
+    const [hours, minutes] = normalizedTime.split(':');
+    const hourNum = Number(hours);
+
+    if (!Number.isInteger(hourNum) || !minutes) {
+        return 'N/A';
+    }
+
+    const ampm = hourNum >= 12 ? 'PM' : 'AM';
+    const displayHour = hourNum % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+};
+
+const showBookingLoadingOverlay = (message) => {
+    if (typeof window.showLoadingOverlay === 'function') {
+        window.showLoadingOverlay(message);
+        return;
+    }
+
+    if (window.JamRoomUtils && typeof window.JamRoomUtils.showLoading === 'function') {
+        window.JamRoomUtils.showLoading(document.body, message || 'Processing...');
+    }
+};
+
+const hideBookingLoadingOverlay = () => {
+    if (typeof window.hideLoadingOverlay === 'function') {
+        window.hideLoadingOverlay();
+        return;
+    }
+
+    if (window.JamRoomUtils && typeof window.JamRoomUtils.hideLoading === 'function') {
+        window.JamRoomUtils.hideLoading(document.body);
+    }
+};
 
 const getSlotRequestLocalDateString = (date = new Date()) => {
     const year = date.getFullYear();
@@ -54,7 +311,8 @@ const fetchSlotRequestAvailability = async (date) => {
     }
 
     const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/bookings/availability/${date}`, {
+    const apiBase = resolveApiUrl();
+    const res = await fetch(`${apiBase}/api/bookings/availability/${date}`, {
         headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -100,7 +358,7 @@ const loadSlotRequestTimeOptions = async (dateInputEl) => {
 
         const todayLocal = getSlotRequestLocalDateString(new Date());
         const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-        const availableSlots = slotRequestTimeSlots.filter((slot) => {
+        const availableSlots = getSlotRequestTimeSlots().filter((slot) => {
             if (selectedDate === todayLocal && (slot.hour * 60) <= currentMinutes) {
                 return false;
             }
@@ -118,7 +376,7 @@ const loadSlotRequestTimeOptions = async (dateInputEl) => {
         timeSelect.disabled = false;
     } catch (error) {
         timeSelect.innerHTML = '<option value="">Error loading times</option>';
-        showAlert(error.message || 'Unable to load time options', 'error');
+        showBookingAlert(error.message || 'Unable to load time options', 'error');
     } finally {
         if (loadingEl) loadingEl.style.display = 'none';
     }
@@ -172,10 +430,117 @@ const initSlotRequestDatePickers = () => {
     });
 };
 
+// ─── Shared helper: build lesson row HTML (used by both render modes) ────────
+const buildLessonRowHTML = (lesson, bookingId) => {
+    const status = String(lesson?.status || 'SCHEDULED').toUpperCase();
+    const statusClass = status === 'COMPLETED' ? 'completed' : status === 'CANCELLED' ? 'cancelled' : 'scheduled';
+    const statusLabel = status.charAt(0) + status.slice(1).toLowerCase();
+    const weekNum = lesson?.weekNumber || lesson?.classNumber || 1;
+    const scheduledDate = lesson?.scheduledDate ? formatBookingDate(lesson.scheduledDate) : 'TBD';
+    const completionDate = lesson?.completedDate ? formatBookingDate(lesson.completedDate) : null;
+    const completionTime = lesson?.completedStartTime && lesson?.completedEndTime
+        ? `${formatBookingTime(lesson.completedStartTime)} - ${formatBookingTime(lesson.completedEndTime)}`
+        : null;
+    const headerDateStr = (() => {
+        const src = status === 'COMPLETED' && lesson?.completedDate ? lesson.completedDate : lesson?.scheduledDate;
+        if (!src) return null;
+        const d = new Date(src);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    })();
+    const slotReq = lesson?.slotRequest || {};
+    const slotReqStatus = String(slotReq.status || 'NONE').toUpperCase();
+    const slotReqHeaderBadge = slotReqStatus === 'PENDING'
+        ? ` <span class="lesson-status-badge lesson-status-scheduled" style="font-size:0.7em;">Slot Pending</span>`
+        : '';
+    const getWeekRange = (d) => {
+        if (!d) return null;
+        const dt = new Date(d);
+        if (Number.isNaN(dt.getTime())) return null;
+        const dow = dt.getDay();
+        const diff = dow === 0 ? -6 : 1 - dow;
+        const mon = new Date(dt); mon.setDate(dt.getDate() + diff); mon.setHours(0,0,0,0);
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+        const fmt = (x) => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+        return { min: fmt(mon), max: fmt(sun) };
+    };
+    const weekRange = status === 'SCHEDULED' ? getWeekRange(lesson?.scheduledDate) : null;
+    const lessonIdStr = String(lesson?._id || '');
+
+    let slotRequestSection = '';
+    if (status === 'SCHEDULED') {
+        if (slotReqStatus === 'PENDING') {
+            const pDate = slotReq.proposedDate ? new Date(slotReq.proposedDate).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}) : '';
+            slotRequestSection = `<div class="lesson-slot-request lesson-slot-pending">
+                <p><strong>Slot request pending approval</strong></p>
+                <p>Requested: ${pDate} at ${slotReq.proposedStartTime || 'N/A'} (${slotReq.proposedEndTime || ''})</p>
+                <button class="btn btn-sm btn-secondary" onclick="cancelSlotRequest('${bookingId}','${lessonIdStr}',this)">Withdraw Request</button>
+            </div>`;
+        } else if (slotReqStatus === 'REJECTED') {
+            slotRequestSection = `<div class="lesson-slot-request lesson-slot-rejected">
+                <p><strong>Slot request was rejected.</strong>${slotReq.responseNote ? ` Note: ${slotReq.responseNote}` : ''} You can submit a new request.</p>
+            </div>`;
+        } else if (slotReqStatus === 'APPROVED') {
+            slotRequestSection = `<p style="color:var(--success-color);font-size:0.85em">✔ Slot confirmed by admin</p>`;
+        }
+        if (slotReqStatus !== 'PENDING') {
+            const minDate = weekRange?.min || '';
+            const maxDate = weekRange?.max || '';
+            slotRequestSection += `<details class="lesson-slot-form">
+                <summary class="btn btn-sm btn-primary lesson-slot-trigger">Request Slot</summary>
+                <div class="lesson-slot-form-panel">
+                    <div class="field-help">Pick a date within this lesson week, then choose from available JamRoom time slots.</div>
+                    <div class="time-container lesson-slot-time-container">
+                        <div class="form-group lesson-slot-field">
+                            <label><strong>Date</strong></label>
+                            <input type="date" class="slot-req-date" min="${minDate}" max="${maxDate}">
+                        </div>
+                        <div class="form-group lesson-slot-field">
+                            <label><strong>Start Time</strong></label>
+                            <select class="slot-req-time" disabled>
+                                <option value="">Select a date first</option>
+                            </select>
+                            <div class="loading-text start-time-loading slot-req-time-loading">Loading available times...</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-success lesson-slot-submit" onclick="submitSlotRequest('${bookingId}','${lessonIdStr}',this)">Submit Request</button>
+                </div>
+            </details>`;
+        }
+    }
+
+    return `
+        <li>
+            <details class="lesson-accordion">
+                <summary class="lesson-accordion-header">
+                    <span class="lesson-accordion-week">Week ${weekNum}${headerDateStr ? ` · ${headerDateStr}` : ''}${slotReqHeaderBadge}</span>
+                    <span class="lesson-status-badge lesson-status-${statusClass}">${statusLabel}</span>
+                </summary>
+                <div class="lesson-accordion-body">
+                    <p><strong>Scheduled:</strong> ${scheduledDate} (${formatBookingTime(lesson?.scheduledStartTime || '') || 'N/A'} – ${formatBookingTime(lesson?.scheduledEndTime || '') || 'N/A'})</p>
+                    ${status === 'COMPLETED' && completionDate ? `<p><strong>Completed on:</strong> ${completionDate}${completionTime ? `, ${completionTime}` : ''}</p>` : ''}
+                    ${lesson?.notes ? `<p><strong>Notes:</strong> ${lesson.notes}</p>` : ''}
+                    ${lesson?.details ? `<p><strong>Details:</strong> ${lesson.details}</p>` : ''}
+                    ${slotRequestSection}
+                </div>
+            </details>
+        </li>
+    `;
+};
+
 // Load user's bookings
-const loadMyBookings = async () => {
-    const loadingEl = document.getElementById('bookingsLoading');
-    const bookingsEl = document.getElementById('bookingsList');
+const loadMyBookings = async (options = {}) => {
+    const loadingElementId = options?.loadingElementId || 'bookingsLoading';
+    const bookingsElementId = options?.bookingsElementId || 'bookingsList';
+    const loadingEl = document.getElementById(loadingElementId);
+    const bookingsEl = document.getElementById(bookingsElementId);
+    const classOnly = options?.classOnly === true;
+    const trackerMode = options?.trackerMode === true; // Lesson Tracker page: focused lesson view
+    const prefetchedBookings = Array.isArray(options?.allBookings) ? options.allBookings : null;
+
+    if (!loadingEl && !bookingsEl) {
+        return;
+    }
 
     if (loadingEl) {
         loadingEl.style.display = 'none';
@@ -189,240 +554,153 @@ const loadMyBookings = async () => {
     }
 
     try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/api/bookings/my-bookings`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+        let allBookings = prefetchedBookings;
+        if (!allBookings) {
+            const token = localStorage.getItem('token');
+            const apiBase = resolveApiUrl();
+            const res = await fetch(`${apiBase}/api/bookings/my-bookings`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+            allBookings = Array.isArray(data.bookings) ? data.bookings : [];
+        }
+
+        const bookings = classOnly
+            ? allBookings.filter((entry) => entry?.classSession?.isClassBooking)
+            : allBookings;
+
+        myBookingsById.clear();
+        bookings.forEach((booking) => {
+            if (booking?._id) {
+                myBookingsById.set(String(booking._id), booking);
+            }
         });
 
-        const data = await res.json();
-
-        if (data.bookings.length === 0) {
-            document.getElementById('bookingsList').innerHTML =
-                '<p class="booking-empty-message">No bookings yet</p>';
+        if (bookings.length === 0) {
+            if (bookingsEl) {
+                bookingsEl.innerHTML = classOnly
+                    ? '<p class="booking-empty-message">No class bookings available for lesson tracking yet.</p>'
+                    : '<p class="booking-empty-message">No bookings yet</p>';
+            }
             return;
         }
 
         let html = '';
-        data.bookings.forEach(booking => {
-            const isPerday = booking.bookingMode === 'perday';
-            const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
-            const perDayRange = (booking.perDayStartDate && booking.perDayEndDate)
-                ? `${formatDate(booking.perDayStartDate)} to ${formatDate(booking.perDayEndDate)}`
-                : formatDate(booking.date);
-            const perDayTimeRange = `${formatTime(booking.startTime)} to ${formatTime(booking.endTime)}`;
 
-            const statusClass = booking.bookingStatus.toLowerCase();
-            const rentalsDisplay = booking.rentals && booking.rentals.length > 0
-                ? booking.rentals.filter(r => r && r.name && r.quantity !== undefined && r.price !== undefined)
-                    .map(r => {
-                        const rentalType = String(r.rentalType || 'inhouse').toLowerCase();
-                        const days = isPerday ? perDayDays : 1;
-                        const amount = (isPerday || rentalType === 'perday')
-                            ? (r.price * r.quantity * days)
-                            : (rentalType === 'persession' || rentalType === 'pertrack')
-                                ? (r.price * r.quantity)
-                                : (r.price * r.quantity * (booking.duration || 1));
-                        return `<li>${r.name} × ${r.quantity} - ₹${amount}</li>`;
-                    }).join('')
-                : `<li>${booking.rentalType || 'Unknown rental'}</li>`;
+        if (trackerMode) {
+            // ── TRACKER MODE: class-focused cards, always expanded, lessons as primary ──
+            bookings.forEach(booking => {
+                const classSession = booking.classSession || {};
+                if (!classSession.isClassBooking) return;
 
-            const bookingDateLine = isPerday
-                ? `<p><strong>📅 Per-day Range:</strong> ${perDayRange} (${perDayDays} day(s))</p>`
-                : `<p><strong>📅 Date:</strong> ${formatDate(booking.date)}</p>`;
+                const statusClass = booking.bookingStatus.toLowerCase();
+                const completed = Number(classSession.completedClassesCount || 0);
+                const total = Number(classSession.totalClassesPlanned || 0);
+                const remaining = classSession.classesRemainingAfterBooking ?? (total - completed);
+                const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+                const planStart = classSession.planStartDate ? formatBookingDate(classSession.planStartDate) : 'N/A';
+                const planEnd = classSession.planEndDate ? formatBookingDate(classSession.planEndDate) : 'N/A';
 
-            const bookingTimeLine = isPerday
-                ? `<p><strong>🕐 Pick-up/Return:</strong> ${perDayTimeRange}</p>`
-                : `<p><strong>🕐 Time:</strong> ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)} (${booking.duration}h)</p>`;
+                const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
+                const lessonRowsHTML = lessons.length > 0
+                    ? lessons.map((lesson) => buildLessonRowHTML(lesson, booking._id)).join('')
+                    : '';
 
-            const classSession = booking.classSession || {};
-
-            const bookingItemNames = booking.rentals && booking.rentals.length > 0
-                ? booking.rentals
-                    .filter((rental) => rental && rental.name)
-                    .map((rental) => rental.name)
-                : [];
-            const bookingSummaryTitle = classSession.isClassBooking
-                ? (classSession.selectedClassItemName || classSession.instrument || 'Music Class')
-                : (bookingItemNames.length > 0
-                    ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2} more` : ''}`
-                    : (booking.rentalType || 'Booking'));
-            const bookingSummaryMeta = isPerday
-                ? `${perDayRange} | ${perDayTimeRange}`
-                : `${formatDate(booking.date)} | ${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}`;
-            const lessons = Array.isArray(classSession.lessons) ? classSession.lessons : [];
-            const lessonRows = lessons.length > 0
-                ? lessons.map((lesson) => {
-                    const status = String(lesson?.status || 'SCHEDULED').toUpperCase();
-                    const statusClass = status === 'COMPLETED' ? 'completed' : status === 'CANCELLED' ? 'cancelled' : 'scheduled';
-                    const statusLabel = status.charAt(0) + status.slice(1).toLowerCase();
-                    const weekNum = lesson?.weekNumber || lesson?.classNumber || 1;
-                    const scheduledDate = lesson?.scheduledDate ? formatDate(lesson.scheduledDate) : 'TBD';
-                    const completionDate = lesson?.completedDate ? formatDate(lesson.completedDate) : null;
-                    const completionTime = lesson?.completedStartTime && lesson?.completedEndTime
-                        ? `${formatTime(lesson.completedStartTime)} - ${formatTime(lesson.completedEndTime)}`
-                        : null;
-                    const headerDateStr = (() => {
-                        const src = status === 'COMPLETED' && lesson?.completedDate ? lesson.completedDate : lesson?.scheduledDate;
-                        if (!src) return null;
-                        const d = new Date(src);
-                        if (Number.isNaN(d.getTime())) return null;
-                        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-                    })();
-                    // Slot request badge for header
-                    const slotReq = lesson?.slotRequest || {};
-                    const slotReqStatus = String(slotReq.status || 'NONE').toUpperCase();
-                    const slotReqHeaderBadge = slotReqStatus === 'PENDING'
-                        ? ` <span class="lesson-status-badge lesson-status-scheduled" style="font-size:0.7em;">Slot Pending</span>`
-                        : '';
-
-                    // Determine week date range for the date input
-                    const getWeekRange = (d) => {
-                        if (!d) return null;
-                        const dt = new Date(d);
-                        if (Number.isNaN(dt.getTime())) return null;
-                        const dow = dt.getDay();
-                        const diff = dow === 0 ? -6 : 1 - dow;
-                        const mon = new Date(dt); mon.setDate(dt.getDate() + diff); mon.setHours(0,0,0,0);
-                        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-                        const fmt = (x) => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
-                        return { min: fmt(mon), max: fmt(sun) };
-                    };
-                    const weekRange = status === 'SCHEDULED' ? getWeekRange(lesson?.scheduledDate) : null;
-
-                    // Build slot request section
-                    let slotRequestSection = '';
-                    if (status === 'SCHEDULED') {
-                        const bookingId = booking._id;
-                        const lessonIdStr = String(lesson?._id || '');
-                        if (slotReqStatus === 'PENDING') {
-                            const pDate = slotReq.proposedDate ? new Date(slotReq.proposedDate).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}) : '';
-                            slotRequestSection = `<div class="lesson-slot-request lesson-slot-pending">
-                                <p><strong>Slot request pending approval</strong></p>
-                                <p>Requested: ${pDate} at ${slotReq.proposedStartTime || 'N/A'} (${slotReq.proposedEndTime || ''})</p>
-                                <button class="btn btn-sm btn-secondary" onclick="cancelSlotRequest('${bookingId}','${lessonIdStr}',this)">Withdraw Request</button>
-                            </div>`;
-                        } else if (slotReqStatus === 'REJECTED') {
-                            slotRequestSection = `<div class="lesson-slot-request lesson-slot-rejected">
-                                <p><strong>Slot request was rejected.</strong>${slotReq.responseNote ? ` Note: ${slotReq.responseNote}` : ''} You can submit a new request.</p>
-                            </div>`;
-                        } else if (slotReqStatus === 'APPROVED') {
-                            slotRequestSection = `<p style="color:var(--success-color);font-size:0.85em">✔ Slot confirmed by admin</p>`;
-                        }
-                        if (slotReqStatus !== 'PENDING') {
-                            const minDate = weekRange?.min || '';
-                            const maxDate = weekRange?.max || '';
-                            slotRequestSection += `<details class="lesson-slot-form">
-                                <summary class="btn btn-sm btn-primary lesson-slot-trigger">Request Slot</summary>
-                                <div class="lesson-slot-form-panel">
-                                    <div class="field-help">Pick a date within this lesson week, then choose from available JamRoom time slots.</div>
-                                    <div class="time-container lesson-slot-time-container">
-                                        <div class="form-group lesson-slot-field">
-                                            <label><strong>Date</strong></label>
-                                            <input type="date" class="slot-req-date" min="${minDate}" max="${maxDate}">
-                                        </div>
-                                        <div class="form-group lesson-slot-field">
-                                            <label><strong>Start Time</strong></label>
-                                            <select class="slot-req-time" disabled>
-                                                <option value="">Select a date first</option>
-                                            </select>
-                                            <div class="loading-text start-time-loading slot-req-time-loading">Loading available times...</div>
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-sm btn-success lesson-slot-submit" onclick="submitSlotRequest('${bookingId}','${lessonIdStr}',this)">Submit Request</button>
-                                </div>
-                            </details>`;
-                        }
-                    }
-
-                    return `
-                        <li>
-                            <details class="lesson-accordion">
-                                <summary class="lesson-accordion-header">
-                                    <span class="lesson-accordion-week">Week ${weekNum}${headerDateStr ? ` · ${headerDateStr}` : ''}${slotReqHeaderBadge}</span>
-                                    <span class="lesson-status-badge lesson-status-${statusClass}">${statusLabel}</span>
-                                </summary>
-                                <div class="lesson-accordion-body">
-                                    <p><strong>Scheduled:</strong> ${scheduledDate} (${formatTime(lesson?.scheduledStartTime || '') || 'N/A'} – ${formatTime(lesson?.scheduledEndTime || '') || 'N/A'})</p>
-                                    ${status === 'COMPLETED' && completionDate ? `<p><strong>Completed on:</strong> ${completionDate}${completionTime ? `, ${completionTime}` : ''}</p>` : ''}
-                                    ${lesson?.notes ? `<p><strong>Notes:</strong> ${lesson.notes}</p>` : ''}
-                                    ${lesson?.details ? `<p><strong>Details:</strong> ${lesson.details}</p>` : ''}
-                                    ${slotRequestSection}
-                                </div>
-                            </details>
-                        </li>
-                    `;
-                }).join('')
-                : '';
-
-            const classSessionDetails = classSession.isClassBooking
-                ? `
-                    <p><strong>🎓 Class Instrument:</strong> ${classSession.instrument || 'Music'}</p>
-                    <p><strong>🎼 Class Item:</strong> ${classSession.selectedClassItemName || classSession.instrument || 'N/A'}</p>
-                    <p><strong>📍 Class Location:</strong> ${classSession.location || 'N/A'}</p>
-                    <p><strong>🗓️ Default Weekly Slot:</strong> ${(classSession.preferredWeekday || 'N/A')} ${classSession.preferredStartTime ? `at ${formatTime(classSession.preferredStartTime)}` : ''}</p>
-                    <p><strong>📅 Plan Window:</strong> ${classSession.planStartDate ? formatDate(classSession.planStartDate) : 'N/A'} to ${classSession.planEndDate ? formatDate(classSession.planEndDate) : 'N/A'}</p>
-                    <p><strong>📚 Classes:</strong> ${classSession.classesPerMonth || 0}/month, ${classSession.totalClassesPlanned || 0} total</p>
-                    <p><strong>✅ Progress:</strong> ${classSession.completedClassesCount || 0}/${classSession.totalClassesPlanned || 0} completed (${classSession.classesRemainingAfterBooking ?? 0} remaining)</p>
-                    <p><strong>💳 Fee:</strong> ₹${classSession.totalFeeBeforeDiscount || classSession.monthlyFee || 0} | <strong>Discount:</strong> ₹${classSession.discountAmount || 0} | <strong>Paid:</strong> ₹${classSession.totalFeeAfterDiscount || classSession.monthlyFeeDueNow || 0}</p>
-                `
-                : '';
-
-            const classSessionBlock = classSession.isClassBooking
-                ? `
-                    <div class="booking-class-tabs">
-                        <div class="booking-class-tab-list" role="tablist" aria-label="Class booking sections">
-                            <button type="button" class="booking-class-tab active" data-tab-target="details" onclick="switchBookingClassTab(this, 'details')">Class Details</button>
-                            <button type="button" class="booking-class-tab" data-tab-target="tracker" onclick="switchBookingClassTab(this, 'tracker')">Lesson Tracker</button>
-                        </div>
-                        <div class="booking-class-tab-panel active" data-tab-panel="details">
-                            ${classSessionDetails}
-                        </div>
-                        <div class="booking-class-tab-panel" data-tab-panel="tracker" hidden>
-                            ${lessonRows
-                                ? `<ul class="lesson-accordion-list">${lessonRows}</ul>`
-                                : '<p class="booking-empty-message booking-empty-padded">No lesson tracker entries yet.</p>'}
-                        </div>
-                    </div>
-                `
-                : '';
-
-            html += `
-                <details class="booking-card booking-card-collapsible ${statusClass}">
-                    <summary class="booking-card-summary">
-                        <div class="booking-card-summary-primary">
-                            <h4 class="booking-card-title">${bookingSummaryTitle}</h4>
-                            <p class="booking-card-summary-meta">${bookingSummaryMeta}</p>
-                        </div>
-                        <div class="booking-card-summary-side">
+                html += `
+                    <div class="tracker-plan-card booking-card ${statusClass}">
+                        <div class="tracker-plan-header">
+                            <div class="tracker-plan-title-block">
+                                <h3 class="tracker-plan-title">🎓 ${classSession.selectedClassItemName || classSession.instrument || 'Music Class'}</h3>
+                                <span class="tracker-plan-meta">📍 ${classSession.location || 'N/A'} &nbsp;·&nbsp; 🗓️ ${classSession.preferredWeekday || 'N/A'}${classSession.preferredStartTime ? ` at ${formatBookingTime(classSession.preferredStartTime)}` : ''}</span>
+                                <span class="tracker-plan-meta">📅 ${planStart} → ${planEnd}</span>
+                            </div>
                             <span class="status-badge status-${statusClass}">${booking.bookingStatus}</span>
-                            <strong class="booking-card-summary-total">₹${booking.price}</strong>
                         </div>
-                    </summary>
-                    <div class="booking-card-body">
-                        <p><strong>📝 Items:</strong></p>
-                        <ul class="booking-rentals-list">${rentalsDisplay}</ul>
-                        ${bookingDateLine}
-                        ${bookingTimeLine}
-                        ${classSessionBlock}
-                        <p><strong>💰 Total:</strong> ₹${booking.price}
-                            ${booking.subtotal !== undefined && booking.taxAmount !== undefined
-                            ? `<small>(Subtotal: ₹${booking.subtotal} + Tax: ₹${booking.taxAmount})</small>` : ''}
-                        </p>
-                        ${booking.bandName ? `<p><strong>🎵 Band:</strong> ${booking.bandName}</p>` : ''}
-                        <div class="booking-actions-row">
-                            ${booking.bookingStatus === 'PENDING'
-                            ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger">Cancel Booking</button>`
-                            : ''}
-                            ${(booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
-                            ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary" title="Download Bill PDF">📄 Download Bill</button>`
-                            : ''}
+                        <div class="tracker-progress-bar-wrap">
+                            <div class="tracker-progress-bar" style="width:${progressPct}%"></div>
+                        </div>
+                        <div class="tracker-progress-stats">
+                            <span>✅ ${completed} completed</span>
+                            <span>📚 ${remaining} remaining</span>
+                            <span>Total: ${total}</span>
+                        </div>
+                        <div class="tracker-lessons">
+                            ${lessons.length > 0
+                                ? `<ul class="lesson-accordion-list">${lessonRowsHTML}</ul>`
+                                : '<p class="booking-empty-message booking-empty-padded">No lesson entries yet.</p>'}
                         </div>
                     </div>
-                </details>
-            `;
-        });
+                `;
+            });
+        } else {
+            html += '<div class="table-container bookings-user-table-container"><table class="bookings-user-table"><thead><tr><th>#</th><th>Booking</th><th>Date</th><th>Time</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead><tbody>';
 
-        document.getElementById('bookingsList').innerHTML = html || '<p class="booking-empty-message">No valid bookings found</p>';
+            bookings.forEach((booking, index) => {
+                const isPerday = booking.bookingMode === 'perday';
+                const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
+                const statusClass = String(booking.bookingStatus || '').toLowerCase();
+                const isRejectedBooking = String(booking.bookingStatus || '').toUpperCase() === 'REJECTED';
+                const paymentSnapshot = getBookingPaymentSnapshot(booking);
+                const paymentStatusClass = String(paymentSnapshot.paymentStatus || 'pending').toLowerCase();
+                const bookingItemNames = booking.rentals && booking.rentals.length > 0
+                    ? booking.rentals.filter((r) => r && r.name).map((r) => r.name)
+                    : [];
+                const classSession = booking.classSession || {};
+                const bookingTitle = classSession.isClassBooking
+                    ? (classSession.selectedClassItemName || classSession.instrument || 'Music Class')
+                    : (bookingItemNames.length > 0
+                        ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2}` : ''}`
+                        : (booking.rentalType || 'Booking'));
+
+                const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
+                    ? `${formatBookingDate(booking.perDayStartDate)}<br><small>to ${formatBookingDate(booking.perDayEndDate)}</small>`
+                    : formatBookingDate(booking.date);
+                const timeText = isPerday
+                    ? `${formatBookingTime(booking.startTime)} to ${formatBookingTime(booking.endTime)}<br><small>${perDayDays} day(s)</small>`
+                    : `${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}<br><small>${Math.max(1, Number(booking.duration) || 1)}h</small>`;
+
+                const actionButtons = [
+                    `<button onclick="openUserBookingDetails('${booking._id}')" class="btn btn-primary btn-sm">Details</button>`,
+                    booking.bookingStatus === 'PENDING'
+                        ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger btn-sm">Cancel</button>`
+                        : '',
+                    (booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
+                        ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download Bill PDF">Download Bill</button>`
+                        : ''
+                ].filter(Boolean).join(' ');
+
+                html += `
+                    <tr>
+                        <td class="bookings-user-col-serial">${index + 1}</td>
+                        <td>
+                            <strong>${bookingTitle}</strong>
+                            ${booking.bandName ? `<br><small>Band: ${booking.bandName}</small>` : ''}
+                        </td>
+                        <td>${dateText}</td>
+                        <td>${timeText}</td>
+                        <td>
+                            <span class="status-badge status-${statusClass}">${booking.bookingStatus || 'N/A'}</span><br>
+                            ${isRejectedBooking
+                                ? ''
+                                : `<small>
+                                    <span class="status-badge status-${paymentStatusClass}">${paymentSnapshot.paymentStatus}</span>
+                                    &nbsp;Paid: ${formatBookingCurrency(paymentSnapshot.paid)}<br>
+                                    Remaining: ${formatBookingCurrency(paymentSnapshot.remaining)}
+                                </small>`}
+                        </td>
+                        <td><strong>₹${Number(booking.price || 0)}</strong></td>
+                        <td class="bookings-user-actions">${actionButtons || '<small>N/A</small>'}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table></div>';
+        }
+
+        if (bookingsEl) {
+            bookingsEl.innerHTML = html || '<p class="booking-empty-message">No valid bookings found</p>';
+        }
         initSlotRequestDatePickers();
     } catch (error) {
         console.error('Load bookings error:', error);
@@ -448,18 +726,19 @@ const submitSlotRequest = async (bookingId, lessonId, btnEl) => {
         const proposedStartTime = timeInput?.value?.trim();
 
         if (!proposedDate) {
-            showAlert('Please select a date.', 'error');
+            showBookingAlert('Please select a date.', 'error');
             return;
         }
 
         if (!proposedStartTime) {
-            showAlert('Please select a start time.', 'error');
+            showBookingAlert('Please select a start time.', 'error');
             return;
         }
 
         if (btnEl) btnEl.disabled = true;
         const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/api/bookings/${bookingId}/class-lessons/${lessonId}/request-slot`, {
+        const apiBase = resolveApiUrl();
+        const res = await fetch(`${apiBase}/api/bookings/${bookingId}/class-lessons/${lessonId}/request-slot`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -470,10 +749,14 @@ const submitSlotRequest = async (bookingId, lessonId, btnEl) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || 'Failed to submit slot request');
 
-        showAlert(data.message || 'Slot request submitted!', 'success');
-        await loadMyBookings();
+        showBookingAlert(data.message || 'Slot request submitted!', 'success');
+        if (typeof window.refreshMyBookingsPage === 'function') {
+            await window.refreshMyBookingsPage();
+        } else {
+            await loadMyBookings();
+        }
     } catch (error) {
-        showAlert(error.message || 'Failed to submit slot request', 'error');
+        showBookingAlert(error.message || 'Failed to submit slot request', 'error');
         if (btnEl) btnEl.disabled = false;
     }
 };
@@ -485,7 +768,8 @@ const cancelSlotRequest = async (bookingId, lessonId, btnEl) => {
     try {
         if (btnEl) btnEl.disabled = true;
         const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/api/bookings/${bookingId}/class-lessons/${lessonId}/request-slot`, {
+        const apiBase = resolveApiUrl();
+        const res = await fetch(`${apiBase}/api/bookings/${bookingId}/class-lessons/${lessonId}/request-slot`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -496,10 +780,14 @@ const cancelSlotRequest = async (bookingId, lessonId, btnEl) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || 'Failed to withdraw request');
 
-        showAlert(data.message || 'Slot request withdrawn.', 'success');
-        await loadMyBookings();
+        showBookingAlert(data.message || 'Slot request withdrawn.', 'success');
+        if (typeof window.refreshMyBookingsPage === 'function') {
+            await window.refreshMyBookingsPage();
+        } else {
+            await loadMyBookings();
+        }
     } catch (error) {
-        showAlert(error.message || 'Failed to withdraw request', 'error');
+        showBookingAlert(error.message || 'Failed to withdraw request', 'error');
         if (btnEl) btnEl.disabled = false;
     }
 };
@@ -509,35 +797,41 @@ const cancelBooking = async (bookingId) => {
     if (!confirm('Are you sure you want to cancel this booking?')) return;
 
     try {
-        showLoadingOverlay('Cancelling booking...');
+        showBookingLoadingOverlay('Cancelling booking...');
         const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/api/bookings/${bookingId}/cancel`, {
+        const apiBase = resolveApiUrl();
+        const res = await fetch(`${apiBase}/api/bookings/${bookingId}/cancel`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (!res.ok) throw new Error('Failed to cancel booking');
 
-        showAlert('Booking cancelled successfully', 'success');
-        await loadMyBookings();
+        showBookingAlert('Booking cancelled successfully', 'success');
+        if (typeof window.refreshMyBookingsPage === 'function') {
+            await window.refreshMyBookingsPage();
+        } else {
+            await loadMyBookings();
+        }
     } catch (error) {
-        showAlert(error.message || 'Failed to cancel booking', 'error');
+        showBookingAlert(error.message || 'Failed to cancel booking', 'error');
     } finally {
-        hideLoadingOverlay();
+        hideBookingLoadingOverlay();
     }
 };
 
 // Download PDF bill for user
 const downloadUserPDF = async (bookingId) => {
     try {
-        showLoadingOverlay('Generating your bill PDF...');
+        showBookingLoadingOverlay('Generating your bill PDF...');
 
         const token = localStorage.getItem('token');
 
         // First, try server-side PDF generation
         try {
             console.log('Attempting server-side PDF generation...');
-            const res = await fetch(`${API_URL}/api/bookings/${bookingId}/download-pdf`, {
+            const apiBase = resolveApiUrl();
+            const res = await fetch(`${apiBase}/api/bookings/${bookingId}/download-pdf`, {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -556,7 +850,7 @@ const downloadUserPDF = async (bookingId) => {
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
 
-                showAlert('Your bill PDF has been downloaded successfully!', 'success');
+                showBookingAlert('Your bill PDF has been downloaded successfully!', 'success');
                 return; // Success, exit early
             }
 
@@ -568,14 +862,16 @@ const downloadUserPDF = async (bookingId) => {
             console.log('Server-side PDF generation failed, trying client-side...', serverError.message);
 
             // Fallback to client-side PDF generation
-            showLoadingOverlay('Server unavailable, generating PDF locally...');
+            showBookingLoadingOverlay('Server unavailable, generating PDF locally...');
+
+            const apiBase = resolveApiUrl();
 
             // Get booking data and admin settings for client-side generation
             const [bookingRes, settingsRes] = await Promise.all([
-                fetch(`${API_URL}/api/bookings/${bookingId}`, {
+                fetch(`${apiBase}/api/bookings/${bookingId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
-                fetch(`${API_URL}/api/admin/debug-settings`, {
+                fetch(`${apiBase}/api/admin/debug-settings`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
             ]);
@@ -593,8 +889,12 @@ const downloadUserPDF = async (bookingId) => {
             }
 
             // Generate PDF on client-side
-            await generatePDFClient(bookingData.booking, settingsData);
-            showAlert('Your bill PDF has been downloaded successfully! (Generated locally)', 'success');
+            if (typeof window.generatePDFClient !== 'function') {
+                throw new Error('generatePDFClient is not defined');
+            }
+
+            await window.generatePDFClient(bookingData.booking, settingsData);
+            showBookingAlert('Your bill PDF has been downloaded successfully! (Generated locally)', 'success');
         }
 
     } catch (error) {
@@ -614,9 +914,9 @@ const downloadUserPDF = async (bookingId) => {
             userMessage = 'Unable to generate PDF. Please try again or contact support if the problem persists.';
         }
 
-        showAlert(userMessage, 'error');
+        showBookingAlert(userMessage, 'error');
     } finally {
-        hideLoadingOverlay();
+        hideBookingLoadingOverlay();
     }
 };
 
@@ -645,3 +945,5 @@ window.cancelSlotRequest = cancelSlotRequest;
 window.cancelBooking = cancelBooking;
 window.downloadUserPDF = downloadUserPDF;
 window.switchBookingClassTab = switchBookingClassTab;
+window.loadLessonTrackerBookings = () => loadMyBookings({ classOnly: true });
+window.openUserBookingDetails = openUserBookingDetails;

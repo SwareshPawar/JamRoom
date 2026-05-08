@@ -18,11 +18,11 @@ const updatePriceDisplay = () => {
     }
 
     const bookingMode = window.getBookingMode ? window.getBookingMode() : 'hourly';
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
 
-    // Get duration
-    const startTime = document.getElementById('startTime')?.value;
-    const endTime = document.getElementById('endTime')?.value;
-    const duration = startTime && endTime ? calculateDuration(startTime, endTime) : 1;
+    const duration = bookingMode === 'hourly'
+        ? calculateDuration()
+        : 1;
 
     const perDayInfo = window.getPerDayBookingInfo
         ? window.getPerDayBookingInfo()
@@ -39,11 +39,13 @@ const updatePriceDisplay = () => {
         let itemTotal;
         let displayQuantity;
         let showHourMultiplier = false;
+        let showDayMultiplier = false;
 
         if (bookingMode === 'perday' || rental.rentalType === 'perday') {
             // Per-day rentals: charged by selected day range.
             itemTotal = rental.price * rental.quantity * perDayDays;
             displayQuantity = rental.quantity;
+            showDayMultiplier = true;
         } else if (rental.rentalType === 'persession' || rental.rentalType === 'pertrack') {
             // Per-session rentals: charged once per booking session.
             itemTotal = rental.price * rental.quantity;
@@ -72,17 +74,21 @@ const updatePriceDisplay = () => {
 
         const quantityText = displayQuantity > 1 ? ` x${displayQuantity}` : '';
         const hourText = showHourMultiplier && duration > 1 ? ` x${duration}h` : '';
+    const dayText = showDayMultiplier && perDayDays > 0 ? ` x${perDayDays}d` : '';
+    const metaText = `${quantityText}${hourText}${dayText}`;
 
         selectedRentalsHTML += `
             <div class="rental-item">
-                <span>${rental.name}${quantityText}${hourText}</span>
-                <span>₹${itemTotal}</span>
+                <span class="rental-item-main">
+                    <span class="rental-item-name">${rental.name}</span>
+                    ${metaText ? `<span class="rental-item-meta">${metaText.trim()}</span>` : ''}
+                </span>
+                <span class="rental-item-total">₹${itemTotal}</span>
             </div>
         `;
     });
 
     // For class bookings, override pricing with monthly fee from config
-    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
     const isClassBooking = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
     if (isClassBooking) {
         const classConfig = typeof window.getClassConfig === 'function'
@@ -151,16 +157,41 @@ const updatePriceDisplay = () => {
     priceDisplay.style.display = 'block';
 };
 
-// Calculate duration between start and end time
-const calculateDuration = (startTime, endTime) => {
-    const [startHour, startMin] = startTime.split(':').map(Number);
-    let [endHour, endMin] = endTime.split(':').map(Number);
+const calculateDuration = (startTimeOverride, endTimeOverride) => {
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const isFlatRateBooking = typeof window.isFlatRateSessionBookingCategory === 'function'
+        ? window.isFlatRateSessionBookingCategory(bookingType)
+        : false;
+    const isClassBooking = typeof window.isClassBookingCategory === 'function'
+        ? window.isClassBookingCategory(bookingType)
+        : false;
 
-    // Handle midnight (00:00) as 24:00
-    if (endHour === 0) endHour = 24;
+    if (isFlatRateBooking || isClassBooking) {
+        return 1;
+    }
 
-    const startMinutes = startHour * 60 + startMin;
-    const endMinutes = endHour * 60 + endMin;
+    const startTime = String(startTimeOverride || document.getElementById('startTime')?.value || '').trim();
+    const endTime = String(endTimeOverride || document.getElementById('endTime')?.value || '').trim();
+
+    if (!startTime || !endTime) {
+        return 1;
+    }
+
+    const toMinutes = (timeValue) => {
+        const [hourPart, minutePart] = String(timeValue || '').split(':');
+        const hours = Number(hourPart);
+        const minutes = Number(minutePart);
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+            return NaN;
+        }
+        return (hours * 60) + minutes;
+    };
+
+    const startMinutes = toMinutes(startTime);
+    const endMinutes = toMinutes(endTime);
+    if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || endMinutes <= startMinutes) {
+        return 1;
+    }
 
     return Math.max(1, Math.ceil((endMinutes - startMinutes) / 60));
 };

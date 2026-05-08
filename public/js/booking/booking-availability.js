@@ -3,43 +3,20 @@
  * Contains schedule loading and start/end time filtering helpers.
  */
 
-// All available time slots
-const allTimeSlots = [
-    { value: '09:00', label: '9:00 AM', hour: 9 },
-    { value: '10:00', label: '10:00 AM', hour: 10 },
-    { value: '11:00', label: '11:00 AM', hour: 11 },
-    { value: '12:00', label: '12:00 PM', hour: 12 },
-    { value: '13:00', label: '1:00 PM', hour: 13 },
-    { value: '14:00', label: '2:00 PM', hour: 14 },
-    { value: '15:00', label: '3:00 PM', hour: 15 },
-    { value: '16:00', label: '4:00 PM', hour: 16 },
-    { value: '17:00', label: '5:00 PM', hour: 17 },
-    { value: '18:00', label: '6:00 PM', hour: 18 },
-    { value: '19:00', label: '7:00 PM', hour: 19 },
-    { value: '20:00', label: '8:00 PM', hour: 20 },
-    { value: '21:00', label: '9:00 PM', hour: 21 },
-    { value: '22:00', label: '10:00 PM', hour: 22 },
-    { value: '23:00', label: '11:00 PM', hour: 23 }
-];
+// Single source of truth for studio time slots.
+// Generates hourly slots between startHour and endHour (inclusive).
+const buildTimeSlots = (startHour = 9, endHour = 23) => {
+    const slots = [];
+    for (let h = startHour; h <= endHour; h++) {
+        const hh = String(h).padStart(2, '0');
+        const period = h >= 12 ? 'PM' : 'AM';
+        const displayHour = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+        slots.push({ value: `${hh}:00`, label: `${displayHour}:00 ${period}`, hour: h });
+    }
+    return slots;
+};
 
-// End time slots (includes midnight)
-const allEndTimeSlots = [
-    { value: '10:00', label: '10:00 AM', hour: 10 },
-    { value: '11:00', label: '11:00 AM', hour: 11 },
-    { value: '12:00', label: '12:00 PM', hour: 12 },
-    { value: '13:00', label: '1:00 PM', hour: 13 },
-    { value: '14:00', label: '2:00 PM', hour: 14 },
-    { value: '15:00', label: '3:00 PM', hour: 15 },
-    { value: '16:00', label: '4:00 PM', hour: 16 },
-    { value: '17:00', label: '5:00 PM', hour: 17 },
-    { value: '18:00', label: '6:00 PM', hour: 18 },
-    { value: '19:00', label: '7:00 PM', hour: 19 },
-    { value: '20:00', label: '8:00 PM', hour: 20 },
-    { value: '21:00', label: '9:00 PM', hour: 21 },
-    { value: '22:00', label: '10:00 PM', hour: 22 },
-    { value: '23:00', label: '11:00 PM', hour: 23 },
-    { value: '00:00', label: '12:00 AM (Midnight)', hour: 24 }
-];
+const allTimeSlots = buildTimeSlots();
 
 const getLocalDateString = (date = new Date()) => {
     const year = date.getFullYear();
@@ -62,21 +39,69 @@ const hasFutureStartSlotsForToday = (selectedDate) => {
 let availabilityRequestSeq = 0;
 let activeAvailabilityController = null;
 
+const setHourlyAvailabilityVisibility = (isVisible) => {
+    const view = document.getElementById('hourlyAvailabilityView');
+    if (!view) return;
+    view.hidden = !isVisible;
+};
+
+const setPerdayAvailabilityVisibility = (isVisible) => {
+    const view = document.getElementById('perdayReferenceView');
+    if (!view) return;
+    view.hidden = !isVisible;
+};
+
+const getHourlyUnavailableRanges = (availabilityData) => {
+    const unavailableRanges = [];
+
+    if (availabilityData && Array.isArray(availabilityData.bookings)) {
+        availabilityData.bookings.forEach((booking) => {
+            if (booking.bookingStatus === 'CONFIRMED') {
+                unavailableRanges.push({
+                    start: booking.startTime,
+                    end: booking.endTime,
+                    type: 'booking'
+                });
+            }
+        });
+    }
+
+    if (availabilityData && Array.isArray(availabilityData.blockedTimes)) {
+        availabilityData.blockedTimes.forEach((blocked) => {
+            unavailableRanges.push({
+                start: blocked.startTime,
+                end: blocked.endTime,
+                type: 'blocked'
+            });
+        });
+    }
+
+    return unavailableRanges;
+};
+
 // Populate start time slots based on selected date and availability
 const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     const startTimeSelect = document.getElementById('startTime');
-    const endTimeSelect = document.getElementById('endTime');
     const loadingEl = document.getElementById('startTimeLoading');
 
-    if (!startTimeSelect || !endTimeSelect) {
+    if (!startTimeSelect) {
+        return;
+    }
+
+    // Flat-rate track/session bookings do not require slot picking.
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    if (typeof window.isFlatRateSessionBookingCategory === 'function' && window.isFlatRateSessionBookingCategory(bookingType)) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        startTimeSelect.innerHTML = '<option value="">No time needed</option>';
+        startTimeSelect.disabled = true;
+        populateEndTimeSlots('', selectedDate, null);
         return;
     }
 
     // For class bookings, show all time slots without availability filtering
-    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
     if (typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType)) {
         if (loadingEl) loadingEl.style.display = 'none';
-        startTimeSelect.innerHTML = '<option value="">Select class time</option>';
+        startTimeSelect.innerHTML = '<option value="">Pick class time</option>';
         allTimeSlots.forEach(slot => {
             const option = document.createElement('option');
             option.value = slot.value;
@@ -84,6 +109,7 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
             startTimeSelect.appendChild(option);
         });
         startTimeSelect.disabled = false;
+        populateEndTimeSlots(startTimeSelect.value || '', selectedDate, null);
         return;
     }
 
@@ -93,14 +119,11 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     }
     startTimeSelect.disabled = true;
 
-    // Reset end time when start time changes
-    endTimeSelect.innerHTML = '<option value="">Select start time first</option>';
-    endTimeSelect.disabled = true;
-
     startTimeSelect.innerHTML = '<option value="">Loading...</option>';
 
     if (!selectedDate) {
-        startTimeSelect.innerHTML = '<option value="">Select date first</option>';
+        startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+        populateEndTimeSlots('', selectedDate, null);
         if (loadingEl) {
             loadingEl.style.display = 'none';
         }
@@ -113,35 +136,10 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
 
-        // Get booked and blocked time ranges
-        const unavailableRanges = [];
-
-        // Only confirmed bookings block new slot selection.
-        if (availabilityData && availabilityData.bookings) {
-            availabilityData.bookings.forEach(booking => {
-                if (booking.bookingStatus === 'CONFIRMED') {
-                    unavailableRanges.push({
-                        start: booking.startTime,
-                        end: booking.endTime,
-                        type: 'booking'
-                    });
-                }
-            });
-        }
-
-        // Add blocked times to unavailable ranges
-        if (availabilityData && availabilityData.blockedTimes) {
-            availabilityData.blockedTimes.forEach(blocked => {
-                unavailableRanges.push({
-                    start: blocked.startTime,
-                    end: blocked.endTime,
-                    type: 'blocked'
-                });
-            });
-        }
+        const unavailableRanges = getHourlyUnavailableRanges(availabilityData);
 
         // Reset and populate start time options
-        startTimeSelect.innerHTML = '<option value="">Select time</option>';
+        startTimeSelect.innerHTML = '<option value="">Pick time</option>';
 
         let hasAvailableSlots = false;
 
@@ -181,9 +179,12 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
             startTimeSelect.disabled = false;
         }
 
+        populateEndTimeSlots(startTimeSelect.value || '', selectedDate, availabilityData);
+
     } catch (error) {
         console.error('Error populating time slots:', error);
         startTimeSelect.innerHTML = '<option value="">Error loading times</option>';
+        populateEndTimeSlots('', selectedDate, null);
     } finally {
         if (loadingEl) {
             loadingEl.style.display = 'none';
@@ -213,82 +214,132 @@ const isTimeSlotUnavailable = (timeSlot, unavailableRanges) => {
     });
 };
 
-// Helper function to check if a time range overlaps with unavailable ranges
-const isTimeRangeUnavailable = (startTime, endTime, unavailableRanges) => {
-    const [startHour, startMinute] = startTime.split(':').map(Number);
-    const [endHour, endMinute] = endTime.split(':').map(Number);
-
-    const startTimeInMinutes = startHour * 60 + startMinute;
-    let endTimeInMinutes = endHour * 60 + endMinute;
-
-    // Handle midnight crossover
-    if (endTimeInMinutes <= startTimeInMinutes) {
-        endTimeInMinutes += 24 * 60;
-    }
-
-    return unavailableRanges.some(range => {
-        const [rangeStartHour, rangeStartMinute] = range.start.split(':').map(Number);
-        const [rangeEndHour, rangeEndMinute] = range.end.split(':').map(Number);
-
-        const rangeStartInMinutes = rangeStartHour * 60 + rangeStartMinute;
-        let rangeEndInMinutes = rangeEndHour * 60 + rangeEndMinute;
-
-        if (rangeEndInMinutes <= rangeStartInMinutes) {
-            rangeEndInMinutes += 24 * 60;
-        }
-
-        // Check for any overlap between the ranges
-        return !(endTimeInMinutes <= rangeStartInMinutes || startTimeInMinutes >= rangeEndInMinutes);
-    });
-};
-
-// Populate end time slots based on selected start time and check availability
-const populateEndTimeSlots = () => {
-    const startTimeSelect = document.getElementById('startTime');
+const populateEndTimeSlots = (selectedStartTime, selectedDate, availabilityData = window.currentAvailabilityData) => {
     const endTimeSelect = document.getElementById('endTime');
-    const dateInput = document.getElementById('bookingDate');
-    const selectedStartTime = startTimeSelect.value;
-
-    endTimeSelect.innerHTML = '<option value="">Select end time</option>';
-
-    if (!selectedStartTime) {
-        endTimeSelect.innerHTML = '<option value="">Select start time first</option>';
-        endTimeSelect.disabled = true;
+    if (!endTimeSelect) {
         return;
     }
 
-    endTimeSelect.disabled = false;
-    const [startHour] = selectedStartTime.split(':').map(Number);
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const isFlatRateCategory = typeof window.isFlatRateSessionBookingCategory === 'function'
+        ? window.isFlatRateSessionBookingCategory(bookingType)
+        : false;
+    const isClassCategory = typeof window.isClassBookingCategory === 'function'
+        ? window.isClassBookingCategory(bookingType)
+        : false;
 
-    // Get current availability data if available
-    const unavailableRanges = window.currentAvailabilityData ?
-        [...(window.currentAvailabilityData.bookings || []).filter(b =>
-            b.bookingStatus === 'CONFIRMED'
-        ).map(b => ({ start: b.startTime, end: b.endTime, type: 'booking' })),
-        ...(window.currentAvailabilityData.blockedTimes || []).map(b =>
-            ({ start: b.startTime, end: b.endTime, type: 'blocked' })
-        )] : [];
-
-    allEndTimeSlots.forEach(slot => {
-        // Only show times after the selected start time
-        if (slot.hour > startHour) {
-            // Check if the time range from start to this end time is available
-            const isRangeAvailable = !isTimeRangeUnavailable(selectedStartTime, slot.value, unavailableRanges);
-
-            if (isRangeAvailable) {
-                const option = document.createElement('option');
-                option.value = slot.value;
-                option.textContent = slot.label;
-                endTimeSelect.appendChild(option);
-            }
+    if (isFlatRateCategory) {
+        endTimeSelect.innerHTML = '<option value="">No time needed</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+        if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+            endTimeSelect._refreshCustomTimeDropdown();
         }
+        return;
+    }
+
+    if (isClassCategory) {
+        endTimeSelect.innerHTML = '<option value="">Auto based on class duration</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+        if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+            endTimeSelect._refreshCustomTimeDropdown();
+        }
+        return;
+    }
+
+    if (!selectedDate) {
+        endTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+        if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+            endTimeSelect._refreshCustomTimeDropdown();
+        }
+        return;
+    }
+
+    if (!selectedStartTime) {
+        endTimeSelect.innerHTML = '<option value="">Pick start time first</option>';
+        endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+        if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+            endTimeSelect._refreshCustomTimeDropdown();
+        }
+        return;
+    }
+
+    const unavailableRanges = getHourlyUnavailableRanges(availabilityData);
+    const selectedStartMinutes = timeToMinutes(selectedStartTime);
+
+    endTimeSelect.innerHTML = '<option value="">Pick end time</option>';
+
+    allTimeSlots.forEach((slot) => {
+        if (timeToMinutes(slot.value) <= selectedStartMinutes) {
+            return;
+        }
+
+        if (isHourlyRangeUnavailable(selectedStartTime, slot.value, unavailableRanges)) {
+            return;
+        }
+
+        const option = document.createElement('option');
+        option.value = slot.value;
+        option.textContent = slot.label;
+        endTimeSelect.appendChild(option);
     });
 
-    // Check if any options were added
-    if (endTimeSelect.children.length <= 1) {
-        endTimeSelect.innerHTML = '<option value="">No available end times</option>';
+    const hasChoices = endTimeSelect.options.length > 1;
+    if (!hasChoices) {
+        endTimeSelect.innerHTML = '<option value="">No valid end times</option>';
         endTimeSelect.disabled = true;
+        endTimeSelect.value = '';
+    } else {
+        endTimeSelect.disabled = false;
+        if (endTimeSelect.value) {
+            const hasExisting = Array.from(endTimeSelect.options).some((option) => option.value === endTimeSelect.value);
+            if (!hasExisting) {
+                endTimeSelect.value = '';
+            }
+        }
     }
+
+    if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+        endTimeSelect._refreshCustomTimeDropdown();
+    }
+};
+
+const timeToMinutes = (value) => {
+    const [hours, minutes] = String(value || '').split(':').map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        return -1;
+    }
+    return (hours * 60) + minutes;
+};
+
+const isHourlyRangeUnavailable = (rangeStart, rangeEnd, unavailableRanges) => {
+    const requestStart = timeToMinutes(rangeStart);
+    let requestEnd = timeToMinutes(rangeEnd);
+    if (requestStart < 0 || requestEnd < 0) {
+        return true;
+    }
+
+    if (requestEnd <= requestStart) {
+        requestEnd += 24 * 60;
+    }
+
+    return unavailableRanges.some((range) => {
+        const rangeStartMin = timeToMinutes(range.start);
+        let rangeEndMin = timeToMinutes(range.end);
+        if (rangeStartMin < 0 || rangeEndMin < 0) {
+            return false;
+        }
+
+        if (rangeEndMin <= rangeStartMin) {
+            rangeEndMin += 24 * 60;
+        }
+
+        return requestStart < rangeEndMin && requestEnd > rangeStartMin;
+    });
 };
 
 // Legacy function for backward compatibility
@@ -309,8 +360,36 @@ const populateTimeSlots = async () => {
 // Load availability reference for selected date
 const loadAvailability = async (date) => {
     const container = document.getElementById('referenceTimeline');
+    const startTimeSelect = document.getElementById('startTime');
+    const startTimeLoadingEl = document.getElementById('startTimeLoading');
+
+    // For flat-rate track/session bookings: date/time availability is not needed.
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    if (typeof window.isFlatRateSessionBookingCategory === 'function' && window.isFlatRateSessionBookingCategory(bookingType)) {
+        await populateStartTimeSlots('', null);
+        if (container) {
+            container.innerHTML = '';
+        }
+        setHourlyAvailabilityVisibility(false);
+        window.currentAvailabilityData = null;
+        return;
+    }
+
+    // For class bookings: skip the hourly timeline fetch entirely.
+    if (typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType)) {
+        // Keep class time dropdown functional while bypassing hourly conflict API.
+        await populateStartTimeSlots(date, null);
+        if (container) {
+            container.innerHTML = '';
+        }
+        setHourlyAvailabilityVisibility(false);
+        window.currentAvailabilityData = null;
+        return;
+    }
+
     if (!container) {
         await populateStartTimeSlots(date, null);
+        setHourlyAvailabilityVisibility(false);
         return;
     }
 
@@ -320,9 +399,27 @@ const loadAvailability = async (date) => {
             activeAvailabilityController.abort();
             activeAvailabilityController = null;
         }
-        container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">Select a date to view availability</div>';
+        container.innerHTML = '';
+        setHourlyAvailabilityVisibility(false);
         window.currentAvailabilityData = null;
+
+        if (startTimeSelect) {
+            startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+            startTimeSelect.disabled = true;
+        }
+        populateEndTimeSlots('', '', null);
+        if (startTimeLoadingEl) {
+            startTimeLoadingEl.style.display = 'none';
+        }
         return;
+    }
+
+    if (startTimeSelect) {
+        startTimeSelect.innerHTML = '<option value="">Loading available slots...</option>';
+        startTimeSelect.disabled = true;
+    }
+    if (startTimeLoadingEl) {
+        startTimeLoadingEl.style.display = 'block';
     }
 
     const requestId = ++availabilityRequestSeq;
@@ -331,7 +428,8 @@ const loadAvailability = async (date) => {
         activeAvailabilityController.abort();
     }
 
-    container.innerHTML = '<div class="booking-theme-status booking-theme-status-loading">Loading availability...</div>';
+    container.innerHTML = '';
+    setHourlyAvailabilityVisibility(false);
 
     let timeoutId;
     const controller = new AbortController();
@@ -378,10 +476,11 @@ const loadAvailability = async (date) => {
         console.error('Error loading availability:', error);
 
         if (error.name === 'AbortError') {
-            container.innerHTML = '<div class="booking-theme-status booking-theme-status-danger">Loading availability timed out. Please try again.</div>';
+            container.innerHTML = '';
         } else {
-            container.innerHTML = '<div class="booking-theme-status booking-theme-status-danger">Failed to load schedule. Please try again.</div>';
+            container.innerHTML = '';
         }
+        setHourlyAvailabilityVisibility(false);
 
         // Clear availability data on error
         window.currentAvailabilityData = null;
@@ -393,6 +492,10 @@ const loadAvailability = async (date) => {
             clearTimeout(timeoutId);
         }
 
+        if (startTimeLoadingEl) {
+            startTimeLoadingEl.style.display = 'none';
+        }
+
         if (requestId === availabilityRequestSeq && activeAvailabilityController === controller) {
             activeAvailabilityController = null;
         }
@@ -402,52 +505,150 @@ const loadAvailability = async (date) => {
 // Display availability timeline with simplified user view
 const displayAvailability = (data) => {
     const container = document.getElementById('referenceTimeline');
+    if (!container) return;
     const selectedDate = document.getElementById('bookingDate')?.value || '';
 
-    if (data.bookings.length === 0 && data.blockedTimes.length === 0) {
+    // For flat-rate track/session bookings the hourly timeline is not meaningful.
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    if (typeof window.isFlatRateSessionBookingCategory === 'function' && window.isFlatRateSessionBookingCategory(bookingType)) {
+        container.innerHTML = '';
+        setHourlyAvailabilityVisibility(false);
+        return;
+    }
+
+    // For class bookings the hourly timeline is not meaningful — show a class-specific message.
+    if (typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType)) {
+        container.innerHTML = '';
+        setHourlyAvailabilityVisibility(false);
+        return;
+    }
+
+    const bookings = Array.isArray(data?.bookings) ? data.bookings : [];
+    const blockedTimes = Array.isArray(data?.blockedTimes) ? data.blockedTimes : [];
+
+    if (bookings.length === 0 && blockedTimes.length === 0) {
         if (!hasFutureStartSlotsForToday(selectedDate)) {
             container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No slots left today. Choose another date.</div>';
+            setHourlyAvailabilityVisibility(true);
             return;
         }
 
         container.innerHTML = '<div class="booking-theme-status booking-theme-status-success">All time slots available for this date.</div>';
+        setHourlyAvailabilityVisibility(true);
         return;
     }
 
+    const confirmedBookings = bookings.filter((booking) => booking.bookingStatus === 'CONFIRMED');
+    const pendingBookings = bookings.filter((booking) => booking.bookingStatus !== 'CONFIRMED');
+
+    const summaryParts = [];
+    if (confirmedBookings.length > 0) summaryParts.push(`${confirmedBookings.length} booked`);
+    if (blockedTimes.length > 0) summaryParts.push(`${blockedTimes.length} blocked`);
+    if (pendingBookings.length > 0) summaryParts.push(`${pendingBookings.length} pending`);
+
+    const hasHardConflicts = confirmedBookings.length > 0 || blockedTimes.length > 0;
+    const summaryClass = hasHardConflicts ? 'booking-theme-status-warning' : 'booking-theme-status-muted';
+    const summaryText = summaryParts.length > 0
+        ? `Availability summary: ${summaryParts.join(', ')}.`
+        : 'No schedule items.';
+
+    container.innerHTML = `<div class="booking-theme-status ${summaryClass}">${summaryText}</div>`;
+    setHourlyAvailabilityVisibility(true);
+};
+
+const getPerdayAvailabilityEmptyMessage = () => {
+    const startDate = document.getElementById('perdayStartDate')?.value || '';
+    const endDate = document.getElementById('perdayEndDate')?.value || '';
+    const pickupTime = document.getElementById('perdayPickupTime')?.value || '';
+    const returnTime = document.getElementById('perdayReturnTime')?.value || '';
+
+    if (!startDate || !endDate) {
+        return 'Select pickup and return dates.';
+    }
+
+    if (!pickupTime) {
+        return 'Select pickup time.';
+    }
+
+    if (!returnTime) {
+        return 'Return time will auto-fill.';
+    }
+
+    return 'No item availability to show yet.';
+};
+
+/**
+ * Render per-day item availability inside #perdayAvailabilityTimeline.
+ *
+ * @param {object} opts
+ * @param {string[]} opts.unavailableItems - normalised item name keys that are fully booked
+ * @param {object} opts.bookedItemQuantities - { nameKey: bookedQty }
+ * @param {Array<{name:string,nameKey:string,maxQuantity:number}>} opts.catalogItems - full perday catalog
+ * @param {boolean} opts.loading - show loading state
+ * @param {string|null} opts.error - error message
+ */
+const displayPerdayAvailability = ({ unavailableItems = [], bookedItemQuantities = {}, catalogItems = [], loading = false, error = null } = {}) => {
+    const container = document.getElementById('perdayAvailabilityTimeline');
+    if (!container) return;
+
+    if (loading) {
+        setPerdayAvailabilityVisibility(true);
+        container.innerHTML = '<div class="booking-theme-status booking-theme-status-loading">Checking availability...</div>';
+        return;
+    }
+
+    if (error) {
+        setPerdayAvailabilityVisibility(true);
+        container.innerHTML = `<div class="booking-theme-status booking-theme-status-danger">${error}</div>`;
+        return;
+    }
+
+    if (catalogItems.length === 0) {
+        setPerdayAvailabilityVisibility(false);
+        container.innerHTML = '';
+        return;
+    }
+
+    const unavailableSet = new Set(unavailableItems.map((k) => String(k).toLowerCase()));
+    const unavailableCatalogItems = catalogItems.filter(({ nameKey }) => unavailableSet.has(String(nameKey).toLowerCase()));
+
     let html = '';
-
-    // Show bookings with simplified information for users
-    data.bookings.forEach(booking => {
-        const isConfirmed = booking.bookingStatus === 'CONFIRMED';
-        const statusText = booking.bookingStatus === 'CONFIRMED' ? 'Booked' : 'Pending';
-        const statusClass = isConfirmed ? 'timeline-status-confirmed' : 'timeline-status-pending';
-        const itemStateClass = isConfirmed ? 'timeline-booking-confirmed' : 'timeline-booking-pending';
+    unavailableCatalogItems.forEach(({ name, nameKey, maxQuantity }) => {
+        const bookedQty = bookedItemQuantities[nameKey] || 0;
+        const statusClass = 'timeline-status-confirmed';
+        const itemStateClass = 'timeline-booking-confirmed';
+        const statusLabel = 'Booked';
+        const qtyNote = maxQuantity > 1
+            ? ` (${Math.max(0, maxQuantity - bookedQty)}/${maxQuantity} available)`
+            : '';
 
         html += `
-            <div class="timeline-item booked ${itemStateClass}">
-                <strong>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</strong>
-                <span class="timeline-status-label ${statusClass}">${statusText}</span>
+            <div class="timeline-item perday-availability-item ${itemStateClass}">
+                <strong>${name}${qtyNote}</strong>
+                <span class="timeline-status-label ${statusClass}">${statusLabel}</span>
             </div>
         `;
     });
 
-    // Show blocked times
-    data.blockedTimes.forEach(blocked => {
-        html += `
-            <div class="timeline-item blocked">
-                <strong>${formatTime(blocked.startTime)} - ${formatTime(blocked.endTime)}</strong>
-                <span class="timeline-status-label timeline-status-unavailable">Unavailable</span>
-            </div>
-        `;
-    });
+    const allAvailable = unavailableSet.size === 0;
+    const allUnavailable = catalogItems.length > 0 && unavailableCatalogItems.length === catalogItems.length;
+    const summaryClass = allAvailable ? 'booking-theme-status-success' : allUnavailable ? 'booking-theme-status-danger' : 'booking-theme-status-warning';
+    const summaryText = allAvailable
+        ? 'All per-day items are available for the selected range.'
+        : allUnavailable
+            ? 'All per-day items are booked for this range. Choose different dates.'
+            : 'Some items are unavailable for the selected range.';
 
-    container.innerHTML = html || '<div class="booking-theme-status booking-theme-status-muted">No schedule items</div>';
+    setPerdayAvailabilityVisibility(true);
+    container.innerHTML = `<div class="booking-theme-status ${summaryClass}">${summaryText}</div>${html}`;
 };
 
 // Expose for cross-file calls and compatibility.
+window.buildTimeSlots = buildTimeSlots;
 window.allTimeSlots = allTimeSlots;
 window.populateStartTimeSlots = populateStartTimeSlots;
 window.populateEndTimeSlots = populateEndTimeSlots;
 window.populateTimeSlots = populateTimeSlots;
 window.loadAvailability = loadAvailability;
 window.displayAvailability = displayAvailability;
+window.displayPerdayAvailability = displayPerdayAvailability;

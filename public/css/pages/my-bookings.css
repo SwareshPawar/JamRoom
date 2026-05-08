@@ -1,0 +1,305 @@
+.my-bookings-main-content {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+#myBookingsPageSection,
+#lessonTrackerSection {
+    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--surface-elevated) 88%, var(--surface-1));
+}
+
+.section-header-with-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.tracker-intro {
+    margin-bottom: 10px;
+}
+
+.my-bookings-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.my-bookings-tab {
+    border: 1px solid var(--border-color);
+    background: var(--surface-1);
+    color: var(--text-color);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.my-bookings-tab.active {
+    border-color: color-mix(in srgb, var(--primary-color) 65%, var(--border-color));
+    background: color-mix(in srgb, var(--primary-color) 14%, var(--surface-1));
+    color: var(--primary-color);
+}
+
+.my-bookings-tab-panel {
+    display: none;
+}
+
+.my-bookings-tab-panel.active {
+    display: block;
+}
+
+.bookings-user-table-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.bookings-user-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+}
+
+.bookings-user-table th,
+.bookings-user-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border-color-light);
+    vertical-align: top;
+    text-align: left;
+}
+
+.bookings-user-table th {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: var(--text-color-light);
+    background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1));
+}
+
+.bookings-user-col-serial {
+    font-weight: 700;
+    text-align: center;
+}
+
+.bookings-user-actions {
+    white-space: nowrap;
+}
+
+.bookings-user-actions .btn {
+    margin: 0 4px 4px 0;
+}
+
+.status-paid {
+    background: color-mix(in srgb, var(--success-color) 18%, transparent);
+    color: var(--text-color);
+}
+
+.status-partial {
+    background: color-mix(in srgb, var(--info-color) 18%, transparent);
+    color: var(--text-color);
+}
+
+.user-booking-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: grid;
+    place-items: center;
+    padding: 12px;
+}
+
+.user-booking-modal[hidden] {
+    display: none !important;
+}
+
+.user-booking-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 14, 28, 0.55);
+    backdrop-filter: blur(3px);
+}
+
+.user-booking-modal-dialog {
+    position: relative;
+    width: min(920px, calc(100vw - 20px));
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--surface-elevated);
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.35);
+    padding: 14px;
+}
+
+.user-booking-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.user-booking-modal-head h3 {
+    margin: 0;
+}
+
+.user-booking-modal-close {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-1);
+    color: var(--text-color);
+    font-size: 1.3rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+}
+
+.user-booking-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.user-booking-modal-panel {
+    border: 1px solid var(--border-color-light);
+    border-radius: 10px;
+    padding: 10px;
+    background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1));
+}
+
+.user-booking-modal-panel h4 {
+    margin: 0 0 8px;
+}
+
+.user-booking-modal-panel p {
+    margin: 4px 0;
+}
+
+.user-booking-modal-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.user-booking-modal-list li {
+    margin: 4px 0;
+}
+
+body.user-booking-modal-open {
+    overflow: hidden;
+}
+
+/* ── Tracker-mode plan card ─────────────────────────────────────────────── */
+.tracker-plan-card {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-color-light);
+    border-radius: var(--radius-lg, 12px);
+    padding: 18px 20px;
+    margin-bottom: 16px;
+}
+
+.tracker-plan-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.tracker-plan-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.tracker-plan-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.tracker-plan-meta {
+    font-size: 0.85rem;
+    color: var(--text-color-light);
+}
+
+/* Progress bar */
+.tracker-progress-bar-wrap {
+    height: 8px;
+    background: var(--border-color-light);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.tracker-progress-bar {
+    height: 100%;
+    background: var(--primary-color);
+    border-radius: 99px;
+    transition: width 0.4s ease;
+    min-width: 2px;
+}
+
+.tracker-progress-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 0.82rem;
+    color: var(--text-color-light);
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.tracker-lessons {
+    border-top: 1px solid var(--border-color-light);
+    padding-top: 12px;
+}
+
+/* Progress badge on My Bookings class cards */
+.booking-class-progress-badge {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: color-mix(in srgb, var(--primary-color) 16%, var(--surface-elevated));
+    color: var(--primary-color);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .tracker-plan-header {
+        flex-direction: column;
+    }
+
+    .tracker-progress-stats {
+        gap: 10px;
+    }
+
+    .bookings-user-table {
+        min-width: 680px;
+    }
+
+    .user-booking-modal {
+        padding: 8px;
+    }
+
+    .user-booking-modal-dialog {
+        width: min(100%, calc(100vw - 10px));
+        max-height: calc(100vh - 10px);
+        padding: 10px;
+    }
+
+    .user-booking-modal-grid {
+        grid-template-columns: 1fr;
+    }
+}

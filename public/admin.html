@@ -9,6 +9,7 @@
     <!-- Shared CSS -->
     <link rel="stylesheet" href="/css/shared.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css">
     
     <!-- Shared JavaScript Modules -->
     <script src="/js/shared/utils.js"></script>
@@ -28,10 +29,8 @@
     <script src="/js/admin/admin-bookings-edit.js"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
-    <!-- Flatpickr Date Picker -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <!-- Calendar Library -->
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
     
     <!-- Admin-specific styles -->
     
@@ -7229,6 +7228,11 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
         // Initialize shared modules
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🎛️ Admin Panel: Shared modules initialized');
+            
+            // Show loading placeholder in navigation before auth check
+            if (window.NavigationManager) {
+                window.NavigationManager.showLoadingPlaceholder('navigationContainer');
+            }
             
             // Initialize admin functionality
             checkAuth();

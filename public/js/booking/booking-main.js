@@ -194,5 +194,175 @@
 
         initBookingDatePickers();
 
+        const populateTimeSelectOptions = (selectId, placeholderText) => {
+            const select = document.getElementById(selectId);
+            if (!select) {
+                return;
+            }
+
+            const previousValue = select.value;
+            select.innerHTML = `<option value="">${placeholderText}</option>`;
+            (window.allTimeSlots || []).forEach((slot) => {
+                const option = document.createElement('option');
+                option.value = slot.value;
+                option.textContent = slot.label;
+                select.appendChild(option);
+            });
+
+            if (previousValue && Array.from(select.options).some((option) => option.value === previousValue)) {
+                select.value = previousValue;
+            }
+        };
+
+        const initPerdayTimeSelects = () => {
+            populateTimeSelectOptions('perdayPickupTime', 'Select time');
+            populateTimeSelectOptions('perdayReturnTime', 'Return time matches pickup time');
+        };
+
+        // Reusable custom dropdown for booking time fields.
+        const bindCustomTimeSelect = ({ selectId, triggerId, displayId, defaultText }) => {
+            const select = document.getElementById(selectId);
+            const trigger = document.getElementById(triggerId);
+            const display = document.getElementById(displayId);
+            if (!select || !trigger || !display) return;
+
+            // Panel appended to body for free fixed positioning
+            const panel = document.createElement('div');
+            panel.className = 'time-custom-panel';
+            panel.setAttribute('role', 'listbox');
+            panel.style.display = 'none';
+            document.body.appendChild(panel);
+
+            let isOpen = false;
+
+            const updateDisplay = () => {
+                const opt = select.options[select.selectedIndex];
+                display.textContent = (opt && opt.value) ? opt.textContent : (select.options[0]?.textContent || defaultText);
+            };
+
+            const syncPanelOptions = () => {
+                panel.innerHTML = '';
+                Array.from(select.options).forEach((opt) => {
+                    const li = document.createElement('div');
+                    li.className = 'time-custom-option' + (opt.value === select.value && opt.value ? ' selected' : '');
+                    li.textContent = opt.textContent;
+                    if (!opt.value) li.dataset.placeholder = '1';
+                    li.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        if (!opt.value) return;
+                        select.value = opt.value;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                        updateDisplay();
+                        closePanel();
+                    });
+                    panel.appendChild(li);
+                });
+            };
+
+            const positionPanel = () => {
+                const rect = trigger.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom - 8;
+                const spaceAbove = rect.top - 8;
+                const maxH = Math.min(260, Math.max(spaceBelow, spaceAbove) - 4);
+
+                panel.style.width = rect.width + 'px';
+                panel.style.left = rect.left + 'px';
+                panel.style.maxHeight = maxH + 'px';
+
+                if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+                    panel.style.top = (rect.bottom + 4) + 'px';
+                    panel.style.bottom = '';
+                } else {
+                    panel.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+                    panel.style.top = '';
+                }
+            };
+
+            const openPanel = () => {
+                if (trigger.disabled || isOpen) return;
+                syncPanelOptions();
+                positionPanel();
+                panel.style.display = 'block';
+                trigger.setAttribute('aria-expanded', 'true');
+                isOpen = true;
+            };
+
+            const closePanel = () => {
+                panel.style.display = 'none';
+                trigger.setAttribute('aria-expanded', 'false');
+                isOpen = false;
+            };
+
+            trigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                isOpen ? closePanel() : openPanel();
+            });
+
+            document.addEventListener('mousedown', (e) => {
+                if (isOpen && !panel.contains(e.target) && !trigger.contains(e.target)) {
+                    closePanel();
+                }
+            });
+
+            // Sync trigger disabled state with select
+            const refreshTriggerState = () => {
+                trigger.disabled = select.disabled;
+                if (select.disabled) closePanel();
+                updateDisplay();
+            };
+
+            select._refreshCustomTimeDropdown = () => {
+                updateDisplay();
+                if (isOpen) {
+                    syncPanelOptions();
+                    positionPanel();
+                }
+            };
+
+            const disabledObserver = new MutationObserver(refreshTriggerState);
+            disabledObserver.observe(select, { attributes: true, attributeFilter: ['disabled'] });
+
+            // Sync display when select value changes externally
+            select.addEventListener('change', updateDisplay);
+
+            // Watch for innerHTML changes (option repopulation)
+            const optionsObserver = new MutationObserver(() => {
+                updateDisplay();
+                if (isOpen) { syncPanelOptions(); positionPanel(); }
+            });
+            optionsObserver.observe(select, { childList: true, subtree: true, characterData: true });
+
+            window.addEventListener('resize', () => { if (isOpen) positionPanel(); });
+            window.addEventListener('scroll', () => { if (isOpen) positionPanel(); }, true);
+
+            refreshTriggerState();
+        };
+
+        initPerdayTimeSelects();
+        bindCustomTimeSelect({
+            selectId: 'startTime',
+            triggerId: 'startTimeTrigger',
+            displayId: 'startTimeDisplay',
+            defaultText: 'Pick time'
+        });
+        bindCustomTimeSelect({
+            selectId: 'endTime',
+            triggerId: 'endTimeTrigger',
+            displayId: 'endTimeDisplay',
+            defaultText: 'Pick start time first'
+        });
+        bindCustomTimeSelect({
+            selectId: 'perdayPickupTime',
+            triggerId: 'perdayPickupTimeTrigger',
+            displayId: 'perdayPickupTimeDisplay',
+            defaultText: 'Select time'
+        });
+        bindCustomTimeSelect({
+            selectId: 'perdayReturnTime',
+            triggerId: 'perdayReturnTimeTrigger',
+            displayId: 'perdayReturnTimeDisplay',
+            defaultText: 'Return time matches pickup time'
+        });
+
         // Initialize
         checkAuth();

@@ -10,8 +10,12 @@ let perdayUnavailableItems = new Set();
 let perdayBookedItemQuantities = new Map();
 let perdaySelectedRange = null;
 let perdayAvailabilityRequestSeq = 0;
+let perdayInFlightKey = '';
+const perdayAvailabilityCache = new Map();
+const PERDAY_AVAILABILITY_CACHE_TTL_MS = 30000;
 let availableBookingModes = ['hourly', 'perday'];
 let activeBookingCategory = '';
+let perdayConstraintsInitialized = false;
 
 const bookingCategoryModeMap = new Map();
 
@@ -232,6 +236,36 @@ const getTodayDateString = () => {
     return `${year}-${month}-${day}`;
 };
 
+const addDaysToYmd = (dateStr, daysToAdd = 0) => {
+    const base = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(base.getTime())) return dateStr;
+    base.setDate(base.getDate() + Number(daysToAdd || 0));
+    const year = base.getFullYear();
+    const month = String(base.getMonth() + 1).padStart(2, '0');
+    const day = String(base.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const setDateInputMinValue = (inputEl, minYmd) => {
+    if (!inputEl || !minYmd) return;
+    inputEl.min = minYmd;
+    if (inputEl._flatpickr) {
+        inputEl._flatpickr.set('minDate', minYmd);
+    }
+};
+
+const setDateInputValue = (inputEl, ymdValue, { triggerChange = false } = {}) => {
+    if (!inputEl || !ymdValue) return;
+    if (inputEl._flatpickr) {
+        inputEl._flatpickr.setDate(ymdValue, triggerChange, 'Y-m-d');
+        return;
+    }
+    inputEl.value = ymdValue;
+    if (triggerChange) {
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+};
+
 const combineDateAndTime = (dateValue, timeValue) => {
     if (!dateValue || !timeValue) return null;
 
@@ -303,12 +337,8 @@ const ensurePerdayAvailabilityInfoEl = () => {
     return infoEl;
 };
 
-const updatePerdayAvailabilityInfo = (message = '') => {
-    const infoEl = ensurePerdayAvailabilityInfoEl();
-    if (!infoEl) return;
-
-    infoEl.textContent = message;
-    infoEl.style.display = message ? 'block' : 'none';
+const updatePerdayAvailabilityInfo = (_message = '') => {
+    // Suppressed: the #perdayReferenceView panel now displays per-day item availability.
 };
 
 const toTitleCase = (value) => String(value || '')
@@ -342,43 +372,8 @@ const ensurePerdayBookedItemsPanelEl = () => {
     return panelEl;
 };
 
-const renderPerdayBookedItemsPanel = ({ hasValidRange = false } = {}) => {
-    const panelEl = ensurePerdayBookedItemsPanelEl();
-    if (!panelEl) return;
-
-    if (!hasValidRange || !perdaySelectedRange) {
-        panelEl.style.display = 'none';
-        panelEl.innerHTML = '';
-        return;
-    }
-
-    const { startDate, endDate, pickupTime, returnTime } = perdaySelectedRange;
-    const headerText = `Booked items in selected range: ${startDate} ${pickupTime} to ${endDate} ${returnTime}`;
-
-    if (perdayBookedItemQuantities.size === 0) {
-        panelEl.style.display = 'block';
-        panelEl.innerHTML = `
-            <div class="perday-booked-header">${headerText}</div>
-            <div class="perday-booked-empty">No per-day items are booked for this range.</div>
-        `;
-        return;
-    }
-
-    const listHtml = [...perdayBookedItemQuantities.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([nameKey, qty]) => `
-            <li class="perday-booked-item">
-                <span class="perday-booked-name">${getPerdayItemDisplayName(nameKey)}</span>
-                <span class="perday-booked-qty">Booked: ${qty}</span>
-            </li>
-        `)
-        .join('');
-
-    panelEl.style.display = 'block';
-    panelEl.innerHTML = `
-        <div class="perday-booked-header">${headerText}</div>
-        <ul class="perday-booked-list">${listHtml}</ul>
-    `;
+const renderPerdayBookedItemsPanel = (_opts = {}) => {
+    // Suppressed: #perdayReferenceView now handles this display.
 };
 
 const applyPerdayItemAvailability = () => {
@@ -440,6 +435,7 @@ const fetchPerdayItemAvailability = async () => {
     const endDate = document.getElementById('perdayEndDate')?.value || '';
     const pickupTime = document.getElementById('perdayPickupTime')?.value || '';
     const returnTime = document.getElementById('perdayReturnTime')?.value || '';
+    const availabilityKey = `${startDate}|${endDate}|${pickupTime}|${returnTime}`;
 
     const durationInfo = calculatePerDayDurationInfo({
         startDate,
@@ -453,10 +449,42 @@ const fetchPerdayItemAvailability = async () => {
         perdayBookedItemQuantities = new Map();
         perdaySelectedRange = null;
         applyPerdayItemAvailability();
+        if (typeof window.displayPerdayAvailability === 'function') {
+            window.displayPerdayAvailability({});
+        }
+        return;
+    }
+
+    if (perdayInFlightKey === availabilityKey) {
+        return;
+    }
+
+    const cachedEntry = perdayAvailabilityCache.get(availabilityKey);
+    if (cachedEntry && (Date.now() - cachedEntry.timestamp) <= PERDAY_AVAILABILITY_CACHE_TTL_MS) {
+        perdaySelectedRange = { startDate, endDate, pickupTime, returnTime };
+        perdayUnavailableItems = new Set((cachedEntry.data.unavailableItems || []).map((name) => normalizeRentalNameKey(name)));
+        perdayBookedItemQuantities = new Map(
+            Object.entries(cachedEntry.data.bookedItemQuantities || {}).map(([name, qty]) => [normalizeRentalNameKey(name), Number(qty) || 0])
+        );
+        applyPerdayItemAvailability();
+
+        if (typeof window.displayPerdayAvailability === 'function') {
+            window.displayPerdayAvailability({
+                unavailableItems: cachedEntry.data.unavailableItems || [],
+                bookedItemQuantities: cachedEntry.data.bookedItemQuantities || {},
+                catalogItems: Array.isArray(cachedEntry.data.catalogItems) ? cachedEntry.data.catalogItems : []
+            });
+        }
         return;
     }
 
     const requestId = ++perdayAvailabilityRequestSeq;
+    perdayInFlightKey = availabilityKey;
+
+    // Show loading state in the reference panel
+    if (typeof window.displayPerdayAvailability === 'function') {
+        window.displayPerdayAvailability({ loading: true });
+    }
 
     try {
         const params = new URLSearchParams({
@@ -481,18 +509,75 @@ const fetchPerdayItemAvailability = async () => {
             throw new Error(data.message || 'Failed to fetch per-day item availability');
         }
 
+        perdayAvailabilityCache.set(availabilityKey, {
+            timestamp: Date.now(),
+            data: {
+                unavailableItems: data.unavailableItems || [],
+                bookedItemQuantities: data.bookedItemQuantities || {},
+                catalogItems: Array.isArray(data.catalogItems) ? data.catalogItems : []
+            }
+        });
+
         perdaySelectedRange = { startDate, endDate, pickupTime, returnTime };
         perdayUnavailableItems = new Set((data.unavailableItems || []).map((name) => normalizeRentalNameKey(name)));
         perdayBookedItemQuantities = new Map(
             Object.entries(data.bookedItemQuantities || {}).map(([name, qty]) => [normalizeRentalNameKey(name), Number(qty) || 0])
         );
         applyPerdayItemAvailability();
+
+        // Update the reference panel with full catalog + availability
+        if (typeof window.displayPerdayAvailability === 'function') {
+            window.displayPerdayAvailability({
+                unavailableItems: data.unavailableItems || [],
+                bookedItemQuantities: data.bookedItemQuantities || {},
+                catalogItems: Array.isArray(data.catalogItems) ? data.catalogItems : []
+            });
+        }
     } catch (error) {
         console.error('Per-day item availability fetch error:', error);
         perdayUnavailableItems = new Set();
         perdayBookedItemQuantities = new Map();
         perdaySelectedRange = null;
         applyPerdayItemAvailability();
+        if (typeof window.displayPerdayAvailability === 'function') {
+            window.displayPerdayAvailability({ error: 'Failed to load item availability. Please try again.' });
+        }
+    } finally {
+        if (perdayInFlightKey === availabilityKey) {
+            perdayInFlightKey = '';
+        }
+    }
+};
+
+const resetPerdayAvailabilityState = () => {
+    perdayUnavailableItems = new Set();
+    perdayBookedItemQuantities = new Map();
+    perdaySelectedRange = null;
+    applyPerdayItemAvailability();
+    if (typeof window.displayPerdayAvailability === 'function') {
+        window.displayPerdayAvailability({});
+    }
+};
+
+const handlePerdayPickupTimeChange = () => {
+    const pickupInput = document.getElementById('perdayPickupTime');
+    if (!pickupInput) return;
+
+    syncPerDayReturnWithPickup();
+    refreshPerDayDaysInfo();
+
+    if (currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
+        updatePriceDisplay();
+    }
+
+    if (pickupInput.value) {
+        fetchPerdayItemAvailability();
+    } else {
+        resetPerdayAvailabilityState();
+    }
+
+    if (typeof window.scheduleBookingFormDraftSave === 'function') {
+        window.scheduleBookingFormDraftSave();
     }
 };
 
@@ -522,6 +607,10 @@ const syncPerDayReturnWithPickup = () => {
     if (!pickupInput || !returnInput) return;
 
     returnInput.value = pickupInput.value || '';
+    if (typeof returnInput._refreshCustomTimeDropdown === 'function') {
+        returnInput._refreshCustomTimeDropdown();
+    }
+    returnInput.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
 const toggleBookingModeFields = (mode) => {
@@ -551,10 +640,9 @@ const toggleBookingModeFields = (mode) => {
     }
 
     if (endTimeInput) {
+        endTimeInput.disabled = true;
         if (isPerday) {
-            endTimeInput.disabled = true;
-        } else {
-            endTimeInput.disabled = !startTimeInput?.value;
+            endTimeInput.value = '';
         }
     }
 
@@ -583,7 +671,8 @@ const switchBookingMode = (mode) => {
 
     if (currentBookingMode === 'hourly') {
         const selectedDate = document.getElementById('bookingDate')?.value;
-        if (selectedDate && typeof loadAvailability === 'function') {
+        const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+        if (!isFlatRateSessionBookingCategory(bookingType) && selectedDate && typeof loadAvailability === 'function') {
             loadAvailability(selectedDate);
         }
 
@@ -592,8 +681,18 @@ const switchBookingMode = (mode) => {
     }
 
     if (currentBookingMode === 'perday') {
-        fetchPerdayItemAvailability();
+        // B1: Lazily initialise per-day input constraints on first switch to per-day mode.
+        if (!perdayConstraintsInitialized) {
+            perdayConstraintsInitialized = true;
+            setPerDayInputConstraints();
+        } else if (document.getElementById('perdayPickupTime')?.value) {
+            fetchPerdayItemAvailability();
+        } else {
+            resetPerdayAvailabilityState();
+        }
     }
+
+    refreshHourlySchedulingVisibility();
 
     if (typeof updatePriceDisplay === 'function') {
         updatePriceDisplay();
@@ -617,80 +716,112 @@ const setPerDayInputConstraints = () => {
     if (!startInput || !endInput || !pickupInput || !returnInput) return;
 
     const today = getTodayDateString();
-    startInput.min = today;
+    const getMinReturnDate = () => (startInput.value
+        ? addDaysToYmd(startInput.value, 1)
+        : addDaysToYmd(today, 1));
+    setDateInputMinValue(startInput, today);
 
-    if (!startInput.value) {
-        startInput.value = today;
-    }
+    const updatePickupTimeConstraints = () => {
+        const selectedStartDate = startInput.value || '';
+        const isToday = selectedStartDate === today;
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    if (!endInput.value) {
-        endInput.value = startInput.value || today;
-    }
+        let hasEnabledTime = false;
+        Array.from(pickupInput.options || []).forEach((option, index) => {
+            const optionValue = String(option.value || '');
+            if (!optionValue) {
+                option.disabled = false;
+                return;
+            }
 
-    endInput.min = startInput.value || today;
+            const [hours, minutes] = optionValue.split(':').map((value) => Number(value));
+            const optionMinutes = (Number(hours) * 60) + Number(minutes);
+            const shouldDisable = isToday && Number.isFinite(optionMinutes) && optionMinutes < currentMinutes;
+            option.disabled = shouldDisable;
+            hasEnabledTime = hasEnabledTime || !shouldDisable;
+        });
 
-    if (endInput.value && startInput.value && endInput.value < startInput.value) {
-        endInput.value = startInput.value;
-    }
-
-    startInput.addEventListener('change', () => {
-        endInput.min = startInput.value || today;
-        if (endInput.value && startInput.value && endInput.value < startInput.value) {
-            endInput.value = startInput.value;
+        const currentSelectedOption = pickupInput.options[pickupInput.selectedIndex];
+        if (pickupInput.value && (!currentSelectedOption || currentSelectedOption.disabled)) {
+            pickupInput.value = '';
+            syncPerDayReturnWithPickup();
         }
 
-        syncPerDayReturnWithPickup();
+        if (!hasEnabledTime && pickupInput.value) {
+            pickupInput.value = '';
+            syncPerDayReturnWithPickup();
+        }
 
+        const placeholderOption = pickupInput.options[0];
+        if (placeholderOption && !placeholderOption.value) {
+            placeholderOption.textContent = hasEnabledTime
+                ? 'Select time'
+                : 'No time slots available today';
+        }
+
+        if (typeof pickupInput._refreshCustomTimeDropdown === 'function') {
+            pickupInput._refreshCustomTimeDropdown();
+        }
+    };
+
+    setDateInputValue(startInput, '');
+    setDateInputValue(endInput, '');
+    pickupInput.value = '';
+    returnInput.value = '';
+    setDateInputMinValue(endInput, getMinReturnDate());
+    updatePickupTimeConstraints();
+
+    const handlePerdayDateUpdate = ({ recomputePickupConstraints = false } = {}) => {
+        if (recomputePickupConstraints) {
+            updatePickupTimeConstraints();
+        }
         refreshPerDayDaysInfo();
         if (currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
             updatePriceDisplay();
         }
 
-        if (currentBookingMode === 'perday') {
+        if (pickupInput.value) {
             fetchPerdayItemAvailability();
+        } else {
+            resetPerdayAvailabilityState();
         }
 
         if (typeof window.scheduleBookingFormDraftSave === 'function') {
             window.scheduleBookingFormDraftSave();
         }
+    };
+
+    const handlePickupTimeUpdate = () => {
+        handlePerdayPickupTimeChange();
+    };
+
+    startInput.addEventListener('change', () => {
+        const dynamicMinReturnDate = getMinReturnDate();
+        setDateInputMinValue(endInput, dynamicMinReturnDate);
+        if (endInput.value && endInput.value < dynamicMinReturnDate) {
+            setDateInputValue(endInput, dynamicMinReturnDate, { triggerChange: true });
+        }
+
+        syncPerDayReturnWithPickup();
+        handlePerdayDateUpdate({ recomputePickupConstraints: true });
     });
 
     endInput.addEventListener('change', () => {
-        refreshPerDayDaysInfo();
-        if (currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
-            updatePriceDisplay();
-        }
-
-        if (currentBookingMode === 'perday') {
-            fetchPerdayItemAvailability();
-        }
-
-        if (typeof window.scheduleBookingFormDraftSave === 'function') {
-            window.scheduleBookingFormDraftSave();
-        }
+        handlePerdayDateUpdate({ recomputePickupConstraints: false });
     });
 
-    pickupInput.addEventListener('change', () => {
-        syncPerDayReturnWithPickup();
-
-        refreshPerDayDaysInfo();
-        if (currentBookingMode === 'perday' && typeof updatePriceDisplay === 'function') {
-            updatePriceDisplay();
-        }
-
-        if (currentBookingMode === 'perday') {
-            fetchPerdayItemAvailability();
-        }
-
-        if (typeof window.scheduleBookingFormDraftSave === 'function') {
-            window.scheduleBookingFormDraftSave();
-        }
-    });
+    pickupInput.addEventListener('change', handlePickupTimeUpdate);
 
     syncPerDayReturnWithPickup();
 
     refreshPerDayDaysInfo();
-    fetchPerdayItemAvailability();
+    updatePickupTimeConstraints();
+    if (pickupInput.value) {
+        fetchPerdayItemAvailability();
+    } else {
+        resetPerdayAvailabilityState();
+    }
 };
 
 const isQuantityControlEnabled = (item) => {
@@ -724,7 +855,7 @@ const buildRentalOptionHTML = (item, mode) => {
             <input type="checkbox" class="rental-checkbox" ${defaultChecked} ${defaultDisabled} onchange="toggleRental('${item.key}', '${mode}')">
             <div class="rental-meta">
                 <div class="rental-name">${item.name}</div>
-                <div class="rental-price">${item.price === 0 ? 'FREE' : `₹${item.price}${priceUnit}`}</div>
+                <div class="rental-price">${item.price === 0 ? '' : `₹${item.price}${priceUnit}`}</div>
             </div>
             <div class="rental-qty">
                 ${showQuantity
@@ -990,10 +1121,10 @@ const refreshClassPlanInfoUI = () => {
     const startDate = bookingDateEl?.value ? new Date(`${bookingDateEl.value}T00:00:00`) : new Date();
     const endDate = addDays(startDate, planMonths * classConfig.weeksPerMonthWindow * 7);
 
-    infoTextEl.textContent = `${classesPerMonth} classes/month (${totalClasses} total). Plan window: ${formatYmd(startDate)} to ${formatYmd(endDate)}.`;
+    infoTextEl.textContent = `${classesPerMonth}/month (${totalClasses} total) | ${formatYmd(startDate)} to ${formatYmd(endDate)}`;
     discountHintEl.textContent = discountAmount > 0
-        ? `Discount applied: ${discountPercent}% (₹${discountAmount}). Payable now: ₹${totalAfterDiscount}.`
-        : `Plan fee: ₹${totalBeforeDiscount}.`;
+        ? `${discountPercent}% off (₹${discountAmount}) | Pay now: ₹${totalAfterDiscount}`
+        : `Fee: ₹${totalBeforeDiscount}`;
 };
 
 const isClassBookingCategory = (categoryName) => {
@@ -1004,6 +1135,117 @@ const isClassBookingCategory = (categoryName) => {
     if (!classConfig.enabled) return false;
 
     return classConfig.categoryKeywords.some((keyword) => selectedCategory.includes(keyword));
+};
+
+const isPerTrackBookingCategory = (categoryName) => {
+    const selectedCategory = String(categoryName || '').trim();
+    if (!selectedCategory) return false;
+
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+    const matchedType = rentalTypes.find((type) => String(type?.name || '').trim() === selectedCategory);
+    if (!matchedType) return false;
+
+    if (getCategoryRentalType(matchedType) !== 'pertrack') return false;
+
+    // If this per-track category is bound to a session-type category, it operates within
+    // a session context and still needs date/time scheduling.
+    const sessionTypes = new Set(['persession', 'inhouse']);
+    const isBoundToSession = getConfiguredBindingPairs().some((pair) => {
+        if (pair.leftCategory === selectedCategory) return sessionTypes.has(pair.rightRentalType);
+        if (pair.rightCategory === selectedCategory) return sessionTypes.has(pair.leftRentalType);
+        return false;
+    });
+    if (isBoundToSession) return false;
+
+    return true;
+};
+
+const isFlatRateSessionBookingCategory = (categoryName) => {
+    const selectedCategory = String(categoryName || '').trim();
+    if (!selectedCategory) return false;
+
+    const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+    const matchedType = rentalTypes.find((type) => String(type?.name || '').trim() === selectedCategory);
+    if (!matchedType) return false;
+
+    const rentalTypeToken = getCategoryRentalType(matchedType);
+    return rentalTypeToken === 'pertrack' || rentalTypeToken === 'persession';
+};
+
+const refreshHourlySchedulingVisibility = () => {
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+    const isFlatRateCategory = isFlatRateSessionBookingCategory(bookingType);
+    const isClassCategory = isClassBookingCategory(bookingType);
+    const shouldHideHourlySchedule = currentBookingMode === 'hourly' && isFlatRateCategory;
+    const shouldHideEndTimeOnly = currentBookingMode === 'hourly' && !shouldHideHourlySchedule && isClassCategory;
+
+    const hourlyDateGroup = document.getElementById('hourlyDateGroup');
+    const hourlyAvailabilityView = document.getElementById('hourlyAvailabilityView');
+    const hourlyTimeContainer = document.getElementById('hourlyTimeContainer');
+    const hourlyEndTimeGroup = document.getElementById('hourlyEndTimeGroup');
+    const bookingDateInput = document.getElementById('bookingDate');
+    const startTimeInput = document.getElementById('startTime');
+    const endTimeInput = document.getElementById('endTime');
+    const startTimeLabel = document.getElementById('startTimeLabel');
+    const endTimeLabel = document.getElementById('endTimeLabel');
+    const timeline = document.getElementById('referenceTimeline');
+
+    if (hourlyDateGroup) hourlyDateGroup.style.display = shouldHideHourlySchedule ? 'none' : '';
+    if (hourlyAvailabilityView) hourlyAvailabilityView.style.display = shouldHideHourlySchedule ? 'none' : '';
+    if (hourlyTimeContainer) hourlyTimeContainer.style.display = shouldHideHourlySchedule ? 'none' : '';
+    if (hourlyEndTimeGroup) hourlyEndTimeGroup.style.display = shouldHideEndTimeOnly ? 'none' : '';
+
+    if (startTimeLabel) {
+        if (shouldHideHourlySchedule) {
+            startTimeLabel.textContent = 'Track/Session*';
+        } else {
+            startTimeLabel.textContent = isClassCategory ? 'Class Time*' : 'Start Time*';
+        }
+    }
+
+    if (endTimeLabel) {
+        endTimeLabel.textContent = 'End Time*';
+    }
+
+    if (shouldHideHourlySchedule) {
+        if (bookingDateInput) bookingDateInput.required = false;
+        if (startTimeInput) {
+            startTimeInput.required = false;
+            startTimeInput.disabled = true;
+            startTimeInput.value = '';
+        }
+        if (endTimeInput) {
+            endTimeInput.required = false;
+            endTimeInput.disabled = true;
+            endTimeInput.value = '';
+            if (typeof endTimeInput._refreshCustomTimeDropdown === 'function') {
+                endTimeInput._refreshCustomTimeDropdown();
+            }
+        }
+        if (timeline) {
+            timeline.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No time schedule needed for track/session pricing.</div>';
+        }
+        window.currentAvailabilityData = null;
+        return;
+    }
+
+    if (bookingDateInput) bookingDateInput.required = true;
+    if (startTimeInput) {
+        startTimeInput.required = true;
+        startTimeInput.disabled = !bookingDateInput?.value;
+    }
+    if (endTimeInput) {
+        endTimeInput.required = !shouldHideEndTimeOnly;
+        if (shouldHideEndTimeOnly) {
+            endTimeInput.disabled = true;
+            endTimeInput.value = '';
+        } else {
+            endTimeInput.disabled = !startTimeInput?.value;
+        }
+        if (typeof endTimeInput._refreshCustomTimeDropdown === 'function') {
+            endTimeInput._refreshCustomTimeDropdown();
+        }
+    }
 };
 
 const refreshClassLocationUI = () => {
@@ -1024,7 +1266,7 @@ const refreshClassLocationUI = () => {
     const previousValue = String(selectEl.value || '').trim();
 
     selectEl.innerHTML = [
-        '<option value="">Select class location</option>',
+        '<option value="">Select location</option>',
         ...options.map((location) => `<option value="${location}">${location}</option>`)
     ].join('');
 
@@ -1095,7 +1337,7 @@ const refreshClassLocationUI = () => {
         const startTimeSelectEl = document.getElementById('startTime');
         if (startTimeSelectEl) {
             const prevVal = startTimeSelectEl.value;
-            startTimeSelectEl.innerHTML = '<option value="">Select class time</option>';
+            startTimeSelectEl.innerHTML = '<option value="">Pick class time</option>';
             (window.allTimeSlots || []).forEach(slot => {
                 const opt = document.createElement('option');
                 opt.value = slot.value;
@@ -1109,20 +1351,14 @@ const refreshClassLocationUI = () => {
         refreshClassPlanInfoUI();
     }
 
-    // For class bookings, hide end time (auto-set to start+1h) and rename start time label
-    const endTimeGroup = document.getElementById('endTimeGroup');
+    // For class bookings, rename start-time label.
     const startTimeLabel = document.getElementById('startTimeLabel');
-    const endTimeEl = document.getElementById('endTime');
 
-    if (endTimeGroup) {
-        endTimeGroup.style.display = shouldShow ? 'none' : '';
-    }
-    if (endTimeEl) {
-        endTimeEl.required = !shouldShow;
-    }
     if (startTimeLabel) {
         startTimeLabel.textContent = shouldShow ? 'Class Time*' : 'Start Time*';
     }
+
+    refreshHourlySchedulingVisibility();
 };
 
 const categorizeRentalItems = () => {
@@ -1486,14 +1722,11 @@ const loadSettings = async () => {
             settings = data.settings;
             window.adminSettings = settings;
 
-            setPerDayInputConstraints();
             populateRentalTypes();
             bindBookingModeControls();
             if (typeof window.refreshBookingTypeOptions === 'function') {
                 window.refreshBookingTypeOptions();
             }
-
-            refreshClassLocationUI();
         } else {
             console.error('Failed to load settings:', data);
             showAlert('Failed to load booking settings. Please refresh the page.', 'error');
@@ -1548,3 +1781,5 @@ window.refreshClassLocationUI = refreshClassLocationUI;
 window.getClassConfig = getClassConfig;
 window.refreshClassPlanInfoUI = refreshClassPlanInfoUI;
 window.getClassDiscountForMonths = getClassDiscountForMonths;
+window.isPerTrackBookingCategory = isPerTrackBookingCategory;
+window.isFlatRateSessionBookingCategory = isFlatRateSessionBookingCategory;

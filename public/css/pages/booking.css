@@ -2,9 +2,20 @@
 
 .main-content {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 30px;
     min-width: 0;
+}
+
+body.booking-preload .main-content {
+    opacity: 0;
+    visibility: hidden;
+}
+
+body:not(.booking-preload) .main-content {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.18s ease;
 }
 
 .section {
@@ -113,6 +124,153 @@
 #bookingForm textarea {
     max-width: 100%;
     min-width: 0;
+}
+
+/* Custom dropdown for booking time selectors — prevents native popup from overflowing viewport */
+.time-custom-select {
+    position: relative;
+    width: 100%;
+}
+
+.time-custom-select select {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+    top: 0;
+    left: 0;
+}
+
+.time-custom-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--input-bg, var(--surface-2, #1e1e2e));
+    border: 1px solid var(--border-color, #444);
+    border-radius: 6px;
+    color: var(--text-primary, inherit);
+    font-size: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    gap: 6px;
+    min-height: 38px;
+    box-sizing: border-box;
+}
+
+.time-custom-trigger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.time-custom-trigger[aria-expanded="true"] {
+    border-color: var(--accent-color, #7c3aed);
+    outline: 2px solid color-mix(in srgb, var(--accent-color, #7c3aed) 30%, transparent);
+}
+
+.time-custom-caret {
+    display: inline-block;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid currentColor;
+    flex-shrink: 0;
+    opacity: 0.7;
+    margin-top: 1px;
+}
+
+.time-custom-trigger[aria-expanded="true"] .time-custom-caret {
+    transform: rotate(180deg);
+}
+
+.time-custom-panel {
+    position: fixed;
+    z-index: 9999;
+    background: var(--surface-2, #1e1e2e);
+    border: 1px solid var(--border-color, #444);
+    border-radius: 8px;
+    overflow-y: auto;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    padding: 4px 0;
+    min-width: 140px;
+}
+
+.time-custom-option {
+    padding: 9px 14px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary, inherit);
+    white-space: nowrap;
+}
+
+.time-custom-option:hover,
+.time-custom-option.highlighted {
+    background: var(--accent-color, #7c3aed);
+    color: #fff;
+}
+
+.time-custom-option.selected {
+    font-weight: 600;
+    color: var(--accent-color, #7c3aed);
+}
+
+.time-custom-option.selected:hover {
+    color: #fff;
+}
+
+.time-custom-option[data-placeholder] {
+    color: var(--text-muted, #888);
+    font-style: italic;
+    cursor: default;
+}
+
+.time-custom-option[data-placeholder]:hover {
+    background: transparent;
+    color: var(--text-muted, #888);
+}
+
+.perday-compact-fields {
+    display: grid;
+    gap: 10px;
+}
+
+.booking-inline-field {
+    margin-bottom: 25px;
+}
+
+.booking-inline-field label {
+    margin-bottom: 10px;
+}
+
+.booking-inline-field .field-help {
+    margin-top: 6px;
+}
+
+.booking-inline-action {
+    margin-bottom: 25px;
+    padding-left: 0;
+}
+
+.booking-row {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 4px;
+}
+
+.booking-row label {
+    margin-bottom: 0;
+}
+
+.booking-row .field-help,
+.booking-row .loading-text {
+    grid-column: 2;
+    margin-top: 0;
+    padding: 0;
+    text-align: left;
 }
 
 .booking-type-combobox {
@@ -346,6 +504,46 @@ body.booking-date-picker-open::before {
     pointer-events: none;
 }
 
+/* Final unified control look (higher specificity than legacy field-specific rules). */
+#bookingSection #bookingForm input[type="text"],
+#bookingSection #bookingForm input[type="date"],
+#bookingSection #bookingForm select:not(#startTime),
+#bookingSection #bookingForm textarea,
+#bookingSection #bookingForm input.booking-date-alt-input.flatpickr-input[readonly],
+#bookingSection #bookingTypeSelect,
+#bookingSection #bookingForm .time-custom-trigger {
+    min-height: 42px;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 32%, var(--border-color));
+    border-radius: 8px;
+    background: var(--surface-elevated);
+    color: var(--text-color);
+    box-shadow: none;
+    font-weight: 500;
+}
+
+#bookingSection #bookingForm input[type="text"]:hover,
+#bookingSection #bookingForm input[type="date"]:hover,
+#bookingSection #bookingForm select:not(#startTime):hover,
+#bookingSection #bookingForm textarea:hover,
+#bookingSection #bookingForm input.booking-date-alt-input.flatpickr-input[readonly]:hover,
+#bookingSection #bookingTypeSelect:hover,
+#bookingSection #bookingForm .time-custom-trigger:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 56%, var(--border-color));
+}
+
+#bookingSection #bookingForm input[type="text"]:focus,
+#bookingSection #bookingForm input[type="date"]:focus,
+#bookingSection #bookingForm select:not(#startTime):focus,
+#bookingSection #bookingForm textarea:focus,
+#bookingSection #bookingForm input.booking-date-alt-input.flatpickr-input[readonly]:focus,
+#bookingSection #bookingTypeSelect:focus,
+#bookingSection #bookingForm .time-custom-trigger:focus {
+    border-color: color-mix(in srgb, var(--primary-color) 76%, var(--border-color));
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    outline: none;
+}
+
 @media (max-width: 768px) {
     .flatpickr-calendar.booking-date-calendar-mobile {
         position: fixed !important;
@@ -362,11 +560,20 @@ body.booking-date-picker-open::before {
         overflow: hidden;
     }
 
+    .flatpickr-calendar.booking-date-calendar-mobile .flatpickr-rContainer,
+    .flatpickr-calendar.booking-date-calendar-mobile .flatpickr-weekdays,
+    .flatpickr-calendar.booking-date-calendar-mobile .flatpickr-weekdaycontainer,
     .flatpickr-calendar.booking-date-calendar-mobile .flatpickr-days,
     .flatpickr-calendar.booking-date-calendar-mobile .dayContainer {
         width: 100% !important;
         min-width: 100% !important;
         max-width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    .flatpickr-calendar.booking-date-calendar-mobile .flatpickr-weekday,
+    .flatpickr-calendar.booking-date-calendar-mobile .flatpickr-day {
+        box-sizing: border-box;
     }
 
     .flatpickr-calendar.booking-date-calendar-mobile .flatpickr-day {
@@ -613,9 +820,36 @@ span.flatpickr-weekday {
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     padding: 8px 0;
     font-size: 0.95em;
+}
+
+.selected-rentals .rental-item-main {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.selected-rentals .rental-item-name {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.selected-rentals .rental-item-meta,
+.selected-rentals .rental-item-total {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.selected-rentals .rental-item-meta {
+    color: var(--text-color-light);
+    font-weight: 600;
 }
 
 .price-total .subtotal,
@@ -940,45 +1174,134 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     }
 }
 
-.upi-section {
-    background: var(--surface-1);
-    padding: 20px;
-    border-radius: 8px;
-    margin-top: 20px;
-    text-align: center;
-    display: none;
+.booking-payment-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: grid;
+    place-items: center;
+    padding: 16px;
 }
 
-.upi-section.show { display: block; }
+.booking-payment-modal[hidden] {
+    display: none !important;
+}
+
+.booking-payment-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 10, 20, 0.58);
+    backdrop-filter: blur(4px);
+}
+
+.booking-payment-dialog {
+    position: relative;
+    width: min(780px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    border-radius: 14px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 94%, white 6%) 0%, var(--surface-1) 100%);
+    border: 1px solid color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+    padding: 16px;
+}
+
+.booking-payment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.booking-payment-header h3 {
+    margin: 0;
+}
+
+.booking-payment-close {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-elevated);
+    color: var(--text-color);
+    font-size: 1.35rem;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+}
+
+.booking-payment-close:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.booking-payment-subtitle {
+    margin: 0 0 12px;
+    color: var(--text-color-light);
+}
+
+.booking-payment-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.payment-summary-item {
+    border: 1px solid color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+    background: color-mix(in srgb, var(--primary-color) 8%, var(--surface-1));
+    border-radius: 10px;
+    padding: 10px;
+    display: grid;
+    gap: 4px;
+}
+
+.payment-summary-label {
+    color: var(--text-color-light);
+    font-size: 0.86rem;
+}
 
 .payment-methods {
     display: grid;
-    gap: 15px;
-    margin: 20px 0;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    gap: 12px;
+    margin: 0;
 }
 
 .payment-method {
     background: var(--surface-elevated);
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px;
     transition: var(--transition-normal);
+    text-align: left;
 }
 
 .payment-method:hover {
     border-color: var(--primary-color);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+}
+
+.payment-method h4 {
+    margin: 0 0 10px;
 }
 
 .payment-btn {
     width: 100%;
-    padding: 12px;
-    margin: 5px 0;
+    padding: 10px 12px;
+    margin: 0;
     border: none;
     border-radius: 6px;
     font-weight: 500;
     cursor: pointer;
     transition: var(--transition-normal);
+    text-align: center;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .payment-btn.primary {
@@ -1010,13 +1333,24 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 }
 
 .payment-info {
-    background: color-mix(in srgb, var(--info-color) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--info-color) 35%, transparent);
+    background: color-mix(in srgb, var(--info-color) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--info-color) 24%, transparent);
     border-radius: 6px;
-    padding: 10px;
-    margin: 10px 0;
-    font-family: monospace;
+    padding: 8px 10px;
+    margin: 0;
     word-break: break-all;
+    display: grid;
+    gap: 2px;
+}
+
+.payment-info-label {
+    color: var(--text-color-light);
+    font-size: 0.8rem;
+}
+
+.payment-info-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 600;
 }
 
 .payment-note-text {
@@ -1029,49 +1363,49 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     margin-top: 0;
 }
 
-.payment-close-btn {
-    margin-top: 20px;
+.payment-actions {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
 }
 
+.booking-payment-footer {
+    margin-top: 14px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.payment-close-btn,
 .payment-guide-btn {
-    margin-top: 20px;
-    margin-left: 8px;
+    margin: 0;
 }
 
-.payment-divider {
-    margin: 20px 0;
-    text-align: center;
-    position: relative;
-}
-
-.payment-divider::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: var(--border-color);
-}
-
-.payment-divider span {
-    background: var(--surface-1);
-    padding: 0 15px;
-    color: var(--text-color-light);
-    font-size: 0.9em;
-    display: inline-block;
-    max-width: 100%;
-    overflow-wrap: anywhere;
+.qr-panel {
+    display: grid;
+    align-content: start;
 }
 
 .qr-section {
-    margin-top: 15px;
+    margin-top: 0;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
 }
 
 .qr-section img {
-    max-width: 200px;
-    margin: 10px auto;
+    width: min(210px, 100%);
+    max-width: 210px;
+    margin: 0 auto;
     display: block;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    padding: 6px;
+}
+
+body.booking-payment-open {
+    overflow: hidden;
 }
 
 .reference-view {
@@ -1087,8 +1421,55 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     pointer-events: none;
 }
 
+.reference-view[hidden] {
+    display: none;
+}
+
+#hourlyAvailabilityView {
+    padding: 8px;
+    margin-top: 10px;
+    gap: 6px;
+}
+
+#hourlyTimeContainer {
+    margin-top: 0;
+}
+
+#hourlyAvailabilityView:not([hidden]) + #hourlyTimeContainer {
+    margin-top: 10px;
+}
+
+#hourlyAvailabilityView .reference-view-head {
+    min-height: 0;
+}
+
+#hourlyAvailabilityView .reference-view-title {
+    font-size: 0.84rem;
+}
+
+#hourlyAvailabilityView .reference-view-body {
+    padding: 5px 6px;
+    border-style: solid;
+    border-radius: 6px;
+}
+
+#hourlyAvailabilityView #referenceTimeline .booking-theme-status {
+    margin: 0;
+    padding: 6px 8px;
+    font-size: 0.82rem;
+    line-height: 1.25;
+}
+
+#hourlyAvailabilityView #referenceTimeline .availability-detail-line {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: var(--text-color-light);
+    line-height: 1.25;
+}
+
 .reference-view-head {
-    display: grid;
+    display: flex;
+    align-items: center;
     gap: 4px;
 }
 
@@ -1145,6 +1526,28 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 
 .timeline-item.booked.timeline-booking-confirmed {
     border-left-color: var(--danger-color);
+}
+
+/* Per-day availability items */
+.timeline-item.perday-availability-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.timeline-item.perday-availability-item.timeline-booking-available {
+    background: color-mix(in srgb, var(--success-color) 12%, transparent);
+    border-left: 4px solid var(--success-color);
+}
+
+.timeline-item.perday-availability-item.timeline-booking-confirmed {
+    background: color-mix(in srgb, var(--danger-color) 16%, transparent);
+    border-left: 4px solid var(--danger-color);
+}
+
+.timeline-status-available {
+    color: var(--success-color);
 }
 
 .timeline-item.blocked {
@@ -1443,6 +1846,11 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     border-left: 4px solid var(--danger-color);
 }
 
+.booking-theme-status-warning {
+    background: color-mix(in srgb, var(--warning-color) 12%, var(--surface-elevated));
+    border-left: 4px solid var(--warning-color);
+}
+
 .booking-theme-status-muted,
 .booking-theme-status-loading {
     background: color-mix(in srgb, var(--secondary-color) 10%, var(--surface-elevated));
@@ -1474,16 +1882,45 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 
     .section,
     .booking-flow-block,
-    .booking-theme-status,
     .rentals-container,
     .price-display,
-    .reference-view,
     .booking-card,
     .payment-method,
-    .payment-info,
-    .upi-section {
-        padding: 8px !important;
+    .payment-info {
+        padding: 8px;
         margin-bottom: 8px;
+    }
+
+    .booking-payment-modal {
+        padding: 10px;
+    }
+
+    .booking-payment-dialog {
+        width: min(100%, 100vw - 12px);
+        max-height: calc(100vh - 12px);
+        padding: 12px;
+    }
+
+    .booking-payment-summary,
+    .payment-methods {
+        grid-template-columns: 1fr;
+    }
+
+    .booking-payment-footer {
+        flex-direction: column-reverse;
+    }
+
+    .booking-payment-footer .btn {
+        width: 100%;
+    }
+
+    .booking-theme-status {
+        padding: 8px;
+    }
+
+    .reference-view {
+        padding: 8px;
+        margin-top: 8px;
     }
 
     .form-group,
@@ -1493,6 +1930,61 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     .time-container {
         gap: 8px;
         margin-bottom: 8px;
+    }
+
+    .booking-inline-field {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        align-items: center;
+        column-gap: 8px;
+        row-gap: 2px;
+        margin-bottom: 6px;
+    }
+
+    .booking-inline-field label {
+        margin-bottom: 0;
+    }
+
+    .booking-inline-field .field-help {
+        grid-column: 2;
+        margin-top: 0;
+    }
+
+    .booking-inline-action {
+        margin-bottom: 8px;
+        padding-left: 144px;
+    }
+
+    .booking-row {
+        grid-template-columns: 92px minmax(0, 1fr);
+        column-gap: 8px;
+        row-gap: 2px;
+    }
+
+    .perday-compact-fields {
+        gap: 6px;
+    }
+
+    #bookingForm input.booking-date-alt-input.flatpickr-input[readonly] {
+        min-height: 42px;
+        padding: 8px 34px 8px 10px;
+        font-size: 0.92rem;
+    }
+
+    #bookingForm input[type="date"],
+    #bookingForm select,
+    #bookingForm .time-custom-trigger {
+        min-height: 42px;
+        padding: 8px 10px;
+        font-size: 0.95rem;
+    }
+
+    .reference-view {
+        gap: 6px;
+    }
+
+    .reference-view-body {
+        padding: 6px 8px;
     }
 
     .form-group {
@@ -1516,6 +2008,16 @@ input[type="checkbox"].rental-checkbox:focus-visible {
     .field-help {
         margin-top: 4px;
         font-size: 11px;
+    }
+
+    #classLocationGroup .field-help,
+    #classPreferredWeekdayGroup .field-help {
+        display: none;
+    }
+
+    #classPlanInfoGroup .field-help {
+        font-size: 10.5px;
+        line-height: 1.25;
     }
 
     .category-header {
@@ -1550,8 +2052,7 @@ input[type="checkbox"].rental-checkbox:focus-visible {
         margin-left: 0;
     }
 
-    .perday-booked-item,
-    .selected-rentals .rental-item {
+    .perday-booked-item {
         flex-direction: column;
         align-items: flex-start;
     }

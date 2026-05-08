@@ -355,10 +355,6 @@ const restoreBookingFormDraft = async () => {
                 startTimeEl.value = '';
             }
 
-            if (typeof populateEndTimeSlots === 'function') {
-                populateEndTimeSlots();
-            }
-
             const endTimeEl = document.getElementById('endTime');
             if (endTimeEl) {
                 endTimeEl.value = '';
@@ -472,19 +468,56 @@ const buildBookingFormPayload = () => {
         endTime = perDayReturnTime;
         duration = perDayDays * 24;
     } else {
+        const bookingTypeForScheduleRule = document.getElementById('bookingTypeSelect')?.value.trim() || '';
+        const isFlatRateBookingCategory = typeof window.isFlatRateSessionBookingCategory === 'function'
+            ? window.isFlatRateSessionBookingCategory(bookingTypeForScheduleRule)
+            : false;
+        const isClassBookingCategory = typeof window.isClassBookingCategory === 'function'
+            ? window.isClassBookingCategory(bookingTypeForScheduleRule)
+            : false;
+
         startTime = document.getElementById('startTime')?.value;
         endTime = document.getElementById('endTime')?.value;
         bookingDate = document.getElementById('bookingDate')?.value;
 
+        if (!isFlatRateBookingCategory) {
+            if (!bookingDate) {
+                throw new Error('Please select a booking date.');
+            }
+
+            if (!startTime) {
+                throw new Error('Please select a valid start time.');
+            }
+
+            if (!isClassBookingCategory && !endTime) {
+                throw new Error('Please select a valid end time.');
+            }
+        }
+
         if (!bookingDate) {
-            throw new Error('Please select a booking date.');
+            bookingDate = getTodayDateString();
         }
 
-        if (!startTime || !endTime) {
-            throw new Error('Please select valid start and end times.');
+        if (!startTime && !isFlatRateBookingCategory) {
+            startTime = '09:00';
         }
 
-        duration = calculateDuration(startTime, endTime);
+        if (isFlatRateBookingCategory) {
+            startTime = startTime || '09:00';
+            endTime = endTime || startTime;
+            duration = 1;
+        } else if (isClassBookingCategory) {
+            endTime = '';
+            duration = 1;
+        } else {
+            duration = typeof window.calculateDuration === 'function'
+                ? window.calculateDuration(startTime, endTime)
+                : 1;
+
+            if (!Number.isFinite(duration) || duration < 1) {
+                throw new Error('End time must be later than start time.');
+            }
+        }
     }
 
     const { rentalsArray, subtotal } = buildRentalsForSubmission(duration);
@@ -598,14 +631,24 @@ const resetBookingFormState = () => {
 
     const perdayStartDateEl = document.getElementById('perdayStartDate');
     if (perdayStartDateEl) {
-        perdayStartDateEl.value = today;
-        perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        if (perdayStartDateEl._flatpickr) {
+            perdayStartDateEl._flatpickr.clear();
+            perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+            perdayStartDateEl.value = '';
+            perdayStartDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
 
     const perdayEndDateEl = document.getElementById('perdayEndDate');
     if (perdayEndDateEl) {
-        perdayEndDateEl.value = today;
-        perdayEndDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        if (perdayEndDateEl._flatpickr) {
+            perdayEndDateEl._flatpickr.clear();
+            perdayEndDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+            perdayEndDateEl.value = '';
+            perdayEndDateEl.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
 
     if (priceDisplay) {
@@ -668,7 +711,9 @@ const handleBookingFormSubmit = async (e) => {
 
         clearBookingFormDraft();
         resetBookingFormState();
-        await loadMyBookings();
+        if (typeof window.loadMyBookings === 'function') {
+            await window.loadMyBookings();
+        }
         if (submittedMode === 'hourly') {
             await loadAvailability(formData.date);
         }
@@ -695,25 +740,41 @@ const bindBookingDateChange = (bookingDateEl) => {
         const startTimeSelect = document.getElementById('startTime');
         const endTimeSelect = document.getElementById('endTime');
 
-        if (startTimeSelect && endTimeSelect) {
-            startTimeSelect.innerHTML = '<option value="">Select date first</option>';
-            endTimeSelect.innerHTML = '<option value="">Select start time first</option>';
+        if (startTimeSelect) {
+            startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
             startTimeSelect.disabled = true;
-            endTimeSelect.disabled = true;
+            startTimeSelect.value = '';
+
+            if (endTimeSelect) {
+                endTimeSelect.innerHTML = '<option value="">Pick start time first</option>';
+                endTimeSelect.disabled = true;
+                endTimeSelect.value = '';
+                if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
+                    endTimeSelect._refreshCustomTimeDropdown();
+                }
+            }
 
             if (selectedDate) {
                 await loadAvailability(selectedDate);
             } else {
                 const timeline = document.getElementById('referenceTimeline');
+                const availabilityView = document.getElementById('hourlyAvailabilityView');
                 if (timeline) {
-                    timeline.innerHTML = '<div class="loading-text">Select a date to view availability</div>';
+                    timeline.innerHTML = '';
+                }
+                if (availabilityView) {
+                    availabilityView.hidden = true;
                 }
                 window.currentAvailabilityData = null;
             }
         } else {
             const timeline = document.getElementById('referenceTimeline');
+            const availabilityView = document.getElementById('hourlyAvailabilityView');
             if (timeline) {
-                timeline.innerHTML = '<div class="loading-text">Select a date to view availability</div>';
+                timeline.innerHTML = '';
+            }
+            if (availabilityView) {
+                availabilityView.hidden = true;
             }
             window.currentAvailabilityData = null;
         }
@@ -726,9 +787,13 @@ const bindBookingDateChange = (bookingDateEl) => {
 
     const onDateChange = async (e) => {
         const selectedDate = (e?.target?.value || bookingDateEl.value || '').trim();
-        await handleDateSelection(selectedDate);
-
         const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
+        const isFlatRate = typeof window.isFlatRateSessionBookingCategory === 'function' && window.isFlatRateSessionBookingCategory(bookingType);
+
+        if (!isFlatRate) {
+            await handleDateSelection(selectedDate);
+        }
+
         const isClass = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
         if (isClass) {
             const classPreferredWeekdayEl = document.getElementById('classPreferredWeekday');
@@ -845,6 +910,18 @@ const initBookingFormHandlers = () => {
 
         bookingTypeEl.addEventListener('focus', () => {
             renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+            setBookingTypeDropdownOpen(true);
+            highlightedOptionIndex = -1;
+        });
+
+        bookingTypeEl.addEventListener('click', () => {
+            if (bookingTypeEl.disabled) {
+                return;
+            }
+
+            bookingTypeEl.value = '';
+            handleBookingTypeChange();
+            renderBookingTypeSelectOptions();
             setBookingTypeDropdownOpen(true);
             highlightedOptionIndex = -1;
         });
@@ -983,29 +1060,9 @@ const initBookingFormHandlers = () => {
     const startTimeEl = document.getElementById('startTime');
     if (startTimeEl) {
         startTimeEl.addEventListener('change', () => {
-            const bookingType = document.getElementById('bookingTypeSelect')?.value || '';
-            const isClass = typeof window.isClassBookingCategory === 'function' && window.isClassBookingCategory(bookingType);
-            if (isClass && startTimeEl.value) {
-                // Auto-set end time based on class session duration configured in admin settings
-                const classConfig = typeof window.getClassConfig === 'function' ? window.getClassConfig() : { sessionDurationHours: 1 };
-                const sessionDurationHours = Math.max(1, Number(classConfig.sessionDurationHours || 1));
-                const [h, m] = startTimeEl.value.split(':').map(Number);
-                const endHour = (h + sessionDurationHours) % 24;
-                const endTimeVal = `${String(endHour).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
-                const endTimeEl = document.getElementById('endTime');
-                if (endTimeEl) {
-                    let opt = endTimeEl.querySelector(`option[value="${endTimeVal}"]`);
-                    if (!opt) {
-                        opt = document.createElement('option');
-                        opt.value = endTimeVal;
-                        opt.textContent = endTimeVal;
-                        endTimeEl.appendChild(opt);
-                    }
-                    endTimeEl.value = endTimeVal;
-                    endTimeEl.disabled = false;
-                }
-            } else {
-                populateEndTimeSlots();
+            if (typeof window.populateEndTimeSlots === 'function') {
+                const selectedDate = document.getElementById('bookingDate')?.value || '';
+                window.populateEndTimeSlots(startTimeEl.value || '', selectedDate, window.currentAvailabilityData || null);
             }
             updatePriceDisplay();
             scheduleBookingFormDraftSave();

@@ -21,9 +21,8 @@
 
         <main class="catalog-layout">
             <section class="catalog-shell" aria-labelledby="catalogTitle">
-                <header class="catalog-header">
-                    <h1 id="catalogTitle">Catalog</h1>
-                    <p>Browse all available catalog items and rates. Updates in Admin Settings appear here automatically.</p>
+                <header class="catalog-header section-header">
+                    <h2 id="catalogTitle">Catalog</h2>
                 </header>
 
                 <div id="catalogTabs" class="catalog-tabs" role="tablist" aria-label="Catalog categories"></div>
@@ -70,6 +69,9 @@
             const amount = isPerDay
                 ? Number(item?.perdayPrice || item?.price || 0)
                 : Number(item?.price || 0);
+
+            if (amount === 0) return '';
+
             const priceLabel = formatInr(amount);
 
             if (priceLabel === 'Included') {
@@ -170,7 +172,7 @@
             const listMarkup = selected.items.map((item, index) => {
                 const rowId = `catalog-row-${index}`;
                 return `
-                    <li class="catalog-item-row${item.isBase ? ' catalog-item-base' : ''}">
+                    <li class="catalog-item-row">
                         <button
                             type="button"
                             class="catalog-item-trigger"
@@ -191,7 +193,6 @@
             panel.innerHTML = `
                 <div class="catalog-panel-head">
                     <h2>${escapeHtml(selected.name)}</h2>
-                    <p>${escapeHtml(selected.description || 'Choose from available items in this category.')}</p>
                 </div>
                 <div class="catalog-table-head" aria-hidden="true">
                     <span>Item</span>
@@ -200,6 +201,7 @@
                 <ul class="catalog-item-list" aria-label="Catalog items and rates">
                     ${listMarkup}
                 </ul>
+                <p class="catalog-panel-description">${escapeHtml(selected.description || 'Choose from available items in this category.')}</p>
             `;
 
             panel.querySelectorAll('.catalog-item-trigger').forEach((button) => {
