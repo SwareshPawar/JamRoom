@@ -8,6 +8,7 @@ const getSlotRequestTimeSlots = () => window.allTimeSlots || [];
 
 const slotRequestAvailabilityCache = new Map();
 const myBookingsById = new Map();
+let slotRequestFlatpickrLoadPromise = null;
 
 const resolveApiUrl = () => {
     if (typeof API_URL === 'string' && API_URL.trim()) {
@@ -328,6 +329,69 @@ const fetchSlotRequestAvailability = async (date) => {
     return data;
 };
 
+const loadScriptFallback = (src) => new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+        resolve();
+        return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+    document.body.appendChild(script);
+});
+
+const loadStyleFallback = (href) => new Promise((resolve) => {
+    if (document.querySelector(`link[href="${href}"]`)) {
+        resolve();
+        return;
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.onload = resolve;
+    link.onerror = resolve;
+    document.head.appendChild(link);
+});
+
+const ensureSlotRequestFlatpickrLoaded = async () => {
+    if (typeof window.flatpickr === 'function') {
+        return true;
+    }
+
+    if (slotRequestFlatpickrLoadPromise) {
+        return slotRequestFlatpickrLoadPromise;
+    }
+
+    const jsUrl = '/js/vendor/flatpickr.min.js';
+    const cssUrl = '/css/vendor/flatpickr.min.css';
+
+    slotRequestFlatpickrLoadPromise = (async () => {
+        if (window.LazyLoader) {
+            await Promise.all([
+                window.LazyLoader.loadStylesheet(cssUrl),
+                window.LazyLoader.loadFlatpickr()
+            ]);
+        } else {
+            await Promise.all([
+                loadStyleFallback(cssUrl),
+                loadScriptFallback(jsUrl)
+            ]);
+        }
+
+        return typeof window.flatpickr === 'function';
+    })()
+        .catch(() => false)
+        .finally(() => {
+            slotRequestFlatpickrLoadPromise = null;
+        });
+
+    return slotRequestFlatpickrLoadPromise;
+};
+
 const loadSlotRequestTimeOptions = async (dateInputEl) => {
     const form = dateInputEl?.closest('.lesson-slot-form');
     const timeSelect = form?.querySelector('.slot-req-time');
@@ -382,8 +446,9 @@ const loadSlotRequestTimeOptions = async (dateInputEl) => {
     }
 };
 
-const initSlotRequestDatePickers = () => {
-    if (typeof window.flatpickr !== 'function') {
+const initSlotRequestDatePickers = async () => {
+    const isFlatpickrReady = await ensureSlotRequestFlatpickrLoaded();
+    if (!isFlatpickrReady || typeof window.flatpickr !== 'function') {
         return;
     }
 
@@ -701,7 +766,7 @@ const loadMyBookings = async (options = {}) => {
         if (bookingsEl) {
             bookingsEl.innerHTML = html || '<p class="booking-empty-message">No valid bookings found</p>';
         }
-        initSlotRequestDatePickers();
+        await initSlotRequestDatePickers();
     } catch (error) {
         console.error('Load bookings error:', error);
 

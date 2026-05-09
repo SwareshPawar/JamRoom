@@ -3,6 +3,66 @@
  * Keeps page init + auth checks separate from booking business logic.
  */
 
+const BOOKING_SCRIPT_DEPENDENCIES = [
+    {
+        src: '/js/booking/booking-pricing.js',
+        isReady: () => typeof window.updatePriceDisplay === 'function'
+    },
+    {
+        src: '/js/booking/booking-rentals.js',
+        isReady: () => typeof window.loadSettings === 'function'
+    },
+    {
+        src: '/js/booking/booking-form.js',
+        isReady: () => typeof window.initBookingFormHandlers === 'function'
+    }
+];
+
+const appendScriptTag = (src) => {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        document.body.appendChild(script);
+    });
+};
+
+const reloadScriptWithRetry = async (src, retries = 2) => {
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+        const cacheBypassSrc = `${src}${src.includes('?') ? '&' : '?'}retry=${Date.now()}-${attempt}`;
+        try {
+            if (window.LazyLoader && typeof window.LazyLoader.loadScript === 'function') {
+                await window.LazyLoader.loadScript(cacheBypassSrc, { async: true });
+            } else {
+                await appendScriptTag(cacheBypassSrc);
+            }
+            return;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw lastError || new Error(`Unable to load dependency script: ${src}`);
+};
+
+const ensureBookingDependenciesLoaded = async () => {
+    for (const dependency of BOOKING_SCRIPT_DEPENDENCIES) {
+        if (dependency.isReady()) {
+            continue;
+        }
+
+        await reloadScriptWithRetry(dependency.src, 2);
+
+        if (!dependency.isReady()) {
+            throw new Error(`Dependency did not initialize after load: ${dependency.src}`);
+        }
+    }
+};
+
 // Initialize application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize shared modules
@@ -53,8 +113,13 @@ async function initializeBookingPage() {
         const authResult = await checkAuth();
         if (!authResult) return;
 
+        await ensureBookingDependenciesLoaded();
+
         // Load settings (fetches catalog/rental config)
-        await loadSettings();
+        if (typeof window.loadSettings !== 'function') {
+            throw new Error('Booking settings module is unavailable (window.loadSettings missing)');
+        }
+        await window.loadSettings();
 
         if (typeof window.restoreBookingFormDraft === 'function') {
             await window.restoreBookingFormDraft();

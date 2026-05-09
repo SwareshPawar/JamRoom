@@ -1,10 +1,11 @@
-const CACHE_NAME = 'jamroom-v6';
+const CACHE_NAME = 'jamroom-v7';
 const STATIC_ASSETS = [
   '/booking.html',
   '/login.html', 
   '/index.html',
   '/css/shared.css',
   '/css/pages/booking.css',
+  '/css/vendor/flatpickr.min.css',
   '/manifest.webmanifest',
   '/icons/jamroom-192.png',
   '/icons/jamroom-512.png',
@@ -15,6 +16,7 @@ const STATIC_ASSETS = [
   '/js/shared/auth.js',
   '/js/shared/payment.js',
   '/js/shared/navigation.js',
+  '/js/vendor/flatpickr.min.js',
   '/js/booking/booking-auth.js',
   '/js/booking/booking-availability.js',
   '/js/booking/booking-pricing.js',

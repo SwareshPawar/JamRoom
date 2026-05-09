@@ -55,7 +55,7 @@ const LazyLoader = (() => {
     };
 
     const loadFlatpickr = () => {
-        return loadScript('https://cdn.jsdelivr.net/npm/flatpickr', { async: true });
+        return loadScript('/js/vendor/flatpickr.min.js', { async: true });
     };
 
     const loadFullCalendar = () => {

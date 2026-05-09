@@ -101,6 +101,14 @@ Acceptance:
 ## Phase 2 - Script loading model (defer + route/lazy loading)
 Objective: remove render-blocking and load only what each page needs initially.
 
+Status: In progress (step 1 started on 2026-05-09).
+
+Implemented in step 1:
+- Booking page now lazy-loads Flatpickr instead of eager script load.
+- Admin page now lazy-loads FullCalendar JS/CSS only when Calendar flow initializes.
+- My Bookings page no longer eagerly loads Flatpickr; slot date-pickers lazy-load it when needed.
+- Account page now lazy-loads booking-related modules only when the My Bookings tab is opened.
+
 Tasks:
 - Convert non-critical scripts to defer on core pages.
 - Split critical vs deferred bootstrap in each page:
