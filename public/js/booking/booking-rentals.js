@@ -16,7 +16,7 @@ const PERDAY_AVAILABILITY_CACHE_TTL_MS = 30000;
 let availableBookingModes = ['hourly', 'perday'];
 let activeBookingCategory = '';
 let perdayConstraintsInitialized = false;
-const BOOKING_SETTINGS_CACHE_KEY = 'jamroom_booking_settings_cache_v1';
+const BOOKING_SETTINGS_CACHE_KEY = 'jamroom_booking_settings_cache_v2';
 
 const bookingCategoryModeMap = new Map();
 
@@ -985,6 +985,7 @@ const getConfiguredBindingPairs = () => {
         : [];
 
     return rawPairs
+        .filter((pair) => !pair?.deletedAt)
         .map((pair) => {
             const leftCategory = String(pair?.leftCategory || '').trim();
             const rightCategory = String(pair?.rightCategory || '').trim();

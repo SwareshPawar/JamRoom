@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jamroom-v6';
+const CACHE_NAME = 'jamroom-v7';
 const STATIC_ASSETS = [
   '/booking.html',
   '/login.html', 
