@@ -16,6 +16,7 @@ const PERDAY_AVAILABILITY_CACHE_TTL_MS = 30000;
 let availableBookingModes = ['hourly', 'perday'];
 let activeBookingCategory = '';
 let perdayConstraintsInitialized = false;
+const BOOKING_SETTINGS_CACHE_KEY = 'jamroom_booking_settings_cache_v1';
 
 const bookingCategoryModeMap = new Map();
 
@@ -110,6 +111,37 @@ const renderBookingModeOptions = () => {
         : getDefaultBookingMode();
 
     modeSwitch.innerHTML = '';
+};
+
+const getDynamicItemsLabel = (mode) => {
+    const bookingType = document.getElementById('bookingTypeSelect')?.value || activeBookingCategory || '';
+
+    if (mode === 'perday') {
+        return 'Per-Day Items*';
+    }
+
+    if (isClassBookingCategory(bookingType)) {
+        return 'Class Items*';
+    }
+
+    if (isFlatRateSessionBookingCategory(bookingType)) {
+        return 'Session Items*';
+    }
+
+    return 'Catalog Items*';
+};
+
+const refreshRentalSectionLabels = () => {
+    const hourlyLabelEl = document.getElementById('hourlyItemsLabel');
+    const perdayLabelEl = document.getElementById('perdayItemsLabel');
+
+    if (hourlyLabelEl) {
+        hourlyLabelEl.textContent = getDynamicItemsLabel('hourly');
+    }
+
+    if (perdayLabelEl) {
+        perdayLabelEl.textContent = getDynamicItemsLabel('perday');
+    }
 };
 
 const getMapForMode = (mode) => mode === 'perday' ? perdaySelectedRentals : hourlySelectedRentals;
@@ -693,6 +725,7 @@ const switchBookingMode = (mode) => {
     }
 
     refreshHourlySchedulingVisibility();
+    refreshRentalSectionLabels();
 
     if (typeof updatePriceDisplay === 'function') {
         updatePriceDisplay();
@@ -1246,6 +1279,8 @@ const refreshHourlySchedulingVisibility = () => {
             endTimeInput._refreshCustomTimeDropdown();
         }
     }
+
+    refreshRentalSectionLabels();
 };
 
 const refreshClassLocationUI = () => {
@@ -1712,27 +1747,80 @@ const resetBookingRentalState = () => {
     populateRentalTypes();
 };
 
+const getCachedBookingSettings = () => {
+    try {
+        const cachedValue = localStorage.getItem(BOOKING_SETTINGS_CACHE_KEY);
+        if (!cachedValue) return null;
+        const parsed = JSON.parse(cachedValue);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_error) {
+        return null;
+    }
+};
+
+const setCachedBookingSettings = (value) => {
+    try {
+        localStorage.setItem(BOOKING_SETTINGS_CACHE_KEY, JSON.stringify(value));
+    } catch (_error) {
+        // Ignore storage quota and serialization errors.
+    }
+};
+
+const fetchBookingSettingsWithRetry = async (retries = 2) => {
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+        try {
+            const res = await fetch(`${API_URL}/api/bookings/settings`, { cache: 'no-store' });
+            const data = await res.json();
+
+            if (res.ok && data.success && data.settings) {
+                return data.settings;
+            }
+
+            throw new Error(data?.message || 'Invalid settings response');
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw lastError || new Error('Failed to fetch booking settings');
+};
+
 // Load settings using shared API
 const loadSettings = async () => {
     try {
-        const res = await fetch(`${API_URL}/api/bookings/settings`);
-        const data = await res.json();
+        settings = await fetchBookingSettingsWithRetry(2);
+        window.adminSettings = settings;
+        setCachedBookingSettings(settings);
 
-        if (res.ok && data.success && data.settings) {
-            settings = data.settings;
+        populateRentalTypes();
+        bindBookingModeControls();
+        refreshRentalSectionLabels();
+
+        if (typeof window.refreshBookingTypeOptions === 'function') {
+            window.refreshBookingTypeOptions();
+        }
+    } catch (error) {
+        console.error('Failed to load settings:', error);
+
+        const cachedSettings = getCachedBookingSettings();
+        if (cachedSettings) {
+            settings = cachedSettings;
             window.adminSettings = settings;
 
             populateRentalTypes();
             bindBookingModeControls();
+            refreshRentalSectionLabels();
+
             if (typeof window.refreshBookingTypeOptions === 'function') {
                 window.refreshBookingTypeOptions();
             }
-        } else {
-            console.error('Failed to load settings:', data);
-            showAlert('Failed to load booking settings. Please refresh the page.', 'error');
+
+            showAlert('Loaded last saved booking settings. Some recent catalog changes may require refresh.', 'warning');
+            return;
         }
-    } catch (error) {
-        console.error('Failed to load settings:', error);
+
         showAlert('Connection error while loading settings. Please check your internet connection.', 'error');
     }
 };
