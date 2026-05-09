@@ -105,8 +105,34 @@
 
         // Booking history + billing actions moved to booking-bookings.js
 
-        const initBookingDatePickers = () => {
-            if (typeof window.flatpickr !== 'function') {
+        let bookingDatePickerLoadPromise = null;
+
+        const ensureFlatpickrLoaded = async () => {
+            if (typeof window.flatpickr === 'function') {
+                return true;
+            }
+
+            if (bookingDatePickerLoadPromise) {
+                return bookingDatePickerLoadPromise;
+            }
+
+            if (window.LazyLoader && typeof window.LazyLoader.loadFlatpickr === 'function') {
+                bookingDatePickerLoadPromise = window.LazyLoader.loadFlatpickr()
+                    .then(() => typeof window.flatpickr === 'function')
+                    .catch(() => false)
+                    .finally(() => {
+                        bookingDatePickerLoadPromise = null;
+                    });
+
+                return bookingDatePickerLoadPromise;
+            }
+
+            return false;
+        };
+
+        const initBookingDatePickers = async () => {
+            const isFlatpickrReady = await ensureFlatpickrLoaded();
+            if (!isFlatpickrReady) {
                 return;
             }
 
