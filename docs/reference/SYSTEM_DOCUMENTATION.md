@@ -124,7 +124,7 @@
   priceAdjustmentValue: Number (signed: discount negative, surcharge positive),
   priceAdjustmentNote: String (optional),
   bookingStatus: String (enum: ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED']),
-  paymentStatus: String (enum: ['PENDING', 'PAID', 'REFUNDED']),
+  paymentStatus: String (enum: ['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']),
   userName: String (required),
   userEmail: String (required),
   userMobile: String (optional),
@@ -625,7 +625,7 @@ EMAIL_REPLY_TO=support@jamroom.com
 **Updated**:
 - Admin create booking requires registered user selection (`userId`)
 - Inline user create/reset/delete flows added to support create-booking pipeline
-- Admin-created bookings are enforced as `CONFIRMED` + `PAID`
+- Admin-created bookings are enforced as `CONFIRMED` with payment tracking (`PENDING|PARTIAL|PAID`) supported on create/edit
 - Historical override mode allows bypassing date/time conflict checks for missed-bill backfill entries
 - Confirmation recipients are merged from always-notify list, settings admin emails, and admin users
 
@@ -686,6 +686,15 @@ EMAIL_REPLY_TO=support@jamroom.com
 ---
 
 ### Latest Changes (May 2026)
+
+#### 0. Booking + Payment UX/Status Parity Updates
+**Updated**:
+- Hourly bookings use explicit start/end selections in UI and compute duration from selected range for pricing/payload.
+- Flat-rate session/track categories (`persession`, `pertrack`) bypass hourly scheduling UI and run start-date-only booking flow.
+- Per-day return-date changes no longer reset selected pickup time.
+- Post-booking payment options are shown in a modal popup (`booking-payment.js`) instead of inline page section.
+- My Bookings now shows payment progress (paid vs remaining) and supports Details popup per booking.
+- Rejected bookings in Admin Manage Bookings and My Bookings hide payment-pending badge and show rejected status only.
 
 #### 1. Book Now / My Bookings / Lesson Tracker — Route Segregation (Phase 1 Complete)
 **Goal**: Reduce initial load cost of `booking.html` by removing embedded booking history and class tracker. Separate creation intent from management intent at the route level.

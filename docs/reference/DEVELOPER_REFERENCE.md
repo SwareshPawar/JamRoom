@@ -19,7 +19,7 @@
 - **Admin Edit Pattern**: When editing bookings, send `rentals[]` and let backend recompute totals; do not trust client-calculated final totals.
 - **Mobile Booking Pattern**: Use `/booking.html` directly for all devices; do not add iframe shell wrappers for phone mode.
 - **Section UX Pattern (Mobile)**: Keep mobile sections compact/collapsible where needed without route-level redirection.
-- **Admin Create Status Policy**: Admin-created bookings must be enforced as `bookingStatus=CONFIRMED` and `paymentStatus=PAID`.
+- **Admin Create Status Policy**: Admin-created bookings must be enforced as `bookingStatus=CONFIRMED`; payment tracking supports `PENDING|PARTIAL|PAID` on create/edit.
 - **Historical Override Policy**: Use `overrideDateTime=true` only for historical missed-bill entries where conflict/blocked checks should be intentionally bypassed.
 - **Navigation Resilience Pattern**: Shared nav must always show a fallback menu if auth/bootstrap is delayed; avoid indefinite loading header states.
 - **Auth Resilience Pattern**: Auth bootstrap calls should use timeout + abort handling and may use cached session data to prevent false logouts on transient failures.
@@ -28,7 +28,7 @@
 - **Shared Navigation Pattern**: Render header/nav via `public/js/shared/navigation.js` into `#navigationContainer`; do not handcraft page-specific nav variants.
 - **Header Action Pattern**: Keep theme/logout/tests controls in `.app-header-actions`; keep primary route links in `.main-nav .nav-links`.
 - **Theme Pattern**: Use `public/js/shared/theme.js` and tokenized styles in `public/css/shared.css`; avoid page-local hardcoded theme colors.
-- **Per-Track No-Schedule Pattern**: Categories with `rentalType: 'pertrack'` and no binding to a session/inhouse category bypass all date/time/availability UI. Use `isPerTrackBookingCategory()` as the single guard; do not duplicate the check inline.
+- **Flat-Rate No-Schedule Pattern**: Categories with `rentalType: 'pertrack'` or `rentalType: 'persession'` bypass hourly date/time/availability UI when treated as flat-rate. Use `isFlatRateSessionBookingCategory()` for scheduling visibility decisions.
 - **Per-Track + Session Binding Rule**: A per-track category bound (either direction) to `persession`/`inhouse` in `bookingCategoryBindings.pairs` is treated as a session-context item and requires date/time like any hourly booking.
 - **Time Slot Source Pattern**: `buildTimeSlots(startHour, endHour)` in `booking-availability.js` is the single source of truth for studio hourly slots. Do not redeclare a slots array in other files; read from `window.allTimeSlots` instead.
 - **Select Overflow Pattern**: Native `<select>` popups cannot be constrained by CSS. For dropdowns that overflow viewport on mobile, hide the native select and overlay a `position:fixed` custom panel (see `#startTime` / `initStartTimeCustomDropdown()` in `booking-main.js`). For list-box style fields, `size` attribute + `max-height` CSS is acceptable (see `#perdayPickupTime`).
@@ -190,7 +190,7 @@ function checkSlots() // Not descriptive enough
   "data": {
     "_id": "bookingId",
     "bookingStatus": "PENDING",    // ENUM: PENDING|CONFIRMED|REJECTED|CANCELLED
-    "paymentStatus": "PENDING",    // ENUM: PENDING|PAID|REFUNDED
+    "paymentStatus": "PENDING",    // ENUM: PENDING|PARTIAL|PAID|REFUNDED
     "createdAt": "2026-01-25T10:30:00.000Z"
   }
 }
@@ -239,7 +239,7 @@ function checkSlots() // Not descriptive enough
   priceAdjustmentNote: String,// Optional audit note
   price: Number,              // Final total after tax + adjustment
   bookingStatus: String,      // 'PENDING'|'CONFIRMED'|'REJECTED'|'CANCELLED'
-  paymentStatus: String,      // 'PENDING'|'PAID'|'REFUNDED'
+  paymentStatus: String,      // 'PENDING'|'PARTIAL'|'PAID'|'REFUNDED'
   userName: String,           // User's name (denormalized)
   userEmail: String,          // User's email (denormalized)
   userMobile: String,         // Optional mobile (denormalized)

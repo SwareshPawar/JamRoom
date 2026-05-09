@@ -25,6 +25,15 @@
 🗂️ **Admin Form Draft Persistence**: Admin create-booking and user-management forms now autosave/restore drafts to survive refreshes  
 ➕➖ **Admin Special Price Override**: Admin can apply discount or surcharge amount with optional note; final bill and PDF summaries reflect adjustment transparently  
 
+## 🎉 Latest Enhancements (May 2026)
+
+🕒 **Hourly Booking Restore**: Hourly categories now use date + start + end time with duration-based pricing and payload validation  
+🎚️ **Flat-Rate Session/Track Flow**: `persession`/`pertrack` categories now run start-date-only flow (no hourly range picker)  
+📆 **Per-Day Stability Fix**: Changing return date no longer resets pickup time  
+💳 **Post-Booking Payment Modal**: Payment options now open in a popup after successful booking with copy/open/QR actions  
+📄 **My Bookings Details Modal**: Users can open booking details from My Bookings and view paid vs remaining amounts  
+🚫 **Rejected Status Cleanup**: Manage Bookings and My Bookings hide pending payment badge for rejected bookings  
+
 ## 🚀 Core Features
 
 ### 👤 User Features
@@ -34,9 +43,11 @@
 - ✅ **Enhanced Rental Selection**: Hierarchical categories with smart controls
 - ✅ **Dynamic Pricing**: Real-time price calculation with different rental models
 - ✅ Track Booking Status (Pending/Confirmed/Rejected)
+- ✅ My Bookings payment progress (Paid/Remaining)
+- ✅ Booking Details popup from My Bookings
 - ✅ Cancel Pending Bookings
 - ✅ **PDF Download**: Download booking invoices
-- ✅ UPI QR Code for Payments
+- ✅ Post-booking payment popup with UPI QR/copy/open actions
 - ✅ Universal UPI payment launch + link share/copy fallbacks
 - ✅ Email Notifications & Calendar Invites (.ics)
 - ✅ Mobile-first booking page with add-to-home-screen support
