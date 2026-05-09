@@ -5,6 +5,7 @@ process.env.TZ = process.env.TZ || 'Asia/Kolkata';
 
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const path = require('path');
 const connectDB = require('./config/db');
 const User = require('./models/User');
@@ -12,16 +13,87 @@ const AdminSettings = require('./models/AdminSettings');
 
 const app = express();
 
+const MAX_BASELINE_ENTRIES = 500;
+
+app.locals.performanceBaseline = {
+  pageMetrics: [],
+  apiPayloads: []
+};
+
 // Default admin seeding is disabled unless explicitly enabled.
 const ENABLE_DEFAULT_ADMIN_SEED = String(process.env.ENABLE_DEFAULT_ADMIN_SEED || '').toLowerCase() === 'true';
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const LONG_CACHE_EXTENSIONS = new Set([
+  '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot', '.map', '.json'
+]);
+
+const setStaticCacheHeaders = (res, filePath) => {
+  const ext = path.extname(filePath).toLowerCase();
+
+  if (ext === '.html') {
+    res.setHeader('Cache-Control', 'no-cache');
+    return;
+  }
+
+  if (LONG_CACHE_EXTENSIONS.has(ext)) {
+    res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+    return;
+  }
+
+  res.setHeader('Cache-Control', 'public, max-age=604800');
+};
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(compression());
+
+app.use((req, res, next) => {
+  const isTrackedEndpoint =
+    req.path === '/api/bookings/my-bookings'
+    || req.path === '/api/admin/bookings';
+
+  if (!isTrackedEndpoint) {
+    return next();
+  }
+
+  const startedAt = process.hrtime.bigint();
+  const originalJson = res.json.bind(res);
+
+  res.json = (body) => {
+    const payloadJson = JSON.stringify(body);
+    const payloadBytes = Buffer.byteLength(payloadJson, 'utf8');
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    const record = {
+      endpoint: req.path,
+      method: req.method,
+      statusCode: res.statusCode,
+      payloadBytes,
+      payloadKB: Number((payloadBytes / 1024).toFixed(2)),
+      durationMs: Number(durationMs.toFixed(2)),
+      query: req.query,
+      at: new Date().toISOString()
+    };
+
+    app.locals.performanceBaseline.apiPayloads.push(record);
+    if (app.locals.performanceBaseline.apiPayloads.length > MAX_BASELINE_ENTRIES) {
+      app.locals.performanceBaseline.apiPayloads.shift();
+    }
+
+    res.set('X-JamRoom-Payload-Bytes', String(payloadBytes));
+    return originalJson(body);
+  };
+
+  next();
+});
 
 // Serve static files from public directory
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(PUBLIC_DIR, {
+  etag: true,
+  lastModified: true,
+  setHeaders: setStaticCacheHeaders
+}));
 
 // API Routes
 app.use('/api/auth', require('./routes/auth.routes'));
@@ -33,7 +105,7 @@ app.use('/api/test', require('./routes/test.routes'));
 
 // Root route
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 // Catch-all route for frontend routing
@@ -44,7 +116,7 @@ app.get('*', (req, res) => {
       message: 'API endpoint not found'
     });
   }
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 // Error handling middleware

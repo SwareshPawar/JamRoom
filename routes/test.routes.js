@@ -2,6 +2,24 @@ const express = require('express');
 const router = express.Router();
 const { generateCalendarInvite } = require('../utils/calendar');
 
+const MAX_BASELINE_ENTRIES = 500;
+
+const ensureBaselineStore = (app) => {
+  if (!app.locals.performanceBaseline) {
+    app.locals.performanceBaseline = {
+      pageMetrics: [],
+      apiPayloads: []
+    };
+  }
+  if (!Array.isArray(app.locals.performanceBaseline.pageMetrics)) {
+    app.locals.performanceBaseline.pageMetrics = [];
+  }
+  if (!Array.isArray(app.locals.performanceBaseline.apiPayloads)) {
+    app.locals.performanceBaseline.apiPayloads = [];
+  }
+  return app.locals.performanceBaseline;
+};
+
 // Simple WhatsApp test without database dependency
 const testWhatsApp = async (mobile, message) => {
   try {
@@ -213,6 +231,125 @@ router.post('/dummy-booking', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// @route   POST /api/test/perf-metrics
+// @desc    Store client baseline performance metrics
+// @access  Public (for testing)
+router.post('/perf-metrics', (req, res) => {
+  try {
+    const store = ensureBaselineStore(req.app);
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+
+    const record = {
+      page: String(body.page || ''),
+      pageLabel: String(body.pageLabel || ''),
+      navigationType: String(body.navigationType || ''),
+      transferSize: Number.isFinite(Number(body.transferSize)) ? Number(body.transferSize) : null,
+      encodedBodySize: Number.isFinite(Number(body.encodedBodySize)) ? Number(body.encodedBodySize) : null,
+      decodedBodySize: Number.isFinite(Number(body.decodedBodySize)) ? Number(body.decodedBodySize) : null,
+      domContentLoadedMs: Number.isFinite(Number(body.domContentLoadedMs)) ? Number(body.domContentLoadedMs) : null,
+      loadEventMs: Number.isFinite(Number(body.loadEventMs)) ? Number(body.loadEventMs) : null,
+      firstContentfulPaintMs: Number.isFinite(Number(body.firstContentfulPaintMs)) ? Number(body.firstContentfulPaintMs) : null,
+      largestContentfulPaintMs: Number.isFinite(Number(body.largestContentfulPaintMs)) ? Number(body.largestContentfulPaintMs) : null,
+      firstInteractionMs: Number.isFinite(Number(body.firstInteractionMs)) ? Number(body.firstInteractionMs) : null,
+      firstInteractionDelayMs: Number.isFinite(Number(body.firstInteractionDelayMs)) ? Number(body.firstInteractionDelayMs) : null,
+      userAgent: String(req.headers['user-agent'] || ''),
+      at: new Date().toISOString()
+    };
+
+    store.pageMetrics.push(record);
+    if (store.pageMetrics.length > MAX_BASELINE_ENTRIES) {
+      store.pageMetrics.shift();
+    }
+
+    res.json({ success: true, message: 'Metric captured' });
+  } catch (error) {
+    console.error('Perf metrics ingest error:', error);
+    res.status(500).json({ success: false, message: 'Failed to capture metric' });
+  }
+});
+
+// @route   GET /api/test/perf-baseline
+// @desc    Get baseline metrics snapshot (client + server payload sizes)
+// @access  Public (for testing)
+router.get('/perf-baseline', (req, res) => {
+  try {
+    const store = ensureBaselineStore(req.app);
+    const page = String(req.query.page || '').trim();
+
+    const pageMetrics = page
+      ? store.pageMetrics.filter((entry) => entry.pageLabel === page)
+      : store.pageMetrics;
+
+    const payloadMetrics = store.apiPayloads;
+
+    const average = (values) => {
+      if (!values.length) return null;
+      const sum = values.reduce((acc, value) => acc + value, 0);
+      return Number((sum / values.length).toFixed(2));
+    };
+
+    const pageSummary = {
+      samples: pageMetrics.length,
+      avgTransferKB: average(pageMetrics.filter((m) => Number.isFinite(m.transferSize)).map((m) => m.transferSize / 1024)),
+      avgDomContentLoadedMs: average(pageMetrics.filter((m) => Number.isFinite(m.domContentLoadedMs)).map((m) => m.domContentLoadedMs)),
+      avgFcpMs: average(pageMetrics.filter((m) => Number.isFinite(m.firstContentfulPaintMs)).map((m) => m.firstContentfulPaintMs)),
+      avgLcpMs: average(pageMetrics.filter((m) => Number.isFinite(m.largestContentfulPaintMs)).map((m) => m.largestContentfulPaintMs)),
+      avgFirstInteractionMs: average(pageMetrics.filter((m) => Number.isFinite(m.firstInteractionMs)).map((m) => m.firstInteractionMs)),
+      avgFirstInteractionDelayMs: average(pageMetrics.filter((m) => Number.isFinite(m.firstInteractionDelayMs)).map((m) => m.firstInteractionDelayMs))
+    };
+
+    const payloadByEndpoint = payloadMetrics.reduce((acc, entry) => {
+      if (!acc[entry.endpoint]) {
+        acc[entry.endpoint] = [];
+      }
+      acc[entry.endpoint].push(entry.payloadBytes);
+      return acc;
+    }, {});
+
+    const payloadSummary = Object.keys(payloadByEndpoint).map((endpoint) => {
+      const values = payloadByEndpoint[endpoint];
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const avg = average(values);
+      return {
+        endpoint,
+        samples: values.length,
+        minBytes: min,
+        maxBytes: max,
+        avgBytes: avg,
+        avgKB: avg === null ? null : Number((avg / 1024).toFixed(2))
+      };
+    });
+
+    res.json({
+      success: true,
+      summary: {
+        page: page || 'all',
+        pageSummary,
+        payloadSummary
+      },
+      metrics: {
+        pageMetrics: pageMetrics.slice(-100),
+        payloadMetrics: payloadMetrics.slice(-100)
+      }
+    });
+  } catch (error) {
+    console.error('Perf baseline fetch error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch baseline metrics' });
+  }
+});
+
+// @route   DELETE /api/test/perf-baseline
+// @desc    Reset collected baseline metrics
+// @access  Public (for testing)
+router.delete('/perf-baseline', (req, res) => {
+  const store = ensureBaselineStore(req.app);
+  store.pageMetrics = [];
+  store.apiPayloads = [];
+
+  res.json({ success: true, message: 'Baseline metrics reset' });
 });
 
 // @route   POST /api/test/admin-booking
