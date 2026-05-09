@@ -227,16 +227,22 @@ JamRoom (1h) + Keyboard Per-day + 3 IEMs
 - [ ] Can add notes (optional)
 - [ ] Submit button works
 - [ ] Booking created successfully
-- [ ] UPI QR code displays
-- [ ] UPI details show correctly
+- [ ] Payment options popup appears after booking success
+- [ ] Payment popup close works via `X`, `Done`, backdrop click, and `Esc`
+- [ ] UPI QR code displays inside popup
+- [ ] UPI details (ID, amount, name) show correctly
+- [ ] Copy UPI/amount and Open UPI App actions work
 - [ ] Confirmation message appears
 
 ### View My Bookings
 - [ ] Bookings list loads
 - [ ] Shows all user bookings
 - [ ] Status badges display correctly
+- [ ] Payment progress is shown (status + paid + remaining) for non-rejected bookings
+- [ ] Rejected bookings show only rejected status (no payment-pending badge/progress)
 - [ ] Recent bookings appear first
-- [ ] All booking details visible
+- [ ] Details button opens booking details popup
+- [ ] Booking details popup close works via `X`, backdrop click, and `Esc`
 
 ### Cancel Booking
 - [ ] Cancel button visible for PENDING bookings
@@ -271,6 +277,7 @@ JamRoom (1h) + Keyboard Per-day + 3 IEMs
 - [ ] Booking details complete
 - [ ] User information visible
 - [ ] Action buttons show for pending bookings
+- [ ] Rejected rows show only booking status (do not show pending payment badge)
 
 ### Approve Booking
 - [ ] Approve button works

@@ -16,6 +16,11 @@ Authorization: Bearer <your_jwt_token>
 > - `GET /api/admin/bookings` now supports server-side pagination/search/sort (`page`, `limit`, `q`, `sortBy`) with pagination metadata
 > - `PUT /api/admin/users/:id` supports admin-side updates to registered user details (`name`, `email`, `mobile`)
 
+> **🆕 May 2026 Booking/Payment Behavior Updates**:
+> - User booking flow uses `bookingMode` payload with hourly/per-day fields (`date/startTime/endTime/duration` or per-day range fields)
+> - Create-booking response includes `upiDetails` used by post-booking payment popup flow
+> - Payment tracking statuses in booking lifecycle include `PENDING`, `PARTIAL`, `PAID` (and `REFUNDED` where applicable)
+
 ## 🧪 Testing & Development Tools
 
 ### Test Pages
@@ -335,7 +340,22 @@ Authorization: Bearer <token>
 **Request Body:**
 ```json
 {
-  "slotId": "65abc123...",
+  "bookingMode": "hourly",
+  "date": "2026-05-10",
+  "startTime": "14:00",
+  "endTime": "16:00",
+  "duration": 2,
+  "rentals": [
+    {
+      "name": "JamRoom (Base)",
+      "price": 300,
+      "quantity": 1,
+      "rentalType": "inhouse"
+    }
+  ],
+  "subtotal": 600,
+  "taxAmount": 108,
+  "totalAmount": 708,
   "rentalType": "JamRoom",
   "bandName": "The Rockers",
   "notes": "Need extra microphones"
@@ -350,14 +370,13 @@ Authorization: Bearer <token>
   "booking": {
     "_id": "65def...",
     "userId": "65abc...",
-    "slotId": {
-      "_id": "65ghi...",
-      "date": "2026-01-25",
-      "startTime": "14:00",
-      "endTime": "15:00"
-    },
+    "bookingMode": "hourly",
+    "date": "2026-05-10",
+    "startTime": "14:00",
+    "endTime": "16:00",
+    "duration": 2,
     "rentalType": "JamRoom",
-    "price": 500,
+    "price": 708,
     "bookingStatus": "PENDING",
     "paymentStatus": "PENDING"
   },
@@ -389,15 +408,16 @@ Authorization: Bearer <token>
   "bookings": [
     {
       "_id": "65def...",
-      "slotId": {
-        "date": "2026-01-25",
-        "startTime": "14:00",
-        "endTime": "15:00"
-      },
+      "bookingMode": "hourly",
+      "date": "2026-05-10",
+      "startTime": "14:00",
+      "endTime": "16:00",
+      "duration": 2,
       "rentalType": "JamRoom",
-      "price": 500,
+      "price": 708,
       "bookingStatus": "CONFIRMED",
-      "paymentStatus": "PAID",
+      "paymentStatus": "PARTIAL",
+      "amountPaid": 300,
       "createdAt": "2026-01-20T10:30:00.000Z"
     }
   ]
