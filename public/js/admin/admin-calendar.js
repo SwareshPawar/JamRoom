@@ -5,7 +5,75 @@
 
 (() => {
     const state = {
-        calendar: null
+        calendar: null,
+        fullCalendarReadyPromise: null
+    };
+
+    const loadScriptFallback = (src) => new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) {
+            resolve();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        document.body.appendChild(script);
+    });
+
+    const loadStyleFallback = (href) => new Promise((resolve) => {
+        if (document.querySelector(`link[href="${href}"]`)) {
+            resolve();
+            return;
+        }
+
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.onload = resolve;
+        link.onerror = resolve;
+        document.head.appendChild(link);
+    });
+
+    const ensureFullCalendarLoaded = async () => {
+        if (window.FullCalendar && window.FullCalendar.Calendar) {
+            return window.FullCalendar;
+        }
+
+        if (state.fullCalendarReadyPromise) {
+            return state.fullCalendarReadyPromise;
+        }
+
+        const jsUrl = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js';
+        const cssUrl = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css';
+
+        state.fullCalendarReadyPromise = (async () => {
+            if (window.LazyLoader) {
+                await Promise.all([
+                    window.LazyLoader.loadStylesheet(cssUrl),
+                    window.LazyLoader.loadFullCalendar()
+                ]);
+            } else {
+                await Promise.all([
+                    loadStyleFallback(cssUrl),
+                    loadScriptFallback(jsUrl)
+                ]);
+            }
+
+            if (!window.FullCalendar || !window.FullCalendar.Calendar) {
+                throw new Error('FullCalendar failed to initialize.');
+            }
+
+            return window.FullCalendar;
+        })();
+
+        try {
+            return await state.fullCalendarReadyPromise;
+        } finally {
+            state.fullCalendarReadyPromise = null;
+        }
     };
 
     const buildEventTitle = (booking) => {
@@ -23,10 +91,16 @@
         return `Booking Details:\nName: ${booking.userName}\nEmail: ${booking.userEmail}\nBand: ${booking.bandName || 'N/A'}\nRentals:\n${rentalsDisplay}\nPrice: ₹${booking.price}\nStatus: ${booking.status}\nPayment: ${booking.paymentStatus}\nNotes: ${booking.notes || 'N/A'}`;
     };
 
-    const initCalendar = ({ fullCalendar, loadCalendar }) => {
-        if (!fullCalendar || !fullCalendar.Calendar) {
-            console.error('FullCalendar is not available.');
-            return;
+    const initCalendar = async ({ fullCalendar, loadCalendar }) => {
+        let calendarLib = fullCalendar;
+
+        if (!calendarLib || !calendarLib.Calendar) {
+            try {
+                calendarLib = await ensureFullCalendarLoaded();
+            } catch (error) {
+                console.error('FullCalendar is not available.', error);
+                return;
+            }
         }
 
         if (state.calendar) {
@@ -56,7 +130,7 @@
             yearSelect.appendChild(option);
         }
 
-        state.calendar = new fullCalendar.Calendar(calendarEl, {
+        state.calendar = new calendarLib.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             headerToolbar: {
                 left: 'prev,next today',
