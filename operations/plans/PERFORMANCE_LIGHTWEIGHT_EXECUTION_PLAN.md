@@ -32,6 +32,29 @@ Reduce initial page load time and interaction delay across Book Now, Admin, My B
 ## Phase 0 - Baseline and guardrails (no behavior changes)
 Objective: measure before changing.
 
+Status: In progress (started on 2026-05-09).
+
+Implemented baseline hooks:
+- Client telemetry capture wired on major pages via /js/shared/perf-baseline.js:
+  - /booking.html
+  - /admin.html
+  - /my-bookings.html
+  - /account.html
+- Server payload-size capture for list endpoints:
+  - /api/bookings/my-bookings
+  - /api/admin/bookings
+- Metrics API for baseline snapshots:
+  - POST /api/test/perf-metrics
+  - GET /api/test/perf-baseline
+  - DELETE /api/test/perf-baseline
+
+How to collect baseline now:
+1. Reset previous samples: DELETE /api/test/perf-baseline
+2. Visit each target page (hard refresh once per page, then normal refresh)
+3. Exercise list APIs by opening My Bookings and Admin Bookings
+4. Fetch summary: GET /api/test/perf-baseline
+5. Optional page-specific summary: GET /api/test/perf-baseline?page=booking
+
 Tasks:
 - Add simple performance telemetry for each major page:
   - FCP, LCP, TTI proxy (DOMContentLoaded + first user interaction readiness), transferred KB.
@@ -50,6 +73,15 @@ Acceptance:
 
 ## Phase 1 - Static delivery optimization (high ROI, low risk)
 Objective: reduce transfer + parse time without functional changes.
+
+Status: In progress (started on 2026-05-09).
+
+Implemented so far:
+- Added compression middleware in server startup pipeline.
+- Added explicit static cache headers:
+  - HTML: no-cache
+  - JS/CSS/images/fonts and similar static assets: public, max-age=2592000, immutable
+- Kept ETag/Last-Modified enabled for static responses.
 
 Tasks:
 - Add compression middleware (gzip + brotli where available).
