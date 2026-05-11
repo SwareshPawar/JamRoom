@@ -325,12 +325,52 @@
     };
 
     const getNormalizedPriceAdjustment = () => {
-        const rawType = document.getElementById('editPriceAdjustmentType')?.value;
+        const adjustmentTypeEl = document.getElementById('editPriceAdjustmentType');
+        const adjustmentAmountEl = document.getElementById('editPriceAdjustmentAmount');
+
+        if (!adjustmentTypeEl || !adjustmentAmountEl) {
+            const booking = state.currentEditingBookingData || {};
+            const fallbackType = Number(booking?.priceAdjustmentValue || 0) < 0
+                ? 'discount'
+                : Number(booking?.priceAdjustmentValue || 0) > 0
+                    ? 'surcharge'
+                    : 'none';
+            const resolvedType = ['none', 'discount', 'surcharge'].includes(String(booking?.priceAdjustmentType || '').toLowerCase())
+                ? String(booking.priceAdjustmentType).toLowerCase()
+                : fallbackType;
+            const resolvedAmount = Number.isFinite(Number(booking?.priceAdjustmentAmount))
+                ? Number(booking.priceAdjustmentAmount)
+                : Math.abs(Number(booking?.priceAdjustmentValue || 0));
+
+            if (resolvedType === 'discount') {
+                return {
+                    type: 'discount',
+                    amount: Math.max(0, resolvedAmount),
+                    signedValue: -Math.max(0, resolvedAmount)
+                };
+            }
+
+            if (resolvedType === 'surcharge') {
+                return {
+                    type: 'surcharge',
+                    amount: Math.max(0, resolvedAmount),
+                    signedValue: Math.max(0, resolvedAmount)
+                };
+            }
+
+            return {
+                type: 'none',
+                amount: 0,
+                signedValue: 0
+            };
+        }
+
+        const rawType = adjustmentTypeEl.value;
         const normalizedType = ['discount', 'surcharge'].includes(String(rawType || '').trim().toLowerCase())
             ? String(rawType).trim().toLowerCase()
             : 'none';
 
-        const parsedAmount = Number(document.getElementById('editPriceAdjustmentAmount')?.value || 0);
+        const parsedAmount = Number(adjustmentAmountEl.value || 0);
         const normalizedAmount = Number.isFinite(parsedAmount) && parsedAmount > 0
             ? parsedAmount
             : 0;
@@ -551,6 +591,27 @@
             }
 
             const adjustment = getNormalizedPriceAdjustment();
+            const adjustmentNoteInput = document.getElementById('editPriceAdjustmentNote');
+            const resolvedAdjustmentNote = adjustmentNoteInput
+                ? (adjustmentNoteInput.value || '')
+                : (state.currentEditingBookingData?.priceAdjustmentNote || '');
+            const paymentStatusInput = document.getElementById('editPaymentStatus');
+            const amountPaidInput = document.getElementById('editAmountPaid');
+            const paymentReferenceInput = document.getElementById('editPaymentReference');
+            const paymentNoteInput = document.getElementById('editPaymentNote');
+
+            const resolvedPaymentStatus = paymentStatusInput
+                ? String(paymentStatusInput.value || 'PENDING').toUpperCase()
+                : String(state.currentEditingBookingData?.paymentStatus || 'PENDING').toUpperCase();
+            const resolvedAmountPaid = amountPaidInput
+                ? Number(amountPaidInput.value || 0)
+                : Number(state.currentEditingBookingData?.amountPaid || 0);
+            const resolvedPaymentReference = paymentReferenceInput
+                ? String(paymentReferenceInput.value || '').trim()
+                : String(state.currentEditingBookingData?.paymentReference || '').trim();
+            const resolvedPaymentNote = paymentNoteInput
+                ? String(paymentNoteInput.value || '').trim()
+                : String(state.currentEditingBookingData?.paymentNote || '').trim();
 
             const formData = {
                 date: document.getElementById('editDate')?.value,
@@ -571,11 +632,11 @@
                 totalAmount: pricing.totalAmount,
                 priceAdjustmentType: adjustment.type,
                 priceAdjustmentAmount: adjustment.amount,
-                priceAdjustmentNote: document.getElementById('editPriceAdjustmentNote')?.value || '',
-                paymentStatus: (document.getElementById('editPaymentStatus')?.value || 'PENDING').toUpperCase(),
-                amountPaid: Number(document.getElementById('editAmountPaid')?.value || 0),
-                paymentReference: (document.getElementById('editPaymentReference')?.value || '').trim(),
-                paymentNote: (document.getElementById('editPaymentNote')?.value || '').trim(),
+                priceAdjustmentNote: resolvedAdjustmentNote,
+                paymentStatus: resolvedPaymentStatus,
+                amountPaid: resolvedAmountPaid,
+                paymentReference: resolvedPaymentReference,
+                paymentNote: resolvedPaymentNote,
                 notes: document.getElementById('editNotes')?.value
             };
 

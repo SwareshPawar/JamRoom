@@ -514,6 +514,14 @@ const sendUnifiedBookingConfirmationEmails = async ({
   });
   const dueAmount = Math.max(0, Number(booking.price || 0) - collectedAmount);
   const classSession = booking?.classSession || {};
+  const bookingLevelDiscount = Number(booking?.priceAdjustmentValue || 0) < 0
+    ? Math.abs(Number(booking.priceAdjustmentValue || 0))
+    : 0;
+  const classPlanDiscountAmount = classSession.isClassBooking
+    ? Math.max(0, Number(classSession.discountAmount || 0))
+    : 0;
+  const totalDiscountAmount = bookingLevelDiscount + classPlanDiscountAmount;
+  const payableNowLabel = dueAmount > 0 ? 'Payable Now' : 'Paid in Full';
   const classSessionHtml = classSession.isClassBooking
     ? `
           <li><strong>Class Instrument:</strong> ${classSession.instrument || 'Music'}</li>
@@ -557,6 +565,22 @@ const sendUnifiedBookingConfirmationEmails = async ({
     `;
   })();
 
+  const discountHighlightHtml = totalDiscountAmount > 0
+    ? `
+      <div style="margin:14px 0 12px;padding:14px 16px;border-radius:12px;border:1px solid #86efac;background:linear-gradient(135deg,#ecfdf3 0%,#d9fbe8 100%);">
+        <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#166534;font-weight:800;">Discount Applied</div>
+        <div style="margin-top:4px;font-size:30px;line-height:1.1;font-weight:800;color:#14532d;">-₹${totalDiscountAmount.toFixed(2)}</div>
+      </div>
+    `
+    : '';
+
+  const payableHighlightHtml = `
+    <div style="margin:0 0 14px;padding:14px 16px;border-radius:12px;border:1px solid ${dueAmount > 0 ? '#fca5a5' : '#86efac'};background:${dueAmount > 0 ? 'linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%)' : 'linear-gradient(135deg,#ecfdf3 0%,#d9fbe8 100%)'};">
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${dueAmount > 0 ? '#9a3412' : '#166534'};font-weight:800;">${payableNowLabel}</div>
+      <div style="margin-top:4px;font-size:34px;line-height:1.05;font-weight:900;color:${dueAmount > 0 ? '#7c2d12' : '#14532d'};">₹${dueAmount.toFixed(2)}</div>
+    </div>
+  `;
+
   // Send confirmation email to customer.
   try {
     await sendEmail({
@@ -579,6 +603,8 @@ const sendUnifiedBookingConfirmationEmails = async ({
           ${classSessionHtml}
           ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
         </ul>
+        ${discountHighlightHtml}
+        ${payableHighlightHtml}
         ${calendarInvite ? '<p>A calendar invite is attached to this email.</p>' : ''}
         ${paymentMessageByStatus}
         <p>Looking forward to seeing you at ${studioLabel}!</p>

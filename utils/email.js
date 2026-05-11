@@ -1,6 +1,9 @@
 const nodemailer = require('nodemailer');
 
 const JAMROOM_SITE_URL = 'https://jam-room-mu.vercel.app/';
+const BRAND_LOGO_FILE_NAME = 'jamroom-brand-logo.png';
+const BRAND_LOGO_PUBLIC_PATH = `/icons/${BRAND_LOGO_FILE_NAME}`;
+const BRAND_LOGO_URL = `${JAMROOM_SITE_URL.replace(/\/$/, '')}${BRAND_LOGO_PUBLIC_PATH}`;
 
 /**
  * Wraps a bare HTML fragment in a full, styled email document.
@@ -86,8 +89,18 @@ const wrapEmailHtml = (bodyContent) => `<!DOCTYPE html>
           <tr>
             <td class="email-header-td"
               style="background-color:#6c3fc5;padding:24px 24px 18px;text-align:center;">
-              <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">🎸 JamRoom</h1>
-              <p style="margin:5px 0 0;font-size:12px;color:#e8d9ff;">Swar JamRoom &amp; Music Studio</p>
+              <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:12px;">
+                    <img src="${BRAND_LOGO_URL}" alt="JamRoom Logo" width="52" height="52"
+                      style="display:block;width:52px;height:52px;border-radius:10px;object-fit:contain;background:#ffffff;padding:4px;border:1px solid rgba(255,255,255,0.3);" />
+                  </td>
+                  <td style="vertical-align:middle;text-align:left;">
+                    <h1 style="margin:0 0 2px;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">JamRoom</h1>
+                    <p style="margin:0;font-size:12px;color:#e8d9ff;">Swar JamRoom &amp; Music Studio</p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 

@@ -2015,6 +2015,7 @@ router.get('/:id/download-pdf', protect, async (req, res) => {
     console.log('VERCEL environment:', process.env.VERCEL);
     console.log('Available memory:', process.memoryUsage());
     
+    console.log('🔌 Fetching admin settings for PDF generation...');
     const { pdfBuffer, filename } = await generateBillForDownloadWithFilename(booking);
     
     console.log('User PDF generated successfully, size:', pdfBuffer.length, 'filename:', filename);

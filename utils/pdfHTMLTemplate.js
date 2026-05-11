@@ -5,6 +5,8 @@
 
 const { buildServiceGroupSummary } = require('./shared/quotationBilling');
 
+const DEFAULT_BRAND_LOGO_URL = 'https://jam-room-mu.vercel.app/icons/jamroom-brand-logo.png';
+
 /**
  * Format time from 24-hour to 12-hour format
  * @param {string} time24 - Time in 24-hour format (e.g., "14:30")
@@ -98,6 +100,14 @@ const calculatePricing = (booking, settings = null) => {
  * @returns {string} Complete HTML content
  */
 const generateUnifiedPDFHTML = (booking, settings) => {
+    console.log('🔍 PDF Template Debug - Settings Object:', {
+        studioName: settings?.studioName,
+        studioAddress: settings?.studioAddress,
+        studioPhone: settings?.studioPhone,
+        hasSettings: !!settings,
+        settingsKeys: Object.keys(settings || {}).slice(0, 10)
+    });
+    
     const normalizeRentalType = (value) => {
         const raw = String(value || 'inhouse').trim().toLowerCase();
         const compact = raw.replace(/[\s_-]+/g, '');
@@ -185,7 +195,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         ? `<div class="total-row"><span>Class Plan Fee (${classPlanMonths} month${classPlanMonths > 1 ? 's' : ''})</span><strong>₹${classPlanBaseFee.toFixed(2)}</strong></div>`
         : '';
     const classPlanDiscountRow = isClassPlanBooking && classPlanDiscount > 0
-        ? `<div class="total-row"><span>Class Plan Discount</span><strong>-₹${classPlanDiscount.toFixed(2)}</strong></div>`
+        ? `<div class="discount-row"><span>Class Plan Discount</span><strong>-₹${classPlanDiscount.toFixed(2)}</strong></div>`
         : '';
 
     const gstEnabled = settings?.gstConfig?.enabled || false;
@@ -194,8 +204,12 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const gstRow = (gstEnabled && taxAmount > 0)
         ? `<div class="total-row"><span>${gstDisplayName} (${Math.round(gstRate * 100)}%)</span><strong>₹${taxAmount.toFixed(2)}</strong></div>`
         : '';
+    const discountFromAdjustment = adjustmentValue < 0 ? Math.abs(adjustmentValue) : 0;
+    const totalDiscountAmount = classPlanDiscount + discountFromAdjustment;
     const adjustmentRow = adjustmentValue !== 0
-        ? `<div class="total-row"><span>${adjustmentLabel}${adjustmentNote ? ` (${adjustmentNote})` : ''}</span><strong>${adjustmentValue < 0 ? '-' : '+'}₹${Math.abs(adjustmentValue).toFixed(2)}</strong></div>`
+        ? adjustmentValue < 0
+            ? `<div class="discount-row"><span>${adjustmentLabel}${adjustmentNote ? ` (${adjustmentNote})` : ''}</span><strong>-₹${Math.abs(adjustmentValue).toFixed(2)}</strong></div>`
+            : `<div class="total-row"><span>${adjustmentLabel}${adjustmentNote ? ` (${adjustmentNote})` : ''}</span><strong>+₹${Math.abs(adjustmentValue).toFixed(2)}</strong></div>`
         : '';
     const paymentStatusClass = paymentStatus === 'PAID' ? 'paid' : paymentStatus === 'PARTIAL' ? 'partial' : 'pending';
     const paymentMessage = paymentStatus === 'PAID'
@@ -203,6 +217,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         : paymentStatus === 'PARTIAL'
             ? `Partial payment recorded. Kindly settle the remaining balance of ₹${outstandingAmount.toFixed(2)} before your scheduled slot.`
             : `Payment is currently pending. Kindly complete the payment of ₹${outstandingAmount.toFixed(2)} before your scheduled studio slot.`;
+    const payableNowLabel = outstandingAmount > 0 ? 'Payable Now' : 'Paid in Full';
+    const invoiceLogoSrc = String(settings?.logoDataUri || settings?.logoImageUrl || '').trim() || DEFAULT_BRAND_LOGO_URL;
 
     const serviceGroupSections = groupedServiceItems.length > 0
         ? groupedServices.map((group) => {
@@ -277,7 +293,9 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .topbar{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#ffffff;padding:28px 30px 24px}
         .hdr{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}
         .brand{max-width:62%}
-        .brand h1{font-size:26px;font-weight:800;margin-bottom:6px;color:#fff;line-height:1.1}
+        .brand-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+        .brand-logo{width:52px;height:52px;border-radius:10px;object-fit:contain;background:#fff;padding:4px;border:1px solid rgba(255,255,255,0.3);flex-shrink:0}
+        .brand h1{font-size:20px;font-weight:800;margin-bottom:4px;color:#fff;line-height:1.2}
         .brand .tagline{font-size:12px;color:rgba(255,255,255,0.72);margin-bottom:10px;letter-spacing:0.5px}
         .brand .cl{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88)}
         .invoice-panel{min-width:220px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:18px 18px 16px}
@@ -318,11 +336,18 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .totals-card{background:#0f172a;color:#fff;border-radius:22px;padding:20px 22px;margin:18px 0;break-inside:avoid;page-break-inside:avoid}
         .totals-card h3{font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:#cbd5e1;margin-bottom:12px}
         .total-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;font-size:14px;color:#e2e8f0}
+        .discount-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;font-size:14px;color:#86efac;border-left:3px solid #22c55e;padding-left:8px;margin:2px 0}
+        .discount-row strong{font-size:14px;color:#86efac}
         .grand-total{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-top:12px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.14)}
         .grand-total span{font-size:13px;text-transform:uppercase;letter-spacing:1.2px;color:#93c5fd;font-weight:700}
-        .grand-total strong{font-size:32px;color:#ffffff;line-height:1}
-        .received-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0 4px;font-size:14px;color:#86efac;border-top:1px solid rgba(255,255,255,0.1);margin-top:10px}
-        .due-row{display:flex;justify-content:space-between;gap:16px;padding:4px 0;font-size:14px;color:#fca5a5;font-weight:700}
+        .grand-total strong{font-size:24px;color:#ffffff;line-height:1}
+        .received-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0 4px;font-size:13px;color:#86efac;border-top:1px solid rgba(255,255,255,0.1);margin-top:10px}
+        .due-row{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:10px 14px;margin-top:8px;border-radius:12px;background:linear-gradient(135deg,#7f1d1d 0%,#b91c1c 100%);border:1px solid rgba(252,165,165,0.4)}
+        .due-row span{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:#fecaca;font-weight:700}
+        .due-row strong{font-size:22px;line-height:1;color:#fee2e2;font-weight:800}
+        .due-row.settled{background:linear-gradient(135deg,#14532d 0%,#166534 100%);border-color:rgba(134,239,172,0.4)}
+        .due-row.settled span{color:#bbf7d0}
+        .due-row.settled strong{color:#dcfce7}
         .payment-card{border-radius:18px;padding:16px 18px;margin:0 0 18px;break-inside:avoid;page-break-inside:avoid}
         .payment-card.paid{background:#dcfce7;border:1px solid #86efac}
         .payment-card.partial{background:#fff4d6;border:1px solid #ffd166}
@@ -352,8 +377,13 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     <div class="topbar">
         <div class="hdr">
             <div class="brand">
-                <h1>${settings?.studioName || 'JamRoom'}</h1>
-                <div class="tagline">Professional Music Studio</div>
+                <div class="brand-head">
+                    <img class="brand-logo" src="${invoiceLogoSrc}" alt="Logo" />
+                    <div>
+                        <h1>${settings?.studioName || 'JamRoom'}</h1>
+                        <div class="tagline">Professional Jam Room & Music Studio</div>
+                    </div>
+                </div>
                 ${settings?.studioAddress ? `<div class="cl"><strong>Address:</strong> ${settings.studioAddress}</div>` : ''}
                 ${settings?.studioPhone ? `<div class="cl"><strong>Phone / WhatsApp:</strong> ${settings.studioPhone}</div>` : ''}
                 <div class="cl"><strong>Email:</strong> ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</div>
@@ -421,7 +451,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         </div>
 
         <div class="footer">
-            <div>For any queries, contact <strong>${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</strong></div>
+            <div>For any queries, contact <strong>${settings?.adminEmails?.[0] || 'swarjrs@gmail.com'}</strong></div>
             <div style="margin-top:6px;opacity:0.7;">This is a computer-generated invoice. No signature required.</div>
         </div>
     </div>

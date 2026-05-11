@@ -225,12 +225,20 @@
 
 .instagram-embed-card {
     position: relative;
-    min-height: 120px;
+    --instagram-card-height: clamp(420px, 55vw, 620px);
+    height: var(--instagram-card-height);
+    min-height: var(--instagram-card-height);
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+    background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-elevated));
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.14);
+    overflow: hidden;
 }
 
 .instagram-loader {
     position: absolute;
-    inset: 0;
+    inset: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -258,13 +266,30 @@
 
 .instagram-grid .instagram-media {
     margin: 0 !important;
+    display: block !important;
     min-width: 100% !important;
     width: 100% !important;
     max-width: 100% !important;
-    border-radius: 12px;
-    border: 1px solid var(--border-color-light);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    height: 100% !important;
+    min-height: 100% !important;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--border-color-light) 72%, transparent);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     overflow: hidden;
+}
+
+.instagram-grid .instagram-media-rendered,
+.instagram-grid .instagram-media iframe {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    border-radius: 10px !important;
+}
+
+:root[data-theme='dark'] .instagram-embed-card {
+    border-color: color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+    background: color-mix(in srgb, var(--surface-2) 82%, var(--surface-elevated));
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.3);
 }
 
 /* Mobile responsive styles - most are now in shared.css */
@@ -328,6 +353,10 @@
     .instagram-grid {
         grid-template-columns: 1fr;
         gap: 12px;
+    }
+
+    .instagram-embed-card {
+        --instagram-card-height: clamp(440px, 120vw, 620px);
     }
 }
 

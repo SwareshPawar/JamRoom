@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Admin Booking Routes
  * Handles: calendar view, availability, list/filter, approve, reject, delete,
  *          edit, send-ebill, download-pdf, create booking
@@ -49,6 +49,48 @@ const {
   DEFAULT_ADMIN_CREATED_USER_PASSWORD,
   normalizeIndianMobile
 } = require('../../utils/adminHelpers');
+
+// Class booking helpers used by admin create-booking flow.
+const adminCalcEndTime = (startTime, durationHours) => {
+  const [h, m] = String(startTime || '09:00').split(':').map(Number);
+  const totalMin = h * 60 + m + Math.round(durationHours * 60);
+  return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+};
+
+const WEEKDAY_MAP = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+const adminGetNextWeekdayOnOrAfter = (baseDate, weekdayName) => {
+  const targetDay = WEEKDAY_MAP[String(weekdayName || '').toLowerCase().trim()];
+  if (targetDay === undefined) return null;
+  const d = new Date(baseDate);
+  const diff = (targetDay - d.getDay() + 7) % 7;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const adminBuildClassLessons = ({ planStartDate, startTime, endTime, totalClassesPlanned, weeksPerMonthWindow }) => {
+  const lessons = [];
+  const classes = Math.max(0, Number(totalClassesPlanned || 0));
+  const wpmw = Math.max(1, Number(weeksPerMonthWindow || 5));
+  for (let i = 0; i < classes; i++) {
+    const d = new Date(planStartDate);
+    d.setDate(d.getDate() + i * 7);
+    lessons.push({
+      weekNumber: i + 1,
+      classNumber: i + 1,
+      scheduledDate: d,
+      scheduledStartTime: startTime,
+      scheduledEndTime: endTime,
+      isCompleted: false
+    });
+  }
+  return lessons;
+};
+
+const adminGetClassMonthKey = (date) => {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
 const resolveDeletedFilterMode = (value) => {
   const normalized = String(value || 'active').trim().toLowerCase();
@@ -1059,6 +1101,21 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
         ? `<p style="color: #8a5700; line-height: 1.7; margin: 0;">We have received a partial payment of <strong>₹${collectedAmount.toFixed(2)}</strong>. The remaining balance is <strong>₹${outstandingAmount.toFixed(2)}</strong>. Kindly clear the outstanding amount before your scheduled studio slot.</p>`
         : `<p style="color: #856404; line-height: 1.7; margin: 0;">Payment for this booking is currently pending. Kindly clear the due amount of <strong>₹${outstandingAmount.toFixed(2)}</strong> before your scheduled studio slot to keep records up to date.</p>`;
 
+    const BRAND_LOGO_EMAIL_URL = 'https://jam-room-mu.vercel.app/icons/jamroom-brand-logo.png';
+    const discountFromAdjustment = signedAdjustment < 0 ? Math.abs(signedAdjustment) : 0;
+    const totalDiscountAmountForEmail = discountFromAdjustment;
+    const discountHighlightHtml = totalDiscountAmountForEmail > 0
+      ? `<div style="margin:14px 0 12px;padding:14px 16px;border-radius:12px;border:1px solid #86efac;background:linear-gradient(135deg,#ecfdf3 0%,#d9fbe8 100%);">
+          <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#166534;font-weight:800;">&#127381; Discount Applied</div>
+          <div style="margin-top:4px;font-size:30px;line-height:1.1;font-weight:800;color:#14532d;">-&#8377;${totalDiscountAmountForEmail.toFixed(2)}</div>
+          <div style="font-size:12px;color:#166534;margin-top:4px;">You saved &#8377;${totalDiscountAmountForEmail.toFixed(2)} on this booking</div>
+        </div>`
+      : '';
+    const payableHighlightHtml = `<div style="margin:14px 0 10px;padding:14px 16px;border-radius:12px;border:1px solid ${outstandingAmount > 0 ? '#fca5a5' : '#86efac'};background:${outstandingAmount > 0 ? 'linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%)' : 'linear-gradient(135deg,#ecfdf3 0%,#d9fbe8 100%)'};">
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${outstandingAmount > 0 ? '#9a3412' : '#166534'};font-weight:800;">${outstandingAmount > 0 ? '&#9888;&#65039; Outstanding Balance' : '&#10003; Paid in Full'}</div>
+      <div style="margin-top:4px;font-size:34px;line-height:1.05;font-weight:900;color:${outstandingAmount > 0 ? '#7c2d12' : '#14532d'};">&#8377;${outstandingAmount.toFixed(2)}</div>
+      ${outstandingAmount > 0 ? `<div style="font-size:12px;color:#9a3412;margin-top:4px;">Please clear the balance before your scheduled slot</div>` : `<div style="font-size:12px;color:#166534;margin-top:4px;">Your account is fully settled &#10003;</div>`}
+    </div>`;
     const emailSubject = `Invoice for Your ${settings?.studioName || 'JamRoom'} Booking - ${displayDate}`;
     const emailHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -1135,7 +1192,16 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
       <table class="hdr-table" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">
         <tr>
           <td class="hdr-left" style="vertical-align:top;padding-right:12px;">
-            <h2>${settings?.studioName || 'JamRoom'}</h2>
+            <table cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+              <tr>
+                <td style="vertical-align:middle;padding-right:10px;">
+                  <img src="${BRAND_LOGO_EMAIL_URL}" alt="${settings?.studioName || 'JamRoom'} Logo" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:10px;object-fit:contain;background:#ffffff;padding:4px;border:1px solid rgba(255,255,255,0.3);" />
+                </td>
+                <td style="vertical-align:middle;">
+                  <h2 style="margin:0;font-size:18px;color:#fff;">${settings?.studioName || 'JamRoom'}</h2>
+                </td>
+              </tr>
+            </table>
             <div class="cl"><strong>Invoice Date:</strong> ${displayDate}</div>
             ${settings?.studioAddress ? `<div class="cl"><strong>Address:</strong> ${settings.studioAddress}</div>` : ''}
             ${settings?.studioPhone ? `<div class="cl"><strong>Phone / WhatsApp:</strong> ${settings.studioPhone}</div>` : ''}
@@ -1193,12 +1259,14 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
           ${booking.paymentNote ? `<tr><td>Payment Note</td><td>${booking.paymentNote}</td></tr>` : ''}
         </table>
       </div>
+      ${discountHighlightHtml}
+      ${payableHighlightHtml}
       <div class="totals-card">
         <h3>Amount Summary</h3>
         <table class="totals-table" cellpadding="0" cellspacing="0" border="0">
           <tr><td>Subtotal</td><td><strong>₹${subtotal.toFixed(2)}</strong></td></tr>
           ${gstEnabled ? `<tr><td>${gstDisplayName} (${Math.round(gstRate * 100)}%)</td><td><strong>₹${taxAmount.toFixed(2)}</strong></td></tr>` : ''}
-          ${signedAdjustment !== 0 ? `<tr><td>${adjustmentLabel}</td><td><strong>${signedAdjustment < 0 ? '-' : '+'}₹${adjustmentDisplayAmount.toFixed(2)}</strong></td></tr>` : ''}
+          ${signedAdjustment !== 0 ? `<tr><td>${adjustmentLabel}</td><td><strong style="${signedAdjustment < 0 ? 'color:#166534;font-size:15px;font-weight:800;' : ''}">${signedAdjustment < 0 ? '-' : '+'}₹${adjustmentDisplayAmount.toFixed(2)}</strong></td></tr>` : ''}
           <tr class="totals-divider"><td>Total Amount</td><td><strong>₹${totalAmount.toFixed(2)}</strong></td></tr>
           <tr><td style="color:#166534;font-weight:600;">Amount Received</td><td style="text-align:right;white-space:nowrap;"><strong style="color:#166534;">₹${collectedAmount.toFixed(2)}</strong></td></tr>
           <tr><td style="${outstandingAmount > 0 ? 'color:#dc2626;font-weight:700;' : 'color:#166534;'}">Outstanding</td><td style="text-align:right;white-space:nowrap;"><strong style="${outstandingAmount > 0 ? 'color:#dc2626;' : 'color:#166534;'}">₹${outstandingAmount.toFixed(2)}</strong></td></tr>
@@ -1887,9 +1955,9 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     const {
       userId,
       date,
-      startTime,
-      endTime,
-      duration,
+      startTime: reqStartTime,
+      endTime: reqEndTime,
+      duration: reqDuration,
       rentals,
       subtotal,
       rentalType,
@@ -1902,21 +1970,44 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       paymentStatus,
       amountPaid,
       paymentReference,
-      paymentNote
+      paymentNote,
+      classLocation,
+      classPreferredWeekday,
+      classPreferredStartTime,
+      classPlanMonths: reqClassPlanMonths,
+      perDayStartDate,
+      perDayEndDate,
+      perDayPickupTime,
+      perDayReturnTime,
+      perDayDays: reqPerDayDays
     } = req.body;
 
     const shouldOverrideDateTime = overrideDateTime === true || String(overrideDateTime).toLowerCase() === 'true';
+    const isAdminClassBooking = !!(classLocation && classPreferredWeekday);
+    const isAdminPerdayBooking = String(req.body.bookingMode || '').toLowerCase() === 'perday';
+    const startTime = isAdminClassBooking ? (classPreferredStartTime || '09:00') : (isAdminPerdayBooking ? (perDayPickupTime || '09:00') : reqStartTime);
+    const endTime = isAdminClassBooking ? null : (isAdminPerdayBooking ? (perDayReturnTime || '18:00') : reqEndTime);
+    const duration = isAdminClassBooking ? 1 : (isAdminPerdayBooking ? (Number(reqPerDayDays || 1) * 24) : reqDuration);
     const requestedPaymentStatus = paymentStatus;
     const requestedAmountPaid = amountPaid;
     const normalizedPaymentReference = String(paymentReference || '').trim();
     const normalizedPaymentNote = String(paymentNote || '').trim();
     const enforcedBookingStatus = 'CONFIRMED';
 
-    if (!userId || !date || !startTime || !endTime || !duration || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide userId, date, startTime, endTime, duration, and at least one rental'
-      });
+    if (!userId || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide userId and at least one rental' });
+    }
+    if (isAdminClassBooking) {
+      if (!classPreferredWeekday) return res.status(400).json({ success: false, message: 'Please select a preferred weekday for class booking' });
+      if (!classPreferredStartTime) return res.status(400).json({ success: false, message: 'Please select a class start time' });
+      if (!classLocation) return res.status(400).json({ success: false, message: 'Please select a class location' });
+    } else if (isAdminPerdayBooking) {
+      if (!perDayStartDate) return res.status(400).json({ success: false, message: 'Please provide a pickup date' });
+      if (!perDayEndDate) return res.status(400).json({ success: false, message: 'Please provide a return date' });
+    } else {
+      if (!date || !startTime || !endTime || !duration) {
+        return res.status(400).json({ success: false, message: 'Please provide date, startTime, endTime, and duration' });
+      }
     }
 
     const selectedUser = await User.findById(userId).select('name email mobile role forcePasswordReset');
@@ -1936,19 +2027,24 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       }
     }
 
-    if (duration < 1) {
-      return res.status(400).json({
-        success: false,
-        message: 'Duration must be at least 1 hour'
-      });
+    // Mode-aware booking date resolution
+    let bookingDate;
+    let effectiveStartTime = startTime;
+    let effectiveEndTime = endTime;
+    let effectiveDuration = duration;
+
+    if (isAdminPerdayBooking) {
+      bookingDate = parseDateInputToStartOfDay(perDayStartDate);
+    } else if (isAdminClassBooking) {
+      // For class bookings, use today as the plan start (admin override)
+      bookingDate = parseDateInputToStartOfDay(date || new Date().toISOString().split('T')[0]);
+      if (!bookingDate) bookingDate = new Date(new Date().toDateString());
+    } else {
+      bookingDate = parseDateInputToStartOfDay(date);
     }
 
-    const bookingDate = parseDateInputToStartOfDay(date);
     if (!bookingDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid booking date. Use YYYY-MM-DD format.'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid booking date. Use YYYY-MM-DD format.' });
     }
 
     const checkTimeConflict = (start1, end1, start2, end2) => {
@@ -1959,7 +2055,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       return (timeToMinutes(start1) < timeToMinutes(end2) && timeToMinutes(end1) > timeToMinutes(start2));
     };
 
-    if (!shouldOverrideDateTime) {
+    if (!shouldOverrideDateTime && !isAdminClassBooking && !isAdminPerdayBooking) {
       const existingBookings = await Booking.find({
         date: bookingDate,
         bookingStatus: 'CONFIRMED',
@@ -1967,7 +2063,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       });
 
       for (const booking of existingBookings) {
-        if (checkTimeConflict(startTime, endTime, booking.startTime, booking.endTime)) {
+        if (checkTimeConflict(effectiveStartTime, effectiveEndTime, booking.startTime, booking.endTime)) {
           return res.status(400).json({
             success: false,
             message: `Time conflict with existing booking (${formatTimeRange12Hour(booking.startTime, booking.endTime)})`
@@ -1977,14 +2073,14 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
 
       const blockedTimes = await BlockedTime.find({ date: bookingDate });
       for (const blocked of blockedTimes) {
-        if (checkTimeConflict(startTime, endTime, blocked.startTime, blocked.endTime)) {
+        if (checkTimeConflict(effectiveStartTime, effectiveEndTime, blocked.startTime, blocked.endTime)) {
           return res.status(400).json({
             success: false,
             message: `This time slot is blocked by admin (${formatTimeRange12Hour(blocked.startTime, blocked.endTime)})`
           });
         }
       }
-    } else {
+    } else if (!isAdminClassBooking && !isAdminPerdayBooking) {
       console.log('ℹ️ Admin booking override enabled: skipping conflict and blocked-time checks');
     }
 
@@ -2029,12 +2125,71 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
     const rentalTypeSummary = deriveDynamicBookingLabel(rentals, rentalType);
 
+    // Build classSession for class bookings
+    let classSession = null;
+    if (isAdminClassBooking) {
+      const classConfig = settings.classConfig || {};
+      const monthlyFee = Math.max(0, Number(classConfig.monthlyFee || 2000));
+      const classesPerMonth = Math.max(1, Number(classConfig.classesPerMonth || 4));
+      const sessionDurationHours = Math.max(1, Number(classConfig.sessionDurationHours || 1));
+      const weeksPerMonthWindow = Math.max(1, Number(classConfig.weeksPerMonthWindow || 5));
+      const selectedPlanMonths = Math.max(1, Number(reqClassPlanMonths || 1));
+      const multiMonthDiscounts = Array.isArray(classConfig.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [];
+      const discountEntry = multiMonthDiscounts.find((d) => Number(d.months) === selectedPlanMonths);
+      const totalFeeBeforeDiscount = monthlyFee * selectedPlanMonths;
+      const discountAmount = discountEntry ? Math.round(totalFeeBeforeDiscount * Number(discountEntry.discountPercent || 0) / 100) : 0;
+      const totalFeeAfterDiscount = Math.max(0, totalFeeBeforeDiscount - discountAmount);
+      const normalizedPreferredWeekday = String(classPreferredWeekday || '').trim().toLowerCase();
+      const firstClassDate = adminGetNextWeekdayOnOrAfter(bookingDate, normalizedPreferredWeekday) || bookingDate;
+      effectiveStartTime = String(classPreferredStartTime || '09:00').trim();
+      effectiveEndTime = adminCalcEndTime(effectiveStartTime, sessionDurationHours);
+      effectiveDuration = sessionDurationHours;
+      bookingDate = firstClassDate;
+      const totalClassesPlanned = classesPerMonth * selectedPlanMonths;
+      const planEndDate = new Date(bookingDate);
+      planEndDate.setDate(planEndDate.getDate() + selectedPlanMonths * weeksPerMonthWindow * 7);
+      const lessons = adminBuildClassLessons({ planStartDate: bookingDate, startTime: effectiveStartTime, endTime: effectiveEndTime, totalClassesPlanned, weeksPerMonthWindow });
+      const instrument = (rentals[0]?.name || '').trim();
+      classSession = {
+        isClassBooking: true,
+        location: String(classLocation || '').trim(),
+        instrument,
+        classMonth: adminGetClassMonthKey(bookingDate),
+        monthlyFee,
+        classesPerMonth,
+        classNumberInMonth: 1,
+        classesRemainingAfterBooking: totalClassesPlanned,
+        monthlyFeeDueNow: totalFeeAfterDiscount,
+        planMonths: selectedPlanMonths,
+        weeksPerMonthWindow,
+        planStartDate: bookingDate,
+        planEndDate,
+        totalClassesPlanned,
+        completedClassesCount: 0,
+        selectedClassItemName: instrument,
+        preferredWeekday: normalizedPreferredWeekday,
+        preferredStartTime: effectiveStartTime,
+        preferredEndTime: effectiveEndTime,
+        totalFeeBeforeDiscount,
+        discountAmount,
+        totalFeeAfterDiscount,
+        lessons
+      };
+    }
+
     const booking = await Booking.create({
       userId: selectedUser._id,
+      ...(isAdminPerdayBooking ? { bookingMode: 'perday' } : {}),
       date: bookingDate,
-      startTime,
-      endTime,
-      duration,
+      startTime: effectiveStartTime,
+      endTime: effectiveEndTime,
+      duration: effectiveDuration,
+      ...(isAdminPerdayBooking ? {
+        perDayStartDate: parseDateInputToStartOfDay(perDayStartDate),
+        perDayEndDate: parseDateInputToStartOfDay(perDayEndDate),
+        perDayDays: Number(reqPerDayDays || 1)
+      } : {}),
+      ...(classSession ? { classSession } : {}),
       rentalType: rentalTypeSummary,
       rentals: rentals,
       subtotal: calculatedSubtotal,
@@ -2049,7 +2204,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       userMobile: selectedUser.mobile,
       bandName,
       notes: shouldOverrideDateTime
-        ? `${notes ? `${notes}\n` : ''}[Admin Override] Date/time checks bypassed for historical booking entry.`
+        ? `${notes ? `${notes}\n` : ""}[Admin Override] Date/time checks bypassed for historical booking entry.`
         : notes,
       paymentStatus: normalizedPaymentTracking.paymentStatus,
       amountPaid: normalizedPaymentTracking.amountPaid,
@@ -2075,8 +2230,8 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         itemTotal = rental.price * rental.quantity;
         return `${rental.name} × ${rental.quantity} (per session) - ₹${itemTotal}`;
       } else {
-        itemTotal = rental.price * rental.quantity * duration;
-        return `${rental.name} × ${rental.quantity} × ${duration}h - ₹${itemTotal}`;
+        itemTotal = rental.price * rental.quantity * effectiveDuration;
+        return `${rental.name} × ${rental.quantity} × ${effectiveDuration}h - ₹${itemTotal}`;
       }
     }).join('\n');
 
@@ -2085,8 +2240,8 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       description: `Booking confirmed for ${selectedUser.name}${bandName ? ` (${bandName})` : ''}`,
       location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
       startDate: formatDateAsYmdInIst(new Date(bookingDate)),
-      startTime,
-      endTime,
+      startTime: effectiveStartTime,
+      endTime: effectiveEndTime,
       attendees: [selectedUser.email, ...adminNotificationEmails],
       studioName: settings.studioName || 'Swar JamRoom',
       uid: booking.calendarUid,
@@ -2119,8 +2274,8 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         await sendBookingConfirmationWhatsApp(selectedUser.mobile, {
           bookingId: booking._id,
           date: displayDate,
-          startTime,
-          endTime,
+          startTime: effectiveStartTime,
+          endTime: effectiveEndTime,
           totalAmount: calculatedTotalAmount,
           rentals: rentalsWhatsAppSummary,
           status: enforcedBookingStatus,
@@ -2137,8 +2292,8 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         userEmail: selectedUser.email,
         userMobile: selectedUser.mobile,
         date: displayDate,
-        startTime,
-        endTime,
+        startTime: effectiveStartTime,
+        endTime: effectiveEndTime,
         totalAmount: calculatedTotalAmount,
         bookingId: booking._id,
         bandName,
@@ -2164,6 +2319,11 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         startTime: populatedBooking.startTime,
         endTime: populatedBooking.endTime,
         duration: populatedBooking.duration,
+        bookingMode: populatedBooking.bookingMode || 'hourly',
+        perDayStartDate: populatedBooking.perDayStartDate,
+        perDayEndDate: populatedBooking.perDayEndDate,
+        perDayDays: populatedBooking.perDayDays,
+        classSession: populatedBooking.classSession,
         rentals: populatedBooking.rentals,
         subtotal: populatedBooking.subtotal,
         taxAmount: populatedBooking.taxAmount,

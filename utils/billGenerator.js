@@ -8,7 +8,8 @@ const { buildServiceGroupSummary } = require('./shared/quotationBilling');
 // Check if we're in a serverless environment
 const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
 const DEFAULT_STUDIO_WEBSITE = 'https://jam-room-mu.vercel.app/';
-const QUOTATION_LOGO_PATH = path.join(__dirname, '..', 'public', 'icons', 'jamroom-192.png');
+const BRAND_LOGO_FILE_NAME = 'jamroom-brand-logo.png';
+const BRAND_LOGO_PRIMARY_PATH = path.join(__dirname, '..', 'public', 'icons', BRAND_LOGO_FILE_NAME);
 
 let cachedQuotationLogoDataUri = null;
 
@@ -190,11 +191,18 @@ const generateBill = async (booking) => {
        // Get admin settings for company info
 
     const settings = await AdminSettings.getSettings();
+    // Convert Mongoose document to plain object to ensure all fields are accessible
+    const plainSettings = settings ? settings.toObject?.() || JSON.parse(JSON.stringify(settings)) : {};
+    const invoiceSettings = {
+      ...plainSettings,
+      logoDataUri: getQuotationLogoDataUri(),
+      logoImageUrl: `${DEFAULT_STUDIO_WEBSITE.replace(/\/$/, '')}/icons/${BRAND_LOGO_FILE_NAME}`
+    };
     console.log('Retrieved admin settings');
 
       // Generate HTML content
-    const bookingWithResolvedTypes = enrichBookingRentalsWithCatalogTypes(booking, settings);
-    const htmlContent = await generateBillHTML(bookingWithResolvedTypes, settings);
+    const bookingWithResolvedTypes = enrichBookingRentalsWithCatalogTypes(booking, invoiceSettings);
+    const htmlContent = await generateBillHTML(bookingWithResolvedTypes, invoiceSettings);
     console.log('Generated HTML content, length:', htmlContent.length);
 
     console.log('🚀 Launching puppeteer...');
@@ -270,11 +278,23 @@ const generateBillForDownload = async (booking, retryCount = 0) => {
     }
 
     const settings = await AdminSettings.getSettings();
+    // Convert Mongoose document to plain object to ensure all fields are accessible
+    const plainSettings = settings ? settings.toObject?.() || JSON.parse(JSON.stringify(settings)) : {};
+    const invoiceSettings = {
+      ...plainSettings,
+      logoDataUri: getQuotationLogoDataUri(),
+      logoImageUrl: `${DEFAULT_STUDIO_WEBSITE.replace(/\/$/, '')}/icons/${BRAND_LOGO_FILE_NAME}`
+    };
     console.log('Retrieved admin settings:', settings ? '✅ Found' : '❌ Not found');
+    console.log('🔍 Settings fields after toObject():', {
+      studioName: invoiceSettings.studioName,
+      studioAddress: invoiceSettings.studioAddress,
+      studioPhone: invoiceSettings.studioPhone
+    });
 
         // Generate HTML content
-    const bookingWithResolvedTypes = enrichBookingRentalsWithCatalogTypes(booking, settings);
-    const htmlContent = await generateBillHTML(bookingWithResolvedTypes, settings);
+    const bookingWithResolvedTypes = enrichBookingRentalsWithCatalogTypes(booking, invoiceSettings);
+    const htmlContent = await generateBillHTML(bookingWithResolvedTypes, invoiceSettings);
     console.log('Generated HTML content, length:', htmlContent.length);
 
     console.log('🚀 Launching puppeteer with serverless config...');
@@ -388,15 +408,23 @@ const formatCurrency = (value) => {
 };
 
 const getQuotationLogoDataUri = () => {
-  if (cachedQuotationLogoDataUri !== null) {
+  // Re-read if cache is empty or null, so a replaced logo file is always picked up
+  if (cachedQuotationLogoDataUri) {
     return cachedQuotationLogoDataUri;
   }
 
+  if (!fsSync.existsSync(BRAND_LOGO_PRIMARY_PATH)) {
+    return null;
+  }
+
+  const logoPath = BRAND_LOGO_PRIMARY_PATH;
+
   try {
-    const fileBuffer = fsSync.readFileSync(QUOTATION_LOGO_PATH);
+    const fileBuffer = fsSync.readFileSync(logoPath);
     cachedQuotationLogoDataUri = `data:image/png;base64,${fileBuffer.toString('base64')}`;
   } catch (error) {
-    cachedQuotationLogoDataUri = '';
+    // Don't cache on error — retry next time
+    return null;
   }
 
   return cachedQuotationLogoDataUri;
@@ -415,8 +443,14 @@ const getBrandInitials = (studioName) => {
 
 const getPrimaryStudioEmail = (settings) => {
   const configuredEmail = Array.isArray(settings?.adminEmails)
-    ? settings.adminEmails.find((email) => String(email || '').trim())
+    ? settings.adminEmails
+      .map((email) => String(email || '').trim().toLowerCase())
+      .find((email) => Boolean(email))
     : '';
+
+  if (configuredEmail === 'swareshpawar@gmail.com') {
+    return 'swarjrs@gmail.com';
+  }
 
   return configuredEmail || 'swarjrs@gmail.com';
 };
@@ -432,6 +466,8 @@ const buildQuotationPresentationData = (data, settings) => {
   const studioEmail = getPrimaryStudioEmail(settings);
   const studioPhone = String(settings?.studioPhone || '+91 9970011855').trim();
   const studioAddress = String(settings?.studioAddress || '').trim();
+  const discountAmountValue = Math.max(0, Number(data?.discountAmount || 0));
+  const discountNote = String(data?.discountNote || '').trim();
   const websiteUrl = DEFAULT_STUDIO_WEBSITE;
   const calculatedGeneratedAt = data?.generatedAt instanceof Date
     ? data.generatedAt.toLocaleString('en-IN')
@@ -492,7 +528,7 @@ const buildQuotationPresentationData = (data, settings) => {
     studioWhatsAppLink: buildWhatsAppLink(studioPhone),
     websiteUrl,
     logoDataUri: getQuotationLogoDataUri(),
-    logoImageUrl: `${websiteUrl.replace(/\/$/, '')}/icons/jamroom-192.png`,
+    logoImageUrl: `${websiteUrl.replace(/\/$/, '')}/icons/${BRAND_LOGO_FILE_NAME}`,
     brandInitials: getBrandInitials(studioName),
     serviceTypeLabel: String(data?.rentalTypeLabel || '').trim() || 'Quotation',
     selectedTypeLabels: Array.isArray(data?.selectedTypeLabels) ? data.selectedTypeLabels : [],
@@ -500,6 +536,9 @@ const buildQuotationPresentationData = (data, settings) => {
     totalAmountLabel: formatCurrency(Number(data?.totalAmount || 0)),
     subtotalAmountLabel: formatCurrency(Number(data?.calculation?.subtotal || 0)),
     taxAmountLabel: formatCurrency(Number(data?.taxAmount || 0)),
+    discountAmountValue,
+    discountAmountLabel: formatCurrency(discountAmountValue),
+    discountNote,
     taxEnabled: Boolean(data?.gstEnabled),
     gstDisplayLabel: data?.gstDisplayName || 'GST',
     gstRateLabel: `${Math.round((Number(data?.gstRate || 0)) * 100)}%`,
@@ -557,6 +596,9 @@ const generateQuotationHTML = (data, settings) => {
 
   const gstRow = presentation.taxEnabled
     ? `<div class="total-row"><span>${presentation.gstDisplayLabel} (${presentation.gstRateLabel})</span><strong>${presentation.taxAmountLabel}</strong></div>`
+    : '';
+  const discountRow = presentation.discountAmountValue > 0
+    ? `<div class="discount-row"><span>Discount${presentation.discountNote ? ` (${presentation.discountNote})` : ''}</span><strong>-${presentation.discountAmountLabel}</strong></div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -617,6 +659,8 @@ const generateQuotationHTML = (data, settings) => {
     .totals-card{background:#0f172a;color:#fff;border-radius:22px;padding:20px 22px;margin:18px 0;break-inside:avoid;page-break-inside:avoid}
     .totals-card h3{font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:#cbd5e1;margin-bottom:12px}
     .total-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;font-size:14px;color:#e2e8f0}
+    .discount-row{display:flex;justify-content:space-between;gap:16px;padding:8px 10px;margin:8px 0 4px;border-left:3px solid #22c55e;background:rgba(34,197,94,0.16);border-radius:10px;font-size:14px;color:#bbf7d0}
+    .discount-row strong{color:#86efac}
     .grand-total{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-top:12px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.14)}
     .grand-total span{font-size:13px;text-transform:uppercase;letter-spacing:1.2px;color:#93c5fd;font-weight:700}
     .grand-total strong{font-size:32px;color:#ffffff;line-height:1}
@@ -646,7 +690,6 @@ const generateQuotationHTML = (data, settings) => {
           </div>
           <div>
             <h1>${presentation.studioName}</h1>
-            <div class="tagline">Premium studio sessions, production support, and polished delivery for serious artists.</div>
             ${presentation.studioAddress ? `<div class="contact-line"><strong>Address:</strong> ${presentation.studioAddress}</div>` : ''}
             <div class="contact-line"><strong>Phone / WhatsApp:</strong> ${presentation.studioPhone}</div>
             <div class="contact-line"><strong>Email:</strong> ${presentation.studioEmail}</div>
@@ -692,6 +735,7 @@ const generateQuotationHTML = (data, settings) => {
         <h3>Pricing Summary</h3>
         <div class="total-row"><span>Subtotal</span><strong>${presentation.subtotalAmountLabel}</strong></div>
         ${gstRow}
+        ${discountRow}
         <div class="grand-total"><span>Estimated Total</span><strong>${presentation.totalAmountLabel}</strong></div>
       </section>
 

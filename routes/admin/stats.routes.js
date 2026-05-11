@@ -49,20 +49,25 @@ router.get('/debug-pdf', protect, isAdmin, async (req, res) => {
 });
 
 // @route   GET /api/admin/debug-settings
-// @desc    Debug settings values
+// @desc    Get all settings for PDF generation (client + server-side)
 // @access  Private/Admin
 router.get('/debug-settings', protect, isAdmin, async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
+    console.log('🔍 /api/admin/debug-settings endpoint - Settings being returned:', {
+      studioName: settings?.studioName,
+      studioAddress: settings?.studioAddress,
+      studioPhone: settings?.studioPhone,
+      hasSettings: !!settings,
+      settingsKeysCount: Object.keys(settings || {}).length
+    });
+    // Return full settings object needed for PDF templates
     res.json({
       success: true,
-      settings: {
-        studioName: settings.studioName,
-        studioAddress: settings.studioAddress,
-        adminEmails: settings.adminEmails
-      }
+      settings: settings || {}
     });
   } catch (error) {
+    console.error('🔴 /api/admin/debug-settings error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -226,6 +226,11 @@ const sanitizeQuotationRentals = (rawRentals = [], settings = null) => {
 const sanitizeQuotationPayload = (quotation = {}, settings = null) => {
   const rentalTypeLabel = String(quotation?.rentalType || quotation?.rentalTypeLabel || '').trim();
   const notes = String(quotation?.notes || '').trim();
+  const parsedDiscountAmount = Number(quotation?.discountAmount || 0);
+  const discountAmount = Number.isFinite(parsedDiscountAmount) && parsedDiscountAmount > 0
+    ? parsedDiscountAmount
+    : 0;
+  const discountNote = String(quotation?.discountNote || '').trim();
   const selectedTypes = Array.isArray(quotation?.selectedTypes)
     ? quotation.selectedTypes.map((type) => normalizeRentalTypeValue(type))
     : [];
@@ -251,6 +256,8 @@ const sanitizeQuotationPayload = (quotation = {}, settings = null) => {
   return {
     rentalTypeLabel,
     notes,
+    discountAmount,
+    discountNote,
     selectedTypes,
     schedules,
     rentals
@@ -261,6 +268,8 @@ const toSavedQuotationResponse = (savedQuotation, settings) => {
   const sanitized = sanitizeQuotationPayload({
     rentalType: savedQuotation?.rentalTypeLabel,
     notes: savedQuotation?.notes,
+    discountAmount: savedQuotation?.discountAmount,
+    discountNote: savedQuotation?.discountNote,
     selectedTypes: savedQuotation?.selectedTypes,
     schedules: savedQuotation?.schedules,
     rentals: savedQuotation?.rentals
@@ -273,6 +282,8 @@ const toSavedQuotationResponse = (savedQuotation, settings) => {
     selectedTypes: sanitized.selectedTypes,
     schedules: sanitized.schedules,
     notes: sanitized.notes,
+    discountAmount: sanitized.discountAmount,
+    discountNote: sanitized.discountNote,
     rentals: sanitized.rentals,
     createdAt: savedQuotation?.createdAt,
     updatedAt: savedQuotation?.updatedAt,
@@ -332,6 +343,8 @@ router.post('/quotations/saved', protect, isAdmin, async (req, res) => {
       rentalTypeLabel: parsed.rentalTypeLabel,
       selectedTypes: parsed.selectedTypes,
       notes: parsed.notes,
+      discountAmount: parsed.discountAmount,
+      discountNote: parsed.discountNote,
       schedules: parsed.schedules,
       rentals: parsed.rentals.map((item) => ({
         name: item.name,
@@ -395,6 +408,8 @@ router.put('/quotations/saved/:id', protect, isAdmin, async (req, res) => {
       rentalTypeLabel: parsed.rentalTypeLabel,
       selectedTypes: parsed.selectedTypes,
       notes: parsed.notes,
+      discountAmount: parsed.discountAmount,
+      discountNote: parsed.discountNote,
       schedules: parsed.schedules,
       rentals: parsed.rentals.map((item) => ({
         name: item.name,
@@ -580,7 +595,12 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
     const gstRate = gstEnabled ? (settings?.gstConfig?.rate || 0.18) : 0;
     const gstDisplayName = settings?.gstConfig?.displayName || 'GST';
     const taxAmount = gstEnabled ? Math.round(calculation.subtotal * gstRate) : 0;
-    const totalAmount = calculation.subtotal + taxAmount;
+    const rawDiscountAmount = Number(parsedQuotation.discountAmount || 0);
+    const discountAmount = Math.min(
+      Math.max(0, Number.isFinite(rawDiscountAmount) ? rawDiscountAmount : 0),
+      calculation.subtotal + taxAmount
+    );
+    const totalAmount = Math.max(0, calculation.subtotal + taxAmount - discountAmount);
 
     const rentalTypeLabel = String(parsedQuotation.rentalTypeLabel || '').trim()
       || deriveDynamicBookingLabel(sanitizedRentals, 'Quotation');
@@ -599,6 +619,8 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
       calculation,
       rentals: sanitizedRentals,
       quoteNotes,
+      discountAmount,
+      discountNote: parsedQuotation.discountNote,
       generatedAt,
       gstEnabled,
       gstRate,
@@ -640,6 +662,10 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
   .sc-title{font-size:17px;font-weight:800;color:#0f172a;margin-bottom:4px}
   .tc-amount{font-size:30px;font-weight:900;color:#1d4ed8;margin-bottom:6px}
   .sc-sub,.tc-sub{font-size:12px;line-height:1.5;color:#475569}
+  .discount-band{margin-top:8px;padding:8px 10px;border-left:3px solid #16a34a;background:#f0fdf4;border-radius:8px}
+  .discount-band .label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#166534;font-weight:800}
+  .discount-band .value{font-size:18px;line-height:1.1;color:#15803d;font-weight:900;margin-top:3px}
+  .discount-band .note{font-size:11px;line-height:1.4;color:#166534;margin-top:3px}
   .cta{background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
   .cta-title{font-size:15px;font-weight:800;color:#0f172a;margin-bottom:8px}
   .cta-body{font-size:13px;line-height:1.8;color:#0f172a}
@@ -654,6 +680,13 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
   .notes-card{background:#fff;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
   .notes-hd{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px}
   .footer{font-size:11px;line-height:1.8;color:#64748b;border-top:1px solid #e5e7eb;padding-top:12px}
+  .breakdown{background:#f8fafc;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px;margin:0 0 16px 0}
+  .breakdown-title{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:10px}
+  .breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:#374151;border-bottom:1px solid #f1f5f9}
+  .breakdown-row:last-child{border-bottom:none}
+  .breakdown-discount{color:#15803d;font-weight:700}
+  .breakdown-discount strong{color:#15803d}
+  .breakdown-total{font-weight:800;font-size:15px;color:#0f172a;margin-top:4px;padding-top:8px;border-top:2px solid #dbe5f0 !important}
   @media only screen and (max-width:520px){
     .eq{padding:8px}
     .hdr{padding:16px}
@@ -675,6 +708,7 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
       <table class="hdr-table" cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td class="hdr-left">
+            ${quotationPresentation.logoImageUrl ? `<img src="${quotationPresentation.logoImageUrl}" alt="Logo" width="48" height="48" style="border-radius:12px;margin-bottom:8px;display:block;">` : ''}
             <h2>${quotationPresentation.studioName}</h2>
             ${quotationPresentation.studioAddress ? `<div class="cl"><strong>Address:</strong> ${quotationPresentation.studioAddress}</div>` : ''}
             <div class="cl"><strong>Phone / WhatsApp:</strong> ${quotationPresentation.studioPhone}</div>
@@ -708,11 +742,32 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
             <div class="tc">
               <div class="tc-kicker">Estimated Total</div>
               <div class="tc-amount">${quotationPresentation.totalAmountLabel}</div>
-              ${quotationPresentation.taxEnabled
-                ? `<div class="tc-sub">Subtotal: <strong>${quotationPresentation.subtotalAmountLabel}</strong></div><div class="tc-sub">${quotationPresentation.gstDisplayLabel} (${quotationPresentation.gstRateLabel}): <strong>${quotationPresentation.taxAmountLabel}</strong></div>`
-                : `<div class="tc-sub">See attached PDF for full breakdown.</div>`}
+              <div class="tc-sub">See attached PDF for full breakdown.</div>
             </div>
           </td>
+        </tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:12px;overflow:hidden;margin:0 0 16px 0;background:#0f172a;">
+        <tr><td colspan="2" style="padding:14px 20px 8px 20px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;font-weight:700;font-family:Arial,sans-serif;">Pricing Summary</td></tr>
+        <tr>
+          <td style="padding:8px 20px;font-size:13px;color:#cbd5e1;font-family:Arial,sans-serif;border-top:1px solid #1e293b;">Subtotal</td>
+          <td style="padding:8px 20px;font-size:13px;color:#e2e8f0;font-weight:600;text-align:right;font-family:Arial,sans-serif;border-top:1px solid #1e293b;">${quotationPresentation.subtotalAmountLabel}</td>
+        </tr>
+        ${quotationPresentation.discountAmountValue > 0
+          ? `<tr>
+          <td style="padding:8px 20px;font-size:13px;color:#4ade80;font-weight:700;font-family:Arial,sans-serif;border-top:1px solid #1e293b;border-left:3px solid #22c55e;">Discount${quotationPresentation.discountNote ? ` <span style="font-weight:400;color:#86efac;">(${quotationPresentation.discountNote})</span>` : ''}</td>
+          <td style="padding:8px 20px;font-size:13px;color:#4ade80;font-weight:700;text-align:right;font-family:Arial,sans-serif;border-top:1px solid #1e293b;">-${quotationPresentation.discountAmountLabel}</td>
+        </tr>`
+          : ''}
+        ${quotationPresentation.taxEnabled
+          ? `<tr>
+          <td style="padding:8px 20px;font-size:13px;color:#cbd5e1;font-family:Arial,sans-serif;border-top:1px solid #1e293b;">${quotationPresentation.gstDisplayLabel} (${quotationPresentation.gstRateLabel})</td>
+          <td style="padding:8px 20px;font-size:13px;color:#e2e8f0;font-weight:600;text-align:right;font-family:Arial,sans-serif;border-top:1px solid #1e293b;">${quotationPresentation.taxAmountLabel}</td>
+        </tr>`
+          : ''}
+        <tr>
+          <td style="padding:12px 20px;font-size:15px;color:#ffffff;font-weight:800;font-family:Arial,sans-serif;border-top:2px solid #334155;">Estimated Total</td>
+          <td style="padding:12px 20px;font-size:15px;color:#ffffff;font-weight:800;text-align:right;font-family:Arial,sans-serif;border-top:2px solid #334155;">${quotationPresentation.totalAmountLabel}</td>
         </tr>
       </table>
       <div class="cta">
@@ -755,6 +810,7 @@ router.post('/quotations/send', protect, isAdmin, async (req, res) => {
         rentalTypeLabel, selectedTypeLabels, calculation,
         rentals: sanitizedRentals, quoteNotes, generatedAt,
         gstEnabled, gstRate, gstDisplayName, taxAmount, totalAmount,
+        discountAmount, discountNote: parsedQuotation.discountNote,
         recipientName: pdfRecipientName
       }, settings);
     } catch (pdfError) {
@@ -825,6 +881,7 @@ Your quotation has been shared via email.
 
 📌 Type: ${rentalTypeLabel}
 💰 Total: ₹${totalAmount}
+${discountAmount > 0 ? `🎁 Discount: ₹${discountAmount}\n` : ''}
 ${quotationScheduleText ? `📅 Schedule:\n${quotationScheduleText}\n` : ''}
 
 To confirm, reply on email or WhatsApp us at ${quotationPresentation.studioPhone}.`;

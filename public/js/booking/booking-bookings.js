@@ -951,6 +951,15 @@ const downloadUserPDF = async (bookingId) => {
             if (settingsRes.ok) {
                 const settings = await settingsRes.json();
                 settingsData = settings.settings;
+                console.log('🔍 Client PDF - Settings received from API:', {
+                    studioName: settingsData?.studioName,
+                    studioAddress: settingsData?.studioAddress,
+                    studioPhone: settingsData?.studioPhone,
+                    hasSettings: !!settingsData,
+                    settingsKeys: Object.keys(settingsData || {}).slice(0, 10)
+                });
+            } else {
+                console.warn('⚠️ Settings API call failed, PDF will use fallback values');
             }
 
             // Generate PDF on client-side
@@ -958,6 +967,7 @@ const downloadUserPDF = async (bookingId) => {
                 throw new Error('generatePDFClient is not defined');
             }
 
+            console.log('📄 Calling generatePDFClient with settings:', settingsData);
             await window.generatePDFClient(bookingData.booking, settingsData);
             showBookingAlert('Your bill PDF has been downloaded successfully! (Generated locally)', 'success');
         }
