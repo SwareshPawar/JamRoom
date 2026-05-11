@@ -4,14 +4,47 @@
  */
 const LazyLoader = (() => {
     const loadedScripts = new Set();
+    const pendingScripts = new Map();
 
     const loadScript = (src, options = {}) => {
-        return new Promise((resolve, reject) => {
-            if (loadedScripts.has(src)) {
-                resolve();
-                return;
+        if (!src) {
+            return Promise.reject(new Error('Script source is required'));
+        }
+
+        if (loadedScripts.has(src)) {
+            return Promise.resolve();
+        }
+
+        if (pendingScripts.has(src)) {
+            return pendingScripts.get(src);
+        }
+
+        const existingScript = document.querySelector(`script[src="${src}"]`);
+        if (existingScript) {
+            if (existingScript.dataset.lazyLoaderLoaded === 'true' || existingScript.readyState === 'complete') {
+                loadedScripts.add(src);
+                return Promise.resolve();
             }
 
+            const existingPromise = new Promise((resolve, reject) => {
+                existingScript.addEventListener('load', () => {
+                    existingScript.dataset.lazyLoaderLoaded = 'true';
+                    loadedScripts.add(src);
+                    pendingScripts.delete(src);
+                    resolve();
+                }, { once: true });
+
+                existingScript.addEventListener('error', () => {
+                    pendingScripts.delete(src);
+                    reject(new Error(`Failed to load script: ${src}`));
+                }, { once: true });
+            });
+
+            pendingScripts.set(src, existingPromise);
+            return existingPromise;
+        }
+
+        const promise = new Promise((resolve, reject) => {
             const script = document.createElement('script');
             script.src = src;
             script.async = options.async !== false;
@@ -22,16 +55,22 @@ const LazyLoader = (() => {
             }
 
             script.onload = () => {
+                script.dataset.lazyLoaderLoaded = 'true';
                 loadedScripts.add(src);
+                pendingScripts.delete(src);
                 resolve();
             };
 
             script.onerror = () => {
+                pendingScripts.delete(src);
                 reject(new Error(`Failed to load script: ${src}`));
             };
 
             document.body.appendChild(script);
         });
+
+        pendingScripts.set(src, promise);
+        return promise;
     };
 
     const loadStylesheet = (href) => {
@@ -63,16 +102,43 @@ const LazyLoader = (() => {
     };
 
     const observeElement = (element, callback, options = {}) => {
+        if (!element || typeof callback !== 'function') {
+            return () => {};
+        }
+
+        let hasTriggered = false;
+        const runOnce = () => {
+            if (hasTriggered) {
+                return;
+            }
+
+            hasTriggered = true;
+            callback();
+        };
+
+        const isInViewport = () => {
+            const rect = element.getBoundingClientRect();
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+
+            return rect.bottom >= 0 && rect.right >= 0 && rect.top <= viewportHeight && rect.left <= viewportWidth;
+        };
+
         if (!('IntersectionObserver' in window)) {
             // Fallback for browsers without IntersectionObserver
-            callback();
-            return;
+            runOnce();
+            return () => {};
+        }
+
+        if (isInViewport()) {
+            runOnce();
+            return () => {};
         }
 
         const observer = new IntersectionObserver((entries) => {
             entries.forEach((entry) => {
                 if (entry.isIntersecting) {
-                    callback();
+                    runOnce();
                     observer.unobserve(entry.target);
                 }
             });
@@ -82,6 +148,10 @@ const LazyLoader = (() => {
         });
 
         observer.observe(element);
+
+        return () => {
+            observer.disconnect();
+        };
     };
 
     return {

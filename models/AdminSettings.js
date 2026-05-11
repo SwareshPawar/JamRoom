@@ -147,6 +147,16 @@ const adminSettingsSchema = new mongoose.Schema({
       trim: true,
       default: ''
     },
+    discountAmount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    discountNote: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     createdAt: {
       type: Date,
       default: Date.now
@@ -498,7 +508,10 @@ adminSettingsSchema.statics.getSettings = async function() {
     // Create default settings
     settings = await this.create({
       rentalTypes: [],
-      adminEmails: ['admin@jamroom.com'],
+      adminEmails: ['swarjrs@gmail.com'],
+      studioName: 'Swar JamRoom & Music Studio',
+      studioAddress: 'Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
+      studioPhone: '+919970011855',
       classConfig: {
         enabled: true,
         monthlyFee: 2000,
@@ -698,6 +711,44 @@ adminSettingsSchema.statics.getSettings = async function() {
         }
       }
     });
+  }
+  
+  // Ensure required studio info fields are populated with defaults if missing
+  let needsSave = false;
+  if (!settings.studioName) {
+    settings.studioName = 'Swar JamRoom & Music Studio';
+    needsSave = true;
+  }
+  if (!settings.studioAddress) {
+    settings.studioAddress = 'Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057';
+    needsSave = true;
+  }
+  if (!settings.studioPhone) {
+    settings.studioPhone = '+919970011855';
+    needsSave = true;
+  }
+
+  const normalizedAdminEmails = Array.isArray(settings.adminEmails)
+    ? settings.adminEmails
+      .map((email) => String(email || '').trim().toLowerCase())
+      .filter(Boolean)
+    : [];
+  const replacedAdminEmails = normalizedAdminEmails.map((email) =>
+    email === 'swareshpawar@gmail.com' ? 'swarjrs@gmail.com' : email
+  );
+
+  if (replacedAdminEmails.length === 0) {
+    settings.adminEmails = ['swarjrs@gmail.com'];
+    needsSave = true;
+  } else if (JSON.stringify(replacedAdminEmails) !== JSON.stringify(normalizedAdminEmails)) {
+    settings.adminEmails = replacedAdminEmails;
+    needsSave = true;
+  }
+  
+  // Save if any defaults were applied
+  if (needsSave) {
+    await settings.save();
+    console.log('✅ AdminSettings populated with defaults and saved');
   }
   
   return settings;

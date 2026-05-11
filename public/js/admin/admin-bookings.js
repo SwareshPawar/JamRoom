@@ -79,6 +79,26 @@
         return 0;
     };
 
+    const getNormalizedQuickPaymentAdjustment = () => {
+        const rawType = document.getElementById('qpPriceAdjustmentType')?.value;
+        const normalizedType = ['discount', 'surcharge'].includes(String(rawType || '').trim().toLowerCase())
+            ? String(rawType).trim().toLowerCase()
+            : 'none';
+
+        const parsedAmount = Number(document.getElementById('qpPriceAdjustmentAmount')?.value || 0);
+        const normalizedAmount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 0;
+
+        if (normalizedType === 'discount') {
+            return { type: 'discount', amount: normalizedAmount, signedValue: -normalizedAmount };
+        }
+
+        if (normalizedType === 'surcharge') {
+            return { type: 'surcharge', amount: normalizedAmount, signedValue: normalizedAmount };
+        }
+
+        return { type: 'none', amount: 0, signedValue: 0 };
+    };
+
     const notifyBookingAlert = (message, type = 'info') => {
         const alertMessage = String(message || 'Action failed');
         const alertType = String(type || 'info');
@@ -1052,15 +1072,23 @@
         const amountEl = document.getElementById('qpAmountPaid');
         const refEl = document.getElementById('qpReference');
         const noteEl = document.getElementById('qpNote');
+        const adjustmentTypeEl = document.getElementById('qpPriceAdjustmentType');
+        const adjustmentAmountEl = document.getElementById('qpPriceAdjustmentAmount');
+        const adjustmentNoteEl = document.getElementById('qpPriceAdjustmentNote');
         const totalEl = document.getElementById('qpTotalAmount');
         const summaryEl = document.getElementById('qpSummary');
         const chipsEl = document.getElementById('qpPartialChips');
+
+        const bookingAdjustment = getBookingAdjustment(booking);
 
         if (bookingIdEl) bookingIdEl.value = bookingId;
         if (statusEl) statusEl.value = normalizedPaymentStatus;
         if (amountEl) amountEl.value = Math.max(0, amountPaidFromBooking).toFixed(2);
         if (refEl) refEl.value = booking.paymentReference || '';
         if (noteEl) noteEl.value = booking.paymentNote || '';
+        if (adjustmentTypeEl) adjustmentTypeEl.value = bookingAdjustment.type;
+        if (adjustmentAmountEl) adjustmentAmountEl.value = Math.max(0, bookingAdjustment.amount).toFixed(2);
+        if (adjustmentNoteEl) adjustmentNoteEl.value = bookingAdjustment.note || '';
         if (totalEl) totalEl.value = totalAmount.toFixed(2);
 
         // Show/hide partial chips
@@ -1119,11 +1147,17 @@
             }
 
             const outstanding = Math.max(0, totalAmount - amountPaidFromBooking);
+            const adjustmentText = bookingAdjustment.type === 'discount'
+                ? `Discount - ${formatCurrency(bookingAdjustment.amount)}`
+                : bookingAdjustment.type === 'surcharge'
+                    ? `Surcharge + ${formatCurrency(bookingAdjustment.amount)}`
+                    : 'None';
             summaryEl.innerHTML = `
                 <div style="display:flex; flex-wrap:wrap; gap:0.25rem 1.25rem;">
                     <span><strong>Customer:</strong> ${customerName}</span>
                     <span><strong>Type:</strong> ${modeLabel} &mdash; ${durationLabel}</span>
                     ${dateTimeStr ? `<span><strong>Date/Time:</strong> ${dateTimeStr}</span>` : ''}
+                    <span><strong>Adjustment:</strong> ${adjustmentText}</span>
                     <span><strong>Total:</strong> &#8377;${totalAmount.toFixed(2)}</span>
                     <span><strong>Received:</strong> &#8377;${amountPaidFromBooking.toFixed(2)}</span>
                     <span><strong>Outstanding:</strong> &#8377;${outstanding.toFixed(2)}</span>
@@ -1338,6 +1372,7 @@
         const amountPaidEl = document.getElementById('qpAmountPaid');
         const paymentReferenceEl = document.getElementById('qpReference');
         const paymentNoteEl = document.getElementById('qpNote');
+        const adjustmentNoteEl = document.getElementById('qpPriceAdjustmentNote');
 
         if (!paymentStatusEl || !amountPaidEl) {
             showAlert('bookingAlert', 'Payment controls are not available in this view.', 'error');
@@ -1345,7 +1380,11 @@
         }
 
         const paymentStatus = String(paymentStatusEl.value || 'PENDING').toUpperCase();
-        const totalAmount = Math.max(0, Number(booking.price || 0));
+        const currentAdjustment = getBookingAdjustment(booking);
+        const existingTotalAmount = Math.max(0, Number(booking.price || 0));
+        const baseAmountBeforeAdjustment = Math.max(0, existingTotalAmount - currentAdjustment.signedValue);
+        const selectedAdjustment = getNormalizedQuickPaymentAdjustment();
+        const totalAmount = Math.max(0, baseAmountBeforeAdjustment + selectedAdjustment.signedValue);
         const requestedAmount = Number(amountPaidEl.value || 0);
 
         if (!['PENDING', 'PARTIAL', 'PAID'].includes(paymentStatus)) {
@@ -1374,6 +1413,10 @@
         const payload = {
             paymentStatus,
             amountPaid: normalizedAmount,
+            totalAmount,
+            priceAdjustmentType: selectedAdjustment.type,
+            priceAdjustmentAmount: selectedAdjustment.amount,
+            priceAdjustmentNote: String(adjustmentNoteEl?.value || '').trim(),
             paymentReference: String(paymentReferenceEl.value || '').trim(),
             paymentNote: String(paymentNoteEl.value || '').trim(),
             paymentMode: activeMode

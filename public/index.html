@@ -97,7 +97,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
-            let hasRequestedInstagramProcess = false;
             let instagramLoaded = false;
 
             const renderHomeHeroUserBar = (user) => {
@@ -164,26 +163,9 @@
                     return false;
                 };
 
-                if (!hasRequestedInstagramProcess) {
-                    if (triggerInstagramRender()) {
-                        hasRequestedInstagramProcess = true;
-                    } else {
-                        const embedScript = document.querySelector('script[src*="instagram.com/embed.js"]');
-                        if (embedScript) {
-                            embedScript.addEventListener('load', () => {
-                                if (!hasRequestedInstagramProcess && triggerInstagramRender()) {
-                                    hasRequestedInstagramProcess = true;
-                                }
-                            }, { once: true });
-                        }
-
-                        // Single delayed retry to avoid noisy repeated processing calls.
-                        setTimeout(() => {
-                            if (!hasRequestedInstagramProcess && triggerInstagramRender()) {
-                                hasRequestedInstagramProcess = true;
-                            }
-                        }, 900);
-                    }
+                if (!triggerInstagramRender()) {
+                    console.warn('Instagram SDK is not available yet; embeds will remain in loading state.');
+                    return;
                 }
 
                 const isEmbedRendered = (card, embed) => {
@@ -204,8 +186,6 @@
                 };
 
                 const syncLoadedState = () => {
-                    let pending = 0;
-
                     embedCards.forEach((card) => {
                         if (card.classList.contains('loaded')) {
                             return;
@@ -214,12 +194,23 @@
                         const embed = card.querySelector('.instagram-media');
                         if (isEmbedRendered(card, embed)) {
                             markLoaded(card);
-                        } else {
-                            pending += 1;
                         }
                     });
+                };
 
-                    return pending;
+                const bindIframeLoadListener = (card, targetNode) => {
+                    const iframe = (targetNode && targetNode.matches && targetNode.matches('iframe[src*="instagram.com"]'))
+                        ? targetNode
+                        : card.querySelector('iframe[src*="instagram.com"]');
+
+                    if (!iframe || iframe.dataset.instagramLoadBound === 'true') {
+                        return;
+                    }
+
+                    iframe.dataset.instagramLoadBound = 'true';
+                    iframe.addEventListener('load', () => {
+                        markLoaded(card);
+                    }, { once: true });
                 };
 
                 embedCards.forEach((card) => {
@@ -234,7 +225,17 @@
                         return;
                     }
 
-                    const observer = new MutationObserver(() => {
+                    bindIframeLoadListener(card);
+
+                    const observer = new MutationObserver((mutations) => {
+                        mutations.forEach((mutation) => {
+                            mutation.addedNodes.forEach((node) => {
+                                if (node.nodeType === Node.ELEMENT_NODE) {
+                                    bindIframeLoadListener(card, node);
+                                }
+                            });
+                        });
+
                         if (isEmbedRendered(card, embed)) {
                             markLoaded(card);
                             observer.disconnect();
@@ -247,44 +248,30 @@
                         childList: true,
                         subtree: true
                     });
-
-                    setTimeout(() => {
-                        if (!card.classList.contains('loaded')) {
-                            const loaderText = card.querySelector('.instagram-loader-text');
-                            if (loaderText) {
-                                loaderText.textContent = 'Still loading...';
-                            }
-                        }
-                    }, 4500);
                 });
 
-                const statusTimer = setInterval(() => {
-                    const pending = syncLoadedState();
-                    if (pending === 0) {
-                        clearInterval(statusTimer);
-                    }
-                }, 300);
-
-                setTimeout(() => {
-                    clearInterval(statusTimer);
-                    syncLoadedState();
-                }, 9000);
+                syncLoadedState();
             };
 
-            // Set up lazy loading for Instagram section - only load when visible
+            const triggerInstagramLoad = async () => {
+                if (instagramLoaded) return;
+                instagramLoaded = true;
+
+                try {
+                    await LazyLoader.loadInstagramSDK();
+                    await loadInstagramEmbeds();
+                } catch (error) {
+                    console.error('Failed to load Instagram:', error);
+                }
+            };
+
+            // Set up lazy loading for Instagram section.
+            // The showcase starts hidden, so observing it directly is unreliable.
             const instagramShowcase = document.getElementById('instagramShowcase');
             if (instagramShowcase && typeof LazyLoader !== 'undefined') {
-                LazyLoader.observeElement(instagramShowcase, async () => {
-                    if (instagramLoaded) return;
-                    instagramLoaded = true;
+                const visibleAnchor = document.querySelector('.cta') || document.querySelector('main') || document.body;
 
-                    try {
-                        await loadInstagramEmbeds();
-                        await LazyLoader.loadInstagramSDK();
-                    } catch (error) {
-                        console.error('Failed to load Instagram:', error);
-                    }
-                }, { rootMargin: '200px' });
+                LazyLoader.observeElement(visibleAnchor, triggerInstagramLoad, { rootMargin: '240px' });
             }
 
             try {

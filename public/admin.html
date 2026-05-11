@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -689,6 +689,26 @@
                 <input type="number" id="qpAmountPaid" min="0" step="10" placeholder="0.00">
             </div>
 
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="qpPriceAdjustmentType">Special Price Override</label>
+                    <select id="qpPriceAdjustmentType">
+                        <option value="none">None</option>
+                        <option value="discount">Discount (-)</option>
+                        <option value="surcharge">Surcharge (+)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="qpPriceAdjustmentAmount">Adjustment Amount (&#8377;)</label>
+                    <input type="number" id="qpPriceAdjustmentAmount" min="0" step="1" value="0" placeholder="0">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="qpPriceAdjustmentNote">Adjustment Note</label>
+                <input type="text" id="qpPriceAdjustmentNote" placeholder="Optional reason for discount/surcharge">
+            </div>
+
             <div class="form-group">
                 <label for="qpPaymentMode">Payment Mode</label>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;" id="qpPaymentModeGroup">
@@ -839,52 +859,6 @@
                     </div>
                 </div>
 
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label for="editPriceAdjustmentType">Special Price Override</label>
-                        <select id="editPriceAdjustmentType">
-                            <option value="none">None</option>
-                            <option value="discount">Discount (-)</option>
-                            <option value="surcharge">Surcharge (+)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="editPriceAdjustmentAmount">Adjustment Amount (₹)</label>
-                        <input type="number" id="editPriceAdjustmentAmount" min="0" step="1" value="0" placeholder="0">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="editPriceAdjustmentNote">Adjustment Note</label>
-                    <input type="text" id="editPriceAdjustmentNote" placeholder="Optional reason for discount/surcharge">
-                </div>
-
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label for="editPaymentStatus">Payment Status</label>
-                        <select id="editPaymentStatus">
-                            <option value="PENDING">Unpaid (Pending)</option>
-                            <option value="PARTIAL">Partial</option>
-                            <option value="PAID">Paid</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="editAmountPaid">Amount Received (₹)</label>
-                        <input type="number" id="editAmountPaid" min="0" step="1" value="0" placeholder="0">
-                    </div>
-                </div>
-
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label for="editPaymentReference">Payment Reference</label>
-                        <input type="text" id="editPaymentReference" placeholder="Optional transaction/UPI reference">
-                    </div>
-                    <div class="form-group">
-                        <label for="editPaymentNote">Payment Note</label>
-                        <input type="text" id="editPaymentNote" placeholder="Optional note for payment update">
-                    </div>
-                </div>
-
                 <div class="form-group">
                     <label for="editNotes">Notes</label>
                     <textarea id="editNotes" rows="3" placeholder="Additional notes..."></textarea>
@@ -915,68 +889,144 @@
                     <small id="createUserSelected" class="settings-help-text">No user selected</small>
                     <div id="createUserTypeahead" class="create-user-typeahead admin-hidden"></div>
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="createDate">Date*</label>
-                    <input type="date" id="createDate" name="date" required>
+                    <label for="createBookingType">Booking Type / Catalog*</label>
+                    <select id="createBookingType" name="rentalType" required onchange="onCreateBookingTypeChange()">
+                        <option value="">Loading booking catalog...</option>
+                    </select>
+                    <small class="settings-help-text">Select catalog first — form adapts to the booking type.</small>
                 </div>
 
-                <div class="form-group create-override-group">
-                    <div class="admin-theme-info-card admin-theme-info-card-accent">
-                        <label class="create-override-label">
-                            <input type="checkbox" id="createDateTimeOverride" name="overrideDateTime" class="checkbox-auto">
-                            Override date/time checks (history mode)
-                        </label>
-                        <small class="create-override-help">
-                            Allows past date/time booking and bypasses availability conflicts for missed billing entries.
-                        </small>
+                <!-- ── CLASS BOOKING SECTION ── -->
+                <div id="createClassSection" style="display:none">
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="createClassLocation">Class Location*</label>
+                            <select id="createClassLocation">
+                                <option value="">Select location</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="createClassPlanMonths">Plan Duration*</label>
+                            <select id="createClassPlanMonths">
+                                <option value="1">1 Month</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="createClassWeekday">Preferred Weekday*</label>
+                            <select id="createClassWeekday">
+                                <option value="">Select day</option>
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                                <option value="Saturday">Saturday</option>
+                                <option value="Sunday">Sunday</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="createClassStartTime">Class Start Time*</label>
+                            <select id="createClassStartTime">
+                                <option value="">Select time</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="createClassPriceInfo" class="admin-theme-info-card admin-theme-info-card-accent" style="display:none">
+                        <span id="createClassPriceInfoText"></span>
                     </div>
                 </div>
 
-                <div class="admin-reference-view">
-                    <div class="admin-theme-info-card admin-theme-info-card-muted">
-                        <h3>Availability for Selected Date</h3>
-                        <p class="admin-theme-info-note">Shows unavailable time slots</p>
+                <!-- ── PER-DAY BOOKING SECTION ── -->
+                <div id="createPerdaySection" style="display:none">
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="createPerdayStartDate">Pickup Date*</label>
+                            <input type="date" id="createPerdayStartDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="createPerdayPickupTime">Pickup Time*</label>
+                            <select id="createPerdayPickupTime">
+                                <option value="">Select time</option>
+                            </select>
+                        </div>
                     </div>
-                    <div id="createReferenceTimeline" class="admin-timeline">
-                        <div class="loading">Select a date to view availability</div>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="createPerdayEndDate">Return Date*</label>
+                            <input type="date" id="createPerdayEndDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="createPerdayReturnTime">Return Time*</label>
+                            <select id="createPerdayReturnTime">
+                                <option value="">Select time</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="createPerdayDaysInfo" class="admin-theme-info-card" style="display:none">
+                        <span id="createPerdayDaysText"></span>
                     </div>
                 </div>
-                
-                <div class="create-booking-time-grid">
+
+                <!-- ── HOURLY / SESSION BOOKING SECTION ── -->
+                <div id="createHourlySection">
                     <div class="form-group">
-                        <label for="createStartTime">Start Time*</label>
-                        <select id="createStartTime" name="startTime" required disabled>
-                            <option value="">Select date first</option>
-                        </select>
+                        <label for="createDate">Date*</label>
+                        <input type="date" id="createDate" name="date" required>
                     </div>
-                    <div class="form-group">
-                        <label for="createEndTime">End Time*</label>
-                        <select id="createEndTime" name="endTime" required disabled>
-                            <option value="">Select start time first</option>
-                        </select>
+
+                    <div class="form-group create-override-group">
+                        <div class="admin-theme-info-card admin-theme-info-card-accent">
+                            <label class="create-override-label">
+                                <input type="checkbox" id="createDateTimeOverride" name="overrideDateTime" class="checkbox-auto">
+                                Override date/time checks (history mode)
+                            </label>
+                            <small class="create-override-help">
+                                Allows past date/time booking and bypasses availability conflicts for missed billing entries.
+                            </small>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="createDuration">Duration (hours)*</label>
-                        <input type="number" id="createDuration" name="duration" min="1" max="12" step="0.5" readonly placeholder="Auto-calculated" class="readonly-soft">
+
+                    <div class="admin-reference-view">
+                        <div class="admin-theme-info-card admin-theme-info-card-muted">
+                            <h3>Availability for Selected Date</h3>
+                            <p class="admin-theme-info-note">Shows unavailable time slots</p>
+                        </div>
+                        <div id="createReferenceTimeline" class="admin-timeline">
+                            <div class="loading">Select a date to view availability</div>
+                        </div>
+                    </div>
+
+                    <div class="create-booking-time-grid">
+                        <div class="form-group">
+                            <label for="createStartTime">Start Time*</label>
+                            <select id="createStartTime" name="startTime" disabled>
+                                <option value="">Select date first</option>
+                            </select>
+                        </div>
+                        <div id="createEndTimeGroup" class="form-group">
+                            <label for="createEndTime">End Time*</label>
+                            <select id="createEndTime" name="endTime" disabled>
+                                <option value="">Select start time first</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="createDuration">Duration (hours)</label>
+                            <input type="number" id="createDuration" name="duration" min="1" max="12" step="0.5" readonly placeholder="Auto-calculated" class="readonly-soft">
+                        </div>
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="createBandName">Band Name</label>
                     <input type="text" id="createBandName" name="bandName" placeholder="Optional band name">
                 </div>
 
                 <div class="form-group">
-                    <label for="createBookingType">Booking Type / Label*</label>
-                    <select id="createBookingType" name="rentalType" required>
-                        <option value="">Loading booking catalog...</option>
-                    </select>
-                    <small class="settings-help-text">Options are populated from Rental Types & Pricing settings.</small>
-                </div>
-
-                <div class="form-group">
-                    <label>Rental Items*</label>
+                    <label id="createRentalsLabel">Catalog Items*</label>
                     <div id="createBookingRentals" class="admin-rentals-panel">
                         <div class="loading-inline-muted">Loading rental options...</div>
                     </div>
@@ -1232,6 +1282,16 @@
                         <label for="quoteTaxAmount">Tax (&#8377;)</label>
                         <input type="number" id="quoteTaxAmount" readonly class="readonly-soft" value="0">
                     </div>
+                    <div class="form-group">
+                        <label for="quoteDiscountAmount">Discount (&#8377;)</label>
+                        <input type="number" id="quoteDiscountAmount" min="0" step="1" value="0" placeholder="0" oninput="recalculateQuotationTotals()">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="quoteDiscountNote">Discount Note (optional)</label>
+                    <input type="text" id="quoteDiscountNote" placeholder="Optional discount label (e.g. Festival offer)">
+                </div>
+                <div class="form-grid-3">
                     <div class="form-group">
                         <label for="quoteTotalAmount">Final Total (&#8377;)</label>
                         <input type="number" id="quoteTotalAmount" readonly class="readonly-soft" value="0">
@@ -2978,13 +3038,13 @@
             }
         };
 
-        document.getElementById('editDuration').addEventListener('input', recalculateEditBookingTotals);
-        document.getElementById('editDuration').addEventListener('change', recalculateEditBookingTotals);
-        document.getElementById('editBookingRentals').addEventListener('input', recalculateEditBookingTotals);
-        document.getElementById('editBookingRentals').addEventListener('change', recalculateEditBookingTotals);
-        document.getElementById('editPriceAdjustmentType').addEventListener('change', recalculateEditBookingTotals);
-        document.getElementById('editPriceAdjustmentAmount').addEventListener('input', recalculateEditBookingTotals);
-        document.getElementById('editPaymentStatus').addEventListener('change', () => {
+        document.getElementById('editDuration')?.addEventListener('input', recalculateEditBookingTotals);
+        document.getElementById('editDuration')?.addEventListener('change', recalculateEditBookingTotals);
+        document.getElementById('editBookingRentals')?.addEventListener('input', recalculateEditBookingTotals);
+        document.getElementById('editBookingRentals')?.addEventListener('change', recalculateEditBookingTotals);
+        document.getElementById('editPriceAdjustmentType')?.addEventListener('change', recalculateEditBookingTotals);
+        document.getElementById('editPriceAdjustmentAmount')?.addEventListener('input', recalculateEditBookingTotals);
+        document.getElementById('editPaymentStatus')?.addEventListener('change', () => {
             const status = (document.getElementById('editPaymentStatus')?.value || 'PENDING').toUpperCase();
             const amountPaidEl = document.getElementById('editAmountPaid');
             if (!amountPaidEl) return;
@@ -5142,6 +5202,8 @@
                     }
                 }
 
+                onCreateBookingTypeChange();
+
                 if (typeof draft.notes === 'string') {
                     document.getElementById('createNotes').value = draft.notes;
                 }
@@ -5271,6 +5333,16 @@
             return window.JamRoomUtils.buildBookingLabelOptions(rentalTypes, { mode: 'all' });
         };
 
+        const buildAdminCatalogCategoryOptions = (rentalTypes = []) => {
+            return (Array.isArray(rentalTypes) ? rentalTypes : [])
+                .map((type) => {
+                    const name = String(type?.name || '').trim();
+                    if (!name) return null;
+                    return { value: name, label: name };
+                })
+                .filter(Boolean);
+        };
+
         const populateAdminBookingTypeSelect = (selectId, rentalTypes = [], { selectedValue = '' } = {}) => {
             const selectEl = document.getElementById(selectId);
             if (!selectEl) return [];
@@ -5313,15 +5385,19 @@
             if (!selectEl) return [];
 
             const currentValue = String(selectEl.value || '').trim();
-            const selectedRentals = collectCreateSelectedRentals(calculateCreateDurationHours(
-                document.getElementById('createStartTime')?.value,
-                document.getElementById('createEndTime')?.value
-            ), { strict: false }).selectedRentals;
-            const derivedValue = deriveAdminBookingTypeLabel(selectedRentals, rentalTypes);
+            const options = buildAdminCatalogCategoryOptions(rentalTypes);
 
-            return populateAdminBookingTypeSelect('createBookingType', rentalTypes, {
-                selectedValue: currentValue || derivedValue
-            });
+            selectEl.innerHTML = [
+                '<option value="">Select booking catalog</option>',
+                ...options.map((option) => `<option value="${option.value}">${option.label}</option>`)
+            ].join('');
+
+            selectEl.disabled = options.length === 0;
+            if (currentValue && options.some((option) => option.value === currentValue)) {
+                selectEl.value = currentValue;
+            }
+
+            return options;
         };
 
         
@@ -5392,6 +5468,8 @@
             document.getElementById('quoteBookingType').value = '';
             document.getElementById('quoteAdditionalEmails').value = '';
             document.getElementById('quoteNotes').value = '';
+            document.getElementById('quoteDiscountAmount').value = '0';
+            document.getElementById('quoteDiscountNote').value = '';
             document.getElementById('quoteSaveTemplate').checked = false;
             document.getElementById('quoteTemplateName').value = '';
             document.getElementById('quoteTemplateName').disabled = true;
@@ -5424,6 +5502,8 @@
 
             document.getElementById('quoteBookingType').value = String(template.rentalTypeLabel || '').trim();
             document.getElementById('quoteNotes').value = String(template.notes || '').trim();
+            document.getElementById('quoteDiscountAmount').value = String(Math.max(0, Number(template.discountAmount || 0)));
+            document.getElementById('quoteDiscountNote').value = String(template.discountNote || '').trim();
 
             const selectedTypes = Array.isArray(template.selectedTypes)
                 ? template.selectedTypes.map((type) => String(type || '').toLowerCase())
@@ -5820,7 +5900,14 @@
             const gstEnabled = createBookingSettings?.gstConfig?.enabled || false;
             const gstRate = createBookingSettings?.gstConfig?.rate || 0.18;
             const taxAmount = gstEnabled ? Math.round(quoteData.subtotal * gstRate) : 0;
-            const totalAmount = quoteData.subtotal + taxAmount;
+            const rawDiscountAmount = Number(document.getElementById('quoteDiscountAmount')?.value || 0);
+            const discountAmount = Number.isFinite(rawDiscountAmount) && rawDiscountAmount > 0
+                ? Math.min(rawDiscountAmount, quoteData.subtotal + taxAmount)
+                : 0;
+            if (document.getElementById('quoteDiscountAmount')) {
+                document.getElementById('quoteDiscountAmount').value = discountAmount.toFixed(2);
+            }
+            const totalAmount = Math.max(0, quoteData.subtotal + taxAmount - discountAmount);
             document.getElementById('quoteSubtotal').value = quoteData.subtotal.toFixed(2);
             document.getElementById('quoteTaxAmount').value = taxAmount.toFixed(2);
             document.getElementById('quoteTotalAmount').value = totalAmount.toFixed(2);
@@ -5897,6 +5984,7 @@
 
             summaryEl.innerHTML = `<div class="quote-summary-groups">${sectionHtml}</div>`;
         };
+        window.recalculateQuotationTotals = recalculateQuotationTotals;
 
         async function showQuotationModal() {
             try {
@@ -5991,6 +6079,8 @@
                         quotation: {
                             rentalType: quoteLabel,
                             selectedTypes: getSelectedQuoteTypes(),
+                            discountAmount: Number(document.getElementById('quoteDiscountAmount')?.value || 0),
+                            discountNote: String(document.getElementById('quoteDiscountNote')?.value || '').trim(),
                             rentals: quoteData.selectedRentals,
                             schedules: {
                                 inhouse: {
@@ -6081,6 +6171,8 @@
                         quotation: {
                             rentalType: quoteLabel,
                             selectedTypes: getSelectedQuoteTypes(),
+                            discountAmount: Number(document.getElementById('quoteDiscountAmount')?.value || 0),
+                            discountNote: String(document.getElementById('quoteDiscountNote')?.value || '').trim(),
                             rentals: quoteData.selectedRentals,
                             schedules: {
                                 inhouse: {
@@ -6454,6 +6546,275 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             }
         };
 
+        // ── Create Booking: catalog type detection & form mode switching ────────
+
+        const getCreateCatalogRentalType = (categoryName) => {
+            if (!categoryName || !createBookingSettings) return 'hourly';
+            const rentalTypes = Array.isArray(createBookingSettings.rentalTypes) ? createBookingSettings.rentalTypes : [];
+            const match = rentalTypes.find((t) => String(t.name || '').trim() === String(categoryName).trim());
+            if (!match) return 'hourly';
+            const rt = String(match.rentalType || 'inhouse').trim().toLowerCase().replace(/[\s_-]+/g, '');
+            if (rt === 'perday') return 'perday';
+            if (rt === 'persession' || rt === 'session') return 'persession';
+            if (rt === 'pertrack' || rt === 'track') return 'pertrack';
+            return 'hourly';
+        };
+
+        const isCreateClassCategory = (categoryName) => {
+            if (!categoryName || !createBookingSettings) return false;
+            const classConfig = createBookingSettings.classConfig || {};
+            if (!classConfig.enabled) return false;
+            const keywords = Array.isArray(classConfig.categoryKeywords) ? classConfig.categoryKeywords : [];
+            if (keywords.length === 0) return false;
+            const lower = String(categoryName).trim().toLowerCase();
+            return keywords.some((kw) => lower.includes(String(kw).toLowerCase()));
+        };
+
+        const getCreateBookingMode = () => {
+            const cat = document.getElementById('createBookingType')?.value || '';
+            if (!cat) return 'hourly';
+            if (isCreateClassCategory(cat)) return 'class';
+            return getCreateCatalogRentalType(cat);
+        };
+
+        const populateCreateClassTimeOptions = () => {
+            const sel = document.getElementById('createClassStartTime');
+            if (!sel) return;
+            const currentVal = sel.value;
+            sel.innerHTML = '<option value="">Select time</option>';
+            const slots = typeof createBookingStartSlots !== 'undefined' ? createBookingStartSlots : [];
+            slots.forEach((s) => {
+                const opt = document.createElement('option');
+                opt.value = s.value;
+                opt.textContent = s.label;
+                sel.appendChild(opt);
+            });
+            if (currentVal) sel.value = currentVal;
+        };
+
+        const populateCreatePerdayTimeOptions = () => {
+            ['createPerdayPickupTime', 'createPerdayReturnTime'].forEach((selId) => {
+                const sel = document.getElementById(selId);
+                if (!sel) return;
+                const currentVal = sel.value;
+                sel.innerHTML = '<option value="">Select time</option>';
+                const slots = typeof createBookingStartSlots !== 'undefined' ? createBookingStartSlots : [];
+                slots.forEach((s) => {
+                    const opt = document.createElement('option');
+                    opt.value = s.value;
+                    opt.textContent = s.label;
+                    sel.appendChild(opt);
+                });
+                if (currentVal) sel.value = currentVal;
+            });
+        };
+
+        const populateCreateClassLocationOptions = () => {
+            const sel = document.getElementById('createClassLocation');
+            if (!sel || !createBookingSettings) return;
+            const locations = Array.isArray(createBookingSettings.classConfig?.locations)
+                ? createBookingSettings.classConfig.locations
+                : [];
+            sel.innerHTML = '<option value="">Select location</option>';
+            locations.forEach((loc) => {
+                const opt = document.createElement('option');
+                opt.value = loc;
+                opt.textContent = loc;
+                sel.appendChild(opt);
+            });
+        };
+
+        const populateCreateClassPlanOptions = () => {
+            const sel = document.getElementById('createClassPlanMonths');
+            if (!sel || !createBookingSettings) return;
+            const classConfig = createBookingSettings.classConfig || {};
+            const planOptions = Array.isArray(classConfig.planOptionsMonths) && classConfig.planOptionsMonths.length > 0
+                ? classConfig.planOptionsMonths
+                : [1, 3, 6];
+            const multiMonthDiscounts = Array.isArray(classConfig.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [];
+            sel.innerHTML = '';
+            planOptions.forEach((m) => {
+                const discountEntry = multiMonthDiscounts.find((d) => Number(d.months) === m);
+                const discountPct = discountEntry ? Number(discountEntry.discountPercent || 0) : 0;
+                const label = discountPct > 0 ? `${m} Month${m > 1 ? 's' : ''} (${discountPct}% off)` : `${m} Month${m > 1 ? 's' : ''}`;
+                const opt = document.createElement('option');
+                opt.value = String(m);
+                opt.textContent = label;
+                sel.appendChild(opt);
+            });
+        };
+
+        const updateCreateClassPriceInfo = () => {
+            const infoEl = document.getElementById('createClassPriceInfo');
+            const textEl = document.getElementById('createClassPriceInfoText');
+            if (!infoEl || !textEl || !createBookingSettings) return;
+            const classConfig = createBookingSettings.classConfig || {};
+            const monthlyFee = Number(classConfig.monthlyFee || 0);
+            if (monthlyFee === 0) { infoEl.style.display = 'none'; return; }
+            const planMonths = Math.max(1, Number(document.getElementById('createClassPlanMonths')?.value || 1));
+            const multiMonthDiscounts = Array.isArray(classConfig.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [];
+            const discountEntry = multiMonthDiscounts.find((d) => Number(d.months) === planMonths);
+            const discountPct = discountEntry ? Number(discountEntry.discountPercent || 0) : 0;
+            const totalBefore = monthlyFee * planMonths;
+            const discountAmt = Math.round(totalBefore * discountPct / 100);
+            const totalAfter = totalBefore - discountAmt;
+            const classesPerMonth = Number(classConfig.classesPerMonth || 4);
+            const totalClasses = classesPerMonth * planMonths;
+            let msg = `₹${monthlyFee}/month × ${planMonths} month${planMonths > 1 ? 's' : ''} = ₹${totalBefore}`;
+            if (discountAmt > 0) msg += ` − ₹${discountAmt} (${discountPct}% discount) = ₹${totalAfter}`;
+            msg += ` | ${totalClasses} classes planned`;
+            textEl.textContent = msg;
+            infoEl.style.display = '';
+        };
+
+        const combineCreateDateAndTime = (dateValue, timeValue) => {
+            if (!dateValue || !timeValue) return null;
+            const [hours, minutes] = String(timeValue).split(':').map(Number);
+            if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+            const date = new Date(`${dateValue}T00:00:00`);
+            if (Number.isNaN(date.getTime())) return null;
+            date.setHours(hours, minutes, 0, 0);
+            return date;
+        };
+
+        const calculateCreatePerdayDurationInfo = ({ startDate, endDate, pickupTime, returnTime }) => {
+            const startDateTime = combineCreateDateAndTime(startDate, pickupTime);
+            const endDateTime = combineCreateDateAndTime(endDate, returnTime);
+
+            if (!startDateTime || !endDateTime) {
+                return {
+                    days: 0,
+                    totalHours: 0,
+                    isValid: false,
+                    validationMessage: 'Select per-day start/end date and pick-up/return time.'
+                };
+            }
+
+            const diffMs = endDateTime.getTime() - startDateTime.getTime();
+            const dayMs = 24 * 60 * 60 * 1000;
+
+            if (diffMs < dayMs) {
+                return {
+                    days: 0,
+                    totalHours: 0,
+                    isValid: false,
+                    validationMessage: 'Return must be at least 24 hours after pick-up.'
+                };
+            }
+
+            if (diffMs % dayMs !== 0) {
+                return {
+                    days: 0,
+                    totalHours: Math.floor(diffMs / (1000 * 60 * 60)),
+                    isValid: false,
+                    validationMessage: 'Return must be in exact 24-hour blocks (24h, 48h, 72h...).'
+                };
+            }
+
+            const days = diffMs / dayMs;
+            return {
+                days,
+                totalHours: days * 24,
+                isValid: true,
+                validationMessage: ''
+            };
+        };
+
+        const getCreatePerdayBookingInfo = () => {
+            const startDate = document.getElementById('createPerdayStartDate')?.value || '';
+            const endDate = document.getElementById('createPerdayEndDate')?.value || '';
+            const pickupTime = document.getElementById('createPerdayPickupTime')?.value || '';
+            const returnTime = document.getElementById('createPerdayReturnTime')?.value || '';
+            const durationInfo = calculateCreatePerdayDurationInfo({ startDate, endDate, pickupTime, returnTime });
+            return {
+                startDate,
+                endDate,
+                pickupTime,
+                returnTime,
+                days: durationInfo.days,
+                totalHours: durationInfo.totalHours,
+                isValid: durationInfo.isValid,
+                validationMessage: durationInfo.validationMessage
+            };
+        };
+
+        const syncCreatePerdayReturnWithPickup = () => {
+            const pickupInput = document.getElementById('createPerdayPickupTime');
+            const returnInput = document.getElementById('createPerdayReturnTime');
+            if (!pickupInput || !returnInput) return;
+
+            returnInput.value = pickupInput.value || '';
+        };
+
+        const updateCreatePerdayDaysInfo = () => {
+            const infoEl = document.getElementById('createPerdayDaysInfo');
+            const textEl = document.getElementById('createPerdayDaysText');
+            if (!infoEl || !textEl) return;
+            const perdayInfo = getCreatePerdayBookingInfo();
+            if (!perdayInfo.startDate || !perdayInfo.endDate || !perdayInfo.pickupTime || !perdayInfo.returnTime) {
+                infoEl.style.display = 'none';
+                return;
+            }
+
+            textEl.textContent = perdayInfo.isValid
+                ? `${perdayInfo.days} day(s) selected (${perdayInfo.totalHours}h total)`
+                : perdayInfo.validationMessage;
+            infoEl.style.display = '';
+        };
+
+        const showCreateSection = (mode) => {
+            document.getElementById('createClassSection').style.display = mode === 'class' ? '' : 'none';
+            document.getElementById('createPerdaySection').style.display = mode === 'perday' ? '' : 'none';
+            document.getElementById('createHourlySection').style.display = (mode === 'hourly' || mode === 'persession' || mode === 'pertrack') ? '' : 'none';
+            const endTimeGroup = document.getElementById('createEndTimeGroup');
+            if (endTimeGroup) {
+                endTimeGroup.style.display = (mode === 'persession' || mode === 'pertrack') ? 'none' : '';
+            }
+            const rentalsLabel = document.getElementById('createRentalsLabel');
+            if (rentalsLabel) {
+                if (mode === 'class') rentalsLabel.textContent = 'Class Item*';
+                else if (mode === 'perday') rentalsLabel.textContent = 'Per-Day Items*';
+                else rentalsLabel.textContent = 'Catalog Items*';
+            }
+
+            const createDateLabel = document.querySelector('label[for="createDate"]');
+            const createStartLabel = document.querySelector('label[for="createStartTime"]');
+            const dateGroup = document.getElementById('createDate')?.closest('.form-group');
+            const startGroup = document.getElementById('createStartTime')?.closest('.form-group');
+            const availabilityView = document.querySelector('#createHourlySection .admin-reference-view');
+
+            const isFlatRate = mode === 'persession' || mode === 'pertrack';
+            if (dateGroup) dateGroup.style.display = isFlatRate ? 'none' : '';
+            if (startGroup) startGroup.style.display = isFlatRate ? 'none' : '';
+            if (availabilityView) availabilityView.style.display = isFlatRate ? 'none' : '';
+
+            if (createDateLabel) createDateLabel.textContent = 'Date*';
+            if (createStartLabel) createStartLabel.textContent = mode === 'class' ? 'Class Time*' : 'Start Time*';
+
+            const createPerdayReturnTime = document.getElementById('createPerdayReturnTime');
+            if (createPerdayReturnTime) {
+                createPerdayReturnTime.disabled = mode === 'perday';
+            }
+        };
+
+        const onCreateBookingTypeChange = () => {
+            const mode = getCreateBookingMode();
+            showCreateSection(mode);
+            displayCreateBookingRentals(createBookingSettings?.rentalTypes || []);
+            if (mode === 'class') {
+                populateCreateClassLocationOptions();
+                populateCreateClassPlanOptions();
+                populateCreateClassTimeOptions();
+                updateCreateClassPriceInfo();
+            } else if (mode === 'perday') {
+                populateCreatePerdayTimeOptions();
+                syncCreatePerdayReturnWithPickup();
+                updateCreatePerdayDaysInfo();
+            }
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
+        };
+
         const resetCreateBookingForm = () => {
             const form = document.getElementById('createBookingForm');
             form.reset();
@@ -6476,6 +6837,11 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             document.getElementById('createEndTime').innerHTML = '<option value="">Select start time first</option>';
             document.getElementById('createEndTime').disabled = true;
             document.getElementById('createDuration').value = '';
+
+            // Reset dynamic sections to hourly
+            showCreateSection('hourly');
+            document.getElementById('createClassPriceInfo').style.display = 'none';
+            document.getElementById('createPerdayDaysInfo').style.display = 'none';
 
             selectedCreateUser = null;
             document.getElementById('createUserId').value = '';
@@ -6607,16 +6973,101 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
 
         function displayCreateBookingRentals(rentalTypes) {
             const container = document.getElementById('createBookingRentals');
+            const selectedCategory = String(document.getElementById('createBookingType')?.value || '').trim();
+            const mode = getCreateBookingMode();
 
             if (!Array.isArray(rentalTypes) || rentalTypes.length === 0) {
                 container.innerHTML = '<div class="loading-inline-muted">No rental options configured</div>';
                 return;
             }
 
+            if (!selectedCategory) {
+                container.innerHTML = '<div class="loading-inline-muted">Select a booking catalog to view items.</div>';
+                return;
+            }
+
+            const normalizeRentalTypeToken = (value) => {
+                const compact = String(value || 'inhouse').trim().toLowerCase().replace(/[\s_-]+/g, '');
+                if (compact === 'perday') return 'perday';
+                if (compact === 'persession' || compact === 'session') return 'persession';
+                if (compact === 'pertrack' || compact === 'track') return 'pertrack';
+                return 'inhouse';
+            };
+
+            const getCategoryRentalType = (type) => {
+                const explicitType = normalizeRentalTypeToken(type?.rentalType || '');
+                if (String(type?.rentalType || '').trim()) {
+                    return explicitType;
+                }
+
+                const subItems = Array.isArray(type?.subItems) ? type.subItems : [];
+                if (subItems.some((subItem) => normalizeRentalTypeToken(subItem?.rentalType) === 'perday')) {
+                    return 'perday';
+                }
+                if (subItems.some((subItem) => normalizeRentalTypeToken(subItem?.rentalType) === 'persession')) {
+                    return 'persession';
+                }
+                if (subItems.some((subItem) => normalizeRentalTypeToken(subItem?.rentalType) === 'pertrack')) {
+                    return 'pertrack';
+                }
+
+                return 'inhouse';
+            };
+
+            const getConfiguredBindingPairs = () => {
+                const knownCategories = new Set(
+                    rentalTypes
+                        .map((type) => String(type?.name || '').trim())
+                        .filter(Boolean)
+                );
+
+                const rawPairs = Array.isArray(createBookingSettings?.bookingCategoryBindings?.pairs)
+                    ? createBookingSettings.bookingCategoryBindings.pairs
+                    : [];
+
+                return rawPairs
+                    .filter((pair) => !pair?.deletedAt)
+                    .map((pair) => {
+                        const leftCategory = String(pair?.leftCategory || '').trim();
+                        const rightCategory = String(pair?.rightCategory || '').trim();
+                        if (!leftCategory || !rightCategory || leftCategory === rightCategory) return null;
+                        if (!knownCategories.has(leftCategory) || !knownCategories.has(rightCategory)) return null;
+                        return { leftCategory, rightCategory };
+                    })
+                    .filter(Boolean);
+            };
+
+            const getBoundCategoryNames = (categoryName) => {
+                const bound = new Set();
+                getConfiguredBindingPairs().forEach((pair) => {
+                    if (pair.leftCategory === categoryName) {
+                        bound.add(pair.rightCategory);
+                    }
+                });
+                return [...bound];
+            };
+
+            const categoriesToRender = [selectedCategory, ...getBoundCategoryNames(selectedCategory)].filter(Boolean);
+
+            const shouldIncludeCategory = (categoryRentalType) => {
+                if (mode === 'perday') {
+                    return categoryRentalType === 'perday' || categoryRentalType === 'persession' || categoryRentalType === 'pertrack';
+                }
+
+                return categoryRentalType !== 'perday';
+            };
+
             let html = '';
 
-            rentalTypes.forEach((type) => {
-                const categoryRentalType = (type.rentalType || 'inhouse');
+            categoriesToRender.forEach((categoryName) => {
+                const type = rentalTypes.find((entry) => String(entry?.name || '').trim() === categoryName);
+                if (!type) return;
+
+                const categoryRentalType = getCategoryRentalType(type);
+                if (!shouldIncludeCategory(categoryRentalType)) {
+                    return;
+                }
+
                 html += `<details class="admin-rental-collapse"><summary class="admin-rental-summary">${escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
 
                 if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0 && categoryRentalType !== 'perday') {
@@ -6749,7 +7200,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 html += '</div></details>';
             });
 
-            container.innerHTML = html;
+            container.innerHTML = html || '<div class="loading-inline-muted">No catalog items configured for this booking catalog.</div>';
         }
 
         const collectCreateSelectedRentals = (calculatedDuration, { strict = true } = {}) => {
@@ -6855,105 +7306,148 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
         };
 
         const recalculateCreateBookingTotals = () => {
-            const startTime = document.getElementById('createStartTime').value;
-            const endTime = document.getElementById('createEndTime').value;
-            const calculatedDuration = calculateCreateDurationHours(startTime, endTime);
             const gstEnabled = createBookingSettings?.gstConfig?.enabled || false;
             const gstRate = createBookingSettings?.gstConfig?.rate || 0.18;
             const adjustment = normalizePriceAdjustmentInput(
                 document.getElementById('createPriceAdjustmentType')?.value,
                 document.getElementById('createPriceAdjustmentAmount')?.value
             );
-
+            const bookingMode = getCreateBookingMode();
             let calculatedSubtotal = 0;
-            if (calculatedDuration > 0) {
+            let calculatedDuration = 0;
+
+            if (bookingMode === 'class') {
+                const classConfig = createBookingSettings?.classConfig || {};
+                const monthlyFee = Number(classConfig.monthlyFee || 0);
+                const planMonths = Math.max(1, Number(document.getElementById('createClassPlanMonths')?.value || 1));
+                const multiMonthDiscounts = Array.isArray(classConfig.multiMonthDiscounts) ? classConfig.multiMonthDiscounts : [];
+                const discountEntry = multiMonthDiscounts.find((d) => Number(d.months) === planMonths);
+                const discountPct = discountEntry ? Number(discountEntry.discountPercent || 0) : 0;
+                const totalBefore = monthlyFee * planMonths;
+                const discountAmt = Math.round(totalBefore * discountPct / 100);
+                calculatedSubtotal = Math.max(0, totalBefore - discountAmt);
+                calculatedDuration = Number(classConfig.sessionDurationHours || 1);
+                updateCreateClassPriceInfo();
+            } else if (bookingMode === 'perday') {
+                const perdayInfo = getCreatePerdayBookingInfo();
+                const days = perdayInfo.isValid ? Math.max(1, Number(perdayInfo.days || 0)) : 0;
+                calculatedDuration = perdayInfo.isValid ? Math.max(24, Number(perdayInfo.totalHours || 0)) : 0;
+                if (days > 0 && calculatedDuration > 0) {
+                    const calcResult = collectCreateSelectedRentals(calculatedDuration, { strict: false });
+                    calculatedSubtotal = calcResult.calculatedSubtotal;
+                }
+                updateCreatePerdayDaysInfo();
+            } else if (bookingMode === 'persession' || bookingMode === 'pertrack') {
+                calculatedDuration = 1;
                 const calcResult = collectCreateSelectedRentals(calculatedDuration, { strict: false });
                 calculatedSubtotal = calcResult.calculatedSubtotal;
+            } else {
+                const startTime = document.getElementById('createStartTime').value;
+                const endTime = document.getElementById('createEndTime').value;
+                calculatedDuration = calculateCreateDurationHours(startTime, endTime);
+                if (calculatedDuration > 0) {
+                    const calcResult = collectCreateSelectedRentals(calculatedDuration, { strict: false });
+                    calculatedSubtotal = calcResult.calculatedSubtotal;
+                }
             }
 
             const taxAmount = gstEnabled ? Math.round(calculatedSubtotal * gstRate) : 0;
             const finalTotal = calculatedSubtotal + taxAmount + adjustment.signedValue;
-
             const subtotalEl = document.getElementById('createSubtotal');
             const taxEl = document.getElementById('createTaxAmount');
             const finalTotalEl = document.getElementById('createFinalTotal');
-
             if (subtotalEl) subtotalEl.value = calculatedSubtotal.toFixed(2);
             if (taxEl) taxEl.value = taxAmount.toFixed(2);
             if (finalTotalEl) finalTotalEl.value = Math.max(0, finalTotal).toFixed(2);
-
             const paymentStatus = (document.getElementById('createPaymentStatus')?.value || 'PENDING').toUpperCase();
             const amountPaidEl = document.getElementById('createAmountPaid');
             if (amountPaidEl && paymentStatus === 'PAID') {
                 amountPaidEl.value = Math.max(0, finalTotal).toFixed(2);
             }
-
-            return {
-                calculatedDuration,
-                calculatedSubtotal,
-                taxAmount,
-                adjustment,
-                finalTotal
-            };
+            return { calculatedDuration, calculatedSubtotal, taxAmount, adjustment, finalTotal, bookingMode };
         };
 
         async function submitCreateBooking(event) {
             event.preventDefault();
-
-            const form = event.target;
-            const formData = new FormData(form);
+            const formData = new FormData(event.target);
             const userId = document.getElementById('createUserId').value;
-            const normalizedBookingDate = normalizeIsoDateInput(formData.get('date'));
-
-            if (!userId) {
-                showAlert('', 'Please select a registered user before creating booking.', 'warning');
-                return;
-            }
-
-            if (!normalizedBookingDate) {
-                showAlert('', 'Please select a valid booking date.', 'warning');
-                return;
-            }
-
-            const startTime = formData.get('startTime');
-            const endTime = formData.get('endTime');
-
-            if (!startTime || !endTime) {
-                showAlert('', 'Please choose both start and end time.', 'warning');
-                return;
-            }
-
-            const pricingSummary = recalculateCreateBookingTotals();
-            const calculatedDuration = pricingSummary.calculatedDuration;
-            const overrideDateTime = isCreateDateTimeOverrideEnabled();
+            if (!userId) { showAlert('', 'Please select a registered user before creating booking.', 'warning'); return; }
             const bookingTypeLabel = document.getElementById('createBookingType')?.value.trim() || '';
+            if (!bookingTypeLabel) { showAlert('', 'Please select a booking type from the booking catalog.', 'warning'); return; }
 
-            if (calculatedDuration <= 0) {
-                showAlert('', 'End time must be after start time.', 'warning');
-                return;
+            const bookingMode = getCreateBookingMode();
+            const pricingSummary = recalculateCreateBookingTotals();
+            const overrideDateTime = isCreateDateTimeOverrideEnabled();
+            let bookingDate, startTime, endTime, duration;
+            let classLocation, classPreferredWeekday, classPreferredStartTime, classPlanMonths;
+            let perDayStartDate, perDayEndDate, perDayPickupTime, perDayReturnTime, perDayDays;
+
+            if (bookingMode === 'class') {
+                classLocation = (document.getElementById('createClassLocation')?.value || '').trim();
+                classPreferredWeekday = (document.getElementById('createClassWeekday')?.value || '').trim();
+                classPreferredStartTime = (document.getElementById('createClassStartTime')?.value || '').trim();
+                classPlanMonths = Math.max(1, Number(document.getElementById('createClassPlanMonths')?.value || 1));
+                if (!classLocation) { showAlert('', 'Please select a class location.', 'warning'); return; }
+                if (!classPreferredWeekday) { showAlert('', 'Please select a preferred weekday.', 'warning'); return; }
+                if (!classPreferredStartTime) { showAlert('', 'Please select a class start time.', 'warning'); return; }
+                bookingDate = new Date().toISOString().split('T')[0];
+                startTime = classPreferredStartTime;
+                const classConfig = createBookingSettings?.classConfig || {};
+                const sessionHrs = Number(classConfig.sessionDurationHours || 1);
+                const [sh, sm] = classPreferredStartTime.split(':').map(Number);
+                const endMin = sh * 60 + sm + sessionHrs * 60;
+                endTime = `${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
+                duration = sessionHrs;
+            } else if (bookingMode === 'perday') {
+                const perdayInfo = getCreatePerdayBookingInfo();
+                perDayStartDate = perdayInfo.startDate;
+                perDayEndDate = perdayInfo.endDate;
+                perDayPickupTime = perdayInfo.pickupTime;
+                perDayReturnTime = perdayInfo.returnTime;
+                if (!perDayStartDate) { showAlert('', 'Please select a pickup date.', 'warning'); return; }
+                if (!perDayEndDate) { showAlert('', 'Please select a return date.', 'warning'); return; }
+                if (!perDayPickupTime) { showAlert('', 'Please select a pickup time.', 'warning'); return; }
+                if (!perDayReturnTime) { showAlert('', 'Please select a return time.', 'warning'); return; }
+                if (!perdayInfo.isValid) { showAlert('', perdayInfo.validationMessage || 'Invalid per-day duration.', 'warning'); return; }
+                perDayDays = Math.max(1, Number(perdayInfo.days || 1));
+                bookingDate = perDayStartDate;
+                startTime = perDayPickupTime;
+                endTime = perDayReturnTime;
+                duration = Math.max(24, Number(perdayInfo.totalHours || (perDayDays * 24)));
+            } else {
+                bookingDate = normalizeIsoDateInput(document.getElementById('createDate')?.value);
+                startTime = document.getElementById('createStartTime')?.value;
+                endTime = (bookingMode === 'persession' || bookingMode === 'pertrack')
+                    ? (startTime || '09:00')
+                    : document.getElementById('createEndTime')?.value;
+                duration = (bookingMode === 'persession' || bookingMode === 'pertrack') ? 1 : pricingSummary.calculatedDuration;
+                if (!bookingDate) { showAlert('', 'Please select a valid booking date.', 'warning'); return; }
+                if (!startTime) { showAlert('', 'Please select a start time.', 'warning'); return; }
+                if (bookingMode === 'hourly' && !endTime) { showAlert('', 'Please select an end time.', 'warning'); return; }
+                if (bookingMode === 'hourly' && duration <= 0) { showAlert('', 'End time must be after start time.', 'warning'); return; }
+                if (!overrideDateTime && bookingMode === 'hourly') {
+                    const unavailableRanges = getCreateUnavailableRanges(createBookingAvailabilityData);
+                    if (unavailableRanges.length > 0 && isCreateTimeRangeUnavailable(startTime, endTime, unavailableRanges)) {
+                        showAlert('', 'Selected time range overlaps with an unavailable slot.', 'warning');
+                        return;
+                    }
+                }
+                if (!endTime) endTime = startTime;
             }
 
-            if (!bookingTypeLabel) {
-                showAlert('', 'Please select a booking type from the booking catalog.', 'warning');
-                return;
-            }
-
-            const unavailableRanges = getCreateUnavailableRanges(createBookingAvailabilityData);
-            if (!overrideDateTime && unavailableRanges.length > 0 && isCreateTimeRangeUnavailable(startTime, endTime, unavailableRanges)) {
-                showAlert('', 'Selected time range overlaps with an unavailable slot. Please choose another time.', 'warning');
-                return;
-            }
-
-            let selectedRentals;
-            let calculatedSubtotal;
-
-            try {
-                const rentalSummary = collectCreateSelectedRentals(calculatedDuration, { strict: true });
-                selectedRentals = rentalSummary.selectedRentals;
-                calculatedSubtotal = rentalSummary.calculatedSubtotal;
-            } catch (selectionError) {
-                showAlert('', selectionError.message, 'warning');
-                return;
+            let selectedRentals, calculatedSubtotal;
+            if (bookingMode === 'class') {
+                try {
+                    const rs = collectCreateSelectedRentals(duration, { strict: true });
+                    selectedRentals = rs.selectedRentals;
+                } catch (e) { showAlert('', e.message, 'warning'); return; }
+                calculatedSubtotal = pricingSummary.calculatedSubtotal;
+            } else {
+                try {
+                    const rs = collectCreateSelectedRentals(duration, { strict: true });
+                    selectedRentals = rs.selectedRentals;
+                    calculatedSubtotal = rs.calculatedSubtotal;
+                } catch (e) { showAlert('', e.message, 'warning'); return; }
             }
 
             const adjustment = normalizePriceAdjustmentInput(
@@ -6962,27 +7456,27 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             );
             const taxAmount = pricingSummary.taxAmount;
             const totalAmount = calculatedSubtotal + taxAmount + adjustment.signedValue;
+            if (totalAmount < 0) { showAlert('', 'Discount cannot exceed the total amount.', 'warning'); return; }
 
-            if (totalAmount < 0) {
-                showAlert('', 'Discount cannot be greater than subtotal plus tax.', 'warning');
+            const paymentStatus = (document.getElementById('createPaymentStatus')?.value || 'PENDING').toUpperCase();
+            const amountPaid = Number(document.getElementById('createAmountPaid')?.value || 0);
+            if (paymentStatus === 'PARTIAL' && !(amountPaid > 0 && amountPaid < totalAmount)) {
+                showAlert('', 'For partial payment, amount received must be greater than 0 and less than the final total.', 'warning');
                 return;
             }
 
             const bookingData = {
                 userId,
-                date: normalizedBookingDate,
+                bookingMode: bookingMode === 'perday' ? 'perday' : 'hourly',
+                date: bookingDate,
                 startTime,
                 endTime,
-                duration: calculatedDuration,
+                duration,
                 rentalType: bookingTypeLabel,
                 rentals: selectedRentals.map((r) => ({
-                    name: r.name,
-                    category: r.category,
-                    price: r.price,
-                    perdayPrice: r.perdayPrice,
-                    quantity: r.quantity,
-                    rentalType: r.rentalType,
-                    description: r.description
+                    name: r.name, category: r.category, price: r.price,
+                    perdayPrice: r.perdayPrice, quantity: r.quantity,
+                    rentalType: r.rentalType, description: r.description
                 })),
                 subtotal: calculatedSubtotal,
                 taxAmount,
@@ -6990,39 +7484,26 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 priceAdjustmentType: adjustment.type,
                 priceAdjustmentAmount: adjustment.amount,
                 priceAdjustmentNote: (document.getElementById('createPriceAdjustmentNote')?.value || '').trim(),
-                paymentStatus: (document.getElementById('createPaymentStatus')?.value || 'PENDING').toUpperCase(),
-                amountPaid: Number(document.getElementById('createAmountPaid')?.value || 0),
+                paymentStatus,
+                amountPaid,
                 paymentReference: (document.getElementById('createPaymentReference')?.value || '').trim(),
                 paymentNote: (document.getElementById('createPaymentNote')?.value || '').trim(),
-                bandName: formData.get('bandName'),
-                notes: formData.get('notes'),
-                overrideDateTime
+                bandName: formData.get('bandName') || '',
+                notes: formData.get('notes') || '',
+                overrideDateTime,
+                ...(bookingMode === 'class' && { classLocation, classPreferredWeekday, classPreferredStartTime, classPlanMonths }),
+                ...(bookingMode === 'perday' && { perDayStartDate, perDayEndDate, perDayPickupTime, perDayReturnTime, perDayDays })
             };
-
-            if (bookingData.paymentStatus === 'PARTIAL') {
-                if (!(bookingData.amountPaid > 0 && bookingData.amountPaid < totalAmount)) {
-                    showAlert('', 'For partial payment, amount received must be greater than 0 and less than final total.', 'warning');
-                    return;
-                }
-            }
 
             try {
                 showLoading('Creating booking...');
                 const response = await fetch(`${API_URL}/api/admin/bookings`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                     body: JSON.stringify(bookingData)
                 });
-
                 const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.message || 'Failed to create booking');
-                }
-
+                if (!response.ok) throw new Error(result.message || 'Failed to create booking');
                 const bookedFor = selectedCreateUser?.name || 'selected user';
                 showAlert('', `Booking created successfully for ${bookedFor}.\nTotal: ₹${totalAmount}`, 'success');
                 clearCreateBookingDraft();
@@ -7037,94 +7518,51 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             }
         }
 
-        document.getElementById('createUserSearch').addEventListener('input', (event) => {
-            document.getElementById('createUserId').value = '';
-            selectedCreateUser = null;
-            document.getElementById('createUserSelected').textContent = 'No user selected';
-            renderCreateUserTypeahead(event.target.value);
+        let createUserSearchDebounceTimer = null;
+        document.getElementById('createUserSearch').addEventListener('input', (e) => {
+            clearTimeout(createUserSearchDebounceTimer);
+            createUserSearchDebounceTimer = setTimeout(() => renderCreateUserTypeahead(e.target.value), 200);
             scheduleCreateBookingDraftSave();
         });
-
-        document.getElementById('createUserSearch').addEventListener('focus', (event) => {
-            renderCreateUserTypeahead(event.target.value);
+        document.getElementById('createUserSearch').addEventListener('focus', (e) => {
+            if (e.target.value.trim()) renderCreateUserTypeahead(e.target.value);
         });
-
         document.getElementById('createUserSearch').addEventListener('blur', () => {
-            setTimeout(() => {
-                document.getElementById('createUserTypeahead').style.display = 'none';
-            }, 200);
+            setTimeout(() => { const dd = document.getElementById('createUserTypeahead'); if (dd) dd.style.display = 'none'; }, 200);
         });
-
-        const handleCreateDateInputChange = async (rawValue) => {
-            const dateInput = document.getElementById('createDate');
-            const normalizedDate = normalizeIsoDateInput(rawValue);
-
-            if (normalizedDate && dateInput.value !== normalizedDate) {
-                dateInput.value = normalizedDate;
-            }
-
-            if (!normalizedDate) {
-                createDateInputLastValue = '';
-                await loadCreateBookingAvailability('');
-                return;
-            }
-
-            if (normalizedDate === createDateInputLastValue) {
-                return;
-            }
-
-            createDateInputLastValue = normalizedDate;
-            await loadCreateBookingAvailability(normalizedDate);
-            scheduleCreateBookingDraftSave();
-        };
 
         const createDateEl = document.getElementById('createDate');
-        createDateEl.addEventListener('change', async (event) => {
-            await handleCreateDateInputChange(event.target.value);
-        });
-        createDateEl.addEventListener('input', async (event) => {
-            await handleCreateDateInputChange(event.target.value);
-        });
-        createDateEl.addEventListener('blur', async (event) => {
-            await handleCreateDateInputChange(event.target.value);
-        });
-
-        document.getElementById('createDateTimeOverride').addEventListener('change', async () => {
-            updateCreateDateInputConstraints();
-            const selectedDate = normalizeIsoDateInput(document.getElementById('createDate').value);
-            createDateInputLastValue = selectedDate || '';
-            await loadCreateBookingAvailability(selectedDate);
+        createDateEl.addEventListener('change', async () => {
+            const normalizedDate = normalizeIsoDateInput(createDateEl.value);
+            if (!normalizedDate || normalizedDate === createDateInputLastValue) return;
+            createDateInputLastValue = normalizedDate;
+            createDateEl.value = normalizedDate;
+            await loadCreateBookingAvailability(normalizedDate);
             populateCreateEndTimes();
             updateCreateDurationDisplay();
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });
-
         document.getElementById('createStartTime').addEventListener('change', () => {
             populateCreateEndTimes();
             updateCreateDurationDisplay();
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });
-
         document.getElementById('createEndTime').addEventListener('change', () => {
             updateCreateDurationDisplay();
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });
-
         document.getElementById('createBandName').addEventListener('input', scheduleCreateBookingDraftSave);
-        document.getElementById('createBookingType').addEventListener('change', scheduleCreateBookingDraftSave);
         document.getElementById('createNotes').addEventListener('input', scheduleCreateBookingDraftSave);
         document.getElementById('createBookingRentals').addEventListener('change', () => {
             enforceCreateRentalQuantityLimits({ showFeedback: false });
-            refreshCreateBookingTypeSelect();
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });
         document.getElementById('createBookingRentals').addEventListener('input', () => {
-            enforceCreateRentalQuantityLimits({ showFeedback: true });
-            refreshCreateBookingTypeSelect();
+            enforceCreateRentalQuantityLimits({ showFeedback: false });
             recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });
@@ -7141,19 +7579,38 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             const status = (document.getElementById('createPaymentStatus')?.value || 'PENDING').toUpperCase();
             const amountPaidEl = document.getElementById('createAmountPaid');
             if (!amountPaidEl) return;
-
             if (status === 'PENDING') {
                 amountPaidEl.value = '0';
             } else if (status === 'PAID') {
                 const finalTotal = Number(document.getElementById('createFinalTotal')?.value || 0);
                 amountPaidEl.value = Math.max(0, finalTotal).toFixed(2);
             }
+            scheduleCreateBookingDraftSave();
+        });
 
+        document.getElementById('createDateTimeOverride').addEventListener('change', async () => {
+            updateCreateDateInputConstraints();
+            const selectedDate = normalizeIsoDateInput(document.getElementById('createDate').value);
+            createDateInputLastValue = selectedDate || '';
+            await loadCreateBookingAvailability(selectedDate);
+            populateCreateEndTimes();
+            updateCreateDurationDisplay();
+            recalculateCreateBookingTotals();
             scheduleCreateBookingDraftSave();
         });
         document.getElementById('createAmountPaid').addEventListener('input', scheduleCreateBookingDraftSave);
         document.getElementById('createPaymentReference').addEventListener('input', scheduleCreateBookingDraftSave);
         document.getElementById('createPaymentNote').addEventListener('input', scheduleCreateBookingDraftSave);
+        // Class fields
+        document.getElementById('createClassLocation')?.addEventListener('change', scheduleCreateBookingDraftSave);
+        document.getElementById('createClassPlanMonths')?.addEventListener('change', () => { updateCreateClassPriceInfo(); recalculateCreateBookingTotals(); scheduleCreateBookingDraftSave(); });
+        document.getElementById('createClassWeekday')?.addEventListener('change', scheduleCreateBookingDraftSave);
+        document.getElementById('createClassStartTime')?.addEventListener('change', scheduleCreateBookingDraftSave);
+        // Perday fields
+        document.getElementById('createPerdayStartDate')?.addEventListener('change', () => { recalculateCreateBookingTotals(); scheduleCreateBookingDraftSave(); });
+        document.getElementById('createPerdayEndDate')?.addEventListener('change', () => { recalculateCreateBookingTotals(); scheduleCreateBookingDraftSave(); });
+        document.getElementById('createPerdayPickupTime')?.addEventListener('change', () => { syncCreatePerdayReturnWithPickup(); recalculateCreateBookingTotals(); scheduleCreateBookingDraftSave(); });
+        document.getElementById('createPerdayReturnTime')?.addEventListener('change', () => { recalculateCreateBookingTotals(); scheduleCreateBookingDraftSave(); });
 
         document.getElementById('registerCreateUserForm').addEventListener('submit', async (event) => {
             event.preventDefault();
