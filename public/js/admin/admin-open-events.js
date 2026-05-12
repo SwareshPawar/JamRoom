@@ -1,7 +1,6 @@
 (function adminOpenEventsBootstrap() {
     const API_URL = window.location.origin;
     let openEventsCache = [];
-    let activeDraftEventId = '';
     let editingOpenEventId = '';
     let draftStatusPending = false;
 
@@ -158,44 +157,16 @@
     };
 
     const renderDraftTemplates = (events) => {
-        const tabsEl = document.getElementById('openEventDraftTabs');
         const panelEl = document.getElementById('openEventDraftPanel');
-        if (!tabsEl || !panelEl) return;
+        if (!panelEl) return;
 
         const draftEvents = (Array.isArray(events) ? events : []).filter((event) => String(event?.status || '').toLowerCase() === 'draft');
         if (draftEvents.length === 0) {
-            tabsEl.innerHTML = '';
             panelEl.innerHTML = '<div class="loading-inline-muted">No draft open events saved yet.</div>';
-            activeDraftEventId = '';
             return;
         }
 
-        const hasActiveDraft = draftEvents.some((event) => String(event.id) === String(activeDraftEventId));
-        if (!hasActiveDraft) {
-            activeDraftEventId = String(draftEvents[0].id);
-        }
-
-        tabsEl.innerHTML = draftEvents.map((event, index) => {
-            const isActive = String(event.id) === String(activeDraftEventId);
-            const title = String(event.title || `Draft ${index + 1}`).trim();
-            return `
-                <button
-                    type="button"
-                    class="settings-tab-btn admin-open-event-draft-tab-btn ${isActive ? 'active' : ''}"
-                    data-event-id="${escapeHtml(event.id)}"
-                >
-                    ${escapeHtml(title)}
-                </button>
-            `;
-        }).join('');
-
-        const selectedDraft = draftEvents.find((event) => String(event.id) === String(activeDraftEventId)) || draftEvents[0];
-        if (!selectedDraft) {
-            panelEl.innerHTML = '';
-            return;
-        }
-
-        panelEl.innerHTML = renderEventCard(selectedDraft);
+        panelEl.innerHTML = draftEvents.map((event) => renderEventCard(event)).join('');
     };
 
     const renderEvents = (events) => {
@@ -213,7 +184,7 @@
         }
 
         if (nonDraftEvents.length === 0) {
-            container.innerHTML = '<div class="loading-inline-muted">No published or cancelled open events yet. Use draft tabs above to publish when ready.</div>';
+            container.innerHTML = '<div class="loading-inline-muted">No published open events yet. Publish from Draft Open Events when ready.</div>';
             return;
         }
 
@@ -579,13 +550,6 @@
 
         if (!document.body.dataset.adminOpenEventsBound) {
             document.body.addEventListener('click', async (event) => {
-                const draftTabButton = event.target.closest('.admin-open-event-draft-tab-btn');
-                if (draftTabButton) {
-                    activeDraftEventId = String(draftTabButton.getAttribute('data-event-id') || '').trim();
-                    renderDraftTemplates(openEventsCache);
-                    return;
-                }
-
                 const editButton = event.target.closest('.admin-open-event-edit-btn');
                 if (editButton) {
                     const { eventId } = editButton.dataset;

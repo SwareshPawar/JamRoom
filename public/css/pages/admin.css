@@ -1489,9 +1489,9 @@
 
 .tabs {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     border-bottom: 1px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     flex-wrap: nowrap;
     justify-content: flex-start;
     overflow-x: auto;
@@ -1504,14 +1504,15 @@
     flex: 0 0 auto;
     border: 1px solid transparent;
     border-bottom: none;
-    border-radius: 10px 10px 0 0;
-    padding: 10px 14px;
+    border-radius: 12px 12px 0 0;
+    padding: 12px 18px;
     cursor: pointer;
     background: transparent;
-    font-size: 0.92rem;
-    font-weight: 700;
+    font-size: 1rem;
+    font-weight: 800;
     color: var(--text-color-light);
-    transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+    letter-spacing: 0.01em;
+    transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
     white-space: nowrap;
 }
 
@@ -1525,6 +1526,7 @@
     color: var(--text-color);
     background: color-mix(in srgb, var(--surface-elevated) 94%, white 6%);
     border-color: color-mix(in srgb, var(--primary-color) 26%, transparent);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
     position: relative;
 }
 
@@ -2340,7 +2342,7 @@ textarea:focus {
     display: flex;
     gap: 6px;
     border-bottom: 1px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
-    margin-bottom: 25px;
+    margin-bottom: 22px;
     flex-wrap: nowrap;
     overflow-x: auto;
     overflow-y: hidden;
@@ -2355,7 +2357,7 @@ textarea:focus {
     border: 1px solid transparent;
     border-bottom: none;
     border-radius: 10px 10px 0 0;
-    padding: 8px 11px;
+    padding: 8px 12px;
     font-size: 0.9rem;
     font-weight: 700;
     color: var(--text-color-light);
@@ -2375,6 +2377,7 @@ textarea:focus {
     color: var(--text-color);
     background: color-mix(in srgb, var(--surface-elevated) 94%, white 6%);
     border-color: color-mix(in srgb, var(--primary-color) 26%, transparent);
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.06);
 }
 
 .settings-tab-btn.active::after {
@@ -2394,6 +2397,34 @@ textarea:focus {
 .settings-tab-pane.active {
     display: block;
     animation: fadeIn 0.2s ease-in;
+}
+
+/* Tertiary tab level inside settings/open-event panes */
+.settings-tab-pane .settings-tabs-nav {
+    gap: 5px;
+    margin-top: 8px;
+    margin-bottom: 16px;
+    border-bottom-color: color-mix(in srgb, var(--primary-color) 16%, transparent);
+}
+
+.settings-tab-pane .settings-tab-btn {
+    border-radius: 9px 9px 0 0;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--text-color-light) 88%, var(--text-color) 12%);
+    background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-2) 8%);
+}
+
+.settings-tab-pane .settings-tab-btn:hover {
+    background: color-mix(in srgb, var(--surface-elevated) 82%, var(--primary-color) 18%);
+}
+
+.settings-tab-pane .settings-tab-btn.active {
+    font-weight: 700;
+    background: color-mix(in srgb, var(--surface-elevated) 96%, white 4%);
+    border-color: color-mix(in srgb, var(--primary-color) 20%, transparent);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
 
 /* Ensure touch-friendly button sizing on mobile */
@@ -2573,6 +2604,11 @@ textarea:focus {
         flex: 0 0 auto;
     }
 
+    .settings-tab-pane .settings-tab-btn {
+        padding: 8px 10px;
+        font-size: 0.8rem;
+    }
+
     .admin-inline-form,
     .typeahead-input-row,
     .blocked-item-row,
@@ -2630,6 +2666,11 @@ textarea:focus {
         padding: 9px 11px;
         font-size: 0.8rem;
         flex: 0 0 auto;
+    }
+
+    .settings-tab-pane .settings-tab-btn {
+        padding: 7px 9px;
+        font-size: 0.75rem;
     }
 
     .settings-tab-btn.active::after {
