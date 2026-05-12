@@ -70,6 +70,29 @@
         const form = document.getElementById('registerForm');
         const alertDiv = document.getElementById('alert');
         const submitBtn = document.getElementById('submitBtn');
+        const loginLink = document.querySelector('.links a[href="/login.html"]');
+
+        function getRedirectTarget() {
+            const params = new URLSearchParams(window.location.search);
+            const redirectValue = params.get('redirect');
+            if (!redirectValue) return null;
+
+            try {
+                const url = new URL(redirectValue, window.location.origin);
+                if (url.origin !== window.location.origin) {
+                    return null;
+                }
+                return `${url.pathname}${url.search}${url.hash}`;
+            } catch (_error) {
+                return null;
+            }
+        }
+
+        const redirectTarget = getRedirectTarget();
+
+        if (loginLink && redirectTarget) {
+            loginLink.href = `/login.html?redirect=${encodeURIComponent(redirectTarget)}`;
+        }
 
         if (window.NavigationManager) {
             window.NavigationManager.init(null);
@@ -147,7 +170,7 @@
                     showAlert('Registration successful! Redirecting...', 'success');
                     
                     setTimeout(() => {
-                        window.location.href = '/booking.html';
+                        window.location.href = redirectTarget || '/booking.html';
                     }, 1500);
                 } else {
                     showAlert(data.message || 'Registration failed');
@@ -164,7 +187,7 @@
 
         // Check if already logged in
         if (localStorage.getItem('token')) {
-            window.location.href = '/booking.html';
+            window.location.href = redirectTarget || '/booking.html';
         }
     </script>
     <script src="/js/shared/pwa-install.js"></script>

@@ -156,6 +156,39 @@ const openUserBookingDetails = (bookingId) => {
     const booking = myBookingsById.get(String(bookingId || ''));
     if (!modal || !body || !booking) return;
 
+    if (booking.isOpenEventBooking) {
+        const eventInfo = booking.openEvent || {};
+        const slotNumber = Number.isFinite(Number(eventInfo.slotIndex)) ? Number(eventInfo.slotIndex) + 1 : 'N/A';
+        const eventDate = formatBookingDate(booking.date);
+        const slotTime = `${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}`;
+
+        body.innerHTML = `
+            <div class="user-booking-modal-grid">
+                <section class="user-booking-modal-panel">
+                    <h4>Open Event</h4>
+                    <p><strong>Title:</strong> ${escapeBookingHtml(eventInfo.title || 'Open Event')}</p>
+                    <p><strong>Status:</strong> <span class="status-badge status-confirmed">CONFIRMED</span></p>
+                    <p><strong>Slot Number:</strong> ${slotNumber}</p>
+                </section>
+                <section class="user-booking-modal-panel">
+                    <h4>Schedule</h4>
+                    <p><strong>Date:</strong> ${eventDate}</p>
+                    <p><strong>Time:</strong> ${slotTime}</p>
+                    <p><strong>Booking ID:</strong> ${escapeBookingHtml(booking.openEventBookingId || booking._id || 'N/A')}</p>
+                </section>
+                <section class="user-booking-modal-panel">
+                    <h4>Notes</h4>
+                    <p>${escapeBookingHtml(eventInfo.description || booking.notes || 'No additional details provided.')}</p>
+                    <p><strong>Price:</strong> Free</p>
+                </section>
+            </div>
+        `;
+
+        modal.hidden = false;
+        document.body.classList.add('user-booking-modal-open');
+        return;
+    }
+
     const isPerday = booking.bookingMode === 'perday';
     const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
     const payment = getBookingPaymentSnapshot(booking);
@@ -702,6 +735,7 @@ const loadMyBookings = async (options = {}) => {
             html += '<div class="table-container bookings-user-table-container"><table class="bookings-user-table"><thead><tr><th>#</th><th>Booking</th><th>Date</th><th>Time</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead><tbody>';
 
             bookings.forEach((booking, index) => {
+                const isOpenEventBooking = Boolean(booking?.isOpenEventBooking);
                 const isPerday = booking.bookingMode === 'perday';
                 const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
                 const statusClass = String(booking.bookingStatus || '').toLowerCase();
@@ -714,9 +748,11 @@ const loadMyBookings = async (options = {}) => {
                 const classSession = booking.classSession || {};
                 const bookingTitle = classSession.isClassBooking
                     ? (classSession.selectedClassItemName || classSession.instrument || 'Music Class')
-                    : (bookingItemNames.length > 0
-                        ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2}` : ''}`
-                        : (booking.rentalType || 'Booking'));
+                    : (isOpenEventBooking
+                        ? (booking?.openEvent?.title || 'Open Event Slot')
+                        : (bookingItemNames.length > 0
+                            ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2}` : ''}`
+                            : (booking.rentalType || 'Booking')));
 
                 const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
                     ? `${formatBookingDate(booking.perDayStartDate)}<br><small>to ${formatBookingDate(booking.perDayEndDate)}</small>`
@@ -727,10 +763,13 @@ const loadMyBookings = async (options = {}) => {
 
                 const actionButtons = [
                     `<button onclick="openUserBookingDetails('${booking._id}')" class="btn btn-primary btn-sm">Details</button>`,
-                    booking.bookingStatus === 'PENDING'
+                    (isOpenEventBooking && booking?.openEvent?.id)
+                        ? `<a href="/open-event.html?item=event:${booking.openEvent.id}" class="btn btn-secondary btn-sm">Open Event</a>`
+                        : '',
+                    !isOpenEventBooking && booking.bookingStatus === 'PENDING'
                         ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger btn-sm">Cancel</button>`
                         : '',
-                    (booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
+                    !isOpenEventBooking && (booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
                         ? `<button onclick="downloadUserPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download Bill PDF">Download Bill</button>`
                         : ''
                 ].filter(Boolean).join(' ');
@@ -740,13 +779,16 @@ const loadMyBookings = async (options = {}) => {
                         <td class="bookings-user-col-serial">${index + 1}</td>
                         <td>
                             <strong>${bookingTitle}</strong>
+                            ${isOpenEventBooking ? '<br><small>Type: Open Event Slot</small>' : ''}
                             ${booking.bandName ? `<br><small>Band: ${booking.bandName}</small>` : ''}
                         </td>
                         <td>${dateText}</td>
                         <td>${timeText}</td>
                         <td>
                             <span class="status-badge status-${statusClass}">${booking.bookingStatus || 'N/A'}</span><br>
-                            ${isRejectedBooking
+                            ${isOpenEventBooking
+                                ? '<small><span class="status-badge status-paid">FREE</span></small>'
+                                : isRejectedBooking
                                 ? ''
                                 : `<small>
                                     <span class="status-badge status-${paymentStatusClass}">${paymentSnapshot.paymentStatus}</span>
@@ -754,7 +796,7 @@ const loadMyBookings = async (options = {}) => {
                                     Remaining: ${formatBookingCurrency(paymentSnapshot.remaining)}
                                 </small>`}
                         </td>
-                        <td><strong>₹${Number(booking.price || 0)}</strong></td>
+                        <td><strong>${isOpenEventBooking ? 'Free' : `₹${Number(booking.price || 0)}`}</strong></td>
                         <td class="bookings-user-actions">${actionButtons || '<small>N/A</small>'}</td>
                     </tr>
                 `;

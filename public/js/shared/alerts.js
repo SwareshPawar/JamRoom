@@ -90,8 +90,8 @@ class AlertManager {
             }
             
             .jamroom-alert {
-                background: #fff;
-                border: 1px solid #ddd;
+                background: var(--surface-elevated, #ffffff);
+                border: 1px solid var(--border-color, #dbe2ec);
                 border-radius: 8px;
                 padding: 16px;
                 margin-bottom: 10px;
@@ -158,23 +158,23 @@ class AlertManager {
             }
             
             .jamroom-alert.success {
-                border-left: 4px solid #27ae60;
-                background-color: #d5f4e6;
+                border-left: 4px solid var(--success-color, #27ae60);
+                background: color-mix(in srgb, var(--success-color, #27ae60) 14%, var(--surface-elevated, #ffffff));
             }
             
             .jamroom-alert.error {
-                border-left: 4px solid #e74c3c;
-                background-color: #fdeaea;
+                border-left: 4px solid var(--danger-color, #e74c3c);
+                background: color-mix(in srgb, var(--danger-color, #e74c3c) 14%, var(--surface-elevated, #ffffff));
             }
             
             .jamroom-alert.warning {
-                border-left: 4px solid #f39c12;
-                background-color: #fef5e7;
+                border-left: 4px solid var(--warning-color, #f39c12);
+                background: color-mix(in srgb, var(--warning-color, #f39c12) 14%, var(--surface-elevated, #ffffff));
             }
             
             .jamroom-alert.info {
-                border-left: 4px solid #3498db;
-                background-color: #e8f5fd;
+                border-left: 4px solid var(--info-color, #3498db);
+                background: color-mix(in srgb, var(--info-color, #3498db) 14%, var(--surface-elevated, #ffffff));
             }
             
             .alert-header {
@@ -186,7 +186,7 @@ class AlertManager {
             
             .alert-title {
                 font-weight: 600;
-                color: #2c3e50;
+                color: var(--text-color, #1f2937);
                 margin: 0;
                 flex: 1;
             }
@@ -196,7 +196,7 @@ class AlertManager {
                 border: none;
                 font-size: 18px;
                 cursor: pointer;
-                color: #7f8c8d;
+                color: var(--text-color-light, #64748b);
                 padding: 0;
                 margin-left: 10px;
                 line-height: 1;
@@ -204,11 +204,11 @@ class AlertManager {
             }
             
             .alert-close:hover {
-                color: #2c3e50;
+                color: var(--text-color, #1f2937);
             }
             
             .alert-message {
-                color: #34495e;
+                color: var(--text-color, #1f2937);
                 margin: 0;
             }
 

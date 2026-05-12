@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Events & Sessions - Swar Jamroom Studio</title>
+    <meta name="theme-color" content="#38bdf8">
+    <script src="/js/shared/theme.js"></script>
+
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/jamroom-192.png">
+
+    <link rel="stylesheet" href="/css/shared.css">
+    <link rel="stylesheet" href="/css/pages/open-event.css?v=20260512c">
+
+    <script src="/js/shared/utils.js"></script>
+    <script src="/js/shared/alerts.js?v=20260512a"></script>
+    <script src="/js/shared/auth.js"></script>
+    <script src="/js/shared/navigation.js"></script>
+    <script src="/js/shared/lazy-loader.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div id="navigationContainer"></div>
+
+        <div class="main-content">
+            <div class="section open-event-hero-section" id="openEventGuestHero">
+                <div class="section-header">
+                    <h2>Open Events & Sessions</h2>
+                </div>
+                <div class="section-content">
+                    <p class="open-event-subtitle">Browse published Open Events and approved Open JamRoom Sessions from the same discovery page.</p>
+                    <div id="openEventAuthNotice" class="open-event-auth-notice" hidden>
+                        <span>You need an account to book a slot.</span>
+                        <div class="open-event-auth-actions">
+                            <a id="openEventLoginLink" href="/login.html" class="btn btn-secondary btn-sm">Login</a>
+                            <a id="openEventRegisterLink" href="/register.html" class="btn btn-primary btn-sm">Register</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section" id="openEventListSection">
+                <div class="section-header">
+                    <h2>Available Open Events & JamRoom Sessions</h2>
+                </div>
+                <div class="section-content">
+                    <div id="openEventStatus" class="open-event-status">Loading open events...</div>
+                    <div id="openEventList" class="open-event-list"></div>
+                </div>
+            </div>
+
+            <div id="openEventDetailModal" class="modal" aria-hidden="true">
+                <div class="modal-content open-event-modal-content">
+                    <div class="modal-header">
+                        <h2 id="openEventDetailTitle">Details</h2>
+                        <span class="close" id="openEventDetailModalClose" role="button" aria-label="Close">&times;</span>
+                    </div>
+                    <div class="section-content">
+                        <div id="openEventMeta" class="open-event-meta"></div>
+                        <div id="openEventDetailBody"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/open-event/open-event-page.js?v=20260512d"></script>
+    <script src="/js/shared/pwa-install.js"></script>
+</body>
+</html>

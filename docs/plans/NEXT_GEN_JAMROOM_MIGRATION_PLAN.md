@@ -1,495 +1,249 @@
 # Next Gen JamRoom Migration Plan
 
-Last Updated: May 1, 2026
+Last Updated: May 12, 2026
 
 ## Goal
-- Evolve JamRoom from a booking-only product into a community-driven music platform.
-- Add a public community feed, open jam session discovery, approval-based join workflows, richer artist profiles, band creation and band collaboration, and unified notifications.
-- Keep the current Node.js + Express + Mongoose + vanilla JS stack unless a later phase proves a stronger architectural need.
+Evolve JamRoom from a booking-only product into a community-aware music platform — starting with a single, focused feature: **Open JamRoom Sessions**.
 
-## Product Vision
-- A registered artist can showcase their skills and profile.
-- A registered artist can create an open jam session post for others to discover.
-- Other artists can browse the feed, request to join, explain what they will contribute, and wait for approval.
-- The creator can approve, reject, and discuss participation through structured in-app messaging.
-- Artists can create bands, invite members, and only add them after the invited user approves.
-- Bands can collaborate internally, receive shared notifications, and make bookings with band context.
-- Admin has full moderation and operational control across posts, comments, jam sessions, bands, messages, and notifications.
+The first release is deliberately minimal. Bands, artist profiles, a standalone community feed, and messaging are deferred to later phases once the Open Session feature is stable and well-used.
 
-## User Experience Summary
+## Product Vision (Long-term)
+- Artists can mark a booking as an open jam session so others can discover it.
+- A scrollable session/community wall lives on the home page.
+- Users can create bands, invite members with approval-based flows, and book as a band.
+- Admin has full moderation control over all user-generated content.
 
-### Community Feed
-- Lives on the home page below the existing sections.
-- Publicly visible for browsing.
-- Login required for posting, liking, commenting, joining a jam session, creating a band, or responding to invites.
-- Infinite-scroll feed continues loading until no more posts remain.
+The current work covers **Phase 1 only**.
 
-### Post Types
-- Open Jam Session
-- Performance Link Post
-- Text / Help / Community Post
+---
 
-### Social Interactions
-- Likes on eligible posts.
-- Comments on posts.
-- Creator-owned moderation for their own posts.
-- Admin override moderation everywhere.
+## Phase 1: Open JamRoom Session (Current MVP)
 
-### Messaging
-- Async in-app thread per jam-session join request.
-- Async in-app thread per band invite or band activity discussion where relevant.
-- No real-time chat requirement in the first implementation.
+### Overview
+When a user creates a booking, they can optionally flag it as an **Open JamRoom Session**. Once admin approves the booking, this session is surfaced on the home page and on a dedicated sessions page. Other logged-in users can interact with it.
 
-### Notifications
-- In-app notification badge and panel.
-- Email notifications for important approval events.
-- WhatsApp notifications for important approval events where existing Twilio flow applies.
+This is a booking-integrated feature — it does not require a separate community post model. The open session data lives on the `Booking` model.
 
-## Delivery Principles
-- Reuse the existing auth system and route style.
-- Keep the first release operationally simple: async messaging, not real-time chat.
-- Prefer denormalized snapshots where the existing codebase already follows that pattern.
-- Keep public browsing separate from authenticated interaction.
-- Build admin moderation in the first version, not as a later afterthought.
-- Make each phase deployable behind feature flags where practical.
+---
 
-## Phase 1: Platform Foundations And Data Model
+### User Experience
 
-### Objectives
-- Add the core schemas and route surfaces needed for community, jam participation, messaging, notifications, and bands.
-- Extend user profiles so artists can present useful public information.
+#### Booking Creation
+- During booking, the user sees an optional toggle: **"Make this an Open JamRoom Session"**.
+- When toggled on, the user can optionally provide:
+  - A short caption / description (what the session is about)
+  - A media URL (YouTube or Instagram link) — auto-detected and embedded, Facebook wall-style
+- Everything else (date, time, studio, duration) is already captured by the booking form.
+
+#### Home Page — Open Sessions Section
+- If at least one approved open session exists, a section titled **"Open JamRoom Sessions"** appears on the home page **above** the Instagram showcase.
+- If no approved open sessions exist, the section is completely hidden — no empty state shown.
+- Each session is shown as a compact card displaying:
+  - Session date and time
+  - Booked-by user's **first name** (shown only after admin approval)
+  - Short caption (if provided)
+  - Auto-embedded video preview thumbnail if a media URL was provided
+- Cards are clickable to expand inline or navigate to the session detail page.
+
+#### Session Detail Page (`/open-sessions.html`)
+- Independent page listing all active approved open sessions.
+- Each session shows the full detail:
+  - Date, time, studio name
+  - Booker's first name
+  - Caption
+  - Embedded video (YouTube iframe or Instagram embed auto-detected from URL)
+  - Comments and presence markers from other users
+
+#### Session Interactions (logged-in users only)
+- **Mark Presence**: a logged-in user can tap "I'll be there" or similar to indicate they plan to attend/participate.
+- **Comment**: a short comment can be posted under the session.
+- Presence markers and comment authors show the user's first name only.
+- No approval workflow required for presence/comments in Phase 1.
+
+#### Admin Approval
+- When a booking with `isOpenSession: true` is approved by admin, the session automatically becomes visible on the home page and sessions page.
+- Admin can see all open session bookings in the admin panel (filtered view).
+- Admin can remove the open session flag or hide a session independently of the booking status if needed.
+
+---
 
 ### Data Model Changes
 
-#### Update `models/User.js`
-- Add `bio`
-- Add `skills` as free-form tags
-- Add `socialLinks` for showcase links
-- Add public-profile oriented fields as needed for future expansion:
-  - `city`
-  - `genres`
-  - `instruments`
-  - `profileVisibility`
+#### Update `models/Booking.js`
+Add the following fields:
+- `isOpenSession`: Boolean, default `false`
+- `openSession.caption`: String (optional short description from user)
+- `openSession.mediaUrl`: String (optional YouTube or Instagram URL)
+- `openSession.mediaType`: String, enum `['youtube', 'instagram', null]` — auto-detected from URL on save
+- `openSession.comments`: Array of `{ userId, firstName, text, createdAt }`
+- `openSession.presenceMarkers`: Array of `{ userId, firstName, markedAt }`
+- `openSession.hiddenByAdmin`: Boolean, default `false` — allows admin to hide without cancelling booking
 
-#### New `models/CommunityPost.js`
-- `type`: `jam_session | performance_link | text`
-- `author`
-- `authorSnapshot`
-- `title`
-- `content`
-- `mediaUrl`
-- `mediaType`: `youtube | instagram`
-- `likes`
-- `likesCount`
-- `comments`
-- `commentsCount`
-- `status`
-- `createdAt`, `updatedAt`
+---
 
-#### Jam Session Structure Inside `CommunityPost`
-- `jamSession.date`
-- `jamSession.time`
-- `jamSession.locationText`
-- `jamSession.genre`
-- `jamSession.description`
-- `jamSession.maxParticipants`
-- `jamSession.status`: `open | full | cancelled | closed`
-- `jamSession.participants[]` with:
-  - `userId`
-  - `name`
-  - `skillsSnapshot`
-  - `requestMessage`
-  - `status`: `pending | approved | rejected | withdrawn`
-  - `requestedAt`
-  - `respondedAt`
+### API Changes
 
-#### New `models/MessageThread.js`
-- Used for structured async conversations.
-- Covers both jam join requests and band-related discussions.
-- Fields:
-  - `threadType`: `jam_join | band_invite | band_internal | booking_context`
-  - `communityPostId` when tied to a jam session
-  - `bandId` when tied to a band
-  - `participants`
-  - `participantSnapshots`
-  - `subject`
-  - `messages[]`
-  - `status`
-  - `createdAt`, `updatedAt`
+#### Update `routes/booking.routes.js`
+- Accept `isOpenSession`, `openSession.caption`, `openSession.mediaUrl` in the booking creation payload.
+- Auto-detect and set `openSession.mediaType` from the URL on save.
 
-#### New `models/Notification.js`
-- `userId`
-- `type`
-- `fromUserId`
-- `fromUserName`
-- `communityPostId`
-- `bandId`
-- `threadId`
-- `text`
-- `read`
-- `createdAt`
+#### New endpoints in `routes/booking.routes.js` (or a new `routes/openSession.routes.js`)
+- `GET /api/open-sessions` — returns all approved, non-hidden open sessions (public, no auth required)
+- `POST /api/open-sessions/:bookingId/presence` — toggle presence marker (auth required)
+- `POST /api/open-sessions/:bookingId/comments` — add a comment (auth required)
+- `DELETE /api/open-sessions/:bookingId/comments/:commentId` — delete own comment (auth required)
 
-#### New `models/Band.js`
-- `name`
-- `slug`
-- `createdBy`
-- `ownerId`
-- `bio`
-- `genres`
-- `city`
-- `members[]`
-- `memberCount`
-- `bookingContactMode`
-- `isActive`
-- `createdAt`, `updatedAt`
+#### Update `routes/admin/bookings.routes.js`
+- Add `PATCH /api/admin/bookings/:id/hide-session` — admin toggle to hide/show an open session independently.
 
-#### New `models/BandInvite.js`
-- Approval-based membership is modeled explicitly.
-- Fields:
-  - `bandId`
-  - `invitedUserId`
-  - `invitedByUserId`
-  - `roleLabel`
-  - `inviteMessage`
-  - `status`: `pending | approved | rejected | cancelled | expired`
-  - `respondedAt`
-  - `createdAt`
+---
 
-### API And Route Changes
+### Frontend Changes
 
-#### New `routes/community.routes.js`
-- Public feed endpoints.
-- Authenticated post creation and interaction endpoints.
-- Jam join request endpoints.
-- Comment and like endpoints.
-- Message thread endpoints.
-- Notification endpoints.
+#### `public/booking.html` + `public/js/booking/`
+- Add optional toggle UI for "Make this an Open JamRoom Session".
+- Conditionally show caption and media URL fields when toggled on.
 
-#### New `routes/band.routes.js`
-- Create band.
-- Update own band.
-- Invite user to band.
-- Approve or reject band invite.
-- List my bands.
-- Get band details.
-- Leave band.
-- Remove member from band.
-- Band messaging thread access.
-- Band-aware booking handoff endpoints.
+#### `public/index.html`
+- Add `<section id="openSessionsSection">` placed **before** the Instagram showcase section.
+- Section is rendered only when at least one approved open session is returned from the API.
 
-#### Update `routes/profile.routes.js`
-- Accept `bio`, `skills`, `socialLinks`, and band-relevant public profile details.
+#### New `public/js/home/open-sessions.js`
+- Fetches `GET /api/open-sessions` on page load.
+- If response is empty, hides the section entirely.
+- Renders compact session cards.
+- Handles click-to-expand and link to `/open-sessions.html`.
+- Auto-detects YouTube / Instagram media URL and renders embedded preview.
 
-#### Update `routes/admin.routes.js`
-- Add admin community moderation endpoints.
-- Add admin band oversight endpoints.
+#### New `public/open-sessions.html`
+- Independent page listing all approved open sessions.
+- Full card layout: date/time, first name, caption, embedded media, comments, presence.
+- Logged-in users can post comments and mark presence directly on this page.
 
-#### Update `server.js`
-- Mount `/api/community`
-- Mount `/api/bands`
+#### New `public/js/open-sessions/open-sessions-page.js`
+- Drives the `/open-sessions.html` page.
+- Fetches session list, renders full cards.
+- Handles comment submission and presence toggle with auth check.
 
-### Operational Notes
-- Add indexes for feed ordering, notification unread counts, and pending band invite lookups.
-- Add lightweight validation for supported performance links.
-- Add feature flags for `communityEnabled` and `bandsEnabled` in admin settings if rollout control is desired.
+#### New `public/css/pages/open-sessions.css`
+- Card styles, embedded media container, comment thread styles, presence badge.
 
-## Phase 2: Rich Profiles And Artist Identity
+#### `public/admin.html` + `public/js/admin/`
+- Add a filter/view in admin bookings to show only open session bookings.
+- Show session caption and media URL in admin booking detail.
+- Add hide/show toggle for admin to control session visibility independently.
+
+---
+
+### New Files (Phase 1)
+- `public/open-sessions.html`
+- `public/js/home/open-sessions.js`
+- `public/js/open-sessions/open-sessions-page.js`
+- `public/css/pages/open-sessions.css`
+
+### Existing Files Changed (Phase 1)
+- `models/Booking.js` — add `isOpenSession` and `openSession` subdocument fields
+- `routes/booking.routes.js` — accept open session fields at creation
+- `routes/admin/bookings.routes.js` — add admin hide/show endpoint
+- `public/booking.html` — open session toggle UI
+- `public/index.html` — open sessions section before Instagram
+- `public/admin.html` — open session filter and controls
+
+### Scope Boundaries For Phase 1
+- No separate CommunityPost model — open session data lives on Booking.
+- No artist profile expansion.
+- No bands.
+- No in-app messaging or notification panel.
+- No likes — only presence markers and comments.
+- No media upload — URL paste only (YouTube / Instagram auto-embed).
+- No nested/threaded comments — flat list only.
+- No real-time updates — standard page load/submit.
+- Admin approves the booking as normal; session visibility is automatic on booking approval.
+
+### Success Criteria For Phase 1
+- User can mark a booking as an open session during creation.
+- Approved open sessions appear on the home page above Instagram when at least one exists.
+- Sessions page shows full detail with embedded media, comments, and presence.
+- Logged-in users can comment and mark presence.
+- Admin can hide individual sessions independently.
+
+---
+
+## Phase 2: Rich Artist Profiles (Deferred)
 
 ### Objectives
-- Make user accounts useful for discovery, matching, and collaboration.
-- Ensure creators and invitees can evaluate each other before approving jam or band participation.
+- Expand user accounts with bio, skills tags, genres, instruments, and showcase links.
+- Surface profile snapshots on open session cards and future community posts.
 
-### Account Experience Changes
-- Expand `public/account.html` profile tab to include:
-  - Bio
-  - Skills tags
-  - Genres
-  - Instruments / contribution types
-  - Showcase links
-  - City / location text
+*Details to be defined when Phase 1 is stable.*
 
-### Public Profile Presentation
-- Surface profile snapshot data in:
-  - Community post cards
-  - Jam session participant requests
-  - Band member lists
-  - Messaging threads
+---
 
-### Band Identity Foundations
-- Allow a user to:
-  - Create a band
-  - Give it a name and description
-  - See current members
-  - Track pending invites
-- Membership is not immediate.
-- A band member is only added after explicit approval by the invited user.
-
-### Frontend Work
-- Update profile save flow to persist the new fields.
-- Add tag-entry UI for skills.
-- Add profile summary cards that can later be reused in community and band views.
-
-## Phase 3: Community Feed And Posting System
+## Phase 3: Standalone Community Feed And Post Types (Deferred)
 
 ### Objectives
-- Launch the Facebook-style scrollable wall on the home page.
-- Support the three initial post types with a stable, paginated feed.
+- Launch a Facebook-style scrollable wall on the home page beyond open sessions.
+- Support multiple post types: performance link posts and text/community posts in addition to open jam sessions.
+- Introduce a standalone `CommunityPost` model separate from bookings.
+- Infinite-scroll paginated feed.
 
-### Feed Placement
-- Add the feed below existing home page content in `public/index.html`.
+*Details to be defined when Phase 2 is stable.*
 
-### Post Types
+---
 
-#### Open Jam Session Post
-- Creator defines:
-  - Title
-  - Date / time
-  - Location text
-  - Genre
-  - Description
-  - What contributors are needed
-  - Maximum participant count
-
-#### Performance Link Post
-- Supports recognized embeds for:
-  - YouTube
-  - Instagram
-
-#### Text / Help Post
-- General discussion, help requests, collab notes, or announcements.
-
-### Frontend Work
-- New feed renderer.
-- Infinite scroll.
-- Post creation modal.
-- Login-gated interactions.
-- Like and comment interactions.
-- Own-post controls for edit/delete scope where permitted.
-
-### Backend Work
-- Paginated feed endpoint.
-- Create post endpoint.
-- Single post fetch.
-- Like toggle.
-- Comment add/remove.
-- Post delete rules.
-
-## Phase 4: Open Jam Session Join And Approval Workflow
+## Phase 4: Open Jam Session Join And Approval Workflow (Deferred)
 
 ### Objectives
-- Turn open jam posts into structured collaboration requests.
-- Give creators approval control and structured discussion before acceptance.
+- Allow other users to formally request to join an open session with a message.
+- Give the session creator approval control.
+- Introduce async message threads per join request.
 
-### User Flow
-- Logged-in user finds an open jam session.
-- User taps request to join.
-- User submits what they will contribute.
-- System creates:
-  - Pending participant record on the jam post
-  - Async message thread between creator and requester
-  - Notification to creator
-- Creator can:
-  - Review requester's profile snapshot and skills
-  - Discuss contribution through messaging
-  - Approve or reject the request
-- Requester receives result notifications.
+*Details to be defined when Phase 3 is stable.*
 
-### Notifications In This Phase
-- In-app notifications for:
-  - New join request
-  - Join approved
-  - Join rejected
-- Email and WhatsApp notifications for the same approval-critical events.
+---
 
-### Frontend Work
-- Join-request modal.
-- Creator approval controls on own jam posts.
-- Request status badges.
-- Thread view for jam discussions.
-
-## Phase 5: Messaging And Notifications Layer
+## Phase 5: Messaging And Notifications Layer (Deferred)
 
 ### Objectives
-- Provide a simple but complete async communication system.
-- Centralize alerts for jam sessions, invites, approvals, comments, and band activity.
+- In-app notification panel and badge in shared navigation.
+- Async message threads for jam join requests and band coordination.
+- Email and WhatsApp notifications for approval-critical events.
 
-### Messaging Scope
-- Jam join threads
-- Band invite threads
-- Band internal discussion threads
-- Booking-context threads for band coordination if needed
+*Details to be defined when Phase 4 is stable.*
 
-### Notification Scope
-- New jam join requests
-- Join approval / rejection
-- New comments on relevant posts
-- Band invite received
-- Band invite approved / rejected
-- Band booking created or updated
-- Important band member changes
+---
 
-### Frontend Work
-- Notification bell in shared navigation.
-- Notification panel with unread count.
-- Messages tab in account page.
-- Thread list and thread detail view.
-
-### Backend Work
-- Notification creation helpers.
-- Mark-as-read endpoints.
-- Message thread list and post endpoints.
-
-## Phase 6: Band Creation, Membership Approval, And Collaboration
+## Phase 6: Band Creation, Membership, And Collaboration (Deferred)
 
 ### Objectives
-- Let artists form bands inside the platform.
-- Keep membership approval-based.
-- Allow a band to coordinate and act as a collaborative booking unit.
+- Artists can form bands inside the platform.
+- Approval-based membership: invitees must accept before being added.
+- Bands can coordinate internally and make bookings with band context.
 
-### Band Creation Flow
-- Any logged-in eligible user can create a band.
-- Creator sets:
-  - Band name
-  - Description
-  - Genres
-  - City
-  - Initial identity / showcase details
+*Details to be defined when Phase 5 is stable.*
 
-### Approval-Based Member Add Flow
-- Creator or authorized band manager selects a registered user to invite.
-- Invited user gets:
-  - In-app notification
-  - Optional email / WhatsApp notification
-  - Invite thread context showing who invited them and why
-- Invited user approves or rejects.
-- Only after approval:
-  - User is added to `Band.members`
-  - All members are notified
+---
 
-### Band Collaboration Features
-- Band detail page / panel shows:
-  - Member list
-  - Pending invites
-  - Internal message thread
-  - Shared updates
-- Band members can talk internally through async band threads.
-- Band-level activity notifications go to all current members.
-
-### Booking With Band Context
-- Add a booking option for:
-  - Booking as an individual
-  - Booking on behalf of a band
-- Band booking captures:
-  - `bandId`
-  - `bandNameSnapshot`
-  - who created the booking
-  - which members were notified
-- All current band members receive band-booking notifications.
-- Creator/admin can later decide whether band bookings require explicit member confirmation before final submission.
-
-### Data / API Changes In This Phase
-- Extend booking model and booking routes to support optional band-linked bookings.
-- Add band thread endpoints.
-- Add membership and invite management endpoints.
-
-## Phase 7: Admin Moderation And Operational Control
+## Phase 7: Admin Moderation And Operational Control (Deferred)
 
 ### Objectives
-- Ensure admins can control all user-generated and collaborative activity.
+- Full admin moderation across all community posts, comments, bands, invites, and messages.
+- Override and audit capabilities for every approval flow.
 
-### Admin Capabilities
-- View and moderate all community posts.
-- Remove any comment.
-- View jam session participation requests.
-- Override jam request approval decisions if needed.
-- View all bands, members, and pending invites.
-- Cancel abusive or invalid band invites.
-- Remove users from bands administratively.
-- Review message thread metadata when required for moderation or support.
-- Audit notification and approval flows.
+*Details to be defined as community features are built out.*
 
-### Admin UI Work
-- New admin community management section.
-- New admin band management section.
-- Filters for post type, status, band status, invite status, and date.
+---
 
-## Phase 8: Rollout, Hardening, And Quality Gates
-
-### Technical Validation
-- Pagination correctness.
-- Feed performance on long scroll sessions.
-- Notification unread count accuracy.
-- Authorization rules for post ownership, band ownership, and admin overrides.
-- Validation of supported media URLs.
-- Booking flow regression tests with and without `bandId`.
-
-### UX Validation
-- Public users can browse but cannot interact.
-- Logged-in users can clearly understand pending vs approved states.
-- Band invite and jam join approval states are unambiguous.
-- Mobile layouts remain usable at 360, 390, 480, 768 widths.
-
-### Operational Guardrails
-- Rate-limit post creation, comments, likes, invites, and messaging.
-- Add abuse controls for spammy band invites and spammy jam posts.
-- Add future-ready hooks for reporting and blocking if community activity grows.
-
-## New Files Expected
-- `models/CommunityPost.js`
-- `models/MessageThread.js`
-- `models/Notification.js`
-- `models/Band.js`
-- `models/BandInvite.js`
-- `routes/community.routes.js`
-- `routes/band.routes.js`
-- `public/js/community/community-feed.js`
-- `public/js/community/community-post-create.js`
-- `public/js/community/community-messages.js`
-- `public/js/community/community-notifications.js`
-- `public/js/bands/band-main.js`
-- `public/js/bands/band-invites.js`
-- `public/js/admin/admin-community.js`
-- `public/js/admin/admin-bands.js`
-- `public/css/pages/community.css`
-- `public/css/pages/bands.css`
-
-## Existing Files Expected To Change
-- `models/User.js`
-- `models/Booking.js`
-- `server.js`
-- `routes/profile.routes.js`
-- `routes/admin.routes.js`
-- `routes/booking.routes.js`
-- `public/index.html`
-- `public/account.html`
-- `public/admin.html`
-- `public/booking.html`
-- `public/js/shared/navigation.js`
-
-## Release Order Recommendation
-- Release 1:
-  - Phases 1 and 2
-- Release 2:
-  - Phases 3 and 4
-- Release 3:
-  - Phase 5
-- Release 4:
-  - Phase 6
-- Release 5:
-  - Phases 7 and 8
-
-## Scope Boundaries For First Version
+## Long-term Scope Boundaries
 - No real-time websocket chat.
 - No follower graph.
-- No direct messages outside jam / band / booking contexts.
-- No media upload pipeline for images or audio in v1.
-- No threaded nested comments in v1.
-- No public reporting workflow in v1 unless moderation load demands it.
+- No direct messages outside jam/band/booking contexts.
+- No media upload pipeline — URL paste only.
+- No threaded nested comments.
+- No public reporting workflow unless moderation load demands it.
 
-## Success Criteria
-- Artists can discover and join open jam sessions through a feed.
-- Creators can review, discuss, and approve participants.
-- Users can present a richer skill-based identity.
-- Bands can be created with approval-based membership.
-- Bands can coordinate internally and book with shared awareness.
-- Admin can moderate and override the full system safely.
+## Overall Success Criteria
+- Phase 1: Open sessions are discoverable on the home page and can be interacted with.
+- Phase 3+: Artists can discover and join open jam sessions through a richer community feed.
+- Phase 6: Bands can be created with approval-based membership and book with shared awareness.
+- All phases: Admin can moderate and override the full system safely.

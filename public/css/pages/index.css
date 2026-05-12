@@ -205,6 +205,63 @@
 
 
 /* Navigation styles are now in shared.css */
+.open-events-promo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    padding: 24px;
+    margin-bottom: 42px;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 18%, transparent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 88%, var(--primary-color) 12%), color-mix(in srgb, var(--surface-elevated) 90%, #22c55e 10%));
+}
+
+.open-events-promo-copy {
+    max-width: 680px;
+}
+
+.open-events-promo-eyebrow {
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--primary-color-dark);
+}
+
+.open-events-promo h3 {
+    margin: 0 0 10px;
+    font-size: 1.5rem;
+    color: var(--text-color);
+}
+
+.open-events-promo p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.open-events-preview-card {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
+    background: color-mix(in srgb, var(--surface-elevated) 90%, var(--primary-color) 10%);
+    display: grid;
+    gap: 4px;
+}
+
+.open-events-preview-card p {
+    margin: 0;
+}
+
+.open-events-promo-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .instagram-showcase {
     margin-bottom: 50px;
 }
@@ -348,6 +405,15 @@
         width: 100%;
         justify-content: center;
         font-size: 0.9rem;
+    }
+
+    .open-events-promo {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .open-events-promo-actions {
+        justify-content: flex-start;
     }
 
     .instagram-grid {

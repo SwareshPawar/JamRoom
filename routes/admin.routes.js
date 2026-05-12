@@ -13,5 +13,6 @@ router.use('/', require('./admin/settings.routes'));
 router.use('/', require('./admin/slots.routes'));
 router.use('/', require('./admin/whatsapp.routes'));
 router.use('/', require('./admin/quotations.routes'));
+router.use('/', require('./admin/open-events.routes'));
 
 module.exports = router;

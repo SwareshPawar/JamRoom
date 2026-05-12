@@ -122,6 +122,7 @@ class NavigationManager {
         if (path === '/admin.html') return 'admin';
         if (path === '/account.html') return 'account';
         if (path === '/payment-info.html') return 'payment';
+        if (path === '/open-event.html') return 'open-event';
         if (path === '/login.html') return 'login';
         if (path === '/register.html') return 'register';
         if (path === '/reset-password.html') return 'reset-password';
@@ -205,6 +206,14 @@ class NavigationManager {
             label: 'Book Now',
             class: `nav-link ${this.isCurrentHref('/booking.html') ? 'active' : ''}`.trim(),
             id: 'bookingNavLink'
+        });
+
+        links.push({
+            href: '/open-event.html',
+            icon: '🎤',
+            label: 'Open Events',
+            class: `nav-link ${this.isCurrentHref('/open-event.html') ? 'active' : ''}`.trim(),
+            id: 'openEventNavLink'
         });
 
         if (this.isAuthenticated) {

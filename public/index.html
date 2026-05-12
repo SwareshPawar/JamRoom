@@ -49,6 +49,19 @@
                 </div>
             </div>
 
+            <section class="open-events-promo" id="openEventsPromo" aria-labelledby="openEventsPromoTitle">
+                <div class="open-events-promo-copy">
+                    <p class="open-events-promo-eyebrow">New</p>
+                    <h3 id="openEventsPromoTitle">Next Open Event</h3>
+                    <p id="openEventsPromoStatus">Loading upcoming event...</p>
+                    <div id="openEventsPreviewCard" class="open-events-preview-card" hidden></div>
+                </div>
+                <div class="open-events-promo-actions">
+                    <a id="openEventsPrimaryLink" href="/open-event.html" class="btn btn-primary cta-btn">View Open Events</a>
+                    <a id="openEventsSecondaryLink" href="/open-event.html" class="btn btn-secondary cta-btn">See Event Slots</a>
+                </div>
+            </section>
+
             <section class="instagram-showcase" id="instagramShowcase" style="display:none;">
                 <h3 class="instagram-title">Studio Instagram Highlights</h3>
                 <div class="instagram-grid" id="instagramGrid">
@@ -117,9 +130,52 @@
                 `;
             };
 
+            const loadNextOpenEventWidget = async () => {
+                const statusEl = document.getElementById('openEventsPromoStatus');
+                const previewEl = document.getElementById('openEventsPreviewCard');
+                const primaryLinkEl = document.getElementById('openEventsPrimaryLink');
+                const secondaryLinkEl = document.getElementById('openEventsSecondaryLink');
+
+                if (!statusEl || !previewEl || !primaryLinkEl || !secondaryLinkEl) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/open-events');
+                    const payload = await response.json();
+                    const events = Array.isArray(payload?.events) ? payload.events : [];
+
+                    if (events.length === 0) {
+                        statusEl.textContent = 'No published Open Events right now. Check back soon.';
+                        previewEl.hidden = true;
+                        secondaryLinkEl.textContent = 'Explore Open Events';
+                        return;
+                    }
+
+                    const nextEvent = events[0];
+                    statusEl.textContent = 'Upcoming published event ready for slot booking.';
+
+                    const eventLink = `/open-event.html?event=${encodeURIComponent(nextEvent.id)}`;
+                    primaryLinkEl.href = eventLink;
+                    secondaryLinkEl.href = eventLink;
+
+                    previewEl.hidden = false;
+                    previewEl.innerHTML = `
+                        <p><strong>${String(nextEvent.title || 'Open Event')}</strong></p>
+                        <p>${String(nextEvent.date || '')} | ${String(nextEvent.startTime || '')} - ${String(nextEvent.endTime || '')}</p>
+                        <p>${Number(nextEvent.slotCount || 0)} total slot(s)</p>
+                    `;
+                } catch (error) {
+                    console.error('Failed to load next open event widget:', error);
+                    statusEl.textContent = 'Unable to load upcoming Open Event right now.';
+                    previewEl.hidden = true;
+                }
+            };
+
             // Show loading state first, wait for auth status before rendering navigation
             window.NavigationManager.showLoadingPlaceholder('navigationContainer');
             renderHomeHeroUserBar(null);
+            await loadNextOpenEventWidget();
 
             // Lazy load Instagram embeds when section becomes visible
             async function loadInstagramEmbeds() {

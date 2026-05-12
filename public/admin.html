@@ -29,6 +29,7 @@
     <script src="/js/admin/admin-bookings-edit.js"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
+    <script src="/js/admin/admin-open-events.js"></script>
     <script src="/js/vendor/flatpickr.min.js"></script>
     
     <!-- Admin-specific styles -->
@@ -70,6 +71,7 @@
         <div class="section">
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('bookings', this)">📋 Bookings</button>
+                <button class="tab" onclick="switchTab('openEvents', this)">🎤 Open Events</button>
                 <button class="tab" onclick="switchTab('calendar', this)">📅 Calendar</button>
                 <button class="tab" onclick="switchTab('revenue', this)">💰 Revenue</button>
                 <button class="tab" onclick="switchTab('blocked', this)">🚫 Blocked Times</button>
@@ -88,6 +90,57 @@
                 <div id="bookingAlert" class="alert"></div>
                 <div id="bookingsLoading" class="loading">Loading bookings...</div>
                 <div id="bookingsTable"></div>
+            </div>
+
+            <!-- Open Events Tab -->
+            <div id="openEventsTab" class="tab-content">
+                <div class="admin-toolbar">
+                    <h2>Open Events</h2>
+                </div>
+                <div id="openEventsAlert" class="alert"></div>
+
+                <div class="section admin-open-events-form-section">
+                    <h3>Create Open Event</h3>
+                    <form id="openEventCreateForm" class="admin-open-event-form">
+                        <div class="form-group">
+                            <label for="openEventTitle">Title*</label>
+                            <input type="text" id="openEventTitle" required maxlength="120" placeholder="Open Mic Friday">
+                        </div>
+                        <div class="form-group">
+                            <label for="openEventDescription">Description</label>
+                            <textarea id="openEventDescription" rows="3" maxlength="1000" placeholder="Tell performers what this event is about."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="openEventDate">Date*</label>
+                            <input type="text" id="openEventDate" required placeholder="Select date">
+                        </div>
+                        <div class="form-group">
+                            <label for="openEventStartTime">Start Time*</label>
+                            <input type="text" id="openEventStartTime" required placeholder="Select start time">
+                        </div>
+                        <div class="form-group">
+                            <label for="openEventEndTime">End Time*</label>
+                            <input type="text" id="openEventEndTime" required placeholder="Select end time">
+                        </div>
+                        <div class="form-group">
+                            <label for="openEventStatus">Status*</label>
+                            <select id="openEventStatus" required>
+                                <option value="draft">Draft</option>
+                                <option value="published">Published</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="openEventCreateSubmit">Create Open Event</button>
+                    </form>
+                </div>
+
+                <div class="section">
+                    <div class="admin-toolbar">
+                        <h3>Existing Open Events</h3>
+                        <button type="button" class="btn btn-secondary" onclick="loadOpenEvents()">Refresh</button>
+                    </div>
+                    <div id="openEventsLoading" class="loading admin-hidden">Loading open events...</div>
+                    <div id="openEventsList"></div>
+                </div>
             </div>
 
             <!-- Calendar Tab -->
@@ -561,6 +614,20 @@
                 </div>
                 <button type="submit" class="btn btn-danger btn-full">Block Time</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Open Event Bookings Modal -->
+    <div id="openEventBookingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="openEventBookingsModalTitle">Open Event Slot Bookings</h2>
+                <span class="close" onclick="closeModal('openEventBookingsModal')">&times;</span>
+            </div>
+            <div id="openEventBookingsModalBody"></div>
+            <div class="modal-actions-row">
+                <button type="button" class="btn btn-secondary btn-flex" onclick="closeModal('openEventBookingsModal')">Close</button>
+            </div>
         </div>
     </div>
 
@@ -1675,6 +1742,7 @@
             document.getElementById(tab + 'Tab').classList.add('active');
 
             if (tab === 'bookings') loadBookings();
+            if (tab === 'openEvents') loadOpenEvents();
             if (tab === 'calendar') initCalendar();
             if (tab === 'revenue') loadRevenue();
             if (tab === 'blocked') loadBlockedTimes();

@@ -354,6 +354,68 @@ const bookingSchema = new mongoose.Schema({
       }
     }]
   },
+  isOpenSession: {
+    type: Boolean,
+    default: false
+  },
+  openSession: {
+    caption: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    mediaUrl: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    mediaType: {
+      type: String,
+      enum: ['youtube', 'instagram', ''],
+      default: ''
+    },
+    hiddenByAdmin: {
+      type: Boolean,
+      default: false
+    },
+    comments: [{
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      firstName: {
+        type: String,
+        trim: true,
+        required: true
+      },
+      text: {
+        type: String,
+        trim: true,
+        required: true
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    presenceMarkers: [{
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      firstName: {
+        type: String,
+        trim: true,
+        required: true
+      },
+      markedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }]
+  },
   isDeleted: {
     type: Boolean,
     default: false
@@ -383,6 +445,7 @@ bookingSchema.index({ date: 1, startTime: 1 });
 bookingSchema.index({ bookingStatus: 1 });
 bookingSchema.index({ paymentStatus: 1 });
 bookingSchema.index({ date: 1, bookingStatus: 1 });
+bookingSchema.index({ isOpenSession: 1, bookingStatus: 1, date: 1 });
 bookingSchema.index({ bookingMode: 1, perDayStartDate: 1, perDayEndDate: 1 });
 bookingSchema.index({ userId: 1, 'classSession.classMonth': 1, 'classSession.isClassBooking': 1, bookingStatus: 1 });
 bookingSchema.index({ isDeleted: 1, deletedAt: -1 });

@@ -55,6 +55,29 @@
         const form = document.getElementById('loginForm');
         const alertDiv = document.getElementById('alert');
         const submitBtn = document.getElementById('submitBtn');
+        const registerLink = document.querySelector('.links a[href="/register.html"]');
+
+        function getRedirectTarget() {
+            const params = new URLSearchParams(window.location.search);
+            const redirectValue = params.get('redirect');
+            if (!redirectValue) return null;
+
+            try {
+                const url = new URL(redirectValue, window.location.origin);
+                if (url.origin !== window.location.origin) {
+                    return null;
+                }
+                return `${url.pathname}${url.search}${url.hash}`;
+            } catch (_error) {
+                return null;
+            }
+        }
+
+        const redirectTarget = getRedirectTarget();
+
+        if (registerLink && redirectTarget) {
+            registerLink.href = `/register.html?redirect=${encodeURIComponent(redirectTarget)}`;
+        }
 
         if (window.NavigationManager) {
             window.NavigationManager.init(null);
@@ -112,6 +135,11 @@
                     showAlert('Login successful! Redirecting...', 'success');
                     
                     setTimeout(() => {
+                        if (redirectTarget && data.user.role !== 'admin') {
+                            window.location.href = redirectTarget;
+                            return;
+                        }
+
                         // Redirect based on role
                         if (data.user.role === 'admin') {
                             window.location.href = '/admin.html';
@@ -134,7 +162,7 @@
 
         // Check if already logged in
         if (localStorage.getItem('token')) {
-            window.location.href = '/booking.html';
+            window.location.href = redirectTarget || '/booking.html';
         }
     </script>
     <script src="/js/shared/pwa-install.js"></script>

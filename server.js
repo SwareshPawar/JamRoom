@@ -102,6 +102,7 @@ app.use('/api/slots', require('./routes/slot.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/profile', require('./routes/profile.routes'));
 app.use('/api/test', require('./routes/test.routes'));
+app.use('/api/open-events', require('./routes/open-event.routes'));
 
 // Root route
 app.get('/', (req, res) => {

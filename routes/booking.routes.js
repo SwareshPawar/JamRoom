@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Booking = require('../models/Booking');
+const OpenEventBooking = require('../models/OpenEventBooking');
 const BlockedTime = require('../models/BlockedTime');
 const User = require('../models/User');
 const AdminSettings = require('../models/AdminSettings');
@@ -136,6 +137,20 @@ const deriveDynamicBookingLabel = (rentals = [], explicitLabel = '') => {
   return itemNames[0] || categories[0] || String(normalizedRentals[0]?.name || '');
 };
 
+const parseTimeToMinutes = (timeValue) => {
+  const [hourPart, minutePart] = String(timeValue || '').split(':');
+  const hours = Number(hourPart);
+  const minutes = Number(minutePart);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return NaN;
+  return (hours * 60) + minutes;
+};
+
+const formatMinutesToTime = (totalMinutes) => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
 const deriveAvailableBookingModes = (rentalTypes = []) => {
   let hasHourly = false;
   let hasPerday = false;
@@ -172,6 +187,20 @@ const normalizeRentalTypeToken = (value) => {
   if (compact === 'persession' || compact === 'session') return 'persession';
   if (compact === 'pertrack' || compact === 'track') return 'pertrack';
   return 'inhouse';
+};
+
+const resolveMediaTypeFromUrl = (urlValue = '') => {
+  const normalized = String(urlValue || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (normalized.includes('youtube.com') || normalized.includes('youtu.be')) return 'youtube';
+  if (normalized.includes('instagram.com')) return 'instagram';
+  return '';
+};
+
+const extractFirstName = (nameValue = '') => {
+  const trimmed = String(nameValue || '').trim();
+  if (!trimmed) return 'Guest';
+  return trimmed.split(/\s+/)[0];
 };
 
 const getConfiguredAdminEmails = (settings = {}, excludeEmail = '') => {
@@ -672,7 +701,11 @@ router.post('/', protect, async (req, res) => {
       classLocation,
       classPlanMonths,
       classPreferredWeekday,
-      classPreferredStartTime
+      classPreferredStartTime,
+      isOpenSession = false,
+      openSession = {},
+      openSessionCaption = '',
+      openSessionMediaUrl = ''
     } = req.body;
 
     const normalizedMode = String(bookingMode).toLowerCase() === 'perday' ? 'perday' : 'hourly';
@@ -770,6 +803,11 @@ router.post('/', protect, async (req, res) => {
 
     const classDurationHours = isClassBooking ? classConfig.sessionDurationHours : requestedDurationHours;
     const durationForPricing = normalizedMode === 'hourly' ? classDurationHours : 1;
+
+    const openSessionRequested = Boolean(isOpenSession);
+    const requestedCaption = String(openSession?.caption || openSessionCaption || '').trim();
+    const requestedMediaUrl = String(openSession?.mediaUrl || openSessionMediaUrl || '').trim();
+    const resolvedMediaType = resolveMediaTypeFromUrl(requestedMediaUrl);
 
     // Validate duration for hourly mode
     if (normalizedMode === 'hourly' && durationForPricing < 1) {
@@ -1168,6 +1206,15 @@ router.post('/', protect, async (req, res) => {
       bandName,
       notes,
       classSession,
+      isOpenSession: openSessionRequested,
+      openSession: {
+        caption: requestedCaption,
+        mediaUrl: requestedMediaUrl,
+        mediaType: resolvedMediaType,
+        hiddenByAdmin: false,
+        comments: [],
+        presenceMarkers: []
+      },
       paymentStatus: 'PENDING',
       // Admin-created bookings (admin using booking form on behalf of student) are auto-confirmed
       bookingStatus: req.user?.role === 'admin' ? 'CONFIRMED' : 'PENDING'
@@ -1562,10 +1609,67 @@ router.get('/my-bookings', protect, async (req, res) => {
     const bookings = await Booking.find({ userId: req.user._id })
       .sort({ date: -1, startTime: -1 });
 
+    const openEventBookingsRaw = await OpenEventBooking.find({
+      userId: req.user._id,
+      status: 'confirmed'
+    })
+      .populate('eventId', 'title description date startTime endTime slotDuration status')
+      .sort({ createdAt: -1 });
+
+    const openEventBookings = openEventBookingsRaw
+      .map((entry) => {
+        const event = entry.eventId;
+        if (!event) return null;
+
+        const baseStartMinutes = parseTimeToMinutes(event.startTime);
+        const slotDuration = Number(event.slotDuration) || 10;
+        const slotStartMinutes = baseStartMinutes + (Number(entry.slotIndex) * slotDuration);
+        const slotEndMinutes = slotStartMinutes + slotDuration;
+        const slotStartTime = formatMinutesToTime(slotStartMinutes);
+        const slotEndTime = formatMinutesToTime(slotEndMinutes);
+
+        return {
+          _id: `open-event-${entry._id}`,
+          isOpenEventBooking: true,
+          openEventBookingId: entry._id,
+          openEvent: {
+            id: event._id,
+            title: event.title,
+            description: event.description || '',
+            slotIndex: entry.slotIndex,
+            status: event.status
+          },
+          bookingStatus: 'CONFIRMED',
+          paymentStatus: 'PAID',
+          amountPaid: 0,
+          subtotal: 0,
+          taxAmount: 0,
+          price: 0,
+          rentalType: 'Open Event Slot',
+          bookingMode: 'hourly',
+          date: event.date,
+          startTime: slotStartTime,
+          endTime: slotEndTime,
+          duration: slotDuration / 60,
+          notes: event.description || '',
+          createdAt: entry.createdAt,
+          updatedAt: entry.updatedAt
+        };
+      })
+      .filter(Boolean);
+
+    const combinedBookings = [...bookings, ...openEventBookings].sort((a, b) => {
+      const aDateTime = `${String(a?.date || '')}T${String(a?.startTime || '00:00')}:00+05:30`;
+      const bDateTime = `${String(b?.date || '')}T${String(b?.startTime || '00:00')}:00+05:30`;
+      const aTs = Number(new Date(aDateTime)) || Number(new Date(a?.createdAt || 0));
+      const bTs = Number(new Date(bDateTime)) || Number(new Date(b?.createdAt || 0));
+      return bTs - aTs;
+    });
+
     res.json({
       success: true,
-      count: bookings.length,
-      bookings
+      count: combinedBookings.length,
+      bookings: combinedBookings
     });
   } catch (error) {
     console.error('Get my bookings error:', error);
@@ -1639,6 +1743,159 @@ router.get('/payment-info', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error fetching payment info'
+    });
+  }
+});
+
+// @route   GET /api/bookings/open-sessions
+// @desc    Get approved open jam sessions for public/shared discovery
+// @access  Public
+router.get('/open-sessions', async (_req, res) => {
+  try {
+    const todayStart = getTodayStartLocal();
+
+    const sessions = await Booking.find({
+      bookingStatus: 'CONFIRMED',
+      isOpenSession: true,
+      'openSession.hiddenByAdmin': { $ne: true },
+      date: { $gte: todayStart }
+    })
+      .sort({ date: 1, startTime: 1 })
+      .select('date startTime endTime userName rentalType notes openSession classSession');
+
+    res.json({
+      success: true,
+      count: sessions.length,
+      sessions: sessions.map((session) => ({
+        id: session._id,
+        date: formatDateAsYmdInIst(session.date),
+        displayDate: formatDateLongInIst(session.date),
+        startTime: session.startTime,
+        endTime: session.endTime,
+        firstName: extractFirstName(session.userName),
+        title: session.openSession?.caption || `${session.rentalType || 'Jam Session'} Open Session`,
+        caption: String(session.openSession?.caption || '').trim(),
+        mediaUrl: String(session.openSession?.mediaUrl || '').trim(),
+        mediaType: String(session.openSession?.mediaType || '').trim(),
+        notes: String(session.notes || '').trim(),
+        commentsCount: Array.isArray(session.openSession?.comments) ? session.openSession.comments.length : 0,
+        presenceCount: Array.isArray(session.openSession?.presenceMarkers) ? session.openSession.presenceMarkers.length : 0,
+        isClassBooking: Boolean(session.classSession?.isClassBooking)
+      }))
+    });
+  } catch (error) {
+    console.error('Get open sessions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch open jam sessions'
+    });
+  }
+});
+
+// @route   POST /api/bookings/open-sessions/:id/presence
+// @desc    Toggle current user presence marker on open session
+// @access  Private
+router.post('/open-sessions/:id/presence', protect, async (req, res) => {
+  try {
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      bookingStatus: 'CONFIRMED',
+      isOpenSession: true,
+      'openSession.hiddenByAdmin': { $ne: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Open session not found'
+      });
+    }
+
+    const existingEntries = Array.isArray(booking.openSession?.presenceMarkers)
+      ? booking.openSession.presenceMarkers
+      : [];
+
+    const userIdValue = String(req.user._id);
+    const existingIndex = existingEntries.findIndex((entry) => String(entry.userId) === userIdValue);
+
+    if (existingIndex >= 0) {
+      booking.openSession.presenceMarkers.splice(existingIndex, 1);
+    } else {
+      booking.openSession.presenceMarkers.push({
+        userId: req.user._id,
+        firstName: extractFirstName(req.user.name),
+        markedAt: new Date()
+      });
+    }
+
+    await booking.save();
+
+    res.json({
+      success: true,
+      present: existingIndex < 0,
+      presenceCount: booking.openSession.presenceMarkers.length
+    });
+  } catch (error) {
+    console.error('Toggle open session presence error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update presence status'
+    });
+  }
+});
+
+// @route   POST /api/bookings/open-sessions/:id/comments
+// @desc    Add comment on open session
+// @access  Private
+router.post('/open-sessions/:id/comments', protect, async (req, res) => {
+  try {
+    const commentText = String(req.body?.text || '').trim();
+    if (!commentText) {
+      return res.status(400).json({
+        success: false,
+        message: 'Comment text is required'
+      });
+    }
+
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      bookingStatus: 'CONFIRMED',
+      isOpenSession: true,
+      'openSession.hiddenByAdmin': { $ne: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Open session not found'
+      });
+    }
+
+    booking.openSession.comments.push({
+      userId: req.user._id,
+      firstName: extractFirstName(req.user.name),
+      text: commentText,
+      createdAt: new Date()
+    });
+
+    await booking.save();
+    const latestComment = booking.openSession.comments[booking.openSession.comments.length - 1];
+
+    res.status(201).json({
+      success: true,
+      comment: {
+        id: latestComment._id,
+        firstName: latestComment.firstName,
+        text: latestComment.text,
+        createdAt: latestComment.createdAt
+      },
+      commentsCount: booking.openSession.comments.length
+    });
+  } catch (error) {
+    console.error('Add open session comment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add comment'
     });
   }
 });
