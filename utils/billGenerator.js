@@ -4,6 +4,7 @@ const path = require('path');
 const AdminSettings = require('../models/AdminSettings');
 const { generateUnifiedPDFHTML } = require('./pdfHTMLTemplate');
 const { buildServiceGroupSummary } = require('./shared/quotationBilling');
+const { renderServiceGroupSections } = require('./shared/pdfServiceGroups');
 
 // Check if we're in a serverless environment
 const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
@@ -171,6 +172,12 @@ const createPuppeteerConfig = async () => {
   return baseConfig;
 };
 
+// Refactor shared Puppeteer setup logic
+const createPuppeteerInstance = async () => {
+  const puppeteerConfig = await createPuppeteerConfig();
+  return await puppeteer.launch(puppeteerConfig);
+};
+
 /**
  * Generate HTML content for the bill using unified template
  */
@@ -179,82 +186,14 @@ const generateBillHTML = async (booking, settings) => {
 };
 
 /**
- * Generate PDF bill for a booking (optimized for email - stable config)
- */
-const generateBill = async (booking) => {
-  let browser;
-
-  try {
-    console.log('Starting PDF generation for booking:', booking._id);
-    console.log('Environment check:', { VERCEL: process.env.VERCEL, VERCEL_ENV: process.env.VERCEL_ENV });
-
-       // Get admin settings for company info
-
-    const settings = await AdminSettings.getSettings();
-    // Convert Mongoose document to plain object to ensure all fields are accessible
-    const plainSettings = settings ? settings.toObject?.() || JSON.parse(JSON.stringify(settings)) : {};
-    const invoiceSettings = {
-      ...plainSettings,
-      logoDataUri: getQuotationLogoDataUri(),
-      logoImageUrl: `${DEFAULT_STUDIO_WEBSITE.replace(/\/$/, '')}/icons/${BRAND_LOGO_FILE_NAME}`
-    };
-    console.log('Retrieved admin settings');
-
-      // Generate HTML content
-    const bookingWithResolvedTypes = enrichBookingRentalsWithCatalogTypes(booking, invoiceSettings);
-    const htmlContent = await generateBillHTML(bookingWithResolvedTypes, invoiceSettings);
-    console.log('Generated HTML content, length:', htmlContent.length);
-
-    console.log('🚀 Launching puppeteer...');
-    const puppeteerConfig = await createPuppeteerConfig();
-    browser = await puppeteer.launch(puppeteerConfig);
-
-    console.log('Puppeteer browser launched');
-    const page = await browser.newPage();
-
-        // Set content and generate PDF
-    await page.setContent(htmlContent, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30000
-    });
-
-    console.log('HTML content set, generating PDF...');
-
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '20px',
-        right: '20px',
-        bottom: '20px',
-        left: '20px'
-      }
-    });
-
-    console.log('PDF generated successfully, size:', pdfBuffer.length);
-
-    await browser.close();
-    return pdfBuffer;
-  } catch (error) {
-    console.error('PDF generation error:', error.message);
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (closeError) {
-        console.error('Error closing browser:', closeError.message);
-      }
-    }
-    throw new Error(`PDF generation failed: ${error.message}`);
-  }
-};
-
-/**
  * Generate PDF bill for download (optimized for Vercel serverless)
  */
 const generateBillForDownload = async (booking, retryCount = 0) => {
   let browser;
-
   try {
+    browser = await createPuppeteerInstance();
+    const page = await browser.newPage();
+
     console.log(`📄 Starting PDF generation for booking ${booking._id}${retryCount > 0 ? ` (retry ${retryCount})` : ''}`);
     if (isServerless) {
       console.log('⚡ Serverless mode - memory usage:', Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB');
@@ -297,13 +236,9 @@ const generateBillForDownload = async (booking, retryCount = 0) => {
     const htmlContent = await generateBillHTML(bookingWithResolvedTypes, invoiceSettings);
     console.log('Generated HTML content, length:', htmlContent.length);
 
-    console.log('🚀 Launching puppeteer with serverless config...');
-    const browserConfig = await createPuppeteerConfig();
-    browser = await puppeteer.launch(browserConfig);
     console.log('Puppeteer browser launched successfully');
 
-        console.log('Browser launched for PDF download');
-    const page = await browser.newPage();
+      console.log('Browser launched for PDF download');
 
         // Set smaller viewport to reduce memory usage
     await page.setViewport({ width: 800, height: 600 });
@@ -567,32 +502,23 @@ const generateQuotationHTML = (data, settings) => {
     scheduleRows.push(`<div class="timeline-row"><span class="timeline-label">Per-Day Rental</span><span class="timeline-value">Pickup ${calculation.schedules.perday.startDate} ${calculation.schedules.perday.pickupTime} | Return ${calculation.schedules.perday.endDate} ${calculation.schedules.perday.returnTime} (${calculation.perdayDays || 0} day)</span></div>`);
   }
 
-  const serviceGroupSections = presentation.serviceGroups.map((group) => {
-    const rows = group.items.map((item) => `
-      <div class="service-row">
-        <div class="service-copy">
+  const serviceGroupSections = renderServiceGroupSections({
+    groups: presentation.serviceGroups,
+    renderRow: (item) => `
+      <tr class="service-row">
+        <td class="service-col-copy">
           <div class="service-title">${item.title}</div>
           <div class="service-desc">${item.description}</div>
-        </div>
-        <div class="service-meta">
+        </td>
+        <td class="service-col-meta">
           <div class="service-meta-top">${item.rateLabel}${item.quantity > 1 ? ` x ${item.quantity}` : ''}</div>
           <div class="service-meta-sub">${item.billingLabel}</div>
-        </div>
-        <div class="service-amount">${item.amountLabel}</div>
-      </div>`).join('');
-
-    return `
-      <section class="service-group">
-        <div class="service-group-header">
-          <div>
-            <h3>${group.icon} ${group.title}</h3>
-            <p>${group.subtitle}</p>
-          </div>
-          <div class="service-group-subtotal">${group.subtotalLabel}</div>
-        </div>
-        <div class="service-group-body">${rows}</div>
-      </section>`;
-  }).join('');
+        </td>
+        <td class="service-col-amount">
+          <div class="service-amount">${item.amountLabel}</div>
+        </td>
+      </tr>`
+  });
 
   const gstRow = presentation.taxEnabled
     ? `<div class="total-row"><span>${presentation.gstDisplayLabel} (${presentation.gstRateLabel})</span><strong>${presentation.taxAmountLabel}</strong></div>`
@@ -608,9 +534,9 @@ const generateQuotationHTML = (data, settings) => {
   <title>Quotation &ndash; ${presentation.serviceTypeLabel}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;color:#142033;background:#eef2f7;padding:26px}
-    .sheet{max-width:820px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 44px rgba(15,23,42,0.14)}
-    .topbar{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#ffffff;padding:28px 30px 24px}
+    body{font-family:Arial,sans-serif;color:#142033;background:#eef2f7;padding:20px}
+    .sheet{max-width:760px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 44px rgba(15,23,42,0.14)}
+    .topbar{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#ffffff;padding:24px 28px 20px;break-after:avoid;page-break-after:avoid}
     .header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}
     .brand{display:flex;gap:16px;max-width:62%}
     .logo{width:68px;height:68px;border-radius:18px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 68px;border:1px solid rgba(255,255,255,0.16)}
@@ -623,61 +549,66 @@ const generateQuotationHTML = (data, settings) => {
     .quote-kicker{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#bfdbfe;margin-bottom:8px;font-weight:700}
     .quote-panel h2{font-size:30px;line-height:1;margin-bottom:12px}
     .quote-panel .meta-line{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88)}
-    .body{padding:28px 30px 30px}
-    .intro-card,.cta-card,.terms-card,.notes-card,.offer-card{background:#f8fafc;border:1px solid #dbe5f0;border-radius:18px;padding:18px 20px}
-    .intro-card{margin-bottom:18px}
-    .intro-card h3{font-size:18px;margin-bottom:8px;color:#0f172a}
-    .intro-card p{font-size:14px;line-height:1.7;color:#475569}
-    .confidence{margin-top:10px;font-weight:600;color:#0f172a}
-    .summary-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin-bottom:18px;break-inside:avoid;page-break-inside:avoid}
-    .summary-card{background:#ffffff;border:1px solid #dbe5f0;border-radius:18px;padding:18px 20px;break-inside:avoid;page-break-inside:avoid}
-    .summary-label{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:#64748b;font-weight:700;margin-bottom:7px}
-    .summary-value{font-size:17px;font-weight:700;color:#0f172a;line-height:1.4}
-    .summary-sub{font-size:13px;color:#64748b;line-height:1.6;margin-top:6px}
+    .body{padding:20px 24px 24px}
+    .intro-card,.cta-card,.terms-card,.notes-card,.offer-card{background:#f8fafc;border:1px solid #dbe5f0;border-radius:18px;padding:16px 18px}
+    .intro-card{margin-bottom:14px}
+    .intro-card h3{font-size:17px;margin-bottom:6px;color:#0f172a}
+    .intro-card p{font-size:14px;line-height:1.6;color:#475569}
+    .confidence{margin-top:8px;font-weight:600;color:#0f172a}
+    .summary-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-bottom:14px;break-inside:avoid;page-break-inside:avoid}
+    .summary-card{background:#ffffff;border:1px solid #dbe5f0;border-radius:18px;padding:16px 18px;break-inside:avoid;page-break-inside:avoid}
+    .summary-label{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:#64748b;font-weight:700;margin-bottom:6px}
+    .summary-value{font-size:16px;font-weight:700;color:#0f172a;line-height:1.3}
+    .summary-sub{font-size:12px;color:#64748b;line-height:1.5;margin-top:5px}
     .total-card{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-color:#bfdbfe}
-    .total-card .summary-value{font-size:28px;color:#1d4ed8}
-    .section-title{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;font-weight:800;margin:20px 0 12px;break-after:avoid;page-break-after:avoid}
-    .timeline{background:#fff;border:1px solid #dbe5f0;border-radius:18px;padding:16px 18px;margin-bottom:18px;break-inside:avoid;page-break-inside:avoid}
-    .timeline-row{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #edf2f7;break-inside:avoid;page-break-inside:avoid}
+    .total-card .summary-value{font-size:26px;color:#1d4ed8}
+    .section-title{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;font-weight:800;margin:12px 0 10px;break-after:avoid;page-break-after:avoid}
+    .timeline{background:#fff;border:1px solid #dbe5f0;border-radius:18px;padding:14px 16px;margin-bottom:14px;break-inside:avoid;page-break-inside:avoid}
+    .timeline-row{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #edf2f7;break-inside:avoid;page-break-inside:avoid}
     .timeline-row:last-child{border-bottom:0;padding-bottom:0}
     .timeline-label{font-size:13px;font-weight:700;color:#0f172a}
     .timeline-value{font-size:13px;color:#475569;text-align:right}
-    .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:visible;margin-bottom:16px;background:#fff;break-inside:auto;page-break-inside:auto}
-    .service-group-header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
-    .service-group-header h3{font-size:20px;margin-bottom:4px}
-    .service-group-header p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5}
-    .service-group-subtotal{font-size:15px;font-weight:800;white-space:nowrap;background:rgba(255,255,255,0.12);border-radius:999px;padding:8px 12px}
-    .service-group-body{padding:6px 18px 8px;break-inside:auto;page-break-inside:auto}
-    .service-row{display:grid;grid-template-columns:1.5fr .7fr .45fr;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #edf2f7;break-inside:avoid;page-break-inside:avoid}
-    .service-row:last-child{border-bottom:0}
-    .service-title{font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px}
-    .service-desc{font-size:12px;line-height:1.6;color:#64748b}
-    .service-meta{text-align:right}
-    .service-meta-top{font-size:13px;font-weight:700;color:#0f172a}
-    .service-meta-sub{font-size:11px;color:#64748b;margin-top:4px}
-    .service-amount{text-align:right;font-size:15px;font-weight:800;color:#0f172a}
-    .totals-card{background:#0f172a;color:#fff;border-radius:22px;padding:20px 22px;margin:18px 0;break-inside:avoid;page-break-inside:avoid}
-    .totals-card h3{font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:#cbd5e1;margin-bottom:12px}
+    .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:hidden;margin-bottom:12px;background:#fff;break-inside:auto;page-break-inside:auto}
+    .service-table{width:100%;border-collapse:collapse;table-layout:fixed}
+    .service-group-head{display:table-header-group}
+    .service-group-head th{padding:0;border:0}
+    .service-group-header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:14px 16px;color:#fff;break-after:avoid;page-break-after:avoid}
+    .service-group-header h3{font-size:18px;margin-bottom:3px}
+    .service-group-header p{font-size:11px;color:rgba(255,255,255,0.78);line-height:1.4}
+    .service-group-subtotal{font-size:14px;font-weight:800;white-space:nowrap;background:rgba(255,255,255,0.12);border-radius:999px;padding:7px 11px}
+    .service-group-body{display:table-row-group}
+    .service-row td{padding:12px 0;border-bottom:1px solid #edf2f7;vertical-align:middle;break-inside:avoid;page-break-inside:avoid}
+    .service-row:last-child td{border-bottom:0}
+    .service-col-copy{width:56%;padding-left:16px}
+    .service-col-meta{width:28%;text-align:right;padding-left:12px;padding-right:12px}
+    .service-col-amount{width:16%;text-align:right;padding-right:16px}
+    .service-title{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:3px}
+    .service-desc{font-size:11px;line-height:1.5;color:#64748b}
+    .service-meta-top{font-size:12px;font-weight:700;color:#0f172a}
+    .service-meta-sub{font-size:10px;color:#64748b;margin-top:3px}
+    .service-amount{text-align:right;font-size:14px;font-weight:800;color:#0f172a}
+    .totals-card{background:#0f172a;color:#fff;border-radius:22px;padding:18px 20px;margin:12px 0;break-inside:avoid;page-break-inside:avoid}
+    .totals-card h3{font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:#cbd5e1;margin-bottom:10px}
     .total-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;font-size:14px;color:#e2e8f0}
     .discount-row{display:flex;justify-content:space-between;gap:16px;padding:8px 10px;margin:8px 0 4px;border-left:3px solid #22c55e;background:rgba(34,197,94,0.16);border-radius:10px;font-size:14px;color:#bbf7d0}
     .discount-row strong{color:#86efac}
     .grand-total{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-top:12px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.14)}
     .grand-total span{font-size:13px;text-transform:uppercase;letter-spacing:1.2px;color:#93c5fd;font-weight:700}
-    .grand-total strong{font-size:32px;color:#ffffff;line-height:1}
-    .cta-card{background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);margin-bottom:16px;break-inside:avoid;page-break-inside:avoid}
-    .cta-card h3,.terms-card h3,.offer-card h3,.notes-card h3{font-size:17px;color:#0f172a;margin-bottom:10px}
-    .cta-card p,.offer-card p,.notes-card p{font-size:13px;line-height:1.7;color:#475569}
-    .cta-actions{margin-top:10px;font-size:14px;line-height:1.8;color:#0f172a;font-weight:700}
+    .grand-total strong{font-size:30px;color:#ffffff;line-height:1}
+    .cta-card{background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);margin-bottom:12px;break-inside:avoid;page-break-inside:avoid}
+    .cta-card h3,.terms-card h3,.offer-card h3,.notes-card h3{font-size:15px;color:#0f172a;margin-bottom:8px}
+    .cta-card p,.offer-card p,.notes-card p{font-size:12px;line-height:1.6;color:#475569}
+    .cta-actions{margin-top:8px;font-size:13px;line-height:1.6;color:#0f172a;font-weight:700}
     .terms-card{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;break-inside:avoid;page-break-inside:avoid}
-    .terms-card h3{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:10px}
-    .terms-list{padding-left:18px}
-    .terms-list li{margin-bottom:8px;font-size:13px;line-height:1.7;color:#7f1d1d}
+    .terms-card h3{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px}
+    .terms-list{padding-left:16px}
+    .terms-list li{margin-bottom:5px;font-size:12px;line-height:1.5;color:#7f1d1d}
     .offer-card{background:linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%);border:2px solid #f59e0b;break-inside:avoid;page-break-inside:avoid}
-    .offer-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:3px 10px;border-radius:999px;margin-bottom:10px}
+    .offer-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:2px 9px;border-radius:999px;margin-bottom:8px}
     .offer-card p{color:#78350f;font-weight:600}
-    .offer-card .offer-note{font-size:13px;line-height:1.7;color:#92400e;margin-top:8px;font-weight:500}
-    .footer{margin-top:22px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.7;break-inside:avoid;page-break-inside:avoid}
-    @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.intro-card,.summary-grid,.summary-card,.timeline,.timeline-row,.service-row,.totals-card,.cta-card,.terms-card,.offer-card,.notes-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-header,.section-title{break-after:avoid;page-break-after:avoid}}
+    .offer-card .offer-note{font-size:12px;line-height:1.5;color:#92400e;margin-top:6px;font-weight:500}
+    .footer{margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.6;break-inside:avoid;page-break-inside:avoid}
+    @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.intro-card,.summary-grid,.summary-card,.timeline,.timeline-row,.service-row td,.totals-card,.cta-card,.terms-card,.offer-card,.notes-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-head{display:table-header-group}.service-group-header,.section-title{break-after:avoid;page-break-after:avoid}}
   </style>
 </head>
 <body>
@@ -733,10 +664,10 @@ const generateQuotationHTML = (data, settings) => {
 
       <section class="totals-card">
         <h3>Pricing Summary</h3>
-        <div class="total-row"><span>Subtotal</span><strong>${presentation.subtotalAmountLabel}</strong></div>
-        ${gstRow}
         ${discountRow}
-        <div class="grand-total"><span>Estimated Total</span><strong>${presentation.totalAmountLabel}</strong></div>
+        <div class="total-row"><span>Subtotal</span><strong>${presentation.subtotalLabel}</strong></div>
+        <div class="total-row"><span>Tax</span><strong>${presentation.taxLabel}</strong></div>
+        <div class="grand-total"><span>Total Amount</span><strong>${presentation.totalLabel}</strong></div>
       </section>
 
       <section class="cta-card">
@@ -835,7 +766,6 @@ const generateQuotationPDF = async (quotationData, settings) => {
 };
 
 module.exports = {
-  generateBill,
   generateBillForDownload,
   generateBillForDownloadWithFilename,
   generateBillFilename,

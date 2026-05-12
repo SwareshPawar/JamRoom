@@ -33,6 +33,8 @@
 💳 **Post-Booking Payment Modal**: Payment options now open in a popup after successful booking with copy/open/QR actions  
 📄 **My Bookings Details Modal**: Users can open booking details from My Bookings and view paid vs remaining amounts  
 🚫 **Rejected Status Cleanup**: Manage Bookings and My Bookings hide pending payment badge for rejected bookings  
+📧 **Invoice-Style Email Standardization**: Booking, auth, and admin activity emails now share a consistent branded layout, with reusable eBill and quotation builders  
+📑 **PDF Header Repeat Fix**: Service-group headers now repeat correctly across PDF page breaks in both server and browser download flows  
 
 ## 🚀 Core Features
 

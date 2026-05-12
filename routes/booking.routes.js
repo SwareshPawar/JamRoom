@@ -6,8 +6,8 @@ const User = require('../models/User');
 const AdminSettings = require('../models/AdminSettings');
 const { protect } = require('../middleware/auth');
 const { sendEmail } = require('../utils/email');
+const { buildInvoiceStyleEmail } = require('../utils/templates/email/invoiceStyleEmailTemplate');
 const { generateCalendarInvite, buildBookingCalendarUid } = require('../utils/calendar');
-const { generateBill } = require('../utils/billGenerator');
 const { 
   sendBookingRequestNotifications, 
   sendCustomerBookingRequestWhatsApp 
@@ -1212,38 +1212,39 @@ router.post('/', protect, async (req, res) => {
       await sendEmail({
         to: req.user.email,
         subject: 'Booking Request Received - JamRoom',
-        html: `
-          <h2>Booking Request Received</h2>
-          <p>Hi ${req.user.name},</p>
-          <p>Your booking request has been received and is pending admin approval.</p>
-          <h3>Booking Details:</h3>
-          <ul>
-            ${normalizedMode === 'perday'
-              ? `<li><strong>Per-day Range:</strong> ${perDayDateLabel}</li>`
-              : `<li><strong>Date:</strong> ${displayDate}</li>
-                 <li><strong>Time:</strong> ${formatTimeRange12Hour(effectiveStartTime, effectiveEndTime)}</li>
-                 <li><strong>Duration:</strong> ${durationForPricing} hour(s)</li>`
-            }
-          </ul>
-          <h3>Rentals:</h3>
-          <ul>
-            ${rentalsSummary}
-          </ul>
-          ${classSummaryHtml}
-          <h3>Price Breakdown:</h3>
-          <ul>
-            <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
-            ${gstEnabled ? `<li><strong>${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%):</strong> ₹${calculatedTaxAmount}</li>` : ''}
-            <li><strong>Total Amount:</strong> ₹${calculatedTotalAmount}</li>
-            <li><strong>Status:</strong> PENDING</li>
-          </ul>
-          <h3>Payment Details:</h3>
-          <p><strong>UPI ID:</strong> ${settings.upiId}</p>
-          <p><strong>Name:</strong> ${resolvedUpiName}</p>
-          <p><strong>Amount:</strong> ₹${calculatedTotalAmount}</p>
-          <p>Please complete the payment and wait for admin approval.</p>
-          <p>You will receive a confirmation email once approved.</p>
-        `
+        html: buildInvoiceStyleEmail({
+          title: 'Booking Request',
+          label: 'Received',
+          greeting: `Hi ${req.user.name},`,
+          introLines: ['Your booking request has been received and is pending admin approval.'],
+          summaryTitle: 'Booking Details',
+          summaryRows: [
+            ...(normalizedMode === 'perday'
+              ? [{ label: 'Per-day Range', value: perDayDateLabel }]
+              : [
+                  { label: 'Date', value: displayDate },
+                  { label: 'Time', value: formatTimeRange12Hour(effectiveStartTime, effectiveEndTime) },
+                  { label: 'Duration', value: `${durationForPricing} hour(s)` }
+                ]),
+            { label: 'Rentals', html: `<div style="font-size:13px;line-height:1.7;color:#334155;">${rentalsSummary}</div>` },
+            { label: 'Subtotal', value: `₹${calculatedSubtotal}` },
+            ...(gstEnabled ? [{ label: `${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%)`, value: `₹${calculatedTaxAmount}` }] : []),
+            { label: 'Total Amount', value: `₹${calculatedTotalAmount}` },
+            { label: 'Status', value: 'PENDING' },
+            { label: 'UPI ID', value: settings.upiId },
+            { label: 'UPI Name', value: resolvedUpiName },
+            { label: 'Amount', value: `₹${calculatedTotalAmount}` }
+          ],
+          sectionsHtml: [classSummaryHtml ? `<div class="notes-card"><h3>Class Booking</h3>${classSummaryHtml}</div>` : ''],
+          ctaTitle: 'Next Step',
+          ctaHtml: '<p>Please complete the payment and wait for admin approval. You will receive a confirmation email once approved.</p>',
+          termsTitle: 'Booking Terms',
+          terms: [
+            '50% advance payment is required to confirm and block your booking slot.',
+            'Cancellation within 24 hours of the scheduled session is non-refundable.',
+            'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.'
+          ]
+        })
       });
     } catch (emailError) {
       console.log('Booking confirmation email failed:', emailError.message);
@@ -1280,36 +1281,37 @@ router.post('/', protect, async (req, res) => {
         await sendEmail({
           to: adminEmail,
           subject: 'New Booking Request - JamRoom',
-          html: `
-            <h2>New Booking Request</h2>
-            <h3>Booking Details:</h3>
-            <ul>
-              <li><strong>User:</strong> ${req.user.name} (${req.user.email})</li>
-              ${req.user.mobile ? `<li><strong>Mobile:</strong> ${req.user.mobile}</li>` : ''}
-              ${normalizedMode === 'perday'
-                ? `<li><strong>Per-day Range:</strong> ${perDayDateLabel}</li>`
-                : `<li><strong>Date:</strong> ${displayDate}</li>
-                   <li><strong>Time:</strong> ${formatTimeRange12Hour(effectiveStartTime, effectiveEndTime)}</li>
-                   <li><strong>Duration:</strong> ${durationForPricing} hour(s)</li>`
-              }
-            </ul>
-            <h3>Rentals:</h3>
-            <ul>
-              ${rentalsSummary}
-            </ul>
-            ${classSummaryHtml}
-            <h3>Price Details:</h3>
-            <ul>
-              <li><strong>Subtotal:</strong> ₹${calculatedSubtotal}</li>
-              ${gstEnabled ? `<li><strong>${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%):</strong> ₹${calculatedTaxAmount}</li>` : ''}
-              <li><strong>Total:</strong> ₹${calculatedTotalAmount}</li>
-            </ul>
-            ${normalizedMode === 'perday'
-              ? '<p><strong>Admin note:</strong> This per-day rental does not block JamRoom hourly slots automatically. Use Block Time in admin panel if blocking is needed.</p>'
-              : ''}
-            ${bandName ? `<p><strong>Band Name:</strong> ${bandName}</p>` : ''}
-            <p>Please review and approve/reject this booking in the admin panel.</p>
-          `
+          html: buildInvoiceStyleEmail({
+            title: 'New Booking Request',
+            label: 'Admin Review',
+            greeting: 'Hello Team,',
+            introLines: ['A new booking request has been submitted and is awaiting review.'],
+            summaryTitle: 'Booking Details',
+            summaryRows: [
+              { label: 'User', value: `${req.user.name} (${req.user.email})` },
+              ...(req.user.mobile ? [{ label: 'Mobile', value: req.user.mobile }] : []),
+              ...(normalizedMode === 'perday'
+                ? [{ label: 'Per-day Range', value: perDayDateLabel }]
+                : [
+                    { label: 'Date', value: displayDate },
+                    { label: 'Time', value: formatTimeRange12Hour(effectiveStartTime, effectiveEndTime) },
+                    { label: 'Duration', value: `${durationForPricing} hour(s)` }
+                  ]),
+              { label: 'Rentals', html: `<div style="font-size:13px;line-height:1.7;color:#334155;">${rentalsSummary}</div>` },
+              { label: 'Subtotal', value: `₹${calculatedSubtotal}` },
+              ...(gstEnabled ? [{ label: `${settings.gstConfig.displayName || 'GST'} (${Math.round(gstRate * 100)}%)`, value: `₹${calculatedTaxAmount}` }] : []),
+              { label: 'Total', value: `₹${calculatedTotalAmount}` },
+              ...(bandName ? [{ label: 'Band Name', value: bandName }] : [])
+            ],
+            sectionsHtml: [classSummaryHtml ? `<div class="notes-card"><h3>Class Booking</h3>${classSummaryHtml}</div>` : ''],
+            ctaTitle: 'Admin Action',
+            ctaHtml: `<p>Please review and approve or reject this booking in the admin panel.${normalizedMode === 'perday' ? ' This per-day rental does not block JamRoom hourly slots automatically.' : ''}</p>`,
+            termsTitle: 'Notes',
+            terms: [
+              'Use Block Time in the admin panel if this booking needs to block a per-day period.',
+              'All prices are shown as received from the booking request payload.'
+            ]
+          })
         });
       }
     } catch (emailError) {
@@ -1378,37 +1380,6 @@ router.get('/availability/perday-items', async (req, res) => {
       pickupTime,
       returnTime
     } = req.query;
-
-    if (!startDate || !endDate || !pickupTime || !returnTime) {
-      return res.json({
-        success: true,
-        unavailableItems: [],
-        bookedItemQuantities: {}
-      });
-    }
-
-    const startDateTime = parseDateTime(startDate, pickupTime);
-    const endDateTime = parseDateTime(endDate, returnTime);
-    const dayMs = 24 * 60 * 60 * 1000;
-
-    if (!startDateTime || !endDateTime) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid per-day date/time selection'
-      });
-    }
-
-    const diffMs = endDateTime.getTime() - startDateTime.getTime();
-    if (diffMs < dayMs || diffMs % dayMs !== 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Per-day range must be in exact 24-hour blocks'
-      });
-    }
-
-    // Build set of per-day catalog item name keys so the inventory check can also
-    // catch inhouse bookings that use the same physical instruments.
-    const settings = await AdminSettings.getSettings();
     const perdayInventoryNameKeys = new Set();
     const perdayCatalogItems = []; // [{name, maxQuantity}] for the response
     (Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : []).forEach((cat) => {
@@ -1764,18 +1735,20 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
         await sendEmail({
           to: req.user.email,
           subject: 'Slot Request Submitted - JamRoom',
-          html: `
-            <h2>Slot Request Received</h2>
-            <p>Hi ${req.user.name},</p>
-            <p>Your slot request has been submitted and is awaiting admin approval.</p>
-            <h3>Requested Slot:</h3>
-            <ul>
-              <li><strong>Class:</strong> ${classItem}</li>
-              <li><strong>Date:</strong> ${proposedDateLabel}</li>
-              <li><strong>Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
-            </ul>
-            <p>You will receive a confirmation email once the slot is approved.</p>
-          `
+          html: buildInvoiceStyleEmail({
+            title: 'Class Slot Request',
+            label: 'Submitted',
+            greeting: `Hi ${req.user.name},`,
+            introLines: ['Your slot request has been submitted and is awaiting admin approval.'],
+            summaryTitle: 'Requested Slot',
+            summaryRows: [
+              { label: 'Class', value: classItem },
+              { label: 'Date', value: proposedDateLabel },
+              { label: 'Time', value: `${formatTime12(startTime)} – ${formatTime12(endTime)}` }
+            ],
+            ctaTitle: 'What happens next?',
+            ctaHtml: '<p>You will receive a confirmation email once the slot is approved.</p>'
+          })
         });
       } catch (emailError) {
         console.log('Slot request user email failed:', emailError.message);
@@ -1788,18 +1761,21 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
           await sendEmail({
             to: adminEmail,
             subject: 'New Class Slot Request - JamRoom',
-            html: `
-              <h2>New Class Slot Request</h2>
-              <p>A student has submitted a slot request requiring your approval.</p>
-              <h3>Details:</h3>
-              <ul>
-                <li><strong>Student:</strong> ${req.user.name} (${req.user.email})</li>
-                <li><strong>Class:</strong> ${classItem}</li>
-                <li><strong>Requested Date:</strong> ${proposedDateLabel}</li>
-                <li><strong>Requested Time:</strong> ${formatTime12(startTime)} – ${formatTime12(endTime)}</li>
-              </ul>
-              <p>Please review and approve or reject this slot request in the admin panel.</p>
-            `
+            html: buildInvoiceStyleEmail({
+              title: 'New Class Slot Request',
+              label: 'Admin Review',
+              greeting: 'Hello Team,',
+              introLines: ['A student has submitted a slot request requiring your approval.'],
+              summaryTitle: 'Details',
+              summaryRows: [
+                { label: 'Student', value: `${req.user.name} (${req.user.email})` },
+                { label: 'Class', value: classItem },
+                { label: 'Requested Date', value: proposedDateLabel },
+                { label: 'Requested Time', value: `${formatTime12(startTime)} – ${formatTime12(endTime)}` }
+              ],
+              ctaTitle: 'Admin Action',
+              ctaHtml: '<p>Please review and approve or reject this slot request in the admin panel.</p>'
+            })
           });
         }
       } catch (emailError) {
@@ -1903,22 +1879,24 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
       await sendEmail({
         to: req.user.email,
         subject: 'Booking Cancelled - JamRoom',
-        html: `
-          <h2>Booking Cancelled</h2>
-          <p>Hi ${req.user.name},</p>
-          <p>Your booking has been cancelled.</p>
-          <h3>Cancelled Booking Details:</h3>
-          <ul>
-            ${isPerday
-              ? `<li><strong>Per-day Range:</strong> ${perdayRangeText}</li>`
-              : `<li><strong>Date:</strong> ${displayDate}</li>
-                 <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>`
-            }
-            <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
-          </ul>
-          ${cancellationInvite ? '<p>A cancellation calendar invite is attached to remove this slot from your calendar.</p>' : ''}
-          <p>If you paid for this booking, please contact us for a refund.</p>
-        `,
+        html: buildInvoiceStyleEmail({
+          title: 'Cancellation Notice',
+          label: 'Booking Cancelled',
+          greeting: `Hi ${req.user.name},`,
+          introLines: ['Your booking has been cancelled.'],
+          summaryTitle: 'Cancelled Booking Details',
+          summaryRows: [
+            ...(isPerday
+              ? [{ label: 'Per-day Range', value: perdayRangeText }]
+              : [
+                  { label: 'Date', value: displayDate },
+                  { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) }
+                ]),
+            { label: 'Rental Type', value: booking.rentalType }
+          ],
+          ctaTitle: 'Calendar Note',
+          ctaHtml: cancellationInvite ? '<p>A cancellation calendar invite is attached to remove this slot from your calendar.</p>' : '<p>If you paid for this booking, please contact us for a refund.</p>'
+        }),
         attachments: cancellationInvite
           ? [{
               filename: 'booking-cancelled.ics',
@@ -1940,18 +1918,22 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
           await sendEmail({
             to: recipientEmail,
             subject: `Booking Cancelled - ${studioName}`,
-            html: `
-              <h2>Booking Cancelled</h2>
-              <p>A confirmed booking has been cancelled by the customer.</p>
-              <ul>
-                <li><strong>User:</strong> ${booking.userName} (${booking.userEmail})</li>
-                <li><strong>Date:</strong> ${displayDate}</li>
-                <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
-                <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
-                <li><strong>Booking ID:</strong> ${booking._id}</li>
-              </ul>
-              <p>The attached cancellation invite removes the slot from calendar apps.</p>
-            `,
+            html: buildInvoiceStyleEmail({
+              title: 'Cancellation Notice',
+              label: 'Admin Notification',
+              greeting: 'Hello Team,',
+              introLines: ['A confirmed booking has been cancelled by the customer.'],
+              summaryTitle: 'Details',
+              summaryRows: [
+                { label: 'User', value: `${booking.userName} (${booking.userEmail})` },
+                { label: 'Date', value: displayDate },
+                { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) },
+                { label: 'Rental Type', value: booking.rentalType },
+                { label: 'Booking ID', value: booking._id }
+              ],
+              ctaTitle: 'Calendar Note',
+              ctaHtml: '<p>The attached cancellation invite removes the slot from calendar apps.</p>'
+            }),
             attachments: [{
               filename: 'booking-cancelled.ics',
               content: cancellationInvite,

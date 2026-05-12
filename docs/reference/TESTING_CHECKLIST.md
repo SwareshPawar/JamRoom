@@ -358,6 +358,7 @@ JamRoom (1h) + Keyboard Per-day + 3 IEMs
 - [ ] Calendar invite opens in email client
 - [ ] Rejection email received
 - [ ] Cancellation email received
+- [x] Automated smoke coverage exists for login, PDF download, eBill, and quotation send (`scripts/tests/pdf_email_smoke_test.ps1`)
 
 ---
 

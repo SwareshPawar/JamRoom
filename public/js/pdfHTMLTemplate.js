@@ -124,6 +124,49 @@ const getServiceGroupingUtils = () => {
     };
 };
 
+const renderServiceGroupSections = ({ groups, renderRow }) => {
+    const safeGroups = Array.isArray(groups) ? groups : [];
+    if (safeGroups.length === 0) {
+        return '';
+    }
+
+    return safeGroups.map((group) => {
+        const rows = (Array.isArray(group?.items) ? group.items : []).map((item) => renderRow(item, group)).join('');
+        const subtotalLabel = group?.subtotalLabel || (Number.isFinite(Number(group?.subtotal)) ? `&#8377;${Number(group.subtotal).toFixed(2)}` : '&#8377;0.00');
+
+        return `
+            <section class="service-group">
+                <!-- Subtotal section: appears only on first page, not repeated on subsequent pages -->
+                <div class="service-group-subtotal-section">
+                    <div class="service-group-header-initial">
+                        <div>
+                            <h3>${group?.icon || ''} ${group?.title || 'Service Group'}</h3>
+                            <p>${group?.subtitle || 'Studio booking services'}</p>
+                        </div>
+                        <div class="service-group-subtotal">${subtotalLabel}</div>
+                    </div>
+                </div>
+                
+                <table class="service-table" role="presentation">
+                    <!-- Repeating header: appears on each page, but without the subtotal -->
+                    <thead class="service-group-head">
+                        <tr>
+                            <th colspan="3">
+                                <div class="service-group-header-repeat">
+                                    <div>
+                                        <h3>${group?.icon || ''} ${group?.title || 'Service Group'}</h3>
+                                        <p>${group?.subtitle || 'Studio booking services'}</p>
+                                    </div>
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="service-group-body">${rows}</tbody>
+                </table>
+            </section>`;
+    }).join('');
+};
+
 /**
  * Generate unified PDF HTML template
  * @param {Object} booking - Booking data
@@ -246,9 +289,12 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const invoiceLogoSrc = String(settings?.logoDataUri || settings?.logoImageUrl || '').trim() || DEFAULT_BRAND_LOGO_URL;
 
     const serviceGroupSections = groupedServiceItems.length > 0
-        ? groupedServices.map((group) => {
-            const groupSubtotal = Number(group.subtotal || 0);
-            const rows = group.items.map((item) => {
+        ? renderServiceGroupSections({
+            groups: groupedServices.map((group) => ({
+                ...group,
+                subtotalLabel: `&#8377;${Number(group.subtotal || 0).toFixed(2)}`
+            })),
+            renderRow: (item) => {
                 const rentalType = normalizeRentalType(item.rentalType || 'inhouse');
                 const bookingMeta = rentalType === 'perday'
                     ? `${perDayStartLabel} ${formatTime12Hour(booking.startTime)} to ${perDayEndLabel} ${formatTime12Hour(booking.endTime)}`
@@ -257,52 +303,64 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                     ? `&#8377;${item.rate}/day`
                     : (rentalType === 'persession' ? `&#8377;${item.rate}/session` : (rentalType === 'pertrack' ? `&#8377;${item.rate}/track` : `&#8377;${item.rate}/hr`));
                 return `
-                <div class="service-row">
-                    <div class="service-copy">
+                <tr class="service-row">
+                    <td class="service-col-copy">
                         <div class="service-title">${item.title}</div>
                         <div class="service-desc">${item.description || 'Studio rental service'} &bull; ${bookingMeta}</div>
-                    </div>
-                    <div class="service-meta">
+                    </td>
+                    <td class="service-col-meta">
                         <div class="service-meta-top">${itemRateLabel}${item.quantity > 1 ? ` x ${item.quantity}` : ''}</div>
                         <div class="service-meta-sub">${item.billingLabel}</div>
-                    </div>
-                    <div class="service-amount">&#8377;${Number(item.amount || 0).toFixed(2)}</div>
-                </div>`;
-            }).join('');
-            return `
-            <section class="service-group">
-                <div class="service-group-header">
-                    <div>
-                        <h3>${group.icon || ''} ${group.title}</h3>
-                        <p>${group.subtitle || 'Studio booking services'}</p>
-                    </div>
-                    <div class="service-group-subtotal">&#8377;${groupSubtotal.toFixed(2)}</div>
-                </div>
-                <div class="service-group-body">${rows}</div>
-            </section>`;
-        }).join('')
+                    </td>
+                    <td class="service-col-amount">
+                        <div class="service-amount">&#8377;${Number(item.amount || 0).toFixed(2)}</div>
+                    </td>
+                </tr>`;
+            }
+        })
         : `
         <section class="service-group">
-            <div class="service-group-header">
-                <div>
-                    <h3>&#127925; ${booking.rentalType || 'JamRoom Booking'}</h3>
-                    <p>Studio booking for ${isPerday ? `${perDayStartLabel} to ${perDayEndLabel}` : bookingDate.toLocaleDateString('en-IN')}</p>
-                </div>
-                <div class="service-group-subtotal">&#8377;${subtotal.toFixed(2)}</div>
-            </div>
-            <div class="service-group-body">
-                <div class="service-row">
-                    <div class="service-copy">
-                        <div class="service-title">${booking.rentalType || 'Studio Session'}</div>
-                        <div class="service-desc">${isPerday ? `${perDayDays} day(s) &middot; ${perDayTimeRangeLabel}` : `${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)}`}${booking.notes ? ` &middot; ${booking.notes}` : ''}</div>
+            <!-- Subtotal section: appears only on first page, not repeated on subsequent pages -->
+            <div class="service-group-subtotal-section">
+                <div class="service-group-header-initial">
+                    <div>
+                        <h3>&#127925; ${booking.rentalType || 'JamRoom Booking'}</h3>
+                        <p>Studio booking for ${isPerday ? `${perDayStartLabel} to ${perDayEndLabel}` : bookingDate.toLocaleDateString('en-IN')}</p>
                     </div>
-                    <div class="service-meta">
-                        <div class="service-meta-top">${isPerSessionBooking ? `&#8377;${subtotal.toFixed(2)}/session` : (isPerTrackBooking ? `&#8377;${subtotal.toFixed(2)}/track` : `&#8377;${(subtotal / safeDuration).toFixed(2)}/hr`)}</div>
-                        <div class="service-meta-sub">${isPerSessionBooking ? 'Per session' : (isPerTrackBooking ? 'Per track' : `Per hour x ${safeDuration}`)}</div>
-                    </div>
-                    <div class="service-amount">&#8377;${subtotal.toFixed(2)}</div>
+                    <div class="service-group-subtotal">&#8377;${subtotal.toFixed(2)}</div>
                 </div>
             </div>
+            
+            <table class="service-table" role="presentation">
+                <!-- Repeating header: appears on each page, but without the subtotal -->
+                <thead class="service-group-head">
+                    <tr>
+                        <th colspan="3">
+                            <div class="service-group-header-repeat">
+                                <div>
+                                    <h3>&#127925; ${booking.rentalType || 'JamRoom Booking'}</h3>
+                                    <p>Studio booking for ${isPerday ? `${perDayStartLabel} to ${perDayEndLabel}` : bookingDate.toLocaleDateString('en-IN')}</p>
+                                </div>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="service-group-body">
+                    <tr class="service-row">
+                        <td class="service-col-copy">
+                            <div class="service-title">${booking.rentalType || 'Studio Session'}</div>
+                            <div class="service-desc">${isPerday ? `${perDayDays} day(s) &middot; ${perDayTimeRangeLabel}` : `${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)}`}${booking.notes ? ` &middot; ${booking.notes}` : ''}</div>
+                        </td>
+                        <td class="service-col-meta">
+                            <div class="service-meta-top">${isPerSessionBooking ? `&#8377;${subtotal.toFixed(2)}/session` : (isPerTrackBooking ? `&#8377;${subtotal.toFixed(2)}/track` : `&#8377;${(subtotal / safeDuration).toFixed(2)}/hr`)}</div>
+                            <div class="service-meta-sub">${isPerSessionBooking ? 'Per session' : (isPerTrackBooking ? 'Per track' : `Per hour x ${safeDuration}`)}</div>
+                        </td>
+                        <td class="service-col-amount">
+                            <div class="service-amount">&#8377;${subtotal.toFixed(2)}</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </section>`;
 
     return `
@@ -343,17 +401,23 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .status-partial{background:#fff4d6;color:#8a5700;border:1px solid #ffd166}
         .status-refunded{background:#e2e3e5;color:#383d41;border:1px solid #d6d8db}
         .status-cancelled{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
-        .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:hidden;margin-bottom:16px;background:#fff;break-inside:avoid;page-break-inside:avoid}
-        .service-group-header{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
-        .service-group-header h3{font-size:18px;margin-bottom:4px;color:#fff;font-weight:700}
-        .service-group-header p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5;margin:0}
+        .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:hidden;margin-bottom:16px;background:#fff;break-inside:auto;page-break-inside:auto}
+        .service-table{width:100%;border-collapse:collapse;table-layout:fixed}
+        .service-group-head{display:table-header-group}
+        .service-group-head th{padding:0;border:0}
+        .service-group-header-initial,.service-group-header-repeat{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
+        .service-group-header-initial h3,.service-group-header-repeat h3{font-size:18px;margin-bottom:4px;color:#fff;font-weight:700}
+        .service-group-header-initial p,.service-group-header-repeat p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5;margin:0}
+        .service-group-subtotal-section{break-after:avoid;page-break-after:avoid}
         .service-group-subtotal{font-size:14px;font-weight:800;white-space:nowrap;background:rgba(255,255,255,0.12);border-radius:999px;padding:8px 12px;color:#fff;flex-shrink:0}
-        .service-group-body{padding:6px 18px 8px}
-        .service-row{display:grid;grid-template-columns:1.5fr 0.7fr 0.45fr;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #edf2f7;break-inside:avoid;page-break-inside:avoid}
-        .service-row:last-child{border-bottom:0}
+        .service-group-body{display:table-row-group}
+        .service-row td{padding:14px 0;border-bottom:1px solid #edf2f7;vertical-align:middle;break-inside:avoid;page-break-inside:avoid}
+        .service-row:last-child td{border-bottom:0}
+        .service-col-copy{width:56%;padding-left:18px}
+        .service-col-meta{width:28%;text-align:right;padding-left:14px;padding-right:14px}
+        .service-col-amount{width:16%;text-align:right;padding-right:18px}
         .service-title{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
         .service-desc{font-size:12px;line-height:1.5;color:#64748b}
-        .service-meta{text-align:right}
         .service-meta-top{font-size:13px;font-weight:700;color:#0f172a}
         .service-meta-sub{font-size:11px;color:#64748b;margin-top:4px}
         .service-amount{text-align:right;font-size:14px;font-weight:800;color:#0f172a}
@@ -389,7 +453,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .payment-card.partial .payment-message{color:#78350f}
         .payment-card.pending .payment-message{color:#856404}
         .footer{margin-top:22px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.7;text-align:center;break-inside:avoid;page-break-inside:avoid}
-        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-group,.service-row,.info-card,.bill-grid,.totals-card,.payment-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group-header{break-after:avoid;page-break-after:avoid}}
+        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-row td,.info-card,.bill-grid,.totals-card,.payment-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-head{display:table-header-group}.service-group-subtotal-section{break-after:avoid;page-break-after:avoid}.service-group-header-initial,.service-group-header-repeat{break-after:avoid;page-break-after:avoid}}
     </style>
 </head>
 <body>

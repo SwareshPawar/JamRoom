@@ -64,7 +64,10 @@ async function generatePDFClient(booking, settings) {
     // Wait for fonts and styles to load
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    const invoiceElement = tempContainer.querySelector('.invoice');
+    const invoiceElement = tempContainer.querySelector('.sheet') || tempContainer.firstElementChild;
+    if (!invoiceElement) {
+        throw new Error('Unable to locate PDF root element in generated HTML');
+    }
     
     const options = {
         margin: [0.28, 0.28, 0.28, 0.28], // 20px converted to inches (20/72 ≈ 0.28)

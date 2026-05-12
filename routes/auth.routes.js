@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const { sendEmail } = require('../utils/email');
+const { buildInvoiceStyleEmail } = require('../utils/templates/email/invoiceStyleEmailTemplate');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -56,11 +57,23 @@ router.post('/register', async (req, res) => {
       await sendEmail({
         to: email,
         subject: 'Welcome to JamRoom!',
-        html: `
-          <h1>Welcome ${name}!</h1>
-          <p>Thank you for registering with JamRoom. You can now book your jam sessions!</p>
-          <p>Visit our website to explore available slots.</p>
-        `
+        html: buildInvoiceStyleEmail({
+          title: 'Welcome Email',
+          label: 'Account Created',
+          greeting: `Hi ${name},`,
+          introLines: [
+            'Thank you for registering with JamRoom. Your account is ready and you can now explore available slots and book studio time.'
+          ],
+          summaryTitle: 'Account Details',
+          summaryRows: [
+            { label: 'Email', value: email },
+            { label: 'Status', value: 'Registered' },
+            { label: 'Next Step', value: 'Log in to explore available slots' }
+          ],
+          ctaTitle: 'Get Started',
+          ctaHtml: `<p>Visit the JamRoom portal to browse slots, manage bookings, and complete your profile.</p>`,
+          footerLines: ['This is an automated account welcome email.']
+        })
       });
     } catch (emailError) {
       console.log('Welcome email failed:', emailError.message);
@@ -191,13 +204,23 @@ router.post('/forgot-password', async (req, res) => {
       await sendEmail({
         to: email,
         subject: 'Password Reset Request',
-        html: `
-          <h2>Password Reset Request</h2>
-          <p>You requested a password reset. Click the link below to reset your password:</p>
-          <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
-          <p>This link will expire in 30 minutes.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-        `
+        html: buildInvoiceStyleEmail({
+          title: 'Security Link',
+          label: 'Password Reset',
+          greeting: 'Hello,',
+          introLines: [
+            'You requested a password reset. Use the secure link below to set a new password for your JamRoom account.',
+            'This link expires in 30 minutes. If you did not request this change, you can safely ignore this email.'
+          ],
+          summaryTitle: 'Reset Details',
+          summaryRows: [
+            { label: 'Reset Link', value: resetUrl },
+            { label: 'Valid For', value: '30 minutes' }
+          ],
+          ctaTitle: 'Reset Password',
+          ctaHtml: `<p><a href="${resetUrl}" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:700;">Reset Password</a></p>`,
+          footerLines: ['If you did not request this reset, no action is needed.']
+        })
       });
 
       res.json({

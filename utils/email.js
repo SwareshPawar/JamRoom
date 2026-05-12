@@ -32,7 +32,7 @@ const wrapEmailHtml = (bodyContent) => `<!DOCTYPE html>
       .email-card { border-radius: 8px !important; }
       .email-header-td { padding: 20px 16px 16px !important; }
       .email-header-td h1 { font-size: 18px !important; }
-      .email-header-td p { font-size: 12px !important; }
+      .email-header-td p { font-size: 12px !important; color: rgba(255,255,255,0.84) !important; }
       .email-body-td {
         padding: 20px 16px !important;
         font-size: 14px !important;
@@ -52,43 +52,43 @@ const wrapEmailHtml = (bodyContent) => `<!DOCTYPE html>
     /* Apple Mail dark mode override — force light-mode palette */
     @media (prefers-color-scheme: dark) {
       body, .email-wrapper, .email-card {
-        background-color: #ffffff !important;
-        color: #1a1a1a !important;
+        background-color: #eef2f7 !important;
+        color: #1f2937 !important;
       }
       h1, h2, h3, h4, p, li, td, th, span, strong, a {
-        color: #1a1a1a !important;
+        color: #1f2937 !important;
       }
       .email-header-td {
-        background-color: #6c3fc5 !important;
+        background: linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%) !important;
         color: #ffffff !important;
       }
       .email-header-td h1, .email-header-td p {
         color: #ffffff !important;
       }
       .email-footer-td {
-        background-color: #f8f6ff !important;
-        color: #666666 !important;
+        background-color: #f8fafc !important;
+        color: #64748b !important;
       }
       .email-footer-td p, .email-footer-td a {
-        color: #666666 !important;
+        color: #64748b !important;
       }
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:#f0f0f0;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background-color:#eef2f7;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
   <table class="email-wrapper" role="presentation" cellpadding="0" cellspacing="0" width="100%"
-    style="background-color:#f0f0f0;margin:0;padding:0;">
+    style="background-color:#eef2f7;margin:0;padding:0;">
     <tr>
       <td class="email-outer-td" align="center" style="padding:24px 12px;">
 
         <!-- Card container — 100% width on mobile, capped at 600px on desktop -->
         <table class="email-card" role="presentation" cellpadding="0" cellspacing="0"
-          style="max-width:600px;width:100%;background-color:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.10);">
+          style="max-width:600px;width:100%;background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #dbe5f0;box-shadow:0 8px 24px rgba(15,23,42,0.08);">
 
           <!-- Header -->
           <tr>
             <td class="email-header-td"
-              style="background-color:#6c3fc5;padding:24px 24px 18px;text-align:center;">
+              style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:24px 24px 18px;text-align:center;">
               <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
                 <tr>
                   <td style="vertical-align:middle;padding-right:12px;">
@@ -97,7 +97,7 @@ const wrapEmailHtml = (bodyContent) => `<!DOCTYPE html>
                   </td>
                   <td style="vertical-align:middle;text-align:left;">
                     <h1 style="margin:0 0 2px;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">JamRoom</h1>
-                    <p style="margin:0;font-size:12px;color:#e8d9ff;">Swar JamRoom &amp; Music Studio</p>
+                    <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.84);">Swar JamRoom &amp; Music Studio</p>
                   </td>
                 </tr>
               </table>
@@ -106,7 +106,7 @@ const wrapEmailHtml = (bodyContent) => `<!DOCTYPE html>
 
           <!-- Body -->
           <tr>
-            <td class="email-body-td" style="padding:24px;color:#1a1a1a;font-size:15px;line-height:1.7;word-break:break-word;">
+            <td class="email-body-td" style="padding:24px;color:#1f2937;font-size:15px;line-height:1.7;word-break:break-word;">
               ${bodyContent}
             </td>
           </tr>
@@ -114,13 +114,13 @@ const wrapEmailHtml = (bodyContent) => `<!DOCTYPE html>
           <!-- Footer -->
           <tr>
             <td class="email-footer-td"
-              style="background-color:#f8f6ff;padding:16px 24px;border-top:1px solid #e8e0ff;text-align:center;">
-              <p style="margin:0 0 4px;font-size:12px;color:#666666;">
+              style="background-color:#f8fafc;padding:16px 24px;border-top:1px solid #e2e8f0;text-align:center;">
+              <p style="margin:0 0 4px;font-size:12px;color:#64748b;">
                 &copy; JamRoom &mdash; Swar JamRoom &amp; Music Studio
               </p>
-              <p style="margin:0;font-size:12px;color:#666666;word-break:break-all;">
+              <p style="margin:0;font-size:12px;color:#64748b;word-break:break-all;">
                 <a href="${JAMROOM_SITE_URL}" target="_blank" rel="noopener noreferrer"
-                  style="color:#6c3fc5;text-decoration:underline;">${JAMROOM_SITE_URL}</a>
+                  style="color:#1d4ed8;text-decoration:underline;">${JAMROOM_SITE_URL}</a>
               </p>
             </td>
           </tr>
@@ -168,13 +168,13 @@ const sendEmail = async (options) => {
       if (!isFullDocument) {
         // Inject inline styles into common tags for maximum email client compatibility
         normalizedHtml = normalizedHtml
-          .replace(/<h1(?=[^>]*>)/g, '<h1 style="font-size:20px;font-weight:700;color:#1a1a1a;margin:0 0 12px;"')
-          .replace(/<h2(?=[^>]*>)/g, '<h2 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:16px 0 10px;padding-bottom:6px;border-bottom:2px solid #6c3fc5;"')
-          .replace(/<h3(?=[^>]*>)/g, '<h3 style="font-size:15px;font-weight:700;color:#1a1a1a;margin:14px 0 8px;"')
-          .replace(/<ul(?=[^>]*>)/g, '<ul style="padding-left:20px;margin:8px 0;"')
-          .replace(/<li(?=[^>]*>)/g, '<li style="padding:3px 0;color:#1a1a1a;"')
-          .replace(/<p(?=[^>]*>)/g, '<p style="margin:8px 0;color:#1a1a1a;"')
-          .replace(/<strong(?=[^>]*>)/g, '<strong style="color:#1a1a1a;"');
+          .replace(/<h1(?=[^>]*>)/g, '<h1 style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 12px;line-height:1.2;"')
+          .replace(/<h2(?=[^>]*>)/g, '<h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:16px 0 10px;padding-bottom:6px;border-bottom:2px solid #1d4ed8;"')
+          .replace(/<h3(?=[^>]*>)/g, '<h3 style="font-size:15px;font-weight:700;color:#0f172a;margin:14px 0 8px;"')
+          .replace(/<ul(?=[^>]*>)/g, '<ul style="padding-left:20px;margin:8px 0;border-left:3px solid #dbeafe;"')
+          .replace(/<li(?=[^>]*>)/g, '<li style="padding:4px 0;color:#334155;"')
+          .replace(/<p(?=[^>]*>)/g, '<p style="margin:8px 0;color:#334155;"')
+          .replace(/<strong(?=[^>]*>)/g, '<strong style="color:#0f172a;"');
         normalizedHtml = wrapEmailHtml(normalizedHtml);
       }
     }

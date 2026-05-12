@@ -4,6 +4,7 @@
  */
 
 const { buildServiceGroupSummary } = require('./shared/quotationBilling');
+const { renderServiceGroupSections } = require('./shared/pdfServiceGroups');
 
 const DEFAULT_BRAND_LOGO_URL = 'https://jam-room-mu.vercel.app/icons/jamroom-brand-logo.png';
 
@@ -221,9 +222,12 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const invoiceLogoSrc = String(settings?.logoDataUri || settings?.logoImageUrl || '').trim() || DEFAULT_BRAND_LOGO_URL;
 
     const serviceGroupSections = groupedServiceItems.length > 0
-        ? groupedServices.map((group) => {
-            const groupSubtotal = Number(group.subtotal || 0);
-            const rows = group.items.map((item) => {
+        ? renderServiceGroupSections({
+            groups: groupedServices.map((group) => ({
+                ...group,
+                subtotalLabel: `₹${Number(group.subtotal || 0).toFixed(2)}`
+            })),
+            renderRow: (item) => {
                 const rentalType = normalizeRentalType(item.rentalType || 'inhouse');
                 const bookingMeta = rentalType === 'perday'
                     ? `${perDayStartLabel} ${formatTime12Hour(booking.startTime)} to ${perDayEndLabel} ${formatTime12Hour(booking.endTime)}`
@@ -232,52 +236,53 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                     ? `₹${item.rate}/day`
                     : (rentalType === 'persession' ? `₹${item.rate}/session` : (rentalType === 'pertrack' ? `₹${item.rate}/track` : `₹${item.rate}/hr`));
                 return `
-                <div class="service-row">
-                    <div class="service-copy">
+                <tr class="service-row">
+                    <td class="service-col-copy">
                         <div class="service-title">${item.title}</div>
                         <div class="service-desc">${item.description || 'Studio rental service'} &bull; ${bookingMeta}</div>
-                    </div>
-                    <div class="service-meta">
+                    </td>
+                    <td class="service-col-meta">
                         <div class="service-meta-top">${itemRateLabel}${item.quantity > 1 ? ` x ${item.quantity}` : ''}</div>
                         <div class="service-meta-sub">${item.billingLabel}</div>
-                    </div>
-                    <div class="service-amount">₹${Number(item.amount || 0).toFixed(2)}</div>
-                </div>`;
-            }).join('');
-            return `
-            <section class="service-group">
-                <div class="service-group-header">
-                    <div>
-                        <h3>${group.icon || ''} ${group.title}</h3>
-                        <p>${group.subtitle || 'Studio booking services'}</p>
-                    </div>
-                    <div class="service-group-subtotal">₹${groupSubtotal.toFixed(2)}</div>
-                </div>
-                <div class="service-group-body">${rows}</div>
-            </section>`;
-        }).join('')
+                    </td>
+                    <td class="service-col-amount">
+                        <div class="service-amount">₹${Number(item.amount || 0).toFixed(2)}</div>
+                    </td>
+                </tr>`;
+            }
+        })
         : `
         <section class="service-group">
-            <div class="service-group-header">
-                <div>
-                    <h3>🎵 ${booking.rentalType || 'JamRoom Booking'}</h3>
-                    <p>Studio booking for ${isPerday ? `${perDayStartLabel} to ${perDayEndLabel}` : bookingDate.toLocaleDateString('en-IN')}</p>
-                </div>
-                <div class="service-group-subtotal">₹${subtotal.toFixed(2)}</div>
-            </div>
-            <div class="service-group-body">
-                <div class="service-row">
-                    <div class="service-copy">
-                        <div class="service-title">${booking.rentalType || 'Studio Session'}</div>
-                        <div class="service-desc">${isPerday ? `${perDayDays} day(s) · ${perDayTimeRangeLabel}` : `${formatTime12Hour(booking.startTime)} – ${formatTime12Hour(booking.endTime)}`}${booking.notes ? ` · ${booking.notes}` : ''}</div>
-                    </div>
-                    <div class="service-meta">
-                        <div class="service-meta-top">${isPerSessionBooking ? `₹${subtotal.toFixed(2)}/session` : (isPerTrackBooking ? `₹${subtotal.toFixed(2)}/track` : `₹${(subtotal / safeDuration).toFixed(2)}/hr`)}</div>
-                        <div class="service-meta-sub">${isPerSessionBooking ? 'Per session' : (isPerTrackBooking ? 'Per track' : `Per hour x ${safeDuration}`)}</div>
-                    </div>
-                    <div class="service-amount">₹${subtotal.toFixed(2)}</div>
-                </div>
-            </div>
+            <table class="service-table" role="presentation">
+                <thead class="service-group-head">
+                    <tr>
+                        <th colspan="3">
+                            <div class="service-group-header">
+                                <div>
+                                    <h3>🎵 ${booking.rentalType || 'JamRoom Booking'}</h3>
+                                    <p>Studio booking for ${isPerday ? `${perDayStartLabel} to ${perDayEndLabel}` : bookingDate.toLocaleDateString('en-IN')}</p>
+                                </div>
+                                <div class="service-group-subtotal">₹${subtotal.toFixed(2)}</div>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="service-group-body">
+                    <tr class="service-row">
+                        <td class="service-col-copy">
+                            <div class="service-title">${booking.rentalType || 'Studio Session'}</div>
+                            <div class="service-desc">${isPerday ? `${perDayDays} day(s) · ${perDayTimeRangeLabel}` : `${formatTime12Hour(booking.startTime)} – ${formatTime12Hour(booking.endTime)}`}${booking.notes ? ` · ${booking.notes}` : ''}</div>
+                        </td>
+                        <td class="service-col-meta">
+                            <div class="service-meta-top">${isPerSessionBooking ? `₹${subtotal.toFixed(2)}/session` : (isPerTrackBooking ? `₹${subtotal.toFixed(2)}/track` : `₹${(subtotal / safeDuration).toFixed(2)}/hr`)}</div>
+                            <div class="service-meta-sub">${isPerSessionBooking ? 'Per session' : (isPerTrackBooking ? 'Per track' : `Per hour x ${safeDuration}`)}</div>
+                        </td>
+                        <td class="service-col-amount">
+                            <div class="service-amount">₹${subtotal.toFixed(2)}</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </section>`;
 
     return `
@@ -288,9 +293,9 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     <title>${settings?.studioName || 'JamRoom'} Invoice</title>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:Arial,sans-serif;color:#142033;background:#eef2f7;padding:26px}
-        .sheet{max-width:820px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 44px rgba(15,23,42,0.14)}
-        .topbar{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#ffffff;padding:28px 30px 24px}
+        body{font-family:Arial,sans-serif;color:#142033;background:#eef2f7;padding:20px}
+        .sheet{max-width:760px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 44px rgba(15,23,42,0.14)}
+        .topbar{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#ffffff;padding:24px 28px 20px;break-after:avoid;page-break-after:avoid}
         .hdr{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}
         .brand{max-width:62%}
         .brand-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
@@ -302,15 +307,15 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .invoice-panel .kicker{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#bfdbfe;margin-bottom:8px;font-weight:700}
         .invoice-panel h2{font-size:30px;line-height:1;margin-bottom:12px;color:#fff;font-weight:800}
         .invoice-panel .meta-line{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88)}
-        .body{padding:28px 30px 30px}
-        .bill-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;break-inside:avoid;page-break-inside:avoid}
+        .body{padding:20px 24px 24px}
+        .bill-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;break-inside:avoid;page-break-inside:avoid}
         .info-card{background:#f8fafc;border:1px solid #dbe5f0;border-radius:18px;padding:16px 18px;break-inside:avoid;page-break-inside:avoid}
         .info-label{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:#64748b;font-weight:700;margin-bottom:10px}
         .info-name{font-size:18px;font-weight:700;color:#0f172a;margin-bottom:4px}
         .info-email{font-size:13px;color:#64748b;margin-bottom:6px}
         .info-row{font-size:13px;color:#475569;line-height:1.8}
         .info-row strong{color:#0f172a}
-        .section-title{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;font-weight:800;margin:20px 0 12px}
+        .section-title{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;font-weight:800;margin:14px 0 10px;break-after:avoid;page-break-after:avoid}
         .status-badge{display:inline-block;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
         .status-confirmed{background:#dcfce7;color:#166534;border:1px solid #86efac}
         .status-pending{background:#fff3cd;color:#856404;border:1px solid #ffeaa7}
@@ -318,23 +323,28 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .status-partial{background:#fff4d6;color:#8a5700;border:1px solid #ffd166}
         .status-refunded{background:#e2e3e5;color:#383d41;border:1px solid #d6d8db}
         .status-cancelled{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
-        .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:visible;margin-bottom:16px;background:#fff;break-inside:auto;page-break-inside:auto}
-        .service-group-header{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
-        .service-group-header h3{font-size:18px;margin-bottom:4px;color:#fff;font-weight:700}
-        .service-group-header p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5;margin:0}
+        .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:hidden;margin-bottom:12px;background:#fff;break-inside:auto;page-break-inside:auto}
+        .service-table{width:100%;border-collapse:collapse;table-layout:fixed}
+        .service-group-head{display:table-header-group}
+        .service-group-head th{padding:0;border:0}
+        .service-group-header-initial,.service-group-header-repeat{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
+        .service-group-header-initial h3,.service-group-header-repeat h3{font-size:18px;margin-bottom:4px;color:#fff;font-weight:700}
+        .service-group-header-initial p,.service-group-header-repeat p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5;margin:0}
+        .service-group-subtotal-section{break-after:avoid;page-break-after:avoid}
         .service-group-subtotal{font-size:14px;font-weight:800;white-space:nowrap;background:rgba(255,255,255,0.12);border-radius:999px;padding:8px 12px;color:#fff;flex-shrink:0}
-        .service-group-body{padding:6px 18px 8px;break-inside:auto;page-break-inside:auto}
-        .service-row{display:grid;grid-template-columns:1.5fr 0.7fr 0.45fr;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #edf2f7;break-inside:avoid;page-break-inside:avoid}
-        .service-row:last-child{border-bottom:0}
-        .service-copy{}
+        .service-group-body{display:table-row-group}
+        .service-row td{padding:14px 0;border-bottom:1px solid #edf2f7;vertical-align:middle;break-inside:avoid;page-break-inside:avoid}
+        .service-row:last-child td{border-bottom:0}
+        .service-col-copy{width:56%;padding-left:18px}
+        .service-col-meta{width:28%;text-align:right;padding-left:14px;padding-right:14px}
+        .service-col-amount{width:16%;text-align:right;padding-right:18px}
         .service-title{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
         .service-desc{font-size:12px;line-height:1.5;color:#64748b}
-        .service-meta{text-align:right}
         .service-meta-top{font-size:13px;font-weight:700;color:#0f172a}
         .service-meta-sub{font-size:11px;color:#64748b;margin-top:4px}
         .service-amount{text-align:right;font-size:14px;font-weight:800;color:#0f172a}
-        .totals-card{background:#0f172a;color:#fff;border-radius:22px;padding:20px 22px;margin:18px 0;break-inside:avoid;page-break-inside:avoid}
-        .totals-card h3{font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:#cbd5e1;margin-bottom:12px}
+        .totals-card{background:#0f172a;color:#fff;border-radius:22px;padding:18px 20px;margin:12px 0;break-inside:avoid;page-break-inside:avoid}
+        .totals-card h3{font-size:14px;text-transform:uppercase;letter-spacing:1.2px;color:#cbd5e1;margin-bottom:10px}
         .total-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;font-size:14px;color:#e2e8f0}
         .discount-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;font-size:14px;color:#86efac;border-left:3px solid #22c55e;padding-left:8px;margin:2px 0}
         .discount-row strong{font-size:14px;color:#86efac}
@@ -348,11 +358,11 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .due-row.settled{background:linear-gradient(135deg,#14532d 0%,#166534 100%);border-color:rgba(134,239,172,0.4)}
         .due-row.settled span{color:#bbf7d0}
         .due-row.settled strong{color:#dcfce7}
-        .payment-card{border-radius:18px;padding:16px 18px;margin:0 0 18px;break-inside:avoid;page-break-inside:avoid}
+        .payment-card{border-radius:18px;padding:16px 18px;margin:0 0 12px;break-inside:avoid;page-break-inside:avoid}
         .payment-card.paid{background:#dcfce7;border:1px solid #86efac}
         .payment-card.partial{background:#fff4d6;border:1px solid #ffd166}
         .payment-card.pending{background:#fff3cd;border:1px solid #ffeaa7}
-        .payment-kicker{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:700;margin-bottom:10px}
+        .payment-kicker{font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:700;margin-bottom:8px}
         .payment-card.paid .payment-kicker{color:#14532d}
         .payment-card.partial .payment-kicker{color:#78350f}
         .payment-card.pending .payment-kicker{color:#92400e}
@@ -360,16 +370,16 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .payment-row:last-of-type{border-bottom:0}
         .payment-row strong{font-weight:700;color:#0f172a}
         .payment-row span{color:#475569}
-        .payment-message{font-size:13px;line-height:1.7;margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.07);font-style:italic}
+        .payment-message{font-size:13px;line-height:1.6;margin-top:8px;padding-top:6px;border-top:1px solid rgba(0,0,0,0.07);font-style:italic}
         .payment-card.paid .payment-message{color:#14532d}
         .payment-card.partial .payment-message{color:#78350f}
         .payment-card.pending .payment-message{color:#856404}
-        .terms-card{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:18px;padding:16px 18px;margin:0 0 18px;break-inside:avoid;page-break-inside:avoid}
-        .terms-card-hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px}
-        .terms-list{margin:0;padding-left:18px;color:#7f1d1d}
-        .terms-list li{margin:0 0 6px 0;font-size:12px;line-height:1.7}
-        .footer{margin-top:22px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.7;text-align:center;break-inside:avoid;page-break-inside:avoid}
-        @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-row,.info-card,.bill-grid,.totals-card,.payment-card,.terms-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-header{break-after:avoid;page-break-after:avoid}}
+        .terms-card{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:18px;padding:14px 16px;margin:0 0 12px;break-inside:avoid;page-break-inside:avoid}
+        .terms-card-hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:6px}
+        .terms-list{margin:0;padding-left:16px;color:#7f1d1d}
+        .terms-list li{margin:0 0 4px 0;font-size:12px;line-height:1.5}
+        .footer{margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.6;text-align:center;break-inside:avoid;page-break-inside:avoid}
+                @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-row td,.info-card,.bill-grid,.totals-card,.payment-card,.terms-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-head{display:table-header-group}.service-group-subtotal-section{break-after:avoid;page-break-after:avoid}.service-group-header-initial,.service-group-header-repeat{break-after:avoid;page-break-after:avoid}}
     </style>
 </head>
 <body>

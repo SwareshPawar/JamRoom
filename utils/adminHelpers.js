@@ -9,6 +9,7 @@ const { sendEmail } = require('./email');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+const { buildInvoiceStyleEmail } = require('./templates/email/invoiceStyleEmailTemplate');
 const DEFAULT_ADMIN_CREATED_USER_PASSWORD = 'Qwerty123';
 const DEFAULT_APP_LOGIN_URL = 'https://jam-room-mu.vercel.app/';
 const ADMIN_DELETE_OWNER_EMAIL = 'swareshpawar@gmail.com';
@@ -586,38 +587,36 @@ const sendUnifiedBookingConfirmationEmails = async ({
     await sendEmail({
       to: booking.userEmail,
       subject: `Booking Confirmed - ${studioName}`,
-      html: `
-        <h2>🎉 Booking Confirmed</h2>
-        <p>Hi ${booking.userName},</p>
-        <p>Your booking request has been successfully confirmed by our team.</p>
-        <h3>Booking Details:</h3>
-        <ul>
-          <li><strong>Date:</strong> ${displayDate}</li>
-          <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
-          <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
-          <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
-          <li><strong>Price:</strong> ₹${booking.price}</li>
-          <li><strong>Payment Status:</strong> ${booking.paymentStatus || 'PENDING'}</li>
-          <li><strong>Amount Received:</strong> ₹${collectedAmount.toFixed(2)}</li>
-          <li><strong>Outstanding:</strong> ₹${dueAmount.toFixed(2)}</li>
-          ${classSessionHtml}
-          ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
-        </ul>
-        ${discountHighlightHtml}
-        ${payableHighlightHtml}
-        ${calendarInvite ? '<p>A calendar invite is attached to this email.</p>' : ''}
-        ${paymentMessageByStatus}
-        <p>Looking forward to seeing you at ${studioLabel}!</p>
-        <div style="background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:8px;padding:12px 16px;margin:16px 0;">
-          <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px;">⚠ Booking Terms</div>
-          <ul style="margin:0;padding-left:18px;color:#7f1d1d;font-size:13px;line-height:1.7;">
-            <li style="margin-bottom:5px;">50% advance payment is required to confirm and block your booking slot.</li>
-            <li style="margin-bottom:5px;">Cancellation within 24 hours of the scheduled session is non-refundable.</li>
-            <li>All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.</li>
-          </ul>
-        </div>
-        ${customerExtraHtml}
-      `,
+      html: buildInvoiceStyleEmail({
+        title: 'Booking Confirmed',
+        label: 'Customer Notification',
+        greeting: `Hi ${booking.userName},`,
+        introLines: ['Your booking request has been successfully confirmed by our team.'],
+        summaryTitle: 'Booking Details',
+        summaryRows: [
+          { label: 'Date', value: displayDate },
+          { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) },
+          { label: 'Duration', value: `${booking.duration} hour(s)` },
+          { label: 'Rental Type', value: booking.rentalType },
+          { label: 'Price', value: `₹${booking.price}` },
+          { label: 'Payment Status', value: booking.paymentStatus || 'PENDING' },
+          { label: 'Amount Received', value: `₹${collectedAmount.toFixed(2)}` },
+          { label: 'Outstanding', value: `₹${dueAmount.toFixed(2)}` },
+          ...(booking.bandName ? [{ label: 'Band Name', value: booking.bandName }] : [])
+        ],
+        highlightHtml: `${discountHighlightHtml}${payableHighlightHtml}${paymentMessageByStatus}`,
+        sectionsHtml: [
+          classSessionHtml ? `<div class="notes-card"><h3>Class/Plan Details</h3><div style="font-size:13px;line-height:1.7;color:#475569;"><ul style="margin:0;padding-left:18px;">${classSessionHtml}</ul></div></div>` : '',
+          customerExtraHtml ? `<div class="notes-card"><h3>Additional Details</h3>${customerExtraHtml}</div>` : ''
+        ],
+        termsTitle: 'Booking Terms',
+        terms: [
+          '50% advance payment is required to confirm and block your booking slot.',
+          'Cancellation within 24 hours of the scheduled session is non-refundable.',
+          'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.'
+        ],
+        footerLines: [calendarInvite ? 'A calendar invite is attached to this email.' : `Looking forward to seeing you at ${studioLabel}!`]
+      }),
       ...(calendarInvite ? { attachments: [{
         filename: 'booking.ics',
         content: calendarInvite,
@@ -641,22 +640,25 @@ const sendUnifiedBookingConfirmationEmails = async ({
         await sendEmail({
           to: adminEmail,
           subject: `Booking Approved - ${studioLabel}`,
-          html: `
-            <h2>Booking Approved</h2>
-            <p>A booking has been approved by ${confirmedByName}.</p>
-            <h3>Booking Details:</h3>
-            <ul>
-              <li><strong>User:</strong> ${booking.userName} (${booking.userEmail})</li>
-              ${booking.userMobile ? `<li><strong>Mobile:</strong> ${booking.userMobile}</li>` : ''}
-              <li><strong>Date:</strong> ${displayDate}</li>
-              <li><strong>Time:</strong> ${formatTimeRange12Hour(booking.startTime, booking.endTime)}</li>
-              <li><strong>Duration:</strong> ${booking.duration} hour(s)</li>
-              <li><strong>Rental Type:</strong> ${booking.rentalType}</li>
-              <li><strong>Price:</strong> ₹${booking.price}</li>
-              ${classSessionHtml}
-              ${booking.bandName ? `<li><strong>Band Name:</strong> ${booking.bandName}</li>` : ''}
-            </ul>
-          `,
+          html: buildInvoiceStyleEmail({
+            title: 'Booking Approved',
+            label: 'Admin Notification',
+            greeting: 'Hello Team,',
+            introLines: [`A booking has been approved by ${confirmedByName}.`],
+            summaryTitle: 'Booking Details',
+            summaryRows: [
+              { label: 'User', value: `${booking.userName} (${booking.userEmail})` },
+              ...(booking.userMobile ? [{ label: 'Mobile', value: booking.userMobile }] : []),
+              { label: 'Date', value: displayDate },
+              { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) },
+              { label: 'Duration', value: `${booking.duration} hour(s)` },
+              { label: 'Rental Type', value: booking.rentalType },
+              { label: 'Price', value: `₹${booking.price}` },
+              ...(booking.bandName ? [{ label: 'Band Name', value: booking.bandName }] : [])
+            ],
+            sectionsHtml: [classSessionHtml ? `<div class="notes-card"><h3>Class/Plan Details</h3><div style="font-size:13px;line-height:1.7;color:#475569;"><ul style="margin:0;padding-left:18px;">${classSessionHtml}</ul></div></div>` : ''],
+            footerLines: [calendarInvite ? 'A calendar invite is attached to this email.' : '']
+          }),
           ...(calendarInvite ? { attachments: [{
             filename: 'booking.ics',
             content: calendarInvite,

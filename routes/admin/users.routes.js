@@ -11,6 +11,7 @@ const Booking = require('../../models/Booking');
 const { protect } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/admin');
 const { sendEmail } = require('../../utils/email');
+const { buildInvoiceStyleEmail } = require('../../utils/templates/email/invoiceStyleEmailTemplate');
 const {
   normalizeEmail,
   normalizeIndianMobile,
@@ -122,19 +123,24 @@ router.post('/users', protect, isAdmin, async (req, res) => {
       await sendEmail({
         to: user.email,
         subject: `Your ${settings.studioName || 'JamRoom'} Account Invite`,
-        html: `
-          <h2>Welcome to ${settings.studioName || 'JamRoom'}</h2>
-          <p>Hi ${user.name},</p>
-          <p>An admin created your account so you can access JamRoom services.</p>
-          <h3>Login Details</h3>
-          <ul>
-            <li><strong>Login URL:</strong> <a href="${DEFAULT_APP_LOGIN_URL}">${DEFAULT_APP_LOGIN_URL}</a></li>
-            <li><strong>Email:</strong> ${user.email}</li>
-            <li><strong>Temporary Password:</strong> ${DEFAULT_ADMIN_CREATED_USER_PASSWORD}</li>
-          </ul>
-          <p><strong>Security Notice:</strong> You must reset your password on first login before continuing.</p>
-          <p>This is an account invite email only. No booking has been created from this action.</p>
-        `
+        html: buildInvoiceStyleEmail({
+          title: 'Admin Invite',
+          label: 'Account Created by Admin',
+          greeting: `Hi ${user.name},`,
+          introLines: [
+            'An admin created your JamRoom account so you can access studio services and booking tools.',
+            'Please log in and reset your password on first access.'
+          ],
+          summaryTitle: 'Login Details',
+          summaryRows: [
+            { label: 'Login URL', value: DEFAULT_APP_LOGIN_URL },
+            { label: 'Email', value: user.email },
+            { label: 'Temporary Password', value: DEFAULT_ADMIN_CREATED_USER_PASSWORD }
+          ],
+          ctaTitle: 'Security Notice',
+          ctaHtml: `<p>You must reset your password on first login before continuing.</p>`,
+          footerLines: ['This is an account invite email only. No booking has been created from this action.']
+        })
       });
       inviteEmailSent = true;
     } catch (inviteEmailError) {
@@ -556,12 +562,22 @@ router.post('/make-admin', protect, isAdmin, async (req, res) => {
       await sendEmail({
         to: email,
         subject: `Admin Access Granted - ${settings.studioName || 'Swar JamRoom Studio'}`,
-        html: `
-          <h2>Admin Access Granted</h2>
-          <p>Hi ${user.name},</p>
-          <p>You have been granted admin privileges for JamRoom booking system.</p>
-          <p>You can now access the admin panel to manage bookings and settings.</p>
-        `
+        html: buildInvoiceStyleEmail({
+          title: 'Admin Access',
+          label: 'Privileges Granted',
+          greeting: `Hi ${user.name},`,
+          introLines: [
+            'You have been granted admin privileges for the JamRoom booking system.',
+            'You can now access the admin panel to manage bookings, users, and settings.'
+          ],
+          summaryTitle: 'Access Details',
+          summaryRows: [
+            { label: 'Email', value: email },
+            { label: 'Role', value: 'Admin' },
+            { label: 'Portal', value: DEFAULT_APP_LOGIN_URL }
+          ],
+          footerLines: ['Please use your admin access responsibly.']
+        })
       });
     } catch (emailError) {
       console.log('Admin notification email failed:', emailError.message);
