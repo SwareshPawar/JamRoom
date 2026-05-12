@@ -538,40 +538,46 @@ nav a:hover {
     background: #545b62;
 }
 
-.btn-success {
-    background: var(--success-color);
-    color: white;
+/* Override secondary for colored variants */
+.btn.btn-success {
+    background: var(--success-color) !important;
+    color: white !important;
 }
 
-.btn-success:hover {
-    background: #218838;
+.btn.btn-success:hover {
+    background: #15803d !important;
 }
 
-.btn-danger {
-    background: var(--danger-color);
-    color: white;
+.btn.btn-danger {
+    background: var(--danger-color) !important;
+    color: white !important;
 }
 
-.btn-danger:hover {
-    background: #c82333;
+.btn.btn-danger:hover {
+    background: #b91c1c !important;
 }
 
-.btn-warning {
-    background: var(--warning-color);
-    color: var(--dark-color);
+.btn.btn-warning {
+    background: var(--warning-color) !important;
+    color: var(--dark-color) !important;
 }
 
-.btn-warning:hover {
-    background: #e0a800;
+.btn.btn-warning:hover {
+    background: #b45309 !important;
 }
 
-.btn-info {
-    background: var(--info-color);
-    color: white;
+.btn.btn-info {
+    background: var(--info-color) !important;
+    color: white !important;
 }
 
-.btn-info:hover {
-    background: #138496;
+.btn.btn-info:hover {
+    background: #0369a1 !important;
+}
+
+.btn.btn-primary {
+    background: var(--primary-gradient) !important;
+    color: white !important;
 }
 
 /* Button Sizes */

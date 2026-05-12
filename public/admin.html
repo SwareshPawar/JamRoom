@@ -7,7 +7,7 @@
     <script src="/js/shared/theme.js"></script>
     
     <!-- Shared CSS -->
-    <link rel="stylesheet" href="/css/shared.css">
+    <link rel="stylesheet" href="/css/shared.css?v=20260513c">
     <link rel="stylesheet" href="/css/vendor/flatpickr.min.css">
     
     <!-- Shared JavaScript Modules -->
@@ -29,12 +29,12 @@
     <script src="/js/admin/admin-bookings-edit.js"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
-    <script src="/js/admin/admin-open-events.js?v=20260512j"></script>
+    <script src="/js/admin/admin-open-events.js?v=20260513f"></script>
     <script src="/js/vendor/flatpickr.min.js"></script>
     
     <!-- Admin-specific styles -->
     
-    <link rel="stylesheet" href="/css/pages/admin.css">
+    <link rel="stylesheet" href="/css/pages/admin.css?v=20260513c">
 
 </head>
 <body>
@@ -100,14 +100,42 @@
                 <div id="openEventsAlert" class="alert"></div>
 
                 <div class="settings-tabs-nav" id="openEventsTabsNav">
-                    <button type="button" class="settings-tab-btn active" data-open-events-tab="create" onclick="switchOpenEventsTab('create', this)">➕ Create Open Event</button>
-                    <button type="button" class="settings-tab-btn" data-open-events-tab="existing" onclick="switchOpenEventsTab('existing', this)">📋 Existing Open Events</button>
+                    <button type="button" class="settings-tab-btn active" data-open-events-tab="events" onclick="switchOpenEventsTab('events', this)">🎤 Open Event</button>
                     <button type="button" class="settings-tab-btn" data-open-events-tab="drafts" onclick="switchOpenEventsTab('drafts', this)">📝 Draft Open Events</button>
                 </div>
 
-                <div class="settings-tab-pane active" data-open-events-pane="create">
-                    <div class="section admin-open-events-form-section">
-                        <h3>Create Open Event</h3>
+                <div class="settings-tab-pane active" data-open-events-pane="events">
+                    <div class="section">
+                        <div class="admin-toolbar">
+                            <h3>Open Events</h3>
+                            <button type="button" class="btn btn-primary" id="openEventCreateNewBtn" onclick="openOpenEventModal()">➕ Create New Event</button>
+                            <button type="button" class="btn btn-secondary" onclick="loadOpenEvents()">Refresh</button>
+                        </div>
+                        <div id="openEventsLoading" class="loading admin-hidden">Loading open events...</div>
+                        <div id="openEventsList"></div>
+                    </div>
+                </div>
+
+                <div class="settings-tab-pane" data-open-events-pane="drafts">
+                    <div class="section" id="openEventDraftTemplatesSection">
+                        <div class="admin-toolbar">
+                            <h3>Draft Open Events</h3>
+                            <button type="button" class="btn btn-secondary" onclick="loadOpenEvents()">Refresh</button>
+                        </div>
+                        <div id="openEventDraftTabs" class="settings-tabs-nav"></div>
+                        <div id="openEventDraftPanel" class="open-event-bookings-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Open Event Modal -->
+            <div id="openEventModal" class="modal admin-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="openEventModalTitle">Create Open Event</h2>
+                        <button type="button" class="close" onclick="closeOpenEventModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
                         <form id="openEventCreateForm" class="admin-open-event-form">
                             <div class="form-group">
                                 <label for="openEventTitle">Title*</label>
@@ -133,37 +161,12 @@
                                     <option value="">Pick start time first</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="openEventStatus">Status*</label>
-                                <select id="openEventStatus" required>
-                                    <option value="draft">Draft</option>
-                                    <option value="published">Published</option>
-                                </select>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="closeOpenEventModal()">Cancel</button>
+                                <button type="button" class="btn btn-outline" id="openEventSaveDraftBtn" onclick="submitOpenEventWithStatus('draft')">Save as Draft</button>
+                                <button type="submit" class="btn btn-primary" id="openEventCreateSubmit">Create Open Event</button>
                             </div>
-                            <button type="submit" class="btn btn-primary" id="openEventCreateSubmit">Create Open Event</button>
                         </form>
-                    </div>
-                </div>
-
-                <div class="settings-tab-pane" data-open-events-pane="existing">
-                    <div class="section">
-                        <div class="admin-toolbar">
-                            <h3>Existing Open Events</h3>
-                            <button type="button" class="btn btn-secondary" onclick="loadOpenEvents()">Refresh</button>
-                        </div>
-                        <div id="openEventsLoading" class="loading admin-hidden">Loading open events...</div>
-                        <div id="openEventsList"></div>
-                    </div>
-                </div>
-
-                <div class="settings-tab-pane" data-open-events-pane="drafts">
-                    <div class="section" id="openEventDraftTemplatesSection">
-                        <div class="admin-toolbar">
-                            <h3>Draft Open Events</h3>
-                            <button type="button" class="btn btn-secondary" onclick="loadOpenEvents()">Refresh</button>
-                        </div>
-                        <div id="openEventDraftTabs" class="settings-tabs-nav"></div>
-                        <div id="openEventDraftPanel" class="open-event-bookings-list"></div>
                     </div>
                 </div>
             </div>

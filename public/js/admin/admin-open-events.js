@@ -2,6 +2,8 @@
     const API_URL = window.location.origin;
     let openEventsCache = [];
     let activeDraftEventId = '';
+    let editingOpenEventId = '';
+    let draftStatusPending = false;
 
     const formatDateTimeLabel = (event) => `${event.date} | ${event.startTime} - ${event.endTime}`;
 
@@ -20,19 +22,26 @@
     });
 
     const showAlert = (message, type = 'success') => {
+        // Global signature: showAlert(message, type, title)
         if (typeof window.showAlert === 'function') {
-            window.showAlert('openEventsAlert', message, type);
+            window.showAlert(message, type, 'Open Events');
             return;
         }
 
+        // Fallback alert display
         const alertEl = document.getElementById('openEventsAlert');
         if (!alertEl) return;
         alertEl.textContent = message;
         alertEl.className = `alert alert-${type}`;
         alertEl.style.display = 'block';
-        window.setTimeout(() => {
-            alertEl.style.display = 'none';
-        }, 5000);
+        alertEl.style.opacity = '1';
+        alertEl.style.visibility = 'visible';
+        
+        if (type !== 'error') {
+            window.setTimeout(() => {
+                alertEl.style.display = 'none';
+            }, 5000);
+        }
     };
 
     const setLoading = (isLoading) => {
@@ -42,11 +51,55 @@
         loadingEl.style.display = isLoading ? 'flex' : 'none';
     };
 
+    const openOpenEventModal = () => {
+        draftStatusPending = false;
+        editingOpenEventId = '';
+        resetForm();
+        const modal = document.getElementById('openEventModal');
+        const titleEl = document.getElementById('openEventModalTitle');
+        if (modal) {
+            modal.classList.add('show');
+            if (titleEl) titleEl.textContent = 'Create Open Event';
+        }
+        document.body.style.overflow = 'hidden';
+    };
+
+    const closeOpenEventModal = () => {
+        const modal = document.getElementById('openEventModal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+        document.body.style.overflow = '';
+        resetForm();
+        draftStatusPending = false;
+        editingOpenEventId = '';
+    };
+
+    const submitOpenEventWithStatus = (status) => {
+        draftStatusPending = true;
+        const statusSelect = document.getElementById('openEventStatus');
+        if (statusSelect) {
+            statusSelect.value = status;
+        }
+        const form = document.getElementById('openEventCreateForm');
+        if (form) {
+            form.dispatchEvent(new Event('submit'));
+        }
+    };
+
     const toggleSubmit = (isSubmitting) => {
         const button = document.getElementById('openEventCreateSubmit');
+        const draftButton = document.getElementById('openEventSaveDraftBtn');
         if (!button) return;
+        
         button.disabled = isSubmitting;
-        button.textContent = isSubmitting ? 'Creating...' : 'Create Open Event';
+        if (draftButton) draftButton.disabled = isSubmitting;
+        
+        if (editingOpenEventId) {
+            button.textContent = isSubmitting ? 'Updating...' : 'Update Open Event';
+        } else {
+            button.textContent = isSubmitting ? 'Creating...' : 'Create Open Event';
+        }
     };
 
     const buildTimeSlots = (startHour = 9, endHour = 23) => {
@@ -83,8 +136,8 @@
 
     const renderEventCard = (event) => {
         const statusActions = event.status === 'published'
-            ? `<button type="button" class="btn btn-danger btn-sm admin-open-event-status-btn" data-event-id="${event.id}" data-status="cancelled">Cancel Event</button>`
-            : `<button type="button" class="btn btn-primary btn-sm admin-open-event-status-btn" data-event-id="${event.id}" data-status="published">Publish</button>`;
+            ? `<button type="button" class="btn btn-danger btn-sm admin-open-event-status-btn" data-event-id="${event.id}" data-status="draft" title="Move this event back to draft">Move to Draft</button>`
+            : `<button type="button" class="btn btn-primary btn-sm admin-open-event-status-btn" data-event-id="${event.id}" data-status="published" title="Publish this event">Publish</button>`;
 
         return `
             <article class="booking-expand-panel admin-theme-info-card" data-event-id="${event.id}">
@@ -93,9 +146,11 @@
                 <p>${escapeHtml(event.description || 'No description provided.')}</p>
                 <p>Status: <strong>${escapeHtml(event.status)}</strong> | Slots: ${event.slotCount} | Booked: ${event.bookingCount || 0}</p>
                 <div class="booking-table-actions">
-                    <button type="button" class="btn btn-secondary btn-sm admin-open-event-details-btn" data-event-id="${event.id}" data-event-title="${escapeHtml(event.title)}">View Slot Bookings</button>
-                    <button type="button" class="btn btn-secondary btn-sm admin-open-event-notify-btn" data-event-id="${event.id}">Send Notification</button>
-                    <button type="button" class="btn btn-secondary btn-sm admin-open-event-test-email-btn" data-event-id="${event.id}">Send Test Email</button>
+                    <button type="button" class="btn btn-warning btn-sm admin-open-event-edit-btn" data-event-id="${event.id}" title="Edit this event">✏️ Edit</button>
+                    <button type="button" class="btn btn-info btn-sm admin-open-event-details-btn" data-event-id="${event.id}" data-event-title="${escapeHtml(event.title)}" title="View slot bookings">📋 Bookings</button>
+                    <button type="button" class="btn btn-success btn-sm admin-open-event-notify-btn" data-event-id="${event.id}" title="Send to all users">📧 Notify</button>
+                    <button type="button" class="btn btn-secondary btn-sm admin-open-event-test-email-btn" data-event-id="${event.id}" title="Send test email">🧪 Test</button>
+                    <button type="button" class="btn btn-danger btn-sm admin-open-event-delete-btn" data-event-id="${event.id}" title="Delete this event">🗑️ Delete</button>
                     ${statusActions}
                 </div>
             </article>
@@ -212,10 +267,52 @@
         status: document.getElementById('openEventStatus')?.value || 'draft'
     });
 
+    const applyFormData = (eventData = {}) => {
+        const titleInput = document.getElementById('openEventTitle');
+        const descriptionInput = document.getElementById('openEventDescription');
+        const dateInput = document.getElementById('openEventDate');
+        const startSelect = document.getElementById('openEventStartTime');
+        const endSelect = document.getElementById('openEventEndTime');
+        const statusSelect = document.getElementById('openEventStatus');
+
+        if (titleInput) titleInput.value = eventData.title || '';
+        if (descriptionInput) descriptionInput.value = eventData.description || '';
+        if (dateInput) dateInput.value = eventData.date || '';
+        if (startSelect) startSelect.value = eventData.startTime || '';
+        populateOpenEventEndOptions();
+        if (endSelect) endSelect.value = eventData.endTime || '';
+        if (statusSelect) statusSelect.value = eventData.status || 'draft';
+    };
+
+    const clearEditState = () => {
+        editingOpenEventId = '';
+        draftStatusPending = false;
+    };
+
     const resetForm = () => {
         const form = document.getElementById('openEventCreateForm');
         if (form) form.reset();
+        clearEditState();
         syncOpenEventTimeSelects();
+    };
+
+    const startEditingEvent = (eventId) => {
+        const selectedEvent = openEventsCache.find((eventItem) => String(eventItem.id) === String(eventId));
+        if (!selectedEvent) {
+            showAlert('Open event not found for editing.', 'error');
+            return;
+        }
+
+        editingOpenEventId = String(selectedEvent.id);
+        applyFormData(selectedEvent);
+        
+        const modal = document.getElementById('openEventModal');
+        const titleEl = document.getElementById('openEventModalTitle');
+        if (modal) {
+            modal.classList.add('show');
+            if (titleEl) titleEl.textContent = 'Edit Open Event';
+        }
+        document.body.style.overflow = 'hidden';
     };
 
     const populateOpenEventStartOptions = () => {
@@ -320,7 +417,7 @@
         }
     };
 
-    const createOpenEvent = async (event) => {
+    const submitOpenEvent = async (event) => {
         event.preventDefault();
         const payload = collectFormData();
 
@@ -331,18 +428,31 @@
 
         try {
             toggleSubmit(true);
-            await request('/api/admin/open-events', {
-                method: 'POST',
-                body: payload
-            });
+            if (editingOpenEventId) {
+                await request(`/api/admin/open-events/${encodeURIComponent(editingOpenEventId)}`, {
+                    method: 'PATCH',
+                    body: payload
+                });
+                showAlert('Open event updated successfully.');
+            } else {
+                await request('/api/admin/open-events', {
+                    method: 'POST',
+                    body: payload
+                });
+                const message = draftStatusPending 
+                    ? 'Event saved as draft successfully.' 
+                    : 'Open event created successfully.';
+                showAlert(message);
+            }
+            closeOpenEventModal();
             resetForm();
-            showAlert('Open event created successfully.');
             await loadOpenEvents();
         } catch (error) {
-            console.error('Failed to create open event:', error);
-            showAlert(error.message || 'Failed to create open event', 'error');
+            console.error('Failed to save open event:', error);
+            showAlert(error.message || 'Failed to save open event', 'error');
         } finally {
             toggleSubmit(false);
+            draftStatusPending = false;
         }
     };
 
@@ -352,7 +462,7 @@
                 method: 'PATCH',
                 body: { status }
             });
-            showAlert(`Open event marked as ${status}.`);
+            showAlert(status === 'draft' ? 'Open event moved to draft.' : `Open event marked as ${status}.`);
             await loadOpenEvents();
         } catch (error) {
             console.error('Failed to update open event status:', error);
@@ -396,7 +506,7 @@
 
     const sendOpenEventTestEmail = async (eventId) => {
         const button = document.querySelector(`.admin-open-event-test-email-btn[data-event-id="${eventId}"]`);
-        const originalText = button?.textContent || 'Send Test Email';
+        const originalText = button?.textContent || '🧪 Test Email';
         
         try {
             if (button) {
@@ -428,11 +538,43 @@
         }
     };
 
+    const deleteOpenEvent = async (eventId) => {
+        const event_data = openEventsCache.find((e) => String(e.id) === String(eventId));
+        const eventTitle = event_data?.title || 'this event';
+        const confirmed = window.confirm(
+            `⚠️ DELETE OPEN EVENT\n\n` +
+            `Are you sure you want to delete "${eventTitle}"?\n\n` +
+            `This action cannot be undone. All associated slot bookings will also be deleted.\n\n` +
+            `Continue?`
+        );
+        if (!confirmed) return;
+
+        try {
+            setLoading(true);
+            await request(`/api/admin/open-events/${encodeURIComponent(eventId)}`, {
+                method: 'DELETE'
+            });
+            showAlert(`✅ Event "${eventTitle}" deleted successfully.`, 'success');
+            await loadOpenEvents();
+        } catch (error) {
+            console.error('Failed to delete open event:', error);
+            showAlert(error.message || 'Failed to delete event', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const bindEvents = () => {
         const form = document.getElementById('openEventCreateForm');
         if (form && !form.dataset.bound) {
-            form.addEventListener('submit', createOpenEvent);
+            form.addEventListener('submit', submitOpenEvent);
             form.dataset.bound = 'true';
+        }
+
+        const cancelEditButton = document.getElementById('openEventEditCancelBtn');
+        if (cancelEditButton && !cancelEditButton.dataset.bound) {
+            cancelEditButton.addEventListener('click', resetForm);
+            cancelEditButton.dataset.bound = 'true';
         }
 
         if (!document.body.dataset.adminOpenEventsBound) {
@@ -444,14 +586,39 @@
                     return;
                 }
 
+                const editButton = event.target.closest('.admin-open-event-edit-btn');
+                if (editButton) {
+                    const { eventId } = editButton.dataset;
+                    if (!eventId) return;
+                    startEditingEvent(eventId);
+                    return;
+                }
+
                 const statusButton = event.target.closest('.admin-open-event-status-btn');
                 if (statusButton) {
                     const { eventId, status } = statusButton.dataset;
                     if (!eventId || !status) return;
 
-                    const confirmed = window.confirm(`Change this event status to ${status}?`);
-                    if (!confirmed) return;
+                    const eventData = openEventsCache.find((e) => String(e.id) === String(eventId));
+                    const eventTitle = eventData?.title || 'this event';
+                    const isPublishAction = status === 'published';
 
+                    if (typeof showConfirmationModal === 'function') {
+                        const title = isPublishAction ? 'Publish Open Event' : 'Move Open Event To Draft';
+                        const message = isPublishAction
+                            ? `Are you sure you want to publish "${eventTitle}"?`
+                            : `Are you sure you want to move "${eventTitle}" to draft?`;
+                        const confirmText = isPublishAction ? 'Publish Event' : 'Move to Draft';
+
+                        showConfirmationModal(title, message, confirmText, () => {
+                            void updateStatus(eventId, status);
+                        });
+                        return;
+                    }
+
+                    const actionLabel = isPublishAction ? 'publish this event' : 'move this event to draft';
+                    const confirmed = window.confirm(`Are you sure you want to ${actionLabel}?`);
+                    if (!confirmed) return;
                     await updateStatus(eventId, status);
                     return;
                 }
@@ -460,7 +627,13 @@
                 if (notifyButton) {
                     const { eventId } = notifyButton.dataset;
                     if (!eventId) return;
-                    const confirmed = window.confirm('Send this Open Event email notification to all users?');
+                    const event_data = openEventsCache.find((e) => String(e.id) === String(eventId));
+                    const eventTitle = event_data?.title || 'this event';
+                    const confirmed = window.confirm(
+                        `⚠️ SEND NOTIFICATION TO ALL USERS\n\n` +
+                        `This will send the event notification for "${eventTitle}" to ALL users in the system.\n\n` +
+                        `Continue?`
+                    );
                     if (!confirmed) return;
                     await sendOpenEventNotification(eventId);
                     return;
@@ -471,6 +644,14 @@
                     const { eventId } = testEmailButton.dataset;
                     if (!eventId) return;
                     await sendOpenEventTestEmail(eventId);
+                    return;
+                }
+
+                const deleteButton = event.target.closest('.admin-open-event-delete-btn');
+                if (deleteButton) {
+                    const { eventId } = deleteButton.dataset;
+                    if (!eventId) return;
+                    await deleteOpenEvent(eventId);
                     return;
                 }
             });
@@ -503,7 +684,7 @@
         if (activeButton) activeButton.classList.add('active');
         if (activePane) activePane.classList.add('active');
 
-        if (tabName === 'existing') {
+        if (tabName === 'events') {
             await loadOpenEvents();
         }
         if (tabName === 'drafts') {
@@ -520,11 +701,19 @@
     window.AdminOpenEvents = {
         init,
         loadOpenEvents,
-        switchOpenEventsTab
+        switchOpenEventsTab,
+        openOpenEventModal,
+        closeOpenEventModal,
+        submitOpenEventWithStatus,
+        deleteOpenEvent
     };
 
     window.loadOpenEvents = loadOpenEvents;
     window.switchOpenEventsTab = switchOpenEventsTab;
+    window.openOpenEventModal = openOpenEventModal;
+    window.closeOpenEventModal = closeOpenEventModal;
+    window.submitOpenEventWithStatus = submitOpenEventWithStatus;
+    window.deleteOpenEvent = deleteOpenEvent;
 
     document.addEventListener('DOMContentLoaded', init);
 })();

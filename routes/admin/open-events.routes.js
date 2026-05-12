@@ -498,9 +498,13 @@ router.patch('/open-events/:id/status', protect, isAdmin, async (req, res) => {
       });
     }
 
+    // Product behavior: "cancel" means move event back to draft.
+    // Keep this endpoint status-only and side-effect free (no email send here).
+    const normalizedStatus = status === 'cancelled' ? 'draft' : status;
+
     const updates = {
-      status,
-      cancelledAt: status === 'cancelled' ? new Date() : null
+      status: normalizedStatus,
+      cancelledAt: null
     };
 
     const event = await OpenEvent.findByIdAndUpdate(req.params.id, updates, {
@@ -517,7 +521,9 @@ router.patch('/open-events/:id/status', protect, isAdmin, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Open event status updated successfully',
+      message: normalizedStatus === 'draft'
+        ? 'Open event moved to draft successfully'
+        : 'Open event status updated successfully',
       event: eventSummary(event)
     });
   } catch (error) {
@@ -685,6 +691,29 @@ router.post('/open-events/:id/test-email', protect, isAdmin, async (req, res) =>
   } catch (error) {
     console.error('Admin test open event email error:', error);
     res.status(500).json({ success: false, message: 'Failed to send test email' });
+  }
+});
+
+// DELETE open event
+router.delete('/open-events/:id', protect, isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const event = await OpenEvent.findByIdAndDelete(id);
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Open event not found' });
+    }
+    
+    // Also delete associated bookings
+    await OpenEventBooking.deleteMany({ event: id });
+    
+    res.json({
+      success: true,
+      message: 'Open event deleted successfully',
+      event
+    });
+  } catch (error) {
+    console.error('Delete open event error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete open event' });
   }
 });
 
