@@ -326,18 +326,20 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .service-group{border:1px solid #dbe5f0;border-radius:20px;overflow:hidden;margin-bottom:12px;background:#fff;break-inside:auto;page-break-inside:auto}
         .service-table{width:100%;border-collapse:collapse;table-layout:fixed}
         .service-group-head{display:table-header-group}
-        .service-group-head th{padding:0;border:0}
-        .service-group-header-initial,.service-group-header-repeat{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
-        .service-group-header-initial h3,.service-group-header-repeat h3{font-size:18px;margin-bottom:4px;color:#fff;font-weight:700}
-        .service-group-header-initial p,.service-group-header-repeat p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5;margin:0}
-        .service-group-subtotal-section{break-after:avoid;page-break-after:avoid}
+        .service-group-head th{padding:0;border:0;text-align:left}
+        .service-group-header{display:flex;justify-content:space-between;gap:16px;align-items:center;background:linear-gradient(135deg,#0f172a 0%,#1e2f57 100%);padding:16px 18px;color:#fff;break-after:avoid;page-break-after:avoid}
+        .service-group-header > div:first-child{display:flex;flex-direction:column;flex:1}
+        .service-group-header h3{font-size:18px;margin-bottom:4px;color:#fff;font-weight:700;margin:0}
+        .service-group-header p{font-size:12px;color:rgba(255,255,255,0.78);line-height:1.5;margin:0}
+        .service-group-subtotal-row td{padding:10px 18px 6px;border-bottom:1px solid #edf2f7}
+        .service-group-subtotal-inline{display:inline-block;float:right;font-size:14px;font-weight:800;white-space:nowrap;background:linear-gradient(135deg,#334155 0%,#1f2937 100%);border-radius:999px;padding:7px 11px;color:#fff}
         .service-group-subtotal{font-size:14px;font-weight:800;white-space:nowrap;background:rgba(255,255,255,0.12);border-radius:999px;padding:8px 12px;color:#fff;flex-shrink:0}
         .service-group-body{display:table-row-group}
-        .service-row td{padding:14px 0;border-bottom:1px solid #edf2f7;vertical-align:middle;break-inside:avoid;page-break-inside:avoid}
+        .service-row td{padding:14px 8px;border-bottom:1px solid #edf2f7;vertical-align:middle;break-inside:avoid;page-break-inside:avoid}
         .service-row:last-child td{border-bottom:0}
-        .service-col-copy{width:56%;padding-left:18px}
-        .service-col-meta{width:28%;text-align:right;padding-left:14px;padding-right:14px}
-        .service-col-amount{width:16%;text-align:right;padding-right:18px}
+        .service-col-copy{width:56%;padding-left:22px}
+        .service-col-meta{width:28%;text-align:right;padding-left:16px;padding-right:16px}
+        .service-col-amount{width:16%;text-align:right;padding-right:22px}
         .service-title{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
         .service-desc{font-size:12px;line-height:1.5;color:#64748b}
         .service-meta-top{font-size:13px;font-weight:700;color:#0f172a}
@@ -379,7 +381,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         .terms-list{margin:0;padding-left:16px;color:#7f1d1d}
         .terms-list li{margin:0 0 4px 0;font-size:12px;line-height:1.5}
         .footer{margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;line-height:1.6;text-align:center;break-inside:avoid;page-break-inside:avoid}
-                @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-row td,.info-card,.bill-grid,.totals-card,.payment-card,.terms-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-head{display:table-header-group}.service-group-subtotal-section{break-after:avoid;page-break-after:avoid}.service-group-header-initial,.service-group-header-repeat{break-after:avoid;page-break-after:avoid}}
+                @media print{body{background:white}.sheet{box-shadow:none;border-radius:0}.service-row td,.info-card,.bill-grid,.totals-card,.payment-card,.terms-card,.footer{break-inside:avoid;page-break-inside:avoid}.service-group{break-inside:auto;page-break-inside:auto}.service-group-head{display:table-header-group}.service-group-header{break-after:avoid;page-break-after:avoid}}
     </style>
 </head>
 <body>

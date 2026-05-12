@@ -1131,11 +1131,13 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
           <div style="font-size:12px;color:#166534;margin-top:4px;">You saved &#8377;${totalDiscountAmountForEmail.toFixed(2)} on this booking</div>
         </div>`
       : '';
-    const payableHighlightHtml = `<div style="margin:14px 0 10px;padding:14px 16px;border-radius:12px;border:1px solid ${outstandingAmount > 0 ? '#fca5a5' : '#86efac'};background:${outstandingAmount > 0 ? 'linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%)' : 'linear-gradient(135deg,#ecfdf3 0%,#d9fbe8 100%)'};">
-      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${outstandingAmount > 0 ? '#9a3412' : '#166534'};font-weight:800;">${outstandingAmount > 0 ? '&#9888;&#65039; Outstanding Balance' : '&#10003; Paid in Full'}</div>
-      <div style="margin-top:4px;font-size:34px;line-height:1.05;font-weight:900;color:${outstandingAmount > 0 ? '#7c2d12' : '#14532d'};">&#8377;${outstandingAmount.toFixed(2)}</div>
-      ${outstandingAmount > 0 ? `<div style="font-size:12px;color:#9a3412;margin-top:4px;">Please clear the balance before your scheduled slot</div>` : `<div style="font-size:12px;color:#166534;margin-top:4px;">Your account is fully settled &#10003;</div>`}
-    </div>`;
+    const payableHighlightHtml = outstandingAmount > 0
+      ? `<div style="margin:14px 0 10px;padding:14px 16px;border-radius:12px;border:1px solid #fca5a5;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);">
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#9a3412;font-weight:800;">&#9888;&#65039; Outstanding Balance</div>
+      <div style="margin-top:4px;font-size:34px;line-height:1.05;font-weight:900;color:#7c2d12;">&#8377;${outstandingAmount.toFixed(2)}</div>
+      <div style="font-size:12px;color:#9a3412;margin-top:4px;">Please clear the balance before your scheduled slot</div>
+    </div>`
+      : '';
     const emailSubject = `Invoice for Your ${settings?.studioName || 'JamRoom'} Booking - ${displayDate}`;
     const emailHtml = buildEbillEmailHtml({
       settings,

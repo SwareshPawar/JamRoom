@@ -153,6 +153,7 @@
     const state = {
         bookingsById: new Map(),
         allBookings: [],
+        selectedBookingIds: new Set(),
         formatDate: null,
         formatTime: null,
         searchTerm: '',
@@ -167,6 +168,43 @@
         searchDebounceTimer: null,
         loadDeps: null,
         classLessonContext: null
+    };
+
+    const getVisibleBookingIds = () => (Array.isArray(state.allBookings) ? state.allBookings : [])
+        .map((booking) => String(booking?._id || '').trim())
+        .filter(Boolean);
+
+    const pruneSelectionToVisible = () => {
+        const visibleIds = new Set(getVisibleBookingIds());
+        state.selectedBookingIds = new Set(
+            [...state.selectedBookingIds].filter((id) => visibleIds.has(id))
+        );
+    };
+
+    const syncBulkSelectionUi = () => {
+        const visibleIds = getVisibleBookingIds();
+        const visibleSelectedCount = visibleIds.filter((id) => state.selectedBookingIds.has(id)).length;
+        const allVisibleSelected = visibleIds.length > 0 && visibleSelectedCount === visibleIds.length;
+        const partiallySelected = visibleSelectedCount > 0 && !allVisibleSelected;
+
+        const selectAllCheckbox = document.getElementById('bookingsSelectAllVisible');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = allVisibleSelected;
+            selectAllCheckbox.indeterminate = partiallySelected;
+        }
+
+        const selectedCountLabel = document.getElementById('bookingsSelectedCount');
+        if (selectedCountLabel) {
+            selectedCountLabel.textContent = `${visibleSelectedCount} selected`;
+        }
+
+        const bulkDeleteBtn = document.getElementById('bookingsBulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.disabled = visibleSelectedCount === 0;
+            bulkDeleteBtn.textContent = visibleSelectedCount > 0
+                ? `Move Selected (${visibleSelectedCount})`
+                : 'Move Selected';
+        }
     };
 
     const getTodayYmd = () => {
@@ -374,7 +412,7 @@
                        <button onclick="${stopOrClose}downloadPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download PDF Bill">Download PDF</button>`
                     : ''}
                 <button onclick="${stopOrClose}editBooking('${booking._id}', ${serializedBooking})" class="btn btn-warning btn-sm">Edit</button>
-                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Delete</button>
+                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Move to Deleted</button>
             </div>
         `;
     };
@@ -694,6 +732,9 @@
             ? 0
             : ((Math.max(1, state.currentPage) - 1) * Math.max(1, state.pageSize)) + 1;
         const pageEnd = totalCount === 0 ? 0 : Math.min(totalCount, pageStart + Math.max(0, pageCount - 1));
+        const visibleIds = getVisibleBookingIds();
+        const visibleSelectedCount = visibleIds.filter((id) => state.selectedBookingIds.has(id)).length;
+        const allVisibleSelected = visibleIds.length > 0 && visibleSelectedCount === visibleIds.length;
 
         return `
             <div class="bookings-table-controls">
@@ -725,8 +766,93 @@
                     <option value="50" ${state.pageSize === 50 ? 'selected' : ''}>Show 50</option>
                 </select>
                 <div class="bookings-table-meta">Showing ${pageStart}-${pageEnd} of ${totalCount}</div>
+                <div class="bookings-bulk-controls">
+                    <label class="bookings-select-all-control">
+                        <input type="checkbox" id="bookingsSelectAllVisible" ${allVisibleSelected ? 'checked' : ''}>
+                        Select all on this page
+                    </label>
+                    <span id="bookingsSelectedCount" class="bookings-selected-count">${visibleSelectedCount} selected</span>
+                    <button type="button" id="bookingsBulkDeleteBtn" class="btn btn-danger btn-sm" ${visibleSelectedCount === 0 ? 'disabled' : ''}>${visibleSelectedCount > 0 ? `Move Selected (${visibleSelectedCount})` : 'Move Selected'}</button>
+                </div>
             </div>
         `;
+    };
+
+    const bulkDeleteSelectedBookings = async () => {
+        const deps = state.loadDeps || {};
+        const apiUrl = deps.apiUrl;
+
+        if (!apiUrl) {
+            notifyBookingAlert('Unable to delete right now. Please refresh and try again.', 'error');
+            return;
+        }
+
+        const visibleSelectedIds = getVisibleBookingIds().filter((id) => state.selectedBookingIds.has(id));
+        const deletableIds = visibleSelectedIds.filter((id) => {
+            const booking = state.bookingsById.get(id);
+            return booking && booking.isDeleted !== true;
+        });
+        const skippedCount = visibleSelectedIds.length - deletableIds.length;
+
+        if (deletableIds.length === 0) {
+            notifyBookingAlert('Select at least one active booking from the current page.', 'warning');
+            return;
+        }
+
+        const executeDeletion = async () => {
+            let successCount = 0;
+            let failedCount = 0;
+
+            try {
+                showBookingLoading(`Deleting ${deletableIds.length} booking(s)...`);
+                const token = localStorage.getItem('token');
+
+                for (const bookingId of deletableIds) {
+                    try {
+                        const res = await fetch(`${apiUrl}/api/admin/bookings/${bookingId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        if (res.ok) {
+                            successCount += 1;
+                        } else {
+                            failedCount += 1;
+                        }
+                    } catch (error) {
+                        failedCount += 1;
+                    }
+                }
+
+                state.selectedBookingIds.clear();
+
+                if (successCount > 0) {
+                    notifyBookingAlert(`${successCount} booking(s) moved to deleted records.${skippedCount > 0 ? ` ${skippedCount} skipped.` : ''}`, 'success');
+                }
+
+                if (failedCount > 0) {
+                    notifyBookingAlert(`${failedCount} booking(s) could not be deleted. Please retry.`, 'warning');
+                }
+
+                if (typeof deps.refreshStats === 'function') {
+                    await deps.refreshStats();
+                }
+
+                await loadBookings({ page: state.currentPage || 1, showLoader: false });
+            } finally {
+                hideBookingLoading();
+            }
+        };
+
+        const confirmationMessage = `Move ${deletableIds.length} selected booking(s) from this page to deleted records?${skippedCount > 0 ? `\n\n${skippedCount} already-deleted item(s) will be skipped.` : ''}`;
+        if (typeof deps.showConfirmationModal === 'function') {
+            deps.showConfirmationModal('Move Selected Bookings', confirmationMessage, 'Move to Deleted', executeDeletion);
+            return;
+        }
+
+        if (confirm(confirmationMessage)) {
+            await executeDeletion();
+        }
     };
 
     const bindTableControls = () => {
@@ -798,6 +924,51 @@
                 loadBookings({ page: Math.max(1, state.totalPages), showLoader: false });
             });
         }
+
+        const selectAllCheckbox = document.getElementById('bookingsSelectAllVisible');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', () => {
+                const shouldSelectAll = Boolean(selectAllCheckbox.checked);
+                const visibleIds = getVisibleBookingIds();
+                if (shouldSelectAll) {
+                    visibleIds.forEach((id) => state.selectedBookingIds.add(id));
+                } else {
+                    visibleIds.forEach((id) => state.selectedBookingIds.delete(id));
+                }
+
+                const rowCheckboxes = document.querySelectorAll('.booking-row-select');
+                rowCheckboxes.forEach((checkbox) => {
+                    checkbox.checked = shouldSelectAll;
+                });
+
+                syncBulkSelectionUi();
+            });
+        }
+
+        const rowCheckboxes = document.querySelectorAll('.booking-row-select');
+        rowCheckboxes.forEach((checkbox) => {
+            checkbox.addEventListener('change', () => {
+                const bookingId = String(checkbox.getAttribute('data-booking-id') || '').trim();
+                if (!bookingId) return;
+
+                if (checkbox.checked) {
+                    state.selectedBookingIds.add(bookingId);
+                } else {
+                    state.selectedBookingIds.delete(bookingId);
+                }
+
+                syncBulkSelectionUi();
+            });
+        });
+
+        const bulkDeleteBtn = document.getElementById('bookingsBulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.addEventListener('click', () => {
+                bulkDeleteSelectedBookings();
+            });
+        }
+
+        syncBulkSelectionUi();
     };
 
     const renderBookingsTableView = () => {
@@ -807,6 +978,7 @@
         }
 
         const visible = Array.isArray(state.allBookings) ? state.allBookings : [];
+        pruneSelectionToVisible();
         let html = buildTableControlsMarkup(visible.length);
 
         if ((Number(state.totalCount) || 0) === 0) {
@@ -823,10 +995,12 @@
             return;
         }
 
-        html += '<div class="table-container"><table><thead><tr><th>#</th><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status/Payment</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+        html += '<div class="table-container"><table><thead><tr><th class="bookings-select-col">Select</th><th>#</th><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status/Payment</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
 
         let serialNo = ((Math.max(1, state.currentPage) - 1) * Math.max(1, state.pageSize)) + 1;
         visible.forEach((booking) => {
+            const bookingId = String(booking._id || '');
+            const isSelected = state.selectedBookingIds.has(bookingId);
             const isPerday = booking.bookingMode === 'perday';
             const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
             const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
@@ -857,6 +1031,9 @@
 
             html += `
                 <tr class="booking-row-clickable" onclick="openBookingDetailsModal('${booking._id}')" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openBookingDetailsModal('${booking._id}'); }" tabindex="0">
+                    <td class="bookings-select-cell" onclick="event.stopPropagation();">
+                        <input type="checkbox" class="booking-row-select" data-booking-id="${bookingId}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation();" aria-label="Select booking ${serialNo}">
+                    </td>
                     <td class="table-serial-cell">${serialNo++}</td>
                     <td>${escapeHtml(userName)}<br><small>${escapeHtml(userEmail)}</small></td>
                     <td>${dateText}</td>

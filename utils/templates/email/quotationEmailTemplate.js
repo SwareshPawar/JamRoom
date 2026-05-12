@@ -1,3 +1,20 @@
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const buildNotesBulletHtml = (value) => {
+  const lines = String(value || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return '';
+  return `<ul style="margin:0;padding-left:18px;">${lines.map((line) => `<li style="margin:0 0 6px 0;">${escapeHtml(line)}</li>`).join('')}</ul>`;
+};
+
 const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', individualEmail = false, appLoginUrl }) => `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -113,6 +130,7 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
           <td style="padding:12px 20px;font-size:15px;color:#ffffff;font-weight:800;text-align:right;font-family:Arial,sans-serif;border-top:2px solid #334155;">${quotationPresentation.totalAmountLabel}</td>
         </tr>
       </table>
+      ${quotationPresentation.quoteNotes ? `<div class="notes-card"><div class="notes-hd">Additional Notes</div><div style="font-size:13px;line-height:1.7;color:#475569;">${buildNotesBulletHtml(quotationPresentation.quoteNotes)}</div></div>` : ''}
       <div class="cta">
         <div class="cta-title">To confirm your booking</div>
         <div class="cta-body">
@@ -131,7 +149,6 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
         <div class="offer-text">${quotationPresentation.offerLine}</div>
         <div class="offer-note">Reach out to us for special packages tailored to your project needs.</div>
       </div>
-      ${quotationPresentation.quoteNotes ? `<div class="notes-card"><div class="notes-hd">Additional Notes</div><div style="font-size:13px;line-height:1.7;color:#475569;">${quotationPresentation.quoteNotes}</div></div>` : ''}
       <div class="footer">
         <div style="margin:0 0 4px 0;">Visit JamRoom: <a href="${appLoginUrl}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:none;">${appLoginUrl}</a></div>
         <div>All rights reserved. ${quotationPresentation.studioName}</div>

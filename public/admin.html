@@ -1934,6 +1934,165 @@
             `;
         };
 
+        const getSelectedDeletedBookingIds = () => {
+            return Array.from(document.querySelectorAll('.deleted-booking-select:checked'))
+                .map((checkbox) => String(checkbox.getAttribute('data-booking-id') || '').trim())
+                .filter(Boolean);
+        };
+
+        window.syncDeletedBookingsSelectionUi = () => {
+            const checkboxes = Array.from(document.querySelectorAll('.deleted-booking-select'));
+            const selectedIds = getSelectedDeletedBookingIds();
+            const totalCount = checkboxes.length;
+            const selectedCount = selectedIds.length;
+
+            const selectAll = document.getElementById('deletedBookingsSelectAll');
+            if (selectAll) {
+                selectAll.checked = totalCount > 0 && selectedCount === totalCount;
+                selectAll.indeterminate = selectedCount > 0 && selectedCount < totalCount;
+            }
+
+            const selectedCountEl = document.getElementById('deletedBookingsSelectedCount');
+            if (selectedCountEl) {
+                selectedCountEl.textContent = `${selectedCount} selected`;
+            }
+
+            const deleteSelectedBtn = document.getElementById('deletedBookingsBulkDeleteBtn');
+            if (deleteSelectedBtn) {
+                deleteSelectedBtn.disabled = selectedCount === 0;
+                deleteSelectedBtn.textContent = selectedCount > 0
+                    ? `Delete Selected (${selectedCount})`
+                    : 'Delete Selected';
+            }
+        };
+
+        window.toggleDeletedBookingsSelectAll = (sourceCheckbox) => {
+            const shouldSelectAll = Boolean(sourceCheckbox?.checked);
+            document.querySelectorAll('.deleted-booking-select').forEach((checkbox) => {
+                checkbox.checked = shouldSelectAll;
+            });
+            window.syncDeletedBookingsSelectionUi();
+        };
+
+        window.bulkPermanentlyDeleteDeletedBookings = async () => {
+            const selectedIds = getSelectedDeletedBookingIds();
+            if (selectedIds.length === 0) {
+                showErrorAlert('Select at least one deleted booking to permanently delete.');
+                return;
+            }
+
+            showConfirmationModal(
+                'Permanent Delete Selected Bookings',
+                `Permanently delete ${selectedIds.length} selected booking(s)? This cannot be undone.`,
+                'Permanently Delete',
+                async () => {
+                    let successCount = 0;
+                    let failedCount = 0;
+
+                    try {
+                        showLoading(`Permanently deleting ${selectedIds.length} booking(s)...`);
+                        const token = localStorage.getItem('token');
+
+                        for (const bookingId of selectedIds) {
+                            try {
+                                const endpoint = `${API_URL}/api/admin/bookings/${encodeURIComponent(bookingId)}/permanent`;
+                                const res = await fetch(endpoint, {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+
+                                if (res.ok) {
+                                    successCount += 1;
+                                } else {
+                                    failedCount += 1;
+                                }
+                            } catch (error) {
+                                failedCount += 1;
+                            }
+                        }
+
+                        if (successCount > 0) {
+                            showSuccessAlert(`${successCount} booking(s) permanently deleted.`);
+                        }
+
+                        if (failedCount > 0) {
+                            showErrorAlert(`${failedCount} booking(s) could not be permanently deleted.`);
+                        }
+
+                        await loadDeletedRecords(true);
+                    } catch (error) {
+                        showErrorAlert(error.message || 'Failed to permanently delete selected bookings.');
+                    } finally {
+                        hideLoading();
+                    }
+                }
+            );
+        };
+
+        const renderDeletedBookingsTable = (bookings) => {
+            const rows = Array.isArray(bookings) ? bookings : [];
+
+            if (rows.length === 0) {
+                return `
+                    <div class="section">
+                        <h3>Bookings</h3>
+                        <p class="text-muted">No deleted records found.</p>
+                    </div>
+                `;
+            }
+
+            const tableRows = rows.map((booking) => `
+                <tr>
+                    <td class="deleted-bookings-select-cell">
+                        <input
+                            type="checkbox"
+                            class="deleted-booking-select"
+                            data-booking-id="${booking._id}"
+                            onchange="syncDeletedBookingsSelectionUi()"
+                            aria-label="Select deleted booking ${escapeHtml(booking?.userId?.name || booking?.userName || booking?._id || '')}"
+                        >
+                    </td>
+                    <td>${escapeHtml(booking?.userId?.name || booking?.userName || '-')}</td>
+                    <td>${escapeHtml(formatDate(booking?.date || booking?.perDayStartDate || booking?.createdAt || '-'))}</td>
+                    <td>${escapeHtml(booking?.deletedAt ? new Date(booking.deletedAt).toLocaleString('en-IN') : '-')}</td>
+                    <td>
+                        <div class="booking-table-actions">
+                            <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordBooking('${booking._id}')">Restore</button>
+                            <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordBooking('${booking._id}')">Permanent Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            return `
+                <div class="section">
+                    <h3>Bookings</h3>
+                    <div class="deleted-bookings-bulk-controls">
+                        <label class="deleted-bookings-select-all">
+                            <input type="checkbox" id="deletedBookingsSelectAll" onchange="toggleDeletedBookingsSelectAll(this)">
+                            Select all on this list
+                        </label>
+                        <span id="deletedBookingsSelectedCount" class="deleted-bookings-selected-count">0 selected</span>
+                        <button type="button" id="deletedBookingsBulkDeleteBtn" class="btn btn-danger btn-sm" onclick="bulkPermanentlyDeleteDeletedBookings()" disabled>Delete Selected</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="deleted-bookings-select-col">Select</th>
+                                    <th>Customer</th>
+                                    <th>Date</th>
+                                    <th>Deleted At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tableRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        };
+
         const deletedRecordsAction = async ({
             title,
             message,
@@ -2201,7 +2360,7 @@
                 const token = localStorage.getItem('token');
                 const headers = { 'Authorization': `Bearer ${token}` };
                 const deletedSources = [
-                    { key: 'bookings', label: 'Bookings', url: `${API_URL}/api/admin/bookings?deleted=deleted` },
+                    { key: 'bookings', label: 'Bookings', url: `${API_URL}/api/admin/bookings?deleted=deleted&limit=300&sortBy=created_desc` },
                     { key: 'users', label: 'Users', url: `${API_URL}/api/admin/users?deleted=deleted&limit=300` },
                     { key: 'blocked', label: 'Blocked Times', url: `${API_URL}/api/admin/blocked-times?deleted=deleted` },
                     { key: 'settings', label: 'Settings Records', url: `${API_URL}/api/admin/settings/deleted-summary` },
@@ -2262,23 +2421,7 @@
 
                 const sections = [];
 
-                sections.push(renderDeletedTable(
-                    'Bookings',
-                    ['Customer', 'Date', 'Deleted At', 'Actions'],
-                    deletedBookings.map((booking) => `
-                        <tr>
-                            <td>${escapeHtml(booking?.userId?.name || booking?.userName || '-')}</td>
-                            <td>${escapeHtml(formatDate(booking?.date || booking?.perDayStartDate || booking?.createdAt || '-'))}</td>
-                            <td>${escapeHtml(booking?.deletedAt ? new Date(booking.deletedAt).toLocaleString('en-IN') : '-')}</td>
-                            <td>
-                                <div class="booking-table-actions">
-                                    <button class="btn btn-success btn-sm" onclick="restoreDeletedRecordBooking('${booking._id}')">Restore</button>
-                                    <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteDeletedRecordBooking('${booking._id}')">Permanent Delete</button>
-                                </div>
-                            </td>
-                        </tr>
-                    `)
-                ));
+                sections.push(renderDeletedBookingsTable(deletedBookings));
 
                 sections.push(renderDeletedTable(
                     'Users',
@@ -2418,6 +2561,7 @@
                     : '';
 
                 container.innerHTML = warningHtml + renderDeletedRecordsTabs(tabSections);
+                window.syncDeletedBookingsSelectionUi?.();
             } catch (error) {
                 container.innerHTML = `<div class="text-danger">${escapeHtml(error.message || 'Failed to load deleted records')}</div>`;
             }
@@ -2769,7 +2913,12 @@
                 apiUrl: API_URL,
                 showSectionLoading,
                 formatDate,
-                formatTime
+                formatTime,
+                showConfirmationModal,
+                showLoading,
+                hideLoading,
+                showAlert,
+                refreshStats: loadStats
             });
         };
 

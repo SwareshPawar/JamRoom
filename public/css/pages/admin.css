@@ -291,6 +291,36 @@
     text-align: right;
 }
 
+.bookings-bulk-controls {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.bookings-select-all-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.bookings-selected-count {
+    color: var(--text-color-light);
+    font-size: 0.9rem;
+}
+
+.bookings-select-col,
+.bookings-select-cell {
+    width: 72px;
+    text-align: center;
+}
+
+.bookings-select-cell input[type="checkbox"] {
+    transform: scale(1.05);
+}
+
 #bookingsTable .table-container {
     width: 100%;
     max-width: 100%;
@@ -1325,6 +1355,31 @@ table {
     table {
         font-size: 0.9em;
     }
+.deleted-bookings-bulk-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.deleted-bookings-select-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+.deleted-bookings-selected-count {
+    color: var(--text-color-light);
+    font-size: 0.9rem;
+}
+.deleted-bookings-select-col,
+.deleted-bookings-select-cell {
+    width: 72px;
+    text-align: center;
+}
+.deleted-bookings-select-cell input[type="checkbox"] {
+    transform: scale(1.05);
+}
 
     .deleted-records-tabs {
         flex-wrap: nowrap;
@@ -1701,6 +1756,14 @@ table td small {
 @media (max-width: 768px) {
     .bookings-table-controls {
         grid-template-columns: 1fr;
+    }
+
+    .bookings-bulk-controls {
+        align-items: stretch;
+    }
+
+    .bookings-bulk-controls .btn {
+        width: 100%;
     }
 
     .booking-quick-payment-grid {
