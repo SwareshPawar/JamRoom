@@ -55,3 +55,21 @@ Use this set for all customer-facing status badges/cards:
 ## Admin-Only Labels
 
 Labels like `Admin Notification`, `Admin Review`, and `Admin Action` are still valid for admin-recipient emails and do not affect customer-facing status cards.
+
+## Final Verification (Complete Pass)
+
+Date: 2026-05-12
+
+1. Greeting placement standardized for customer booking notifications:
+- `Hi <username>` is now provided through `greeting` (body area) instead of being embedded as the first intro line.
+
+2. Status labels verified in customer admin-action flows:
+- `Deleted`, `Updated`, `Approved`, and `Booked` are active in customer-facing messages.
+
+3. Studio contact email source verified:
+- Invoice-style and related route callsites use `settings.adminEmails[0]` (`studioEmail: settings?.adminEmails?.[0] || ''`).
+
+4. Files updated in final pass:
+- `routes/booking.routes.js`
+- `routes/admin/bookings.routes.js`
+- `routes/auth.routes.js`

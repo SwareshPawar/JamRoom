@@ -429,9 +429,8 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
               studioEmail: settings?.adminEmails?.[0] || '',
               title: 'Booking Request Update',
               label: 'Rejected',
-              greeting: '',
+              greeting: `Hi ${pendingBooking.userName},`,
               introLines: [
-                `Hi ${pendingBooking.userName},`,
                 `Unfortunately, your booking request for ${formatBookingDisplayDate(pendingBooking.date)} from ${formatTime12Hour(pendingBooking.startTime)} to ${formatTime12Hour(pendingBooking.endTime)} has been automatically rejected due to a scheduling conflict with another confirmed booking.`
               ],
               summaryTitle: 'Request Details',
@@ -743,9 +742,8 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Class Slot Approved',
           label: 'Approved',
-          greeting: '',
+          greeting: `Hi ${booking.userName || 'Student'},`,
           introLines: [
-            `Hi ${booking.userName || 'Student'},`,
             'Your slot request has been approved! Here are your confirmed class details.'
           ],
           summaryTitle: 'Slot Details',
@@ -934,9 +932,8 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
             studioEmail: settings?.adminEmails?.[0] || '',
             title: 'Class Slot Booked',
             label: 'Booked',
-            greeting: '',
+            greeting: `Hi ${booking.userName || 'Student'},`,
             introLines: [
-              `Hi ${booking.userName || 'Student'},`,
               'Your class slot has been booked by the studio team.'
             ],
             summaryTitle: 'Slot Details',
@@ -1288,9 +1285,8 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Update',
           label: 'Declined',
-          greeting: '',
+          greeting: `Hi ${booking.userName},`,
           introLines: [
-            `Hi ${booking.userName},`,
             'Unfortunately, your booking request has been declined.'
           ],
           summaryTitle: 'Booking Details',
@@ -1382,9 +1378,8 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Deleted',
           label: 'Deleted',
-          greeting: '',
+          greeting: `Hi ${booking.userName},`,
           introLines: [
-            `Hi ${booking.userName},`,
             'Your booking has been deleted by the admin team.'
           ],
           summaryTitle: 'Deleted Booking Details',
@@ -1788,9 +1783,8 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Updated',
           label: 'Updated',
-          greeting: '',
+          greeting: `Hi ${booking.userName},`,
           introLines: [
-            `Hi ${booking.userName},`,
             'Your booking has been updated by the admin team.'
           ],
           summaryTitle: 'Updated Booking Details',

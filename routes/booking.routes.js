@@ -1235,11 +1235,10 @@ router.post('/', protect, async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Request',
           label: 'Received',
-          greeting: '',
+          greeting: `Hi ${req.user.name},`,
           badgeLabel: 'Catalog Type',
           badgeValue: rentalTypeSummary || 'General',
           introLines: [
-            `Hi ${req.user.name},`,
             'Your booking request has been received and is pending admin approval.'
           ],
           summaryTitle: 'Booking Details',
@@ -1772,9 +1771,8 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
             studioEmail: settings?.adminEmails?.[0] || '',
             title: 'Class Slot Request',
             label: 'Submitted',
-            greeting: '',
+            greeting: `Hi ${req.user.name},`,
             introLines: [
-              `Hi ${req.user.name},`,
               'Your slot request has been submitted and is awaiting admin approval.'
             ],
             summaryTitle: 'Requested Slot',
@@ -1915,9 +1913,8 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Cancellation Notice',
           label: 'Booking Cancelled',
-          greeting: '',
+          greeting: `Hi ${req.user.name},`,
           introLines: [
-            `Hi ${req.user.name},`,
             'Your booking has been cancelled.'
           ],
           summaryTitle: 'Cancelled Booking Details',

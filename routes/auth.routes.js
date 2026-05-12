@@ -218,7 +218,7 @@ router.post('/forgot-password', async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Security Link',
           label: 'Password Reset',
-          greeting: 'Hello,',
+          greeting: `Hi ${user.name || 'there'},`,
           introLines: [
             'You requested a password reset. Use the secure link below to set a new password for your JamRoom account.',
             'This link expires in 30 minutes. If you did not request this change, you can safely ignore this email.'
