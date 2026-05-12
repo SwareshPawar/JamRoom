@@ -200,14 +200,21 @@ body {
 }
 
 .app-header {
-    background: var(--primary-gradient);
     color: var(--text-inverse);
-    padding: 24px 22px;
+    padding: 0;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: flex-end;
+    justify-content: flex-end;
     gap: 14px;
     min-width: 0;
+    position: relative;
+    aspect-ratio: 1755 / 674;
+    width: 100%;
+    background-image: url('/icons/header-image.jpg');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: center;
+    overflow: hidden;
 }
 
 .app-header h1 {
@@ -218,11 +225,7 @@ body {
 }
 
 .app-brand {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
+    display: none;
 }
 
 .app-brand-logo {
@@ -263,7 +266,7 @@ body {
 
 .app-header-greeting {
     margin: 0;
-    display: inline-flex;
+    display: none;
     align-items: center;
     justify-content: center;
     align-self: flex-end;
@@ -282,10 +285,14 @@ body {
 .app-header-actions {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: center;
     gap: 8px;
     min-width: 0;
+    position: absolute;
+    bottom: 3.5%;
+    right: 2.5%;
+    width: 14%;
 }
 
 .app-header-actions-primary {
@@ -1654,11 +1661,19 @@ textarea:disabled {
     }
 
     .app-header {
-        padding: 10px;
+        padding: 0 10px 10px;
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
+        justify-content: flex-start;
         gap: 8px;
-        overflow-x: clip;
+        overflow: visible;
+        aspect-ratio: unset;
+        min-height: unset;
+        background-image: url('/icons/header-image.jpg');
+        background-size: 100% auto;
+        background-repeat: no-repeat;
+        background-position: top center;
+        padding-top: calc(100% * 674 / 1755);
     }
 
     .app-header h1 {
@@ -1668,7 +1683,22 @@ textarea:disabled {
     }
 
     .app-brand {
+        display: none;
+        position: static;
+        transform: none;
         align-items: center;
+        gap: 6px;
+    }
+
+    .app-header-actions {
+        position: static;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        align-items: stretch;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
         gap: 6px;
     }
 
@@ -1788,35 +1818,37 @@ details[open] > .lesson-accordion-header::after {
     }
 
     .app-header-greeting {
-        width: 100%;
-        justify-content: flex-start;
-        align-self: stretch;
+        display: none;
         font-size: 0.88rem;
         padding: 8px 10px;
     }
 
     .app-header-actions {
         width: 100%;
+        min-width: 0;
+        max-width: none;
+        position: static;
         align-items: stretch;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        justify-content: flex-start;
+        gap: 6px;
     }
 
     .app-header-actions-primary {
         width: 100%;
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+        grid-template-columns: 1fr;
+        gap: 6px;
     }
 
     .app-header-actions-primary .btn,
     .app-header-actions-primary a {
         width: 100%;
         text-align: center;
-        padding: 10px 12px;
-        font-size: 0.9rem;
-        min-height: 40px;
+        padding: 8px 10px;
+        font-size: 0.82rem;
+        min-height: 34px;
         min-width: 0;
         white-space: normal;
         overflow-wrap: anywhere;

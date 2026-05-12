@@ -167,9 +167,11 @@
 
                     previewEl.hidden = false;
                     previewEl.innerHTML = `
-                        <p><strong>${String(nextEvent.title || 'Open Event')}</strong></p>
-                        <p>${String(nextEvent.date || '')} | ${String(nextEvent.startTime || '')} - ${String(nextEvent.endTime || '')}</p>
-                        <p>${Number(nextEvent.slotCount || 0)} total slot(s)</p>
+                        <a href="${eventLink}" class="open-events-preview-card-link">
+                            <p><strong>${String(nextEvent.title || 'Open Event')}</strong></p>
+                            <p>${String(nextEvent.date || '')} | ${String(nextEvent.startTime || '')} - ${String(nextEvent.endTime || '')}</p>
+                            <p>${Number(nextEvent.slotCount || 0)} total slot(s)</p>
+                        </a>
                     `;
                 } catch (error) {
                     console.error('Failed to load next open event widget:', error);
