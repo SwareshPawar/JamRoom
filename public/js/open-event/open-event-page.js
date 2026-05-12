@@ -292,12 +292,21 @@
 
                         const stateText = isMine
                             ? 'Booked by you'
-                            : (isBooked ? `Booked by ${this.escapeHtml(slot.bookedByFirstName || 'User')}` : (isPast ? 'Past slot' : 'Available'));
+                            : (isBooked
+                                ? (slot.bookedByName
+                                    ? `Booked by ${this.escapeHtml(slot.bookedByName)}`
+                                    : 'Booked')
+                                : (isPast ? 'Past slot' : 'Available'));
+
+                        const adminMetaHtml = (!isMine && isBooked && slot.bookedByPhone)
+                            ? `<p class="open-event-slot-state">Phone: ${this.escapeHtml(slot.bookedByPhone)}</p>`
+                            : '';
 
                         return `
                             <div class="${classes}">
                                 <p class="open-event-slot-label">${this.escapeHtml(slot.startTime)} - ${this.escapeHtml(slot.endTime)}</p>
                                 <p class="open-event-slot-state">${stateText}</p>
+                                ${adminMetaHtml}
                                 ${actionHtml}
                             </div>
                         `;

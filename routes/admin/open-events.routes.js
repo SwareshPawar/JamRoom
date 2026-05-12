@@ -221,7 +221,7 @@ router.get('/open-events/:id/bookings', protect, isAdmin, async (req, res) => {
     const bookings = await OpenEventBooking.find({
       eventId: event._id,
       status: 'confirmed'
-    }).populate('userId', 'name email').sort({ slotIndex: 1, createdAt: 1 });
+    }).populate('userId', 'name email mobile').sort({ slotIndex: 1, createdAt: 1 });
 
     const startMinutes = parseTimeToMinutes(event.startTime);
 
@@ -236,8 +236,10 @@ router.get('/open-events/:id/bookings', protect, isAdmin, async (req, res) => {
         slotEndTime: formatMinutesToTime(startMinutes + ((booking.slotIndex + 1) * event.slotDuration)),
         userId: booking.userId,
         userFirstName: booking.userFirstName,
+        userFullName: String(booking.userId?.name || '').trim(),
         userName: String(booking.userId?.name || booking.userFirstName || '').trim(),
         userEmail: String(booking.userId?.email || '').trim(),
+        userPhone: String(booking.userId?.mobile || '').trim(),
         createdAt: booking.createdAt
       }))
     });

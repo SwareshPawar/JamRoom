@@ -37,6 +37,7 @@
         const loadingEl = document.getElementById('openEventsLoading');
         if (!loadingEl) return;
         loadingEl.classList.toggle('admin-hidden', !isLoading);
+        loadingEl.style.display = isLoading ? 'flex' : 'none';
     };
 
     const toggleSubmit = (isSubmitting) => {
@@ -115,8 +116,9 @@
                                 <span class="open-event-booking-slot-badge">Slot ${Number(booking.slotIndex) + 1}</span>
                                 <span class="open-event-booking-time">${escapeHtml(booking.slotStartTime || '--:--')} - ${escapeHtml(booking.slotEndTime || '--:--')}</span>
                             </div>
-                            <p><strong>Name:</strong> ${escapeHtml(booking.userName || booking.userFirstName || 'User')}</p>
+                            <p><strong>Full Name:</strong> ${escapeHtml(booking.userFullName || booking.userName || booking.userFirstName || 'User')}</p>
                             <p><strong>Email:</strong> ${escapeHtml(booking.userEmail || 'Not available')}</p>
+                            ${booking.userPhone ? `<p><strong>Phone:</strong> ${escapeHtml(booking.userPhone)}</p>` : ''}
                             <p><strong>Booked At:</strong> ${booking.createdAt ? new Date(booking.createdAt).toLocaleString('en-IN') : 'N/A'}</p>
                         </article>
                     `).join('')
@@ -258,6 +260,27 @@
         }
     };
 
+    const switchOpenEventsTab = async (tabName, buttonEl) => {
+        const root = document.getElementById('openEventsTab');
+        if (!root) return;
+
+        root.querySelectorAll('[data-open-events-tab]').forEach((btn) => {
+            btn.classList.remove('active');
+        });
+        root.querySelectorAll('[data-open-events-pane]').forEach((pane) => {
+            pane.classList.remove('active');
+        });
+
+        const activeButton = buttonEl || root.querySelector(`[data-open-events-tab="${tabName}"]`);
+        const activePane = root.querySelector(`[data-open-events-pane="${tabName}"]`);
+        if (activeButton) activeButton.classList.add('active');
+        if (activePane) activePane.classList.add('active');
+
+        if (tabName === 'existing') {
+            await loadOpenEvents();
+        }
+    };
+
     const init = () => {
         initPickers();
         bindEvents();
@@ -265,10 +288,12 @@
 
     window.AdminOpenEvents = {
         init,
-        loadOpenEvents
+        loadOpenEvents,
+        switchOpenEventsTab
     };
 
     window.loadOpenEvents = loadOpenEvents;
+    window.switchOpenEventsTab = switchOpenEventsTab;
 
     document.addEventListener('DOMContentLoaded', init);
 })();

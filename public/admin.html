@@ -29,7 +29,7 @@
     <script src="/js/admin/admin-bookings-edit.js"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
-    <script src="/js/admin/admin-open-events.js"></script>
+    <script src="/js/admin/admin-open-events.js?v=20260512d"></script>
     <script src="/js/vendor/flatpickr.min.js"></script>
     
     <!-- Admin-specific styles -->
@@ -99,47 +99,56 @@
                 </div>
                 <div id="openEventsAlert" class="alert"></div>
 
-                <div class="section admin-open-events-form-section">
-                    <h3>Create Open Event</h3>
-                    <form id="openEventCreateForm" class="admin-open-event-form">
-                        <div class="form-group">
-                            <label for="openEventTitle">Title*</label>
-                            <input type="text" id="openEventTitle" required maxlength="120" placeholder="Open Mic Friday">
-                        </div>
-                        <div class="form-group">
-                            <label for="openEventDescription">Description</label>
-                            <textarea id="openEventDescription" rows="3" maxlength="1000" placeholder="Tell performers what this event is about."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="openEventDate">Date*</label>
-                            <input type="text" id="openEventDate" required placeholder="Select date">
-                        </div>
-                        <div class="form-group">
-                            <label for="openEventStartTime">Start Time*</label>
-                            <input type="text" id="openEventStartTime" required placeholder="Select start time">
-                        </div>
-                        <div class="form-group">
-                            <label for="openEventEndTime">End Time*</label>
-                            <input type="text" id="openEventEndTime" required placeholder="Select end time">
-                        </div>
-                        <div class="form-group">
-                            <label for="openEventStatus">Status*</label>
-                            <select id="openEventStatus" required>
-                                <option value="draft">Draft</option>
-                                <option value="published">Published</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary" id="openEventCreateSubmit">Create Open Event</button>
-                    </form>
+                <div class="settings-tabs-nav" id="openEventsTabsNav">
+                    <button type="button" class="settings-tab-btn active" data-open-events-tab="create" onclick="switchOpenEventsTab('create', this)">➕ Create Open Event</button>
+                    <button type="button" class="settings-tab-btn" data-open-events-tab="existing" onclick="switchOpenEventsTab('existing', this)">📋 Existing Open Events</button>
                 </div>
 
-                <div class="section">
-                    <div class="admin-toolbar">
-                        <h3>Existing Open Events</h3>
-                        <button type="button" class="btn btn-secondary" onclick="loadOpenEvents()">Refresh</button>
+                <div class="settings-tab-pane active" data-open-events-pane="create">
+                    <div class="section admin-open-events-form-section">
+                        <h3>Create Open Event</h3>
+                        <form id="openEventCreateForm" class="admin-open-event-form">
+                            <div class="form-group">
+                                <label for="openEventTitle">Title*</label>
+                                <input type="text" id="openEventTitle" required maxlength="120" placeholder="Open Mic Friday">
+                            </div>
+                            <div class="form-group">
+                                <label for="openEventDescription">Description</label>
+                                <textarea id="openEventDescription" rows="3" maxlength="1000" placeholder="Tell performers what this event is about."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="openEventDate">Date*</label>
+                                <input type="text" id="openEventDate" required placeholder="Select date">
+                            </div>
+                            <div class="form-group">
+                                <label for="openEventStartTime">Start Time*</label>
+                                <input type="text" id="openEventStartTime" required placeholder="Select start time">
+                            </div>
+                            <div class="form-group">
+                                <label for="openEventEndTime">End Time*</label>
+                                <input type="text" id="openEventEndTime" required placeholder="Select end time">
+                            </div>
+                            <div class="form-group">
+                                <label for="openEventStatus">Status*</label>
+                                <select id="openEventStatus" required>
+                                    <option value="draft">Draft</option>
+                                    <option value="published">Published</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="openEventCreateSubmit">Create Open Event</button>
+                        </form>
                     </div>
-                    <div id="openEventsLoading" class="loading admin-hidden">Loading open events...</div>
-                    <div id="openEventsList"></div>
+                </div>
+
+                <div class="settings-tab-pane" data-open-events-pane="existing">
+                    <div class="section">
+                        <div class="admin-toolbar">
+                            <h3>Existing Open Events</h3>
+                            <button type="button" class="btn btn-secondary" onclick="loadOpenEvents()">Refresh</button>
+                        </div>
+                        <div id="openEventsLoading" class="loading admin-hidden">Loading open events...</div>
+                        <div id="openEventsList"></div>
+                    </div>
                 </div>
             </div>
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 const OpenEvent = require('../models/OpenEvent');
 const OpenEventBooking = require('../models/OpenEventBooking');
 const AdminSettings = require('../models/AdminSettings');
@@ -73,7 +74,7 @@ const resolveUserIdFromAuthorization = (authorizationHeader) => {
   }
 };
 
-const buildSlots = ({ event, confirmedBookings, myBookingSlotIndex }) => {
+const buildSlots = ({ event, confirmedBookings, myBookingSlotIndex, includeBookedNames }) => {
   const slotCount = event.getSlotCount();
   const startMinutes = parseTimeToMinutes(event.startTime);
   const now = new Date();
@@ -103,7 +104,12 @@ const buildSlots = ({ event, confirmedBookings, myBookingSlotIndex }) => {
       startTime: slotStartTime,
       endTime: slotEndTime,
       status,
-      bookedByFirstName: booking?.userFirstName || '',
+      bookedByName: includeBookedNames && booking
+        ? String(booking.userId?.name || booking.userFirstName || '').trim()
+        : '',
+      bookedByPhone: includeBookedNames && booking
+        ? String(booking.userId?.mobile || '').trim()
+        : '',
       isMine: typeof myBookingSlotIndex === 'number' && myBookingSlotIndex === index
     };
   });
@@ -167,17 +173,20 @@ router.get('/:id', async (req, res) => {
     const confirmedBookings = await OpenEventBooking.find({
       eventId: event._id,
       status: 'confirmed'
-    }).sort({ slotIndex: 1 });
+    }).populate('userId', 'name mobile').sort({ slotIndex: 1 });
 
     const requestUserId = resolveUserIdFromAuthorization(req.headers.authorization);
+    let includeBookedNames = false;
     let myBookingSlotIndex = null;
 
     if (requestUserId) {
-      const myBooking = confirmedBookings.find((booking) => String(booking.userId) === requestUserId);
+      const requestUser = await User.findById(requestUserId).select('role');
+      includeBookedNames = String(requestUser?.role || '').toLowerCase() === 'admin';
+      const myBooking = confirmedBookings.find((booking) => String(booking.userId?._id || booking.userId) === requestUserId);
       myBookingSlotIndex = myBooking ? myBooking.slotIndex : null;
     }
 
-    const slots = buildSlots({ event, confirmedBookings, myBookingSlotIndex });
+    const slots = buildSlots({ event, confirmedBookings, myBookingSlotIndex, includeBookedNames });
 
     res.json({
       success: true,
