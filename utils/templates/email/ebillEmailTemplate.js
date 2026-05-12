@@ -83,27 +83,18 @@ const buildEbillEmailHtml = ({
       <table class="hdr-table" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">
         <tr>
           <td class="hdr-left" style="vertical-align:top;padding-right:12px;">
-            <table cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
-              <tr>
-                <td style="vertical-align:middle;padding-right:10px;">
-                  <img src="${BRAND_LOGO_EMAIL_URL}" alt="${settings?.studioName || 'JamRoom'} Logo" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:10px;object-fit:contain;background:#ffffff;padding:4px;border:1px solid rgba(255,255,255,0.3);" />
-                </td>
-                <td style="vertical-align:middle;">
-                  <h2 style="margin:0;font-size:18px;color:#fff;">${settings?.studioName || 'JamRoom'}</h2>
-                </td>
-              </tr>
-            </table>
-            <div class="cl"><strong>Invoice Date:</strong> ${displayDate}</div>
+            ${settings?.logoDataUri || settings?.logoImageUrl ? `<img src="${settings?.logoDataUri || settings?.logoImageUrl}" alt="${settings?.studioName || 'JamRoom'} Logo" width="48" height="48" style="border-radius:10px;margin-bottom:8px;display:block;max-width:100%;">` : ''}
+            <h2 style="margin:0 0 6px 0;font-size:20px;color:#fff;">${settings?.studioName || 'JamRoom'}</h2>
             ${settings?.studioAddress ? `<div class="cl"><strong>Address:</strong> ${settings.studioAddress}</div>` : ''}
             ${settings?.studioPhone ? `<div class="cl"><strong>Phone / WhatsApp:</strong> ${settings.studioPhone}</div>` : ''}
             <div class="cl"><strong>Email:</strong> ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</div>
           </td>
           <td class="hdr-right" style="vertical-align:top;width:200px;min-width:160px;">
             <div class="order-box">
-              <div class="order-kicker">Invoice Summary</div>
-              <div class="order-line"><strong>Customer:</strong> ${booking.userName}</div>
-              <div class="order-line"><strong>Service:</strong> ${booking.rentalType}</div>
-              <div class="order-line"><strong>Total:</strong> ₹${totalAmount.toFixed(2)}</div>
+                <div class="order-kicker">Invoice Summary</div>
+                <div class="order-line"><strong>Booking Date:</strong> ${displayDate}</div>
+                <div class="order-line"><strong>Service:</strong> ${booking.rentalType}</div>
+                <div class="order-line"><strong>Total:</strong> ₹${totalAmount.toFixed(2)}</div>
             </div>
           </td>
         </tr>

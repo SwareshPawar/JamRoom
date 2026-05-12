@@ -21,7 +21,10 @@ const buildRowsHtml = (rows = []) => rows
 
 const buildInvoiceStyleEmail = ({
   brandName = 'JamRoom',
-  brandSubtitle = 'Swar JamRoom & Music Studio',
+  brandSubtitle = '',
+  studioAddress = '',
+  studioPhone = '',
+  studioEmail = '',
   logoUrl = DEFAULT_BRAND_LOGO_URL,
   title = 'Update',
   label = 'Activity Update',
@@ -134,14 +137,17 @@ const buildInvoiceStyleEmail = ({
                   </td>
                 </tr>
               </table>
-              <div class="cl"><strong>${label}</strong></div>
-              ${badgeLabel ? `<div class="cl"><strong>${badgeLabel}:</strong> ${badgeValue}</div>` : ''}
-              <div class="cl">${brandSubtitle}</div>
+              ${studioAddress ? `<div class="cl"><strong>Address:</strong> ${studioAddress}</div>` : ''}
+              ${studioPhone ? `<div class="cl"><strong>Phone / WhatsApp:</strong> ${studioPhone}</div>` : ''}
+              ${studioEmail ? `<div class="cl"><strong>Email:</strong> ${studioEmail}</div>` : ''}
+              ${brandSubtitle ? `<div class="cl">${brandSubtitle}</div>` : ''}
             </td>
             <td class="hdr-right">
               <div class="order-box">
                 <div class="order-kicker">${title}</div>
                 ${greeting ? `<div class="order-line">${greeting}</div>` : ''}
+                ${label ? `<div class="order-line"><strong>Status:</strong> ${label}</div>` : ''}
+                ${badgeLabel ? `<div class="order-line"><strong>${badgeLabel}:</strong> ${badgeValue}</div>` : ''}
                 ${linkUrl ? `<div class="order-line"><strong>${linkLabel || 'Link'}:</strong> <span style="word-break:break-all;">${linkUrl}</span></div>` : ''}
               </div>
             </td>
