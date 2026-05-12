@@ -742,7 +742,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
           studioPhone: settings?.studioPhone || '',
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Class Slot Approved',
-          label: 'Student Notification',
+          label: 'Approved',
           greeting: '',
           introLines: [
             `Hi ${booking.userName || 'Student'},`,
@@ -933,7 +933,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
             studioPhone: settings?.studioPhone || '',
             studioEmail: settings?.adminEmails?.[0] || '',
             title: 'Class Slot Booked',
-            label: 'Student Notification',
+            label: 'Booked',
             greeting: '',
             introLines: [
               `Hi ${booking.userName || 'Student'},`,
@@ -1381,7 +1381,7 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
           studioPhone: settings?.studioPhone || '',
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Deleted',
-          label: 'Admin Action',
+          label: 'Deleted',
           greeting: '',
           introLines: [
             `Hi ${booking.userName},`,
@@ -1787,7 +1787,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
           studioPhone: settings?.studioPhone || '',
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Updated',
-          label: 'Admin Update',
+          label: 'Updated',
           greeting: '',
           introLines: [
             `Hi ${booking.userName},`,

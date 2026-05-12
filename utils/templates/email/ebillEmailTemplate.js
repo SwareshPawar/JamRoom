@@ -27,7 +27,27 @@ const buildEbillEmailHtml = ({
   frontendBookingUrl,
   appLoginUrl,
   timeRangeLabel
-}) => `<!DOCTYPE html>
+}) => {
+  const normalizedBookingStatus = String(bookingStatusLabel || '').trim().toUpperCase();
+  const bookingStatusBadgeLabel = normalizedBookingStatus || 'CONFIRMED';
+  const bookingStatusDescription = normalizedBookingStatus === 'PENDING'
+    ? 'Your booking is pending confirmation from our team.'
+    : normalizedBookingStatus === 'CONFIRMED'
+      ? 'Your booking slot is confirmed and reserved.'
+      : normalizedBookingStatus === 'CANCELLED'
+        ? 'This booking has been cancelled.'
+        : normalizedBookingStatus === 'REJECTED'
+          ? 'This booking request was not approved.'
+          : 'Your booking status has been updated.';
+  const bookingStatusBadgeStyle = normalizedBookingStatus === 'PENDING'
+    ? 'border:1px solid #fcd34d;background:#fef3c7;color:#92400e;'
+    : normalizedBookingStatus === 'CONFIRMED'
+      ? 'border:1px solid #86efac;background:#dcfce7;color:#166534;'
+      : normalizedBookingStatus === 'CANCELLED' || normalizedBookingStatus === 'REJECTED'
+        ? 'border:1px solid #fca5a5;background:#fee2e2;color:#991b1b;'
+        : 'border:1px solid #cbd5e1;background:#e2e8f0;color:#334155;';
+
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -51,7 +71,7 @@ const buildEbillEmailHtml = ({
   .sc-title{font-size:15px;font-weight:800;color:#0f172a;margin-bottom:4px}
   .sc-sub{font-size:12px;line-height:1.6;color:#475569}
   .status-pill{display:inline-block;padding:3px 10px;border-radius:12px;border:1px solid ${paymentStatusBorder};background:${paymentStatusBackground};color:${paymentStatusColor};font-weight:700;white-space:nowrap}
-  .confirm-pill{display:inline-block;padding:3px 10px;border-radius:12px;border:1px solid #86efac;background:#dcfce7;color:#166534;font-weight:700;white-space:nowrap}
+  .confirm-pill{display:inline-block;padding:3px 10px;border-radius:12px;font-weight:700;white-space:nowrap}
   .booking-card,.notes-card{background:#fff;border:1px solid #dbe5f0;border-radius:10px;padding:12px 14px;margin-bottom:12px}
   .booking-card h3{color:#1d4ed8;margin:0 0 8px 0;font-size:14px}
   .detail-table{width:100%;border-collapse:collapse}
@@ -109,8 +129,8 @@ const buildEbillEmailHtml = ({
           <td class="status-card-left" style="vertical-align:top;padding-right:6px;width:50%;">
             <div class="sc">
               <div class="sc-kicker">Booking Status</div>
-              <div class="sc-title"><span class="confirm-pill">${bookingStatusLabel}</span></div>
-              <div class="sc-sub">Your booking slot is confirmed and reserved.</div>
+              <div class="sc-title"><span class="confirm-pill" style="${bookingStatusBadgeStyle}">${bookingStatusBadgeLabel}</span></div>
+              <div class="sc-sub">${bookingStatusDescription}</div>
             </div>
           </td>
           <td class="status-card-right" style="vertical-align:top;padding-left:6px;width:50%;">
@@ -173,6 +193,7 @@ const buildEbillEmailHtml = ({
 </div>
 </body>
 </html>`;
+};
 
 module.exports = {
   buildEbillEmailHtml

@@ -436,6 +436,16 @@ const resolveAdminNotificationEmails = async (settings = null) => {
   return Array.from(recipients);
 };
 
+const getBookingStatusDisplayLabel = (status) => {
+  const normalized = String(status || '').trim().toUpperCase();
+  if (normalized === 'PENDING') return 'Pending';
+  if (normalized === 'CONFIRMED') return 'Confirmed';
+  if (normalized === 'CANCELLED') return 'Cancelled';
+  if (normalized === 'REJECTED') return 'Rejected';
+  if (normalized === 'COMPLETED') return 'Completed';
+  return normalized || 'Confirmed';
+};
+
 const sendUnifiedBookingConfirmationEmails = async ({
   settings,
   booking,
@@ -461,6 +471,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
     : 0;
   const totalDiscountAmount = bookingLevelDiscount + classPlanDiscountAmount;
   const payableNowLabel = dueAmount > 0 ? 'Payable Now' : 'Paid in Full';
+  const bookingStatusDisplayLabel = getBookingStatusDisplayLabel(booking.bookingStatus);
   const classSessionHtml = classSession.isClassBooking
     ? `
           <li><strong>Class Instrument:</strong> ${classSession.instrument || 'Music'}</li>
@@ -517,6 +528,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
     <div style="margin:0 0 14px;padding:14px 16px;border-radius:12px;border:1px solid ${dueAmount > 0 ? '#fca5a5' : '#86efac'};background:${dueAmount > 0 ? 'linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%)' : 'linear-gradient(135deg,#ecfdf3 0%,#d9fbe8 100%)'};">
       <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${dueAmount > 0 ? '#9a3412' : '#166534'};font-weight:800;">${payableNowLabel}</div>
       <div style="margin-top:4px;font-size:34px;line-height:1.05;font-weight:900;color:${dueAmount > 0 ? '#7c2d12' : '#14532d'};">₹${dueAmount.toFixed(2)}</div>
+      ${totalDiscountAmount > 0 ? `<div style="margin-top:4px;font-size:12px;color:${dueAmount > 0 ? '#9a3412' : '#166534'};">Discount included: -₹${totalDiscountAmount.toFixed(2)}</div>` : ''}
     </div>
   `;
 
@@ -531,7 +543,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
         studioPhone: settings?.studioPhone || '',
         studioEmail: settings?.adminEmails?.[0] || '',
         title: 'Booking Confirmed',
-        label: 'Customer Notification',
+        label: bookingStatusDisplayLabel,
         greeting: `Hi ${booking.userName},`,
         introLines: ['Your booking request has been successfully confirmed by our team.'],
         summaryTitle: 'Booking Details',
