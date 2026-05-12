@@ -36,6 +36,14 @@
 - **Context-Safe Module Pattern**: Any JS module loaded on more than one page (e.g. `booking-bookings.js`) must null-guard DOM lookups and exit gracefully when page-specific containers are absent. Do not assume Book Now form context when the module is reused on Account/My Bookings/Lesson Tracker.
 - **Experience Role Pattern (Planned)**: Use `experienceRoles[]` on the User model for UX branching; never overload the `role` auth field with UI behaviour. Role-based navigation and layout changes should read from `experienceRoles`, not `role`.
 
+### **May 2026 Notification Standards**
+- **Customer Greeting Placement**: Use the `greeting` field for customer salutations (for example: `Hi <name>,`) in `buildInvoiceStyleEmail` flows. Do not place greeting text as the first `introLines` entry.
+- **Admin Greeting Pattern**: Keep admin/staff recipient greetings as team-oriented copy (for example: `Hello Team,`).
+- **Customer Status Label Policy**: Use explicit state labels in header status cards. Preferred labels: `Pending`, `Confirmed`, `Cancelled`, `Rejected`, `Updated`, `Deleted`, `Approved`, `Booked`.
+- **No Generic Customer Status Labels**: Avoid generic labels for user-facing updates (for example: `Admin Action`, `Admin Update`, `Student Notification`, `Customer Notification`).
+- **Studio Email Source of Truth**: For invoice-style email headers, always pass `studioEmail` from Admin Settings (`settings.adminEmails[0]`) and never hardcode fallback addresses.
+- **Current Route Coverage**: Booking request/slot request/cancellation in `routes/booking.routes.js`; admin booking approve/reject/edit/delete/slot actions in `routes/admin/bookings.routes.js`; auth and account emails in `routes/auth.routes.js` and `routes/admin/users.routes.js` must follow the same greeting/status/email-source rules.
+
 ---
 
 ## 🎨 **FRONTEND DEVELOPMENT PATTERNS**
