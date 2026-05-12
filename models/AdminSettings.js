@@ -733,15 +733,12 @@ adminSettingsSchema.statics.getSettings = async function() {
       .map((email) => String(email || '').trim().toLowerCase())
       .filter(Boolean)
     : [];
-  const replacedAdminEmails = normalizedAdminEmails.map((email) =>
-    email === 'swareshpawar@gmail.com' ? 'swarjrs@gmail.com' : email
-  );
 
-  if (replacedAdminEmails.length === 0) {
+  if (normalizedAdminEmails.length === 0) {
     settings.adminEmails = ['swarjrs@gmail.com'];
     needsSave = true;
-  } else if (JSON.stringify(replacedAdminEmails) !== JSON.stringify(normalizedAdminEmails)) {
-    settings.adminEmails = replacedAdminEmails;
+  } else if (JSON.stringify(settings.adminEmails) !== JSON.stringify(normalizedAdminEmails)) {
+    settings.adminEmails = normalizedAdminEmails;
     needsSave = true;
   }
   

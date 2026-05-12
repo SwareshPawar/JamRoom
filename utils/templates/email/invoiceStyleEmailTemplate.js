@@ -145,7 +145,6 @@ const buildInvoiceStyleEmail = ({
             <td class="hdr-right">
               <div class="order-box">
                 <div class="order-kicker">${title}</div>
-                ${greeting ? `<div class="order-line">${greeting}</div>` : ''}
                 ${label ? `<div class="order-line"><strong>Status:</strong> ${label}</div>` : ''}
                 ${badgeLabel ? `<div class="order-line"><strong>${badgeLabel}:</strong> ${badgeValue}</div>` : ''}
                 ${linkUrl ? `<div class="order-line"><strong>${linkLabel || 'Link'}:</strong> <span style="word-break:break-all;">${linkUrl}</span></div>` : ''}
@@ -155,6 +154,7 @@ const buildInvoiceStyleEmail = ({
         </table>
       </div>
       <div class="body">
+        ${greeting ? `<p style="margin:0 0 10px 0;font-size:15px;color:#0f172a;">${greeting}</p>` : ''}
         ${intro}
         ${highlightHtml ? `<div class="highlight">${highlightHtml}</div>` : ''}
         ${summaryRows.length > 0 ? `

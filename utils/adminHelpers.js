@@ -4,7 +4,6 @@
  * All pure helpers, constants, and cross-cutting admin logic live here.
  */
 
-const User = require('../models/User');
 const { sendEmail } = require('./email');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -13,11 +12,6 @@ const { buildInvoiceStyleEmail } = require('./templates/email/invoiceStyleEmailT
 const DEFAULT_ADMIN_CREATED_USER_PASSWORD = 'Qwerty123';
 const DEFAULT_APP_LOGIN_URL = 'https://jam-room-mu.vercel.app/';
 const ADMIN_DELETE_OWNER_EMAIL = 'swareshpawar@gmail.com';
-const ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS = [
-  'priyankasoren69075@gmail.com',
-  'vinitapawar2912@gmail.com',
-  'swareshpawar@gmail.com'
-];
 const IST_TIMEZONE = 'Asia/Kolkata';
 
 // ─── Time Formatting ──────────────────────────────────────────────────────────
@@ -433,67 +427,11 @@ const normalizePaymentTracking = ({
 const resolveAdminNotificationEmails = async (settings = null) => {
   const recipients = new Set();
 
-  // Always include key recipients for booking confirmations.
-  ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS.forEach((email) => {
-    const normalized = normalizeEmail(email);
-    if (normalized) recipients.add(normalized);
-  });
-
-  // Admin recipients from settings.
+  // Single source of truth: Admin > Settings > Admin Emails
   (settings?.adminEmails || []).forEach((email) => {
     const normalized = normalizeEmail(email);
     if (normalized) recipients.add(normalized);
   });
-
-  // Admin recipients from user accounts (covers newly granted admins).
-  const adminUsers = await User.find({ role: 'admin' }).select('email');
-  adminUsers.forEach((adminUser) => {
-    const normalized = normalizeEmail(adminUser.email);
-    if (normalized) recipients.add(normalized);
-  });
-
-  // Include engineer/staff contacts configured in WhatsApp settings by resolving
-  // their mobile numbers to registered user accounts with emails.
-  const whatsappSettings = settings?.whatsappNotifications || {};
-  const roleContactLast10Numbers = new Set();
-
-  if (whatsappSettings.businessNotifications?.bookingConfirmations && whatsappSettings.businessNumber) {
-    const normalizedBusinessMobile = normalizeMobileLast10(whatsappSettings.businessNumber);
-    if (normalizedBusinessMobile) {
-      roleContactLast10Numbers.add(normalizedBusinessMobile);
-    }
-  }
-
-  if (Array.isArray(whatsappSettings.notificationNumbers)) {
-    whatsappSettings.notificationNumbers.forEach((contact) => {
-      if (contact?.notifications?.bookingConfirmations && contact?.number) {
-        const normalizedMobile = normalizeMobileLast10(contact.number);
-        if (normalizedMobile) {
-          roleContactLast10Numbers.add(normalizedMobile);
-        }
-      }
-    });
-  }
-
-  if (roleContactLast10Numbers.size > 0) {
-    const usersWithMobile = await User.find({
-      mobile: { $exists: true, $ne: null }
-    }).select('email mobile');
-
-    usersWithMobile.forEach((user) => {
-      const userMobileLast10 = normalizeMobileLast10(user.mobile);
-      if (userMobileLast10 && roleContactLast10Numbers.has(userMobileLast10)) {
-        const normalized = normalizeEmail(user.email);
-        if (normalized) recipients.add(normalized);
-      }
-    });
-  }
-
-  // Owner fallback so owner always receives confirmed-booking email alerts.
-  const ownerEmail = normalizeEmail(ADMIN_DELETE_OWNER_EMAIL);
-  if (ownerEmail) {
-    recipients.add(ownerEmail);
-  }
 
   return Array.from(recipients);
 };
@@ -506,8 +444,8 @@ const sendUnifiedBookingConfirmationEmails = async ({
   customerExtraHtml = ''
 }) => {
   const displayDate = formatBookingDisplayDate(booking.date);
-  const studioName = settings.studioName || 'Swar JamRoom';
-  const studioLabel = settings.studioName || 'Swar JamRoom Studio';
+  const studioName = settings.studioName || 'JamRoom';
+  const studioLabel = settings.studioName || 'JamRoom';
   const collectedAmount = computeCollectedAmount({
     totalAmount: booking.price,
     paymentStatus: booking.paymentStatus,
@@ -588,6 +526,10 @@ const sendUnifiedBookingConfirmationEmails = async ({
       to: booking.userEmail,
       subject: `Booking Confirmed - ${studioName}`,
       html: buildInvoiceStyleEmail({
+        brandName: settings?.studioName || 'JamRoom',
+        studioAddress: settings?.studioAddress || '',
+        studioPhone: settings?.studioPhone || '',
+        studioEmail: settings?.adminEmails?.[0] || '',
         title: 'Booking Confirmed',
         label: 'Customer Notification',
         greeting: `Hi ${booking.userName},`,
@@ -641,6 +583,10 @@ const sendUnifiedBookingConfirmationEmails = async ({
           to: adminEmail,
           subject: `Booking Approved - ${studioLabel}`,
           html: buildInvoiceStyleEmail({
+            brandName: settings?.studioName || 'JamRoom',
+            studioAddress: settings?.studioAddress || '',
+            studioPhone: settings?.studioPhone || '',
+            studioEmail: settings?.adminEmails?.[0] || '',
             title: 'Booking Approved',
             label: 'Admin Notification',
             greeting: 'Hello Team,',
@@ -681,7 +627,6 @@ module.exports = {
   DEFAULT_ADMIN_CREATED_USER_PASSWORD,
   DEFAULT_APP_LOGIN_URL,
   ADMIN_DELETE_OWNER_EMAIL,
-  ALWAYS_NOTIFY_BOOKING_CONFIRM_EMAILS,
   // Time
   formatTime12Hour,
   formatTimeRange12Hour,

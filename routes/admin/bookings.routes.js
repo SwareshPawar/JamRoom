@@ -421,7 +421,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
         try {
           await sendEmail({
             to: pendingBooking.userEmail,
-            subject: `Booking Request Update - ${settings.studioName || 'Swar JamRoom'}`,
+            subject: `Booking Request Update - ${settings.studioName || 'JamRoom'}`,
             html: buildInvoiceStyleEmail({
               brandName: settings?.studioName || 'JamRoom',
               studioAddress: settings?.studioAddress || '',
@@ -429,8 +429,9 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
               studioEmail: settings?.adminEmails?.[0] || '',
               title: 'Booking Request Update',
               label: 'Rejected',
-              greeting: `Hi ${pendingBooking.userName},`,
+              greeting: '',
               introLines: [
+                `Hi ${pendingBooking.userName},`,
                 `Unfortunately, your booking request for ${formatBookingDisplayDate(pendingBooking.date)} from ${formatTime12Hour(pendingBooking.startTime)} to ${formatTime12Hour(pendingBooking.endTime)} has been automatically rejected due to a scheduling conflict with another confirmed booking.`
               ],
               summaryTitle: 'Request Details',
@@ -455,14 +456,14 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
     const calendarInvite = booking.classSession?.isClassBooking
       ? null
       : generateCalendarInvite({
-          title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
+          title: `${settings.studioName || 'JamRoom'} Booking - ${booking.rentalType}`,
           description: `Booking confirmed for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
           location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
           startDate: formatDateAsYmdInIst(new Date(booking.date)),
           startTime: booking.startTime,
           endTime: booking.endTime,
           attendees: [booking.userEmail, ...adminNotificationEmails],
-          studioName: settings.studioName || 'Swar JamRoom',
+          studioName: settings.studioName || 'JamRoom',
           uid: booking.calendarUid,
           sequence: booking.calendarSequence,
           method: 'REQUEST',
@@ -711,14 +712,14 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
       let calendarInvite = null;
       try {
         calendarInvite = generateCalendarInvite({
-          title: `${settings.studioName || 'Swar JamRoom'} – ${classItem} Class`,
+          title: `${settings.studioName || 'JamRoom'} – ${classItem} Class`,
           description: `Class slot confirmed for ${booking.userName || ''}`,
-          location: booking.classSession?.location || settings.studioAddress || 'Swar JamRoom & Music Studio',
+          location: booking.classSession?.location || settings.studioAddress || 'JamRoom Studio',
           startDate: slotDateStr,
           startTime,
           endTime,
           attendees: [booking.userEmail, ...adminNotificationEmails].filter(Boolean),
-          studioName: settings.studioName || 'Swar JamRoom',
+          studioName: settings.studioName || 'JamRoom',
           uid: `lesson-${booking._id}-${id}@${process.env.CALENDAR_UID_DOMAIN || 'jamroom.local'}`,
           sequence: 0,
           method: 'REQUEST',
@@ -742,8 +743,11 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Class Slot Approved',
           label: 'Student Notification',
-          greeting: `Hi ${booking.userName || 'Student'},`,
-          introLines: ['Your slot request has been approved! Here are your confirmed class details.'],
+          greeting: '',
+          introLines: [
+            `Hi ${booking.userName || 'Student'},`,
+            'Your slot request has been approved! Here are your confirmed class details.'
+          ],
           summaryTitle: 'Slot Details',
           summaryRows: [
             { label: 'Class', value: classItem },
@@ -898,14 +902,14 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
       let calendarInvite = null;
       try {
         calendarInvite = generateCalendarInvite({
-          title: `${settings.studioName || 'Swar JamRoom'} – ${classItem} Class`,
+          title: `${settings.studioName || 'JamRoom'} – ${classItem} Class`,
           description: `Class slot booked for ${booking.userName || ''}`,
-          location: booking.classSession?.location || settings.studioAddress || 'Swar JamRoom & Music Studio',
+          location: booking.classSession?.location || settings.studioAddress || 'JamRoom Studio',
           startDate: slotDateStr,
           startTime,
           endTime,
           attendees: [booking.userEmail, ...adminNotificationEmails].filter(Boolean),
-          studioName: settings.studioName || 'Swar JamRoom',
+          studioName: settings.studioName || 'JamRoom',
           uid: `lesson-${booking._id}-${lessonId}@${process.env.CALENDAR_UID_DOMAIN || 'jamroom.local'}`,
           sequence: 0,
           method: 'REQUEST',
@@ -930,8 +934,11 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
             studioEmail: settings?.adminEmails?.[0] || '',
             title: 'Class Slot Booked',
             label: 'Student Notification',
-            greeting: `Hi ${booking.userName || 'Student'},`,
-            introLines: ['Your class slot has been booked by the studio team.'],
+            greeting: '',
+            introLines: [
+              `Hi ${booking.userName || 'Student'},`,
+              'Your class slot has been booked by the studio team.'
+            ],
             summaryTitle: 'Slot Details',
             summaryRows: [
               { label: 'Class', value: classItem },
@@ -1273,7 +1280,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
     try {
       await sendEmail({
         to: booking.userEmail,
-        subject: `Booking Update - ${settings.studioName || 'Swar JamRoom Studio'}`,
+        subject: `Booking Update - ${settings.studioName || 'JamRoom'}`,
         html: buildInvoiceStyleEmail({
           brandName: settings?.studioName || 'JamRoom',
           studioAddress: settings?.studioAddress || '',
@@ -1281,8 +1288,11 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Update',
           label: 'Declined',
-          greeting: `Hi ${booking.userName},`,
-          introLines: ['Unfortunately, your booking request has been declined.'],
+          greeting: '',
+          introLines: [
+            `Hi ${booking.userName},`,
+            'Unfortunately, your booking request has been declined.'
+          ],
           summaryTitle: 'Booking Details',
           summaryRows: [
             { label: 'Date', value: displayDate },
@@ -1364,7 +1374,7 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
     try {
       await sendEmail({
         to: booking.userEmail,
-        subject: `Booking Deleted - ${settings.studioName || 'Swar JamRoom'}`,
+        subject: `Booking Deleted - ${settings.studioName || 'JamRoom'}`,
         html: buildInvoiceStyleEmail({
           brandName: settings?.studioName || 'JamRoom',
           studioAddress: settings?.studioAddress || '',
@@ -1372,8 +1382,11 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Deleted',
           label: 'Admin Action',
-          greeting: `Hi ${booking.userName},`,
-          introLines: ['Your booking has been deleted by the admin team.'],
+          greeting: '',
+          introLines: [
+            `Hi ${booking.userName},`,
+            'Your booking has been deleted by the admin team.'
+          ],
           summaryTitle: 'Deleted Booking Details',
           summaryRows: [
             { label: 'Date', value: displayDate },
@@ -1749,14 +1762,14 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
     const displayDate = formatBookingDisplayDate(booking.date);
     const updateInvite = (booking.bookingStatus === 'CONFIRMED' && hasCalendarRelevantChange)
       ? generateCalendarInvite({
-          title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
+          title: `${settings.studioName || 'JamRoom'} Booking - ${booking.rentalType}`,
           description: `Booking updated for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
           location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
           startDate: updatedDateYmd,
           startTime: booking.startTime,
           endTime: booking.endTime,
           attendees: [booking.userEmail],
-          studioName: settings.studioName || 'Swar JamRoom',
+          studioName: settings.studioName || 'JamRoom',
           uid: booking.calendarUid,
           sequence: booking.calendarSequence,
           method: 'REQUEST',
@@ -1767,7 +1780,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
     try {
       await sendEmail({
         to: booking.userEmail,
-        subject: `Booking Updated - ${settings.studioName || 'Swar JamRoom'}`,
+        subject: `Booking Updated - ${settings.studioName || 'JamRoom'}`,
         html: buildInvoiceStyleEmail({
           brandName: settings?.studioName || 'JamRoom',
           studioAddress: settings?.studioAddress || '',
@@ -1775,8 +1788,11 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Updated',
           label: 'Admin Update',
-          greeting: `Hi ${booking.userName},`,
-          introLines: ['Your booking has been updated by the admin team.'],
+          greeting: '',
+          introLines: [
+            `Hi ${booking.userName},`,
+            'Your booking has been updated by the admin team.'
+          ],
           summaryTitle: 'Updated Booking Details',
           summaryRows: [
             { label: 'Date', value: displayDate },
@@ -2147,14 +2163,14 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     }).join('\n');
 
     const calendarInvite = generateCalendarInvite({
-      title: `${settings.studioName || 'Swar JamRoom'} Booking - ${rentalTypeSummary}`,
+      title: `${settings.studioName || 'JamRoom'} Booking - ${rentalTypeSummary}`,
       description: `Booking confirmed for ${selectedUser.name}${bandName ? ` (${bandName})` : ''}`,
       location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
       startDate: formatDateAsYmdInIst(new Date(bookingDate)),
       startTime: effectiveStartTime,
       endTime: effectiveEndTime,
       attendees: [selectedUser.email, ...adminNotificationEmails],
-      studioName: settings.studioName || 'Swar JamRoom',
+      studioName: settings.studioName || 'JamRoom',
       uid: booking.calendarUid,
       sequence: booking.calendarSequence,
       method: 'REQUEST',

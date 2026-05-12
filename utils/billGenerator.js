@@ -401,10 +401,6 @@ const getPrimaryStudioEmail = (settings) => {
       .find((email) => Boolean(email))
     : '';
 
-  if (configuredEmail === 'swareshpawar@gmail.com') {
-    return 'swarjrs@gmail.com';
-  }
-
   return configuredEmail || 'swarjrs@gmail.com';
 };
 

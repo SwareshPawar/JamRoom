@@ -124,6 +124,10 @@ router.post('/users', protect, isAdmin, async (req, res) => {
         to: user.email,
         subject: `Your ${settings.studioName || 'JamRoom'} Account Invite`,
         html: buildInvoiceStyleEmail({
+          brandName: settings?.studioName || 'JamRoom',
+          studioAddress: settings?.studioAddress || '',
+          studioPhone: settings?.studioPhone || '',
+          studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Admin Invite',
           label: 'Account Created by Admin',
           greeting: `Hi ${user.name},`,
@@ -561,8 +565,12 @@ router.post('/make-admin', protect, isAdmin, async (req, res) => {
     try {
       await sendEmail({
         to: email,
-        subject: `Admin Access Granted - ${settings.studioName || 'Swar JamRoom Studio'}`,
+        subject: `Admin Access Granted - ${settings.studioName || 'JamRoom'}`,
         html: buildInvoiceStyleEmail({
+          brandName: settings?.studioName || 'JamRoom',
+          studioAddress: settings?.studioAddress || '',
+          studioPhone: settings?.studioPhone || '',
+          studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Admin Access',
           label: 'Privileges Granted',
           greeting: `Hi ${user.name},`,

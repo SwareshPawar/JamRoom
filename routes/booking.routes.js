@@ -1219,8 +1219,13 @@ router.post('/', protect, async (req, res) => {
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Request',
           label: 'Received',
-          greeting: `Hi ${req.user.name},`,
-          introLines: ['Your booking request has been received and is pending admin approval.'],
+          greeting: '',
+          badgeLabel: 'Catalog Type',
+          badgeValue: rentalTypeSummary || 'General',
+          introLines: [
+            `Hi ${req.user.name},`,
+            'Your booking request has been received and is pending admin approval.'
+          ],
           summaryTitle: 'Booking Details',
           summaryRows: [
             ...(normalizedMode === 'perday'
@@ -1750,8 +1755,11 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
             studioEmail: settings?.adminEmails?.[0] || '',
             title: 'Class Slot Request',
             label: 'Submitted',
-            greeting: `Hi ${req.user.name},`,
-            introLines: ['Your slot request has been submitted and is awaiting admin approval.'],
+            greeting: '',
+            introLines: [
+              `Hi ${req.user.name},`,
+              'Your slot request has been submitted and is awaiting admin approval.'
+            ],
             summaryTitle: 'Requested Slot',
             summaryRows: [
               { label: 'Class', value: classItem },
@@ -1875,14 +1883,14 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
         : [];
 
       cancellationInvite = generateCalendarInvite({
-        title: `${settings.studioName || 'Swar JamRoom'} Booking - ${booking.rentalType}`,
+        title: `${settings.studioName || 'JamRoom'} Booking - ${booking.rentalType}`,
         description: `Booking cancelled for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
         location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
         startDate: formatDateAsYmdInIst(new Date(booking.date)),
         startTime: booking.startTime,
         endTime: booking.endTime,
         attendees: [booking.userEmail, ...adminCancellationEmails],
-        studioName: settings.studioName || 'Swar JamRoom',
+        studioName: settings.studioName || 'JamRoom',
         uid: booking.calendarUid,
         sequence: booking.calendarSequence,
         method: 'CANCEL',
@@ -1902,8 +1910,11 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Cancellation Notice',
           label: 'Booking Cancelled',
-          greeting: `Hi ${req.user.name},`,
-          introLines: ['Your booking has been cancelled.'],
+          greeting: '',
+          introLines: [
+            `Hi ${req.user.name},`,
+            'Your booking has been cancelled.'
+          ],
           summaryTitle: 'Cancelled Booking Details',
           summaryRows: [
             ...(isPerday
@@ -1931,7 +1942,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
 
     // Send cancellation notifications to admin/staff recipients.
     if (cancellationInvite && adminCancellationEmails.length > 0) {
-      const studioName = settings?.studioName || 'Swar JamRoom';
+      const studioName = settings?.studioName || 'JamRoom';
 
       for (const recipientEmail of adminCancellationEmails) {
         try {

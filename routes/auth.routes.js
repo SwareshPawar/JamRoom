@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
+const AdminSettings = require('../models/AdminSettings');
 const { sendEmail } = require('../utils/email');
 const { buildInvoiceStyleEmail } = require('../utils/templates/email/invoiceStyleEmailTemplate');
 
@@ -54,10 +55,15 @@ router.post('/register', async (req, res) => {
 
     // Send welcome email
     try {
+      const settings = await AdminSettings.getSettings();
       await sendEmail({
         to: email,
-        subject: 'Welcome to JamRoom!',
+        subject: `Welcome to ${settings?.studioName || 'JamRoom'}!`,
         html: buildInvoiceStyleEmail({
+          brandName: settings?.studioName || 'JamRoom',
+          studioAddress: settings?.studioAddress || '',
+          studioPhone: settings?.studioPhone || '',
+          studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Welcome Email',
           label: 'Account Created',
           greeting: `Hi ${name},`,
@@ -201,10 +207,15 @@ router.post('/forgot-password', async (req, res) => {
 
     // Send email
     try {
+      const settings = await AdminSettings.getSettings();
       await sendEmail({
         to: email,
-        subject: 'Password Reset Request',
+        subject: `Password Reset Request - ${settings?.studioName || 'JamRoom'}`,
         html: buildInvoiceStyleEmail({
+          brandName: settings?.studioName || 'JamRoom',
+          studioAddress: settings?.studioAddress || '',
+          studioPhone: settings?.studioPhone || '',
+          studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Security Link',
           label: 'Password Reset',
           greeting: 'Hello,',
