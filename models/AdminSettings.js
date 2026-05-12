@@ -508,7 +508,7 @@ adminSettingsSchema.statics.getSettings = async function() {
     // Create default settings
     settings = await this.create({
       rentalTypes: [],
-      adminEmails: ['swarjrs@gmail.com'],
+      adminEmails: [],
       studioName: 'Swar JamRoom & Music Studio',
       studioAddress: 'Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
       studioPhone: '+919970011855',
@@ -734,10 +734,7 @@ adminSettingsSchema.statics.getSettings = async function() {
       .filter(Boolean)
     : [];
 
-  if (normalizedAdminEmails.length === 0) {
-    settings.adminEmails = ['swarjrs@gmail.com'];
-    needsSave = true;
-  } else if (JSON.stringify(settings.adminEmails) !== JSON.stringify(normalizedAdminEmails)) {
+  if (JSON.stringify(settings.adminEmails) !== JSON.stringify(normalizedAdminEmails)) {
     settings.adminEmails = normalizedAdminEmails;
     needsSave = true;
   }

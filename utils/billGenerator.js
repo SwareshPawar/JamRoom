@@ -401,7 +401,7 @@ const getPrimaryStudioEmail = (settings) => {
       .find((email) => Boolean(email))
     : '';
 
-  return configuredEmail || 'swarjrs@gmail.com';
+  return configuredEmail || '';
 };
 
 const buildWhatsAppLink = (phoneNumber) => {

@@ -174,6 +174,22 @@ const normalizeRentalTypeToken = (value) => {
   return 'inhouse';
 };
 
+const getConfiguredAdminEmails = (settings = {}, excludeEmail = '') => {
+  const seen = new Set();
+  const blocked = String(excludeEmail || '').trim().toLowerCase();
+
+  return (Array.isArray(settings?.adminEmails) ? settings.adminEmails : [])
+    .map((email) => String(email || '').trim().toLowerCase())
+    .filter((email) => {
+      if (!email) return false;
+      if (blocked && email === blocked) return false;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
+      if (seen.has(email)) return false;
+      seen.add(email);
+      return true;
+    });
+};
+
 const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const normalizePreferredWeekday = (value) => {
@@ -1286,7 +1302,8 @@ router.post('/', protect, async (req, res) => {
 
     // Notify admins
     try {
-      for (const adminEmail of settings.adminEmails) {
+      const adminEmails = getConfiguredAdminEmails(settings);
+      for (const adminEmail of adminEmails) {
         await sendEmail({
           to: adminEmail,
           subject: 'New Booking Request - JamRoom',
@@ -1775,8 +1792,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
       }
 
       try {
-        const adminSettings = settings;
-        const adminEmails = Array.isArray(adminSettings?.adminEmails) ? adminSettings.adminEmails : [];
+        const adminEmails = getConfiguredAdminEmails(settings);
         for (const adminEmail of adminEmails) {
           await sendEmail({
             to: adminEmail,
@@ -1869,18 +1885,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
       settings = await AdminSettings.getSettings();
 
       const normalizedUserEmail = String(booking.userEmail || '').trim().toLowerCase();
-      const dedupe = new Set();
-      adminCancellationEmails = Array.isArray(settings?.adminEmails)
-        ? settings.adminEmails
-          .map((email) => String(email || '').trim())
-          .filter((email) => {
-            if (!email || !isValidEmail(email)) return false;
-            const normalized = email.toLowerCase();
-            if (normalized === normalizedUserEmail || dedupe.has(normalized)) return false;
-            dedupe.add(normalized);
-            return true;
-          })
-        : [];
+      adminCancellationEmails = getConfiguredAdminEmails(settings, normalizedUserEmail);
 
       cancellationInvite = generateCalendarInvite({
         title: `${settings.studioName || 'JamRoom'} Booking - ${booking.rentalType}`,

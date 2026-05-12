@@ -87,7 +87,7 @@ const buildEbillEmailHtml = ({
             <h2 style="margin:0 0 6px 0;font-size:20px;color:#fff;">${settings?.studioName || 'JamRoom'}</h2>
             ${settings?.studioAddress ? `<div class="cl"><strong>Address:</strong> ${settings.studioAddress}</div>` : ''}
             ${settings?.studioPhone ? `<div class="cl"><strong>Phone / WhatsApp:</strong> ${settings.studioPhone}</div>` : ''}
-            <div class="cl"><strong>Email:</strong> ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</div>
+            ${settings?.adminEmails?.[0] ? `<div class="cl"><strong>Email:</strong> ${settings.adminEmails[0]}</div>` : ''}
           </td>
           <td class="hdr-right" style="vertical-align:top;width:200px;min-width:160px;">
             <div class="order-box">
@@ -166,7 +166,7 @@ const buildEbillEmailHtml = ({
         : '<div class="attach ok">Your detailed invoice PDF is attached to this email.</div>'}
       <div class="footer">
         <div>Visit JamRoom: <a href="${appLoginUrl}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:none;">${appLoginUrl}</a></div>
-        <div>${settings?.studioName || 'JamRoom Studio'} | ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</div>
+        <div>${settings?.studioName || 'JamRoom Studio'}${settings?.adminEmails?.[0] ? ` | ${settings.adminEmails[0]}` : ''}</div>
       </div>
     </div>
   </div>

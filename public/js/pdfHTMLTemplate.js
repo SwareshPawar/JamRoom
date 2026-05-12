@@ -450,7 +450,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                 </div>
                 ${settings?.studioAddress ? `<div class="cl"><strong>Address:</strong> ${settings.studioAddress}</div>` : ''}
                 ${settings?.studioPhone ? `<div class="cl"><strong>Phone / WhatsApp:</strong> ${settings.studioPhone}</div>` : ''}
-                <div class="cl"><strong>Email:</strong> ${settings?.adminEmails?.[0] || 'admin@jamroom.com'}</div>
+                ${settings?.adminEmails?.[0] ? `<div class="cl"><strong>Email:</strong> ${settings.adminEmails[0]}</div>` : ''}
             </div>
             <div class="invoice-panel">
                 <div class="kicker">Official Invoice</div>
@@ -506,7 +506,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         </div>
 
         <div class="footer">
-            <div>For any queries, contact <strong>${settings?.adminEmails?.[0] || 'swarjrs@gmail.com'}</strong></div>
+            ${settings?.adminEmails?.[0] ? `<div>For any queries, contact <strong>${settings.adminEmails[0]}</strong></div>` : ''}
             <div style="margin-top:6px;opacity:0.7;">This is a computer-generated invoice. No signature required.</div>
         </div>
     </div>
