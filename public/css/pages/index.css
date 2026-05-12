@@ -207,7 +207,8 @@
 /* Navigation styles are now in shared.css */
 .open-events-promo {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    justify-content: center;
     align-items: center;
     gap: 18px;
     padding: 24px;
@@ -215,24 +216,89 @@
     border-radius: 16px;
     border: 1px solid color-mix(in srgb, var(--primary-color) 18%, transparent);
     background: linear-gradient(135deg, color-mix(in srgb, var(--surface-elevated) 88%, var(--primary-color) 12%), color-mix(in srgb, var(--surface-elevated) 90%, #22c55e 10%));
+    text-align: center;
+    position: relative;
+}
+
+.open-events-edge-stars {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.open-events-edge-star {
+    position: absolute;
+    font-size: 1.35rem;
+    line-height: 1;
+    color: #facc15;
+    text-shadow:
+        0 0 6px rgba(255, 255, 255, 0.45),
+        0 0 14px rgba(250, 204, 21, 0.85);
+    z-index: 2;
+    animation: open-events-edge-star-twinkle 1.8s ease-in-out infinite;
+}
+
+.open-events-edge-star-tl {
+    top: 8px;
+    left: 10px;
+}
+
+.open-events-edge-star-tr {
+    top: 8px;
+    right: 10px;
+    animation-delay: 0.35s;
+}
+
+.open-events-edge-star-bl {
+    bottom: 8px;
+    left: 10px;
+    animation-delay: 0.7s;
+}
+
+.open-events-edge-star-br {
+    bottom: 8px;
+    right: 10px;
+    animation-delay: 1.05s;
 }
 
 .open-events-promo-copy {
-    max-width: 680px;
+    max-width: 760px;
+    margin: 0 auto;
 }
 
 .open-events-promo-eyebrow {
-    margin: 0 0 8px;
-    font-size: 0.78rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
+    margin: 0 0 10px;
+    font-size: 0.8rem;
+    font-weight: 900;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--primary-color-dark);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 30%, transparent);
+    background: color-mix(in srgb, var(--surface-elevated) 88%, var(--primary-color) 12%);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--primary-color) 22%, transparent);
+}
+
+.open-events-eyebrow-star {
+    display: inline-block;
+    font-size: 0.92rem;
+    color: color-mix(in srgb, var(--primary-color) 70%, #f59e0b 30%);
+    animation: open-events-star-pulse 1.4s ease-in-out infinite;
+}
+
+.open-events-eyebrow-star:last-child {
+    animation-delay: 0.35s;
 }
 
 .open-events-promo h3 {
     margin: 0 0 10px;
-    font-size: 1.5rem;
+    font-size: 2.25em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     color: var(--text-color);
 }
 
@@ -243,12 +309,15 @@
 
 .open-events-preview-card {
     margin-top: 12px;
+    margin-left: auto;
+    margin-right: auto;
     padding: 12px;
     border-radius: 10px;
     border: 1px solid color-mix(in srgb, var(--primary-color) 24%, transparent);
     background: color-mix(in srgb, var(--surface-elevated) 90%, var(--primary-color) 10%);
     display: grid;
     gap: 4px;
+    max-width: 520px;
 }
 
 .open-events-preview-card p {
@@ -259,7 +328,33 @@
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: center;
+    width: 100%;
+    margin-top: 4px;
+}
+
+@keyframes open-events-star-pulse {
+    0%,
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 0.85;
+    }
+    50% {
+        transform: scale(1.28) rotate(12deg);
+        opacity: 1;
+    }
+}
+
+@keyframes open-events-edge-star-twinkle {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.78;
+    }
+    50% {
+        transform: scale(1.3);
+        opacity: 1;
+    }
 }
 
 .instagram-showcase {
@@ -409,11 +504,11 @@
 
     .open-events-promo {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: center;
     }
 
     .open-events-promo-actions {
-        justify-content: flex-start;
+        justify-content: center;
     }
 
     .instagram-grid {

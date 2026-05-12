@@ -94,6 +94,8 @@
                 <p>Status: <strong>${escapeHtml(event.status)}</strong> | Slots: ${event.slotCount} | Booked: ${event.bookingCount || 0}</p>
                 <div class="booking-table-actions">
                     <button type="button" class="btn btn-secondary btn-sm admin-open-event-details-btn" data-event-id="${event.id}" data-event-title="${escapeHtml(event.title)}">View Slot Bookings</button>
+                    <button type="button" class="btn btn-secondary btn-sm admin-open-event-notify-btn" data-event-id="${event.id}">Send Notification</button>
+                    <button type="button" class="btn btn-secondary btn-sm admin-open-event-test-email-btn" data-event-id="${event.id}">Send Test Email</button>
                     ${statusActions}
                 </div>
             </article>
@@ -358,6 +360,74 @@
         }
     };
 
+    const sendOpenEventNotification = async (eventId) => {
+        const button = document.querySelector(`.admin-open-event-notify-btn[data-event-id="${eventId}"]`);
+        const originalText = button?.textContent || 'Send Notification';
+        
+        try {
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Sending...';
+            }
+            setLoading(true);
+
+            const response = await request(`/api/admin/open-events/${encodeURIComponent(eventId)}/notify-users`, {
+                method: 'POST'
+            });
+
+            setLoading(false);
+            
+            const detailsMessage = response?.sent !== undefined && response?.failed !== undefined
+                ? `✅ Notifications sent to ${response.sent} user${response.sent !== 1 ? 's' : ''}${response.failed > 0 ? ` (${response.failed} failed)` : ''}`
+                : response?.message || 'Notification sent successfully.';
+            
+            showAlert(detailsMessage, 'success');
+        } catch (error) {
+            setLoading(false);
+            console.error('Failed to send open event notification:', error);
+            showAlert(error.message || 'Failed to send notification', 'error');
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        }
+    };
+
+    const sendOpenEventTestEmail = async (eventId) => {
+        const button = document.querySelector(`.admin-open-event-test-email-btn[data-event-id="${eventId}"]`);
+        const originalText = button?.textContent || 'Send Test Email';
+        
+        try {
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Sending...';
+            }
+            setLoading(true);
+
+            const response = await request(`/api/admin/open-events/${encodeURIComponent(eventId)}/test-email`, {
+                method: 'POST'
+            });
+
+            setLoading(false);
+            
+            const detailsMessage = response?.recipients?.length > 0
+                ? `✅ Test email sent to ${response.recipients.length} admin recipient${response.recipients.length !== 1 ? 's' : ''}`
+                : response?.message || 'Test email sent successfully.';
+            
+            showAlert(detailsMessage, 'success');
+        } catch (error) {
+            setLoading(false);
+            console.error('Failed to send open event test email:', error);
+            showAlert(error.message || 'Failed to send test email', 'error');
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        }
+    };
+
     const bindEvents = () => {
         const form = document.getElementById('openEventCreateForm');
         if (form && !form.dataset.bound) {
@@ -375,15 +445,34 @@
                 }
 
                 const statusButton = event.target.closest('.admin-open-event-status-btn');
-                if (!statusButton) return;
+                if (statusButton) {
+                    const { eventId, status } = statusButton.dataset;
+                    if (!eventId || !status) return;
 
-                const { eventId, status } = statusButton.dataset;
-                if (!eventId || !status) return;
+                    const confirmed = window.confirm(`Change this event status to ${status}?`);
+                    if (!confirmed) return;
 
-                const confirmed = window.confirm(`Change this event status to ${status}?`);
-                if (!confirmed) return;
+                    await updateStatus(eventId, status);
+                    return;
+                }
 
-                await updateStatus(eventId, status);
+                const notifyButton = event.target.closest('.admin-open-event-notify-btn');
+                if (notifyButton) {
+                    const { eventId } = notifyButton.dataset;
+                    if (!eventId) return;
+                    const confirmed = window.confirm('Send this Open Event email notification to all users?');
+                    if (!confirmed) return;
+                    await sendOpenEventNotification(eventId);
+                    return;
+                }
+
+                const testEmailButton = event.target.closest('.admin-open-event-test-email-btn');
+                if (testEmailButton) {
+                    const { eventId } = testEmailButton.dataset;
+                    if (!eventId) return;
+                    await sendOpenEventTestEmail(eventId);
+                    return;
+                }
             });
 
             document.body.addEventListener('click', async (event) => {
