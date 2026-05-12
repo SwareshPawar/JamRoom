@@ -104,6 +104,7 @@ class AlertManager {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 font-size: 14px;
                 line-height: 1.4;
+                cursor: pointer;
             }
             
             .jamroom-alert.alert-removing {
@@ -309,6 +310,19 @@ class AlertManager {
             <div class="alert-message">${message}</div>
             ${alertOptions.timeout > 0 ? '<div class="alert-progress"></div>' : ''}
         `;
+
+        alertElement.addEventListener('click', (event) => {
+            const interactiveTarget = event.target.closest('.alert-close, a, button, input, textarea, select, label, [data-alert-interactive="true"]');
+            if (interactiveTarget) return;
+            this.remove(alertId);
+        });
+
+        const closeButton = alertElement.querySelector('.alert-close');
+        if (closeButton) {
+            closeButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+            });
+        }
 
         if (alertOptions.timeout > 0) {
             const progressBar = alertElement.querySelector('.alert-progress');
