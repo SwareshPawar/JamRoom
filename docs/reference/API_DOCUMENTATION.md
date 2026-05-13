@@ -958,6 +958,210 @@ Authorization: Bearer <admin_token>
 
 ---
 
+### Email Testing Status (Admin)
+**GET** `/api/admin/email-testing/status`
+
+Get fixture and recipient status used by the admin Email Testing tab.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "status": {
+    "recipients": ["admin@example.com"],
+    "testUser": {
+      "name": "Swaresh Email Test User",
+      "email": "swareshpawar@gmail.com",
+      "isDeleted": false
+    },
+    "testBooking": {
+      "id": "665...",
+      "bookingStatus": "CONFIRMED",
+      "date": "2026-05-15T00:00:00.000Z",
+      "isDeleted": false
+    },
+    "testCredentials": {
+      "email": "swareshpawar@gmail.com",
+      "password": "Swar@123"
+    }
+  }
+}
+```
+
+---
+
+### Setup Email Testing Fixture (Admin)
+**POST** `/api/admin/email-testing/setup-fixture`
+
+Ensure test fixture user and booking exists for email QA.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Test user and booking fixture are ready.",
+  "fixture": {
+    "user": {
+      "id": "665...",
+      "email": "swareshpawar@gmail.com",
+      "name": "Swaresh Email Test User"
+    },
+    "booking": {
+      "id": "666...",
+      "date": "2026-05-15T00:00:00.000Z",
+      "bookingStatus": "CONFIRMED"
+    }
+  }
+}
+```
+
+---
+
+### Get Email Testing Template Catalog (Admin)
+**GET** `/api/admin/email-testing/templates`
+
+Load template metadata for separated per-template test buttons.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "recipients": ["admin@example.com"],
+  "templates": [
+    {
+      "key": "welcome-user",
+      "title": "Welcome User",
+      "type": "auth",
+      "typeLabel": "Auth",
+      "subjectPreview": "Welcome to SwarJRS!",
+      "attachmentsCount": 0
+    }
+  ]
+}
+```
+
+---
+
+### Generate Email Testing Raw Data (Admin)
+**POST** `/api/admin/email-testing/raw-data`
+
+Generate raw HTML payloads for visual QA.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body:**
+```json
+{
+  "keys": ["welcome-user"]
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "totalTemplates": 1,
+  "rawData": [
+    {
+      "key": "welcome-user",
+      "title": "Welcome User",
+      "type": "auth",
+      "to": "admin@example.com",
+      "subject": "Welcome to SwarJRS!",
+      "html": "<!DOCTYPE html>...",
+      "htmlLength": 7000,
+      "attachments": []
+    }
+  ]
+}
+```
+
+---
+
+### Send Selected Email Testing Templates (Admin)
+**POST** `/api/admin/email-testing/send`
+
+Send selected template test emails to admin recipients only.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body:**
+```json
+{
+  "keys": ["welcome-user", "booking-request-user"]
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Email template dispatch complete: 2 sent, 0 failed.",
+  "recipients": ["admin@example.com"],
+  "sentCount": 2,
+  "failedCount": 0,
+  "totalTemplates": 2,
+  "results": [
+    {
+      "key": "welcome-user",
+      "title": "Welcome User",
+      "type": "auth",
+      "subject": "Welcome to SwarJRS!",
+      "status": "fulfilled",
+      "error": ""
+    }
+  ]
+}
+```
+
+---
+
+### Send All Email Testing Templates (Admin)
+**POST** `/api/admin/email-testing/send-all`
+
+Legacy bulk helper to send all template tests to admin recipients only.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Email template test dispatch complete: 23 sent, 0 failed.",
+  "recipients": ["admin@example.com"],
+  "sentCount": 23,
+  "failedCount": 0,
+  "totalTemplates": 23,
+  "results": []
+}
+```
+
+---
+
 ### Get Admin Settings (Admin)
 **GET** `/api/admin/settings`
 
