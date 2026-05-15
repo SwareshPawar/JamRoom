@@ -7,17 +7,38 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
-const buildRowsHtml = (rows = []) => rows
-  .map((row) => {
-    if (!row) return '';
-    if (typeof row === 'string') return row;
-    const label = escapeHtml(row.label || '');
-    const value = row.html ? row.html : escapeHtml(row.value || '');
-    const labelStyle = row.labelStyle || 'padding:8px 0;font-size:13px;color:#64748b;vertical-align:top;';
-    const valueStyle = row.valueStyle || 'padding:8px 0;font-size:13px;color:#0f172a;text-align:right;vertical-align:top;word-break:break-word;';
-    return `<tr><td style="${labelStyle}">${label}</td><td style="${valueStyle}">${value}</td></tr>`;
-  })
+const buildSummaryItemsHtml = (rows = []) => rows.map((row) => {
+  if (!row) return '';
+  if (typeof row === 'string') return row;
+  const label = escapeHtml(row.label || '');
+  const value = row.html ? row.html : escapeHtml(row.value || '');
+  return `
+    <div class="summary-item">
+      <span class="summary-label">${label}</span>
+      <span class="summary-value">${value}</span>
+    </div>
+  `;
+}).join('');
+
+const buildBulletListHtml = (items = [], itemClass = 'list-item') => items
+  .filter(Boolean)
+  .map((item) => `<li class="${itemClass}">${item}</li>`)
   .join('');
+
+const DEFAULT_BOOKING_TERMS = [
+  '50% advance payment is required to confirm and block your booking slot.',
+  'Additional studio time or scope changes are billed at the applicable quoted rate.',
+  'Cancellation within 24 hours of the scheduled session is non-refundable.',
+  'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.',
+  'This quotation is valid for 7 days, subject to slot and team availability at confirmation.'
+];
+
+const DEFAULT_OFFER_LINE = 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.';
+
+const isLikelyBookingEmail = ({ title = '', label = '', summaryTitle = '' }) => {
+  const fingerprint = `${title} ${label} ${summaryTitle}`.toLowerCase();
+  return /(booking|slot|class|ebill|invoice|open event|payment|cancel)/.test(fingerprint);
+};
 
 const buildInvoiceStyleEmail = ({
   brandName = 'JamRoom',
@@ -44,22 +65,35 @@ const buildInvoiceStyleEmail = ({
   linkLabel = '',
   badgeLabel = '',
   badgeValue = '',
-  noteHtml = ''
+  noteHtml = '',
+  showBookingFooter,
+  bookingFooterTermsTitle = '',
+  bookingFooterTerms = [],
+  bookingFooterOfferBadgeText = '',
+  bookingFooterOfferLine = '',
+  bookingFooterOfferNote = ''
 }) => {
-  const intro = Array.isArray(introLines)
-    ? introLines.filter(Boolean).map((line) => `<p style="margin:0 0 10px 0;font-size:13px;line-height:1.7;color:#475569;">${line}</p>`).join('')
+  const intro = Array.isArray(introLines) && introLines.length > 0
+    ? introLines.filter(Boolean).map((line) => `<p>${line}</p>`).join('')
     : '';
-  const rowsHtml = buildRowsHtml(summaryRows);
+  const summaryItemsHtml = buildSummaryItemsHtml(summaryRows);
   const sections = Array.isArray(sectionsHtml) ? sectionsHtml.filter(Boolean).join('') : '';
-  const termsHtml = Array.isArray(terms) && terms.length > 0
-    ? `<div class="terms-card"><div class="terms-hd">${termsTitle || 'Booking Terms'}</div><ul>${terms.map((term) => `<li>${term}</li>`).join('')}</ul></div>`
-    : '';
+  const termsList = Array.isArray(terms) ? terms.filter(Boolean) : [];
+  const shouldRenderBookingFooter = typeof showBookingFooter === 'boolean'
+    ? showBookingFooter
+    : isLikelyBookingEmail({ title, label, summaryTitle });
+  const footerTermsTitle = String(bookingFooterTermsTitle || '').trim() || termsTitle || 'Booking Terms';
+  const footerTerms = Array.isArray(bookingFooterTerms) && bookingFooterTerms.length > 0
+    ? bookingFooterTerms
+    : (termsList.length > 0 ? termsList : DEFAULT_BOOKING_TERMS);
+  const offerBadgeText = String(bookingFooterOfferBadgeText || '').trim() || 'Special Offer';
+  const offerLine = String(bookingFooterOfferLine || '').trim() || DEFAULT_OFFER_LINE;
+  const offerNote = String(bookingFooterOfferNote || '').trim() || 'Reach out to us for special packages tailored to your project needs.';
   const footerHtml = Array.isArray(footerLines) && footerLines.length > 0
-    ? footerLines.map((line) => `<div>${line}</div>`).join('')
+    ? footerLines.filter(Boolean).map((line) => `<div>${line}</div>`).join('')
     : '';
-  const ctaBlock = ctaHtml
-    ? `<div class="cta-card"><h3>${ctaTitle || 'Next Steps'}</h3>${ctaHtml}</div>`
-    : '';
+  const ctaBlock = ctaHtml ? `<div class="card section-card cta-card"><h3>${ctaTitle || 'Next Steps'}</h3>${ctaHtml}</div>` : '';
+  const heroLines = [greeting ? `<h3>${greeting}</h3>` : '', intro].filter(Boolean).join('');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -70,53 +104,73 @@ const buildInvoiceStyleEmail = ({
 <meta name="supported-color-schemes" content="light">
 <style>
   :root{color-scheme:light only}
-  body{margin:0;padding:0;background:#eef2f7;font-family:Arial,sans-serif;color:#1f2937;-webkit-text-size-adjust:100%}
-  .eq{max-width:760px;margin:0 auto;padding:12px}
-  .card{background:#fff;border-radius:16px;overflow:hidden;border:1px solid #dbe5f0;box-shadow:0 8px 24px rgba(15,23,42,0.08)}
-  .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:20px}
+  body{margin:0;padding:0;background:
+    radial-gradient(circle at 15% 15%,rgba(56,189,248,0.22) 0%,rgba(56,189,248,0) 46%),
+    radial-gradient(circle at 85% 5%,rgba(129,140,248,0.22) 0%,rgba(129,140,248,0) 44%),
+    linear-gradient(180deg,#e9f1ff 0%,#eef5ff 36%,#f7fbff 100%);
+    font-family:'Trebuchet MS','Segoe UI',Verdana,sans-serif;color:#1f2937;-webkit-text-size-adjust:100%}
+  .eq{max-width:760px;margin:0 auto;padding:14px}
+  .card{background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #cfdef7;box-shadow:0 20px 46px rgba(15,23,42,0.16)}
+  .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0f7ec0 100%);color:#fff;padding:22px;position:relative}
+  .hdr:after{content:'';position:absolute;inset:auto 0 0 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)}
+  .hdr:before{content:'';position:absolute;top:-90px;right:-50px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.28) 0%,rgba(255,255,255,0) 70%)}
   .hdr-table{width:100%;border-collapse:collapse}
   .hdr-left{vertical-align:top;padding-right:14px}
   .hdr-right{vertical-align:top;width:210px}
-  .hdr h2{margin:0 0 8px 0;font-size:24px;color:#fff}
+  .hdr h2{margin:0 0 8px 0;font-size:24px;color:#fff;letter-spacing:0.2px}
   .hdr .cl{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88)}
-  .order-box{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:12px 14px}
-  .order-kicker{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#bfdbfe;font-weight:700;margin-bottom:8px}
+  .order-box{background:rgba(3,9,25,0.28);border:1px solid rgba(191,219,254,0.55);border-radius:16px;padding:12px 14px;backdrop-filter:blur(8px)}
+  .order-kicker{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#c7d2fe;font-weight:900;margin-bottom:8px}
   .order-line{font-size:12px;line-height:1.7;color:rgba(255,255,255,0.9)}
-  .body{padding:20px}
-  .hero{background:#f8fafc;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
+  .body{padding:20px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%)}
+  .hero{background:linear-gradient(120deg,#e0f2fe 0%,#eef2ff 54%,#f8fafc 100%);border:1px solid #93c5fd;border-radius:18px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 10px 22px rgba(14,116,144,0.10)}
   .hero h3{margin:0 0 6px 0;font-size:17px;color:#0f172a}
-  .hero p{margin:0;font-size:13px;line-height:1.7;color:#475569}
-  .summary-card,.notes-card,.terms-card,.cta-card{background:#fff;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
-  .summary-card h3,.notes-card h3,.cta-card h3{margin:0 0 8px 0;font-size:15px;color:#0f172a}
-  .summary-table{width:100%;border-collapse:collapse}
-  .summary-table td{border-top:1px solid #edf2f7}
-  .summary-table tr:first-child td{border-top:0}
-  .summary-badge{display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:999px}
-  .summary-value{font-size:14px;font-weight:700;color:#0f172a;word-break:break-word}
-  .summary-value-right{text-align:right}
-  .section{margin:0 0 14px 0}
-  .section-title{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;font-weight:800;margin:0 0 10px 0}
-  .highlight{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
+  .hero p{margin:0 0 10px 0;font-size:13px;line-height:1.7;color:#334155}
+  .hero p:last-child{margin-bottom:0}
+  .section-card{background:#fff;border:1px solid #d5e3f8;border-radius:16px;padding:14px 16px;margin:0 0 14px 0;box-shadow:0 10px 24px rgba(30,64,175,0.08)}
+  .section-card h3{margin:0 0 8px 0;font-size:15px;color:#0f172a}
+  .summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .summary-item{background:linear-gradient(145deg,#f8fbff 0%,#eef6ff 100%);border:1px solid #cfe1fb;border-radius:14px;padding:10px 12px;min-width:0;position:relative;overflow:hidden}
+  .summary-item:before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,#2563eb 0%,#0ea5e9 100%)}
+  .summary-item:nth-child(3n+2):before{background:linear-gradient(180deg,#7c3aed 0%,#2563eb 100%)}
+  .summary-item:nth-child(3n+3):before{background:linear-gradient(180deg,#0891b2 0%,#14b8a6 100%)}
+  .summary-label{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#64748b;font-weight:800;margin-bottom:6px}
+  .summary-value{display:block;font-size:14px;font-weight:700;color:#0f172a;word-break:break-word;line-height:1.5;padding-left:2px}
+  .highlight{background:linear-gradient(130deg,#ecfeff 0%,#eff6ff 50%,#eef2ff 100%);border:1px solid #93c5fd;border-radius:14px;padding:14px 16px;margin:0 0 14px 0}
   .highlight h3{margin:0 0 6px 0;font-size:15px;color:#0f172a}
-  .highlight p{margin:0;font-size:13px;line-height:1.7;color:#334155}
-  .cta-body{font-size:13px;line-height:1.8;color:#0f172a}
-  .terms-card{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626}
+  .highlight p{margin:0;font-size:13px;line-height:1.7;color:#1e3a5f}
+  .summary-badge{display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid #93c5fd}
+  .detail-list{margin:0;padding-left:18px;color:#475569}
+  .detail-list li{margin:0 0 6px 0;font-size:13px;line-height:1.6}
+  .terms-card{background:linear-gradient(135deg,#fff5f5 0%,#fef2f2 100%);border:1px solid #fca5a5;border-left:4px solid #dc2626}
   .terms-hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px}
   .terms-card ul{margin:0;padding-left:18px;color:#7f1d1d}
   .terms-card li{margin:0 0 5px 0;font-size:12px;line-height:1.55}
-  .footer{font-size:11px;line-height:1.8;color:#64748b;border-top:1px solid #e5e7eb;padding-top:12px;word-break:break-word}
-  .footer a{color:#1d4ed8;text-decoration:none}
+  .terms{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:14px;padding:14px 16px;margin:0 0 12px 0}
+  .terms ul{margin:0;padding-left:16px;color:#7f1d1d}
+  .terms li{margin:0 0 6px 0;font-size:13px;line-height:1.6}
+  .offer{background:linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%);border:2px solid #f59e0b;border-radius:14px;padding:14px 16px;margin:0 0 14px 0}
+  .offer-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:8px}
+  .offer-text{font-size:13px;line-height:1.8;color:#78350f;font-weight:600}
+  .offer-note{font-size:13px;line-height:1.7;color:#92400e;margin-top:6px}
+  .cta-card{background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%);border:1px solid #1d4ed8;color:#eff6ff}
+  .cta-card h3{margin:0 0 6px 0;font-size:15px;color:#0f172a}
+  .cta-card h3,.cta-card h4,.cta-card strong{color:#ffffff !important}
+  .cta-card p,.cta-card li,.cta-card span,.cta-card div,.cta-card a{color:#dbeafe !important}
+  .cta-card a{font-weight:700;text-decoration:underline}
+  .footer{font-size:11px;line-height:1.8;color:#475569;border-top:1px solid #dbe5f0;padding-top:12px;word-break:break-word}
+  .footer a{color:#1d4ed8;text-decoration:none;font-weight:700}
   @media only screen and (max-width: 620px){
     .eq{padding:8px}
+    .card{border-radius:18px}
     .hdr{padding:16px}
     .hdr-left,.hdr-right{display:block;width:100% !important;padding:0}
     .hdr-right{margin-top:12px}
     .body{padding:14px}
-    .summary-table,.summary-table tbody,.summary-table tr,.summary-table td{display:block;width:100%}
-    .summary-table td{padding:6px 0 !important;text-align:left !important}
-    .summary-table tr{border-top:1px solid #edf2f7;padding:8px 0}
-    .summary-table tr:first-child{border-top:0}
-    .summary-value-right{text-align:left}
+    .hero,.section-card,.summary-item{border-radius:12px}
+    .summary-label{font-size:9px}
+    .summary-value{font-size:13px}
+    .summary-grid{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -129,7 +183,7 @@ const buildInvoiceStyleEmail = ({
             <td class="hdr-left">
               <table cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
                 <tr>
-                  <td style="vertical-align:middle;padding-right:10px;">
+                  <td style="vertical-align:middle;padding-right:12px;">
                     <img src="${logoUrl}" alt="${brandName} Logo" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:12px;object-fit:contain;background:#ffffff;padding:4px;border:1px solid rgba(255,255,255,0.3);" />
                   </td>
                   <td style="vertical-align:middle;">
@@ -154,20 +208,29 @@ const buildInvoiceStyleEmail = ({
         </table>
       </div>
       <div class="body">
-        ${greeting ? `<p style="margin:0 0 10px 0;font-size:15px;color:#0f172a;">${greeting}</p>` : ''}
-        ${intro}
+        ${heroLines ? `<div class="hero">${heroLines}</div>` : ''}
         ${highlightHtml ? `<div class="highlight">${highlightHtml}</div>` : ''}
-        ${summaryRows.length > 0 ? `
-          <div class="summary-card">
+        ${summaryItemsHtml ? `
+          <div class="section-card">
             <h3>${summaryTitle}</h3>
-            <table class="summary-table">${rowsHtml}</table>
+            <div class="summary-grid">${summaryItemsHtml}</div>
           </div>
         ` : ''}
         ${sections}
         ${ctaBlock}
-        ${termsHtml}
-        ${attachmentNoticeHtml ? `<div class="notes-card"><h3>Attachment</h3>${attachmentNoticeHtml}</div>` : ''}
-        ${noteHtml ? `<div class="notes-card"><h3>Additional Notes</h3>${noteHtml}</div>` : ''}
+        ${attachmentNoticeHtml ? `<div class="section-card"><h3>Attachment</h3>${attachmentNoticeHtml}</div>` : ''}
+        ${noteHtml ? `<div class="section-card"><h3>Additional Notes</h3>${noteHtml}</div>` : ''}
+        ${shouldRenderBookingFooter ? `
+          <div class="terms">
+            <div class="terms-hd">&#9888; ${escapeHtml(footerTermsTitle)}</div>
+            <ul>${buildBulletListHtml(footerTerms)}</ul>
+          </div>
+          <div class="offer">
+            <div class="offer-pill">&#127873; ${escapeHtml(offerBadgeText)}</div>
+            <div class="offer-text">${escapeHtml(offerLine)}</div>
+            <div class="offer-note">${escapeHtml(offerNote)}</div>
+          </div>
+        ` : ''}
         ${footerHtml || footerLines.length > 0 ? `<div class="footer">${footerHtml}</div>` : ''}
       </div>
     </div>

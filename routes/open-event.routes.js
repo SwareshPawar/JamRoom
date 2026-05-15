@@ -12,6 +12,20 @@ const { generateCalendarInvite } = require('../utils/calendar');
 
 const IST_OFFSET = '+05:30';
 
+const buildBookingFooterEmailConfig = (settings = {}) => {
+  const emailSettings = settings?.emailSettings && typeof settings.emailSettings === 'object'
+    ? settings.emailSettings
+    : {};
+
+  return {
+    bookingFooterTermsTitle: String(emailSettings.bookingTermsTitle || '').trim() || 'Booking Terms',
+    bookingFooterTerms: Array.isArray(emailSettings.bookingTerms) ? emailSettings.bookingTerms : [],
+    bookingFooterOfferBadgeText: String(emailSettings.offerBadgeText || '').trim() || 'Special Offer',
+    bookingFooterOfferLine: String(emailSettings.offerLine || '').trim(),
+    bookingFooterOfferNote: String(emailSettings.offerNote || '').trim()
+  };
+};
+
 const parseTimeToMinutes = (timeValue) => {
   const [hourPart, minutePart] = String(timeValue || '').split(':');
   const hours = Number(hourPart);
@@ -318,6 +332,7 @@ router.post('/:id/book', protect, async (req, res) => {
             { label: 'Slot Number', value: String(slotIndex + 1) },
             { label: 'Status', value: 'CONFIRMED' }
           ],
+          ...buildBookingFooterEmailConfig(settings),
           ctaTitle: 'Calendar Invite',
           ctaHtml: '<p>A calendar invite is attached. Add it to your calendar to receive reminders.</p>',
           footerLines: ['Please arrive a few minutes early for smooth check-in.']

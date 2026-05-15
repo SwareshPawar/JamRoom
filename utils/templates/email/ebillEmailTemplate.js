@@ -1,5 +1,13 @@
 const BRAND_LOGO_EMAIL_URL = 'https://jam-room-mu.vercel.app/icons/jamroom-brand-logo.png';
 
+const BOOKING_TERMS = [
+  '50% advance payment is required to confirm and block your booking slot.',
+  'Additional studio time or scope changes are billed at the applicable quoted rate.',
+  'Cancellation within 24 hours of the scheduled session is non-refundable.',
+  'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.',
+  'This quotation is valid for 7 days, subject to slot and team availability at confirmation.'
+];
+
 const buildEbillEmailHtml = ({
   settings,
   booking,
@@ -47,6 +55,20 @@ const buildEbillEmailHtml = ({
         ? 'border:1px solid #fca5a5;background:#fee2e2;color:#991b1b;'
         : 'border:1px solid #cbd5e1;background:#e2e8f0;color:#334155;';
 
+    const emailSettings = settings?.emailSettings && typeof settings.emailSettings === 'object'
+      ? settings.emailSettings
+      : {};
+
+    const bookingTermsTitle = String(emailSettings.bookingTermsTitle || '').trim() || 'Booking Terms';
+    const bookingTerms = Array.isArray(emailSettings.bookingTerms) && emailSettings.bookingTerms.length > 0
+      ? emailSettings.bookingTerms
+      : BOOKING_TERMS;
+    const offerBadgeText = String(emailSettings.offerBadgeText || '').trim() || 'Special Offer';
+    const offerLine = String(emailSettings.offerLine || '').trim()
+      || 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.';
+    const offerNote = String(emailSettings.offerNote || '').trim()
+      || 'Reach out to us for special packages tailored to your project needs.';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,44 +78,71 @@ const buildEbillEmailHtml = ({
 <meta name="supported-color-schemes" content="light">
 <style>
   :root{color-scheme:light only}
-  body{margin:0;padding:0;background:#eef2f7;font-family:Arial,sans-serif;color:#1f2937;-webkit-text-size-adjust:100%}
-  .eq{max-width:640px;margin:0 auto;padding:10px}
-  .card{background:#fff;border-radius:14px;overflow:hidden;border:1px solid #dbe5f0}
-  .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:18px}
+  body{margin:0;padding:0;background:
+    radial-gradient(circle at 8% 8%,rgba(34,211,238,0.2) 0%,rgba(34,211,238,0) 38%),
+    radial-gradient(circle at 90% 4%,rgba(99,102,241,0.22) 0%,rgba(99,102,241,0) 44%),
+    linear-gradient(180deg,#eaf1ff 0%,#eff5ff 40%,#f7fbff 100%);
+    font-family:'Trebuchet MS','Segoe UI',Verdana,sans-serif;color:#1f2937;-webkit-text-size-adjust:100%}
+  .eq{max-width:660px;margin:0 auto;padding:12px}
+  .card{background:#fff;border-radius:22px;overflow:hidden;border:1px solid #d2e2fb;box-shadow:0 18px 40px rgba(30,58,138,0.14)}
+  .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0e7490 100%);color:#fff;padding:20px;position:relative}
+  .hdr:after{content:'';position:absolute;inset:auto 0 0 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)}
+  .hdr:before{content:'';position:absolute;top:-90px;right:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.27) 0%,rgba(255,255,255,0) 70%)}
   .hdr h2{margin:0 0 6px 0;font-size:20px;color:#fff}
   .hdr .cl{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.88)}
-  .order-box{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:10px 12px;margin-top:12px}
-  .order-kicker{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#bfdbfe;font-weight:700;margin-bottom:6px}
+  .order-box{background:rgba(3,9,25,0.28);border:1px solid rgba(191,219,254,0.55);border-radius:14px;padding:10px 12px;margin-top:12px;backdrop-filter:blur(8px)}
+  .order-kicker{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#c7d2fe;font-weight:900;margin-bottom:6px}
   .order-line{font-size:12px;line-height:1.7;color:rgba(255,255,255,0.9)}
-  .body{padding:16px}
-  .sc{background:#f8fafc;border:1px solid #dbe5f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;word-break:break-word}
+  .body{padding:16px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%)}
+  .sc{background:linear-gradient(140deg,#f8fbff 0%,#eff6ff 100%);border:1px solid #cfe1fb;border-radius:14px;padding:12px 14px;margin-bottom:10px;word-break:break-word;box-shadow:0 8px 20px rgba(14,116,144,0.10)}
   .sc-kicker{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:6px}
   .sc-title{font-size:15px;font-weight:800;color:#0f172a;margin-bottom:4px}
   .sc-sub{font-size:12px;line-height:1.6;color:#475569}
   .status-pill{display:inline-block;padding:3px 10px;border-radius:12px;border:1px solid ${paymentStatusBorder};background:${paymentStatusBackground};color:${paymentStatusColor};font-weight:700;white-space:nowrap}
   .confirm-pill{display:inline-block;padding:3px 10px;border-radius:12px;font-weight:700;white-space:nowrap}
-  .booking-card,.notes-card{background:#fff;border:1px solid #dbe5f0;border-radius:10px;padding:12px 14px;margin-bottom:12px}
-  .booking-card h3{color:#1d4ed8;margin:0 0 8px 0;font-size:14px}
-  .detail-table{width:100%;border-collapse:collapse}
-  .detail-table td{padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:13px;word-break:break-word}
-  .detail-table td:first-child{font-weight:700;color:#1f2937;width:42%}
-  .detail-table td:last-child{color:#475569}
-  .totals-card{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin:0 0 12px 0}
-  .totals-card h3{margin:0 0 8px 0;font-size:13px;color:#1d4ed8;text-transform:uppercase;letter-spacing:1px}
+  .booking-card,.notes-card,.cta,.totals-card{background:#fff;border:1px solid #d2e2fb;border-radius:14px;padding:12px 14px;margin-bottom:12px;box-shadow:0 10px 24px rgba(30,64,175,0.08)}
+  .booking-card h3{color:#1e3a8a;margin:0 0 8px 0;font-size:14px}
+  .detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .detail-item{background:linear-gradient(145deg,#f8fbff 0%,#eef6ff 100%);border:1px solid #cfe1fb;border-radius:12px;padding:10px 12px;min-width:0;position:relative;overflow:hidden}
+  .detail-item:before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,#2563eb 0%,#0ea5e9 100%)}
+  .detail-item:nth-child(2n):before{background:linear-gradient(180deg,#7c3aed 0%,#2563eb 100%)}
+  .detail-label{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#64748b;font-weight:800;margin-bottom:4px}
+  .detail-value{display:block;font-size:13px;color:#475569;font-weight:600;word-break:break-word;line-height:1.5}
+  .totals-card{background:linear-gradient(130deg,#ecfeff 0%,#eff6ff 52%,#eef2ff 100%);border:1px solid #93c5fd}
+  .totals-card h3{margin:0 0 8px 0;font-size:13px;color:#1e3a8a;text-transform:uppercase;letter-spacing:1px}
   .totals-table{width:100%;border-collapse:collapse}
   .totals-table td{font-size:13px;color:#0f172a;padding:4px 0;vertical-align:top}
   .totals-table td:last-child{text-align:right;white-space:nowrap}
-  .totals-divider{border-top:1px solid #bfdbfe}
+  .totals-divider{border-top:1px solid #93c5fd}
   .totals-divider td{padding-top:8px!important;font-size:14px!important;font-weight:700}
-  .payment-card{background:${paymentStatusBackground};border:1px solid ${paymentStatusBorder};border-radius:10px;padding:12px 14px;margin:0 0 12px 0;word-break:break-word}
+  .payment-card{background:${paymentStatusBackground};border:1px solid ${paymentStatusBorder};border-radius:12px;padding:12px 14px;margin:0 0 12px 0;word-break:break-word;box-shadow:0 8px 18px rgba(15,23,42,0.08)}
   .payment-card h3{margin:0 0 6px 0;font-size:14px;color:${paymentStatusColor}}
-  .cta{background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin:0 0 12px 0}
-  .cta h3{margin:0 0 6px 0;font-size:14px;color:#0f172a}
-  .cta p{margin:0;font-size:13px;line-height:1.7;color:#475569}
+  .cta{background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%);border:1px solid #1d4ed8}
+  .cta h3{margin:0 0 6px 0;font-size:14px;color:#ffffff}
+  .cta p{margin:0;font-size:13px;line-height:1.7;color:#dbeafe}
   .attach{border-radius:10px;padding:10px 12px;margin:0 0 12px 0;font-size:13px;line-height:1.6}
   .attach.ok{background:#e8f5e8;border:1px solid #4caf50;color:#2e7d32}
   .attach.warn{background:#fff3e0;border:1px solid #ffcc02;color:#92400e}
-  .footer{font-size:11px;line-height:1.8;color:#64748b;border-top:1px solid #e5e7eb;padding-top:10px;word-break:break-word}
+  .terms{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:12px;padding:14px 16px;margin:0 0 12px 0}
+  .terms-hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px}
+  .terms ul{margin:0;padding-left:16px;color:#7f1d1d}
+  .terms li{margin:0 0 6px 0;font-size:13px;line-height:1.6}
+  .offer{background:linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%);border:2px solid #f59e0b;border-radius:12px;padding:14px 16px;margin:0 0 12px 0}
+  .offer-pill{display:inline-block;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:8px}
+  .offer-text{font-size:13px;line-height:1.8;color:#78350f;font-weight:600}
+  .offer-note{font-size:13px;line-height:1.7;color:#92400e;margin-top:6px}
+  .footer{font-size:11px;line-height:1.8;color:#475569;border-top:1px solid #dbe5f0;padding-top:10px;word-break:break-word}
+  @media only screen and (max-width: 620px){
+    .eq{padding:8px}
+    .card{border-radius:18px}
+    .hdr{padding:16px}
+    .body{padding:14px}
+    .detail-grid{grid-template-columns:1fr}
+    .status-card-table,.status-card-table tbody,.status-card-table tr,.status-card-table td{display:block;width:100%}
+    .status-card-table td{padding:0 !important}
+    .status-card-right{margin-top:10px}
+    .booking-card,.notes-card,.cta,.totals-card,.payment-card,.sc{border-radius:12px}
+  }
 </style>
 </head>
 <body>
@@ -151,14 +200,14 @@ const buildEbillEmailHtml = ({
 
       <div class="booking-card">
         <h3>Booking Summary</h3>
-        <table class="detail-table">
-          <tr><td>Date</td><td>${displayDate}</td></tr>
-          <tr><td>Time</td><td>${timeRangeLabel}</td></tr>
-          <tr><td>Service</td><td>${booking.rentalType}</td></tr>
-          <tr><td>Duration</td><td>${booking.duration} hour(s)</td></tr>
-          ${booking.paymentReference ? `<tr><td>Payment Ref</td><td>${booking.paymentReference}</td></tr>` : ''}
-          ${booking.paymentNote ? `<tr><td>Payment Note</td><td>${booking.paymentNote}</td></tr>` : ''}
-        </table>
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Date</span><span class="detail-value">${displayDate}</span></div>
+          <div class="detail-item"><span class="detail-label">Time</span><span class="detail-value">${timeRangeLabel}</span></div>
+          <div class="detail-item"><span class="detail-label">Service</span><span class="detail-value">${booking.rentalType}</span></div>
+          <div class="detail-item"><span class="detail-label">Duration</span><span class="detail-value">${booking.duration} hour(s)</span></div>
+          ${booking.paymentReference ? `<div class="detail-item"><span class="detail-label">Payment Ref</span><span class="detail-value">${booking.paymentReference}</span></div>` : ''}
+          ${booking.paymentNote ? `<div class="detail-item"><span class="detail-label">Payment Note</span><span class="detail-value">${booking.paymentNote}</span></div>` : ''}
+        </div>
       </div>
       ${discountHighlightHtml}
       ${payableHighlightHtml}
@@ -184,6 +233,17 @@ const buildEbillEmailHtml = ({
       ${!pdfAttached
         ? `<div class="attach warn">PDF invoice could not be attached due to a technical issue. You can download your invoice from <a href="${frontendBookingUrl}" style="color:#1d4ed8;font-weight:700;text-decoration:none;">your JamRoom account</a>.</div>`
         : '<div class="attach ok">Your detailed invoice PDF is attached to this email.</div>'}
+      <div class="terms">
+        <div class="terms-hd">&#9888; ${bookingTermsTitle}</div>
+        <ul>
+          ${bookingTerms.map((term) => `<li>${term}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="offer">
+        <div class="offer-pill">&#127873; ${offerBadgeText}</div>
+        <div class="offer-text">${offerLine}</div>
+        <div class="offer-note">${offerNote}</div>
+      </div>
       <div class="footer">
         <div>Visit JamRoom: <a href="${appLoginUrl}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:none;">${appLoginUrl}</a></div>
         <div>${settings?.studioName || 'JamRoom Studio'}${settings?.adminEmails?.[0] ? ` | ${settings.adminEmails[0]}` : ''}</div>

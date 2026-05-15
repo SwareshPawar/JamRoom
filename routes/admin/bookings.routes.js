@@ -47,10 +47,23 @@ const {
   resolveAdminNotificationEmails,
   sendUnifiedBookingConfirmationEmails,
   DEFAULT_APP_LOGIN_URL,
-  DEFAULT_ADMIN_CREATED_USER_PASSWORD,
   normalizeIndianMobile
 } = require('../../utils/adminHelpers');
 const { buildEbillEmailHtml } = require('../../utils/templates/email/ebillEmailTemplate');
+
+const buildBookingFooterEmailConfig = (settings = {}) => {
+  const emailSettings = settings?.emailSettings && typeof settings.emailSettings === 'object'
+    ? settings.emailSettings
+    : {};
+
+  return {
+    bookingFooterTermsTitle: String(emailSettings.bookingTermsTitle || '').trim() || 'Booking Terms',
+    bookingFooterTerms: Array.isArray(emailSettings.bookingTerms) ? emailSettings.bookingTerms : [],
+    bookingFooterOfferBadgeText: String(emailSettings.offerBadgeText || '').trim() || 'Special Offer',
+    bookingFooterOfferLine: String(emailSettings.offerLine || '').trim(),
+    bookingFooterOfferNote: String(emailSettings.offerNote || '').trim()
+  };
+};
 
 // Class booking helpers used by admin create-booking flow.
 const adminCalcEndTime = (startTime, durationHours) => {
@@ -439,6 +452,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
                 { label: 'Time', value: `${formatTime12Hour(pendingBooking.startTime)} to ${formatTime12Hour(pendingBooking.endTime)}` },
                 { label: 'Rental Type', value: pendingBooking.rentalType }
               ],
+              ...buildBookingFooterEmailConfig(settings),
               ctaTitle: 'Next Step',
               ctaHtml: '<p>Please feel free to make a new booking request for a different time slot. Thank you for your understanding.</p>'
             })
@@ -752,6 +766,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
             { label: 'Date', value: slotDateLabel },
             { label: 'Time', value: `${formatTime12(startTime)} – ${formatTime12(endTime)}` }
           ],
+          ...buildBookingFooterEmailConfig(settings),
           ctaTitle: 'Calendar Note',
           ctaHtml: calendarInvite ? '<p>A calendar invite is attached — add it to your calendar to get a reminder.</p><p>See you at the session!</p>' : '<p>See you at the session!</p>'
         }),
@@ -780,6 +795,8 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
                 { label: 'Date', value: slotDateLabel },
                 { label: 'Time', value: `${formatTime12(startTime)} – ${formatTime12(endTime)}` }
               ]
+              ,
+              ...buildBookingFooterEmailConfig(settings)
             }),
             attachments: calAttachment
           });
@@ -942,6 +959,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
               { label: 'Date', value: slotDateLabel },
               { label: 'Time', value: `${formatTime12(startTime)} – ${formatTime12(endTime)}` }
             ],
+            ...buildBookingFooterEmailConfig(settings),
             ctaTitle: 'Calendar Note',
             ctaHtml: calendarInvite ? '<p>A calendar invite is attached — add it to your calendar to get a reminder.</p><p>See you at the session!</p>' : '<p>See you at the session!</p>'
           }),
@@ -973,6 +991,8 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
                 { label: 'Date', value: slotDateLabel },
                 { label: 'Time', value: `${formatTime12(startTime)} – ${formatTime12(endTime)}` }
               ]
+              ,
+              ...buildBookingFooterEmailConfig(settings)
             }),
             attachments: calAttachment
           });
@@ -1296,6 +1316,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
             { label: 'Rental Type', value: booking.rentalType },
             ...(reason ? [{ label: 'Reason', value: reason }] : [])
           ],
+          ...buildBookingFooterEmailConfig(settings),
           ctaTitle: 'Next Step',
           ctaHtml: '<p>Please contact us if you have any questions or would like to book another slot.</p>'
         })
@@ -1390,6 +1411,7 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
             { label: 'Rental Type', value: booking.rentalType },
             { label: 'Price', value: `₹${booking.price}` }
           ],
+          ...buildBookingFooterEmailConfig(settings),
           ctaTitle: 'Support',
           ctaHtml: '<p>If you have any questions, please contact us. If you paid for this booking, please contact us for refund information.</p>'
         })
@@ -1796,6 +1818,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
             { label: 'Price', value: `₹${booking.price}` },
             ...(booking.notes ? [{ label: 'Notes', value: booking.notes }] : [])
           ],
+          ...buildBookingFooterEmailConfig(settings),
           ctaTitle: 'Next Step',
           ctaHtml: updateInvite ? '<p>An updated calendar invite is attached. Please accept it to refresh your calendar slot.</p>' : '<p>If you have any questions about these changes, please contact us.</p>'
         }),
@@ -2171,23 +2194,11 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       status: 'CONFIRMED'
     });
 
-    const loginCredentialsSection = selectedUser.forcePasswordReset ? `
-        <h3>Login Details (Important)</h3>
-        <p>Your account was created by our admin team for this booking.</p>
-        <ul>
-          <li><strong>Login URL:</strong> <a href="${DEFAULT_APP_LOGIN_URL}">${DEFAULT_APP_LOGIN_URL}</a></li>
-          <li><strong>Email:</strong> ${selectedUser.email}</li>
-          <li><strong>Temporary Password:</strong> ${DEFAULT_ADMIN_CREATED_USER_PASSWORD}</li>
-        </ul>
-        <p><strong>Security Notice:</strong> You must reset your password on first login before continuing.</p>
-    ` : '';
-
     await sendUnifiedBookingConfirmationEmails({
       settings,
       booking,
       confirmedByName: req.user.name,
-      calendarInvite,
-      customerExtraHtml: loginCredentialsSection
+      calendarInvite
     });
 
     if (selectedUser.mobile) {

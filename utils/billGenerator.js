@@ -455,7 +455,11 @@ const buildQuotationPresentationData = (data, settings) => {
     }))
   }));
 
-  const bookingTerms = [
+  const configuredEmailSettings = settings?.emailSettings && typeof settings.emailSettings === 'object'
+    ? settings.emailSettings
+    : {};
+
+  const defaultBookingTerms = [
     '50% advance payment is required to confirm and block your booking slot.',
     inhouseHourlyRate > 0
       ? `Extra studio time is billed at ${formatCurrency(inhouseHourlyRate)}/hour, subject to availability.`
@@ -465,9 +469,14 @@ const buildQuotationPresentationData = (data, settings) => {
     'This quotation is valid for 7 days, subject to slot and team availability at confirmation.'
   ];
 
-  const offerLine = data?.calculation?.hasInhouse
-    ? 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.'
-    : 'Priority Offer: Confirm within 48 hours to lock the quoted rates and preferred scheduling support.';
+  const bookingTerms = Array.isArray(configuredEmailSettings.bookingTerms) && configuredEmailSettings.bookingTerms.length > 0
+    ? configuredEmailSettings.bookingTerms.map((term) => String(term || '').trim()).filter(Boolean)
+    : defaultBookingTerms;
+
+  const offerLine = String(configuredEmailSettings.offerLine || '').trim()
+    || (data?.calculation?.hasInhouse
+      ? 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.'
+      : 'Priority Offer: Confirm within 48 hours to lock the quoted rates and preferred scheduling support.');
 
   return {
     studioName,
@@ -494,8 +503,11 @@ const buildQuotationPresentationData = (data, settings) => {
     recipientName: String(data?.recipientName || '').trim(),
     quoteNotes: String(data?.quoteNotes || '').trim(),
     serviceGroups,
+    bookingTermsTitle: String(configuredEmailSettings.bookingTermsTitle || '').trim() || 'Booking Terms',
     bookingTerms,
+    offerBadgeText: String(configuredEmailSettings.offerBadgeText || '').trim() || 'Special Offer',
     offerLine,
+    offerNote: String(configuredEmailSettings.offerNote || '').trim() || 'Reach out to us for special packages tailored to your project needs.',
     confidenceLine: 'Built for artists, bands, composers, and live-session teams who want dependable sound quality and a smooth production experience.',
     introLine: 'We have carefully crafted this quotation based on your requirements to help you plan the best sound quality and production experience.'
   };

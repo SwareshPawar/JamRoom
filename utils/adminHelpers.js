@@ -14,6 +14,20 @@ const DEFAULT_APP_LOGIN_URL = 'https://jam-room-mu.vercel.app/';
 const ADMIN_DELETE_OWNER_EMAIL = 'swareshpawar@gmail.com';
 const IST_TIMEZONE = 'Asia/Kolkata';
 
+const buildBookingFooterEmailConfig = (settings = {}) => {
+  const emailSettings = settings?.emailSettings && typeof settings.emailSettings === 'object'
+    ? settings.emailSettings
+    : {};
+
+  return {
+    bookingFooterTermsTitle: String(emailSettings.bookingTermsTitle || '').trim() || 'Booking Terms',
+    bookingFooterTerms: Array.isArray(emailSettings.bookingTerms) ? emailSettings.bookingTerms : [],
+    bookingFooterOfferBadgeText: String(emailSettings.offerBadgeText || '').trim() || 'Special Offer',
+    bookingFooterOfferLine: String(emailSettings.offerLine || '').trim(),
+    bookingFooterOfferNote: String(emailSettings.offerNote || '').trim()
+  };
+};
+
 // ─── Time Formatting ──────────────────────────────────────────────────────────
 
 const formatTime12Hour = (time24) => {
@@ -563,6 +577,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
           classSessionHtml ? `<div class="notes-card"><h3>Class/Plan Details</h3><div style="font-size:13px;line-height:1.7;color:#475569;"><ul style="margin:0;padding-left:18px;">${classSessionHtml}</ul></div></div>` : '',
           customerExtraHtml ? `<div class="notes-card"><h3>Additional Details</h3>${customerExtraHtml}</div>` : ''
         ],
+        ...buildBookingFooterEmailConfig(settings),
         termsTitle: 'Booking Terms',
         terms: [
           '50% advance payment is required to confirm and block your booking slot.',
@@ -615,6 +630,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
               ...(booking.bandName ? [{ label: 'Band Name', value: booking.bandName }] : [])
             ],
             sectionsHtml: [classSessionHtml ? `<div class="notes-card"><h3>Class/Plan Details</h3><div style="font-size:13px;line-height:1.7;color:#475569;"><ul style="margin:0;padding-left:18px;">${classSessionHtml}</ul></div></div>` : ''],
+            ...buildBookingFooterEmailConfig(settings),
             footerLines: [calendarInvite ? 'A calendar invite is attached to this email.' : '']
           }),
           ...(calendarInvite ? { attachments: [{

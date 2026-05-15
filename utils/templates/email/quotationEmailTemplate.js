@@ -139,15 +139,15 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
         </div>
       </div>
       <div class="terms">
-        <div class="terms-hd">&#9888; Booking Terms</div>
+        <div class="terms-hd">&#9888; ${quotationPresentation.bookingTermsTitle || 'Booking Terms'}</div>
         <ul>
           ${quotationPresentation.bookingTerms.map((term) => `<li>${term}</li>`).join('')}
         </ul>
       </div>
       <div class="offer">
-        <div class="offer-pill">&#127873; Special Offer</div>
+        <div class="offer-pill">&#127873; ${quotationPresentation.offerBadgeText || 'Special Offer'}</div>
         <div class="offer-text">${quotationPresentation.offerLine}</div>
-        <div class="offer-note">Reach out to us for special packages tailored to your project needs.</div>
+        <div class="offer-note">${quotationPresentation.offerNote || 'Reach out to us for special packages tailored to your project needs.'}</div>
       </div>
       <div class="footer">
         <div style="margin:0 0 4px 0;">Visit JamRoom: <a href="${appLoginUrl}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:none;">${appLoginUrl}</a></div>

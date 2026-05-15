@@ -16,6 +16,20 @@ const {
 
 const IST_TIMEZONE = 'Asia/Kolkata';
 
+const buildBookingFooterEmailConfig = (settings = {}) => {
+  const emailSettings = settings?.emailSettings && typeof settings.emailSettings === 'object'
+    ? settings.emailSettings
+    : {};
+
+  return {
+    bookingFooterTermsTitle: String(emailSettings.bookingTermsTitle || '').trim() || 'Booking Terms',
+    bookingFooterTerms: Array.isArray(emailSettings.bookingTerms) ? emailSettings.bookingTerms : [],
+    bookingFooterOfferBadgeText: String(emailSettings.offerBadgeText || '').trim() || 'Special Offer',
+    bookingFooterOfferLine: String(emailSettings.offerLine || '').trim(),
+    bookingFooterOfferNote: String(emailSettings.offerNote || '').trim()
+  };
+};
+
 const formatDateAsYmdInIst = (dateValue) => {
   if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) {
     return '';
@@ -1307,6 +1321,7 @@ router.post('/', protect, async (req, res) => {
             { label: 'Amount', value: `₹${calculatedTotalAmount}` }
           ],
           sectionsHtml: [classSummaryHtml ? `<div class="notes-card"><h3>Class Booking</h3>${classSummaryHtml}</div>` : ''],
+          ...buildBookingFooterEmailConfig(settings),
           ctaTitle: 'Next Step',
           ctaHtml: '<p>Please complete the payment and wait for admin approval. You will receive a confirmation email once approved.</p>',
           termsTitle: 'Booking Terms',
@@ -1380,6 +1395,7 @@ router.post('/', protect, async (req, res) => {
               ...(bandName ? [{ label: 'Band Name', value: bandName }] : [])
             ],
             sectionsHtml: [classSummaryHtml ? `<div class="notes-card"><h3>Class Booking</h3>${classSummaryHtml}</div>` : ''],
+            ...buildBookingFooterEmailConfig(settings),
             ctaTitle: 'Admin Action',
             ctaHtml: `<p>Please review and approve or reject this booking in the admin panel.${normalizedMode === 'perday' ? ' This per-day rental does not block JamRoom hourly slots automatically.' : ''}</p>`,
             termsTitle: 'Notes',
@@ -2038,6 +2054,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
               { label: 'Date', value: proposedDateLabel },
               { label: 'Time', value: `${formatTime12(startTime)} – ${formatTime12(endTime)}` }
             ],
+            ...buildBookingFooterEmailConfig(settings),
             ctaTitle: 'What happens next?',
             ctaHtml: '<p>You will receive a confirmation email once the slot is approved.</p>'
           })
@@ -2068,6 +2085,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
                 { label: 'Requested Date', value: proposedDateLabel },
                 { label: 'Requested Time', value: `${formatTime12(startTime)} – ${formatTime12(endTime)}` }
               ],
+              ...buildBookingFooterEmailConfig(settings),
               ctaTitle: 'Admin Action',
               ctaHtml: '<p>Please review and approve or reject this slot request in the admin panel.</p>'
             })
@@ -2184,6 +2202,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
                 ]),
             { label: 'Rental Type', value: booking.rentalType }
           ],
+          ...buildBookingFooterEmailConfig(settings),
           ctaTitle: 'Calendar Note',
           ctaHtml: cancellationInvite ? '<p>A cancellation calendar invite is attached to remove this slot from your calendar.</p>' : '<p>If you paid for this booking, please contact us for a refund.</p>'
         }),
@@ -2225,6 +2244,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
                 { label: 'Rental Type', value: booking.rentalType },
                 { label: 'Booking ID', value: booking._id }
               ],
+              ...buildBookingFooterEmailConfig(settings),
               ctaTitle: 'Calendar Note',
               ctaHtml: '<p>The attached cancellation invite removes the slot from calendar apps.</p>'
             }),

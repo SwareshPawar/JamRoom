@@ -237,12 +237,13 @@
     gap: 6px;
     align-items: center;
     justify-content: flex-start;
+    min-width: 240px;
 }
 
 .booking-table-actions .btn {
     white-space: nowrap;
-    flex: 0 1 auto;
-    min-width: fit-content;
+    flex: 1 1 calc(50% - 3px);
+    min-width: 96px;
 }
 
 @media (max-width: 768px) {
@@ -260,34 +261,31 @@
 
 @media (max-width: 480px) {
     .booking-table-actions {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
         gap: 6px;
         align-items: stretch;
     }
 
     .booking-table-actions .btn {
-        flex: none;
-        padding: 6px 8px;
-        font-size: 0.7rem;
-        min-width: auto;
+        flex: 1 1 calc(50% - 3px);
+        padding: 6px 10px;
+        font-size: 0.75rem;
+        min-width: 104px;
         text-align: center;
-        white-space: normal;
-        word-break: break-word;
-        line-height: 1.1;
-    }
-
-    /* Allow some buttons to span 2 columns if needed */
-    .booking-table-actions .btn:nth-child(6) {
-        grid-column: span 2;
+        white-space: nowrap;
+        word-break: normal;
+        line-height: 1.2;
     }
 }
 
 .booking-expand-actions {
-    flex-wrap: nowrap;
-    align-items: center;
-    overflow-x: auto;
-    scrollbar-width: thin;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.booking-expand-actions .btn {
+    width: 100%;
 }
 
 .bookings-table-controls {
@@ -1943,11 +1941,13 @@ table td small {
 .booking-expand-actions {
     margin-top: 12px;
     display: flex;
-    flex-wrap: nowrap;
+    flex-direction: column;
     gap: 8px;
-    align-items: center;
-    overflow-x: auto;
-    scrollbar-width: thin;
+    align-items: stretch;
+}
+
+.booking-expand-actions .btn {
+    width: 100%;
 }
 
 .booking-quick-payment-grid {

@@ -292,6 +292,7 @@
                 <!-- Settings Sub-tabs Navigation -->
                 <div class="settings-tabs-nav">
                     <button type="button" class="settings-tab-btn active" data-settings-tab="basic" onclick="switchSettingsTab('basic', this)">⚙️ Basic Settings</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="email" onclick="switchSettingsTab('email', this)">✉️ Email Settings</button>
                     <button type="button" class="settings-tab-btn" data-settings-tab="rentals" onclick="switchSettingsTab('rentals', this)">🏷️ Rental Types & Pricing</button>
                     <button type="button" class="settings-tab-btn" data-settings-tab="bindings" onclick="switchSettingsTab('bindings', this)">🔗 Category Bindings</button>
                     <button type="button" class="settings-tab-btn" data-settings-tab="pdfsections" onclick="switchSettingsTab('pdfsections', this)">📄 PDF Sections</button>
@@ -346,6 +347,40 @@
                                         <small class="settings-help-text">What to call it on bills (e.g., GST, Tax, VAT)</small>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Email Settings Tab -->
+                    <div class="settings-tab-pane" data-settings-pane="email">
+                        <h3 class="settings-section-title">✉️ Email Footer Settings</h3>
+                        <div class="settings-highlight-card" style="margin-bottom: 14px;">
+                            <p class="settings-help-text" style="margin-bottom: 10px;">Configure Booking Terms and Offer footer used in quotation, booking, approval, cancellation, slot, and eBill emails. Additional custom notes stay per-email/per-quotation.</p>
+
+                            <div class="form-grid-3">
+                                <div class="form-group">
+                                    <label for="emailBookingTermsTitle">Booking Terms Heading</label>
+                                    <input type="text" id="emailBookingTermsTitle" maxlength="80" placeholder="Booking Terms">
+                                </div>
+                                <div class="form-group">
+                                    <label for="emailOfferBadgeText">Offer Badge Text</label>
+                                    <input type="text" id="emailOfferBadgeText" maxlength="60" placeholder="Special Offer">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="emailBookingTermsList">Booking Terms (one line per term)</label>
+                                <textarea id="emailBookingTermsList" rows="7" placeholder="50% advance payment is required to confirm and block your booking slot."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="emailOfferLine">Offer Main Line</label>
+                                <textarea id="emailOfferLine" rows="2" placeholder="Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="emailOfferNote">Offer Supporting Note</label>
+                                <textarea id="emailOfferNote" rows="2" placeholder="Reach out to us for special packages tailored to your project needs."></textarea>
                             </div>
                         </div>
                     </div>
@@ -3444,6 +3479,16 @@
             .map((entry) => String(entry || '').trim())
             .filter(Boolean);
 
+        const parseMultilineList = (value) => String(value || '')
+            .split(/\r?\n/)
+            .map((entry) => String(entry || '').trim())
+            .filter(Boolean);
+
+        const formatMultilineList = (items) => (Array.isArray(items) ? items : [])
+            .map((entry) => String(entry || '').trim())
+            .filter(Boolean)
+            .join('\n');
+
         const parseCsvNumberList = (value, { min = 1, max = 24 } = {}) => {
             return [...new Set(
                 String(value || '')
@@ -3529,6 +3574,53 @@
             };
         };
 
+        const loadEmailSettingsForm = (emailSettings = {}) => {
+            const defaults = {
+                bookingTermsTitle: 'Booking Terms',
+                bookingTerms: [
+                    '50% advance payment is required to confirm and block your booking slot.',
+                    'Additional studio time or scope changes are billed at the applicable quoted rate.',
+                    'Cancellation within 24 hours of the scheduled session is non-refundable.',
+                    'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.',
+                    'This quotation is valid for 7 days, subject to slot and team availability at confirmation.'
+                ],
+                offerBadgeText: 'Special Offer',
+                offerLine: 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.',
+                offerNote: 'Reach out to us for special packages tailored to your project needs.'
+            };
+
+            const source = {
+                ...defaults,
+                ...(emailSettings && typeof emailSettings === 'object' ? emailSettings : {})
+            };
+
+            document.getElementById('emailBookingTermsTitle').value = String(source.bookingTermsTitle || defaults.bookingTermsTitle);
+            document.getElementById('emailBookingTermsList').value = formatMultilineList(source.bookingTerms && source.bookingTerms.length > 0 ? source.bookingTerms : defaults.bookingTerms);
+            document.getElementById('emailOfferBadgeText').value = String(source.offerBadgeText || defaults.offerBadgeText);
+            document.getElementById('emailOfferLine').value = String(source.offerLine || defaults.offerLine);
+            document.getElementById('emailOfferNote').value = String(source.offerNote || defaults.offerNote);
+        };
+
+        const collectEmailSettingsFromForm = () => {
+            const fallbackTerms = [
+                '50% advance payment is required to confirm and block your booking slot.',
+                'Additional studio time or scope changes are billed at the applicable quoted rate.',
+                'Cancellation within 24 hours of the scheduled session is non-refundable.',
+                'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.',
+                'This quotation is valid for 7 days, subject to slot and team availability at confirmation.'
+            ];
+
+            const bookingTerms = parseMultilineList(document.getElementById('emailBookingTermsList').value);
+
+            return {
+                bookingTermsTitle: String(document.getElementById('emailBookingTermsTitle').value || '').trim() || 'Booking Terms',
+                bookingTerms: bookingTerms.length > 0 ? bookingTerms : fallbackTerms,
+                offerBadgeText: String(document.getElementById('emailOfferBadgeText').value || '').trim() || 'Special Offer',
+                offerLine: String(document.getElementById('emailOfferLine').value || '').trim() || 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.',
+                offerNote: String(document.getElementById('emailOfferNote').value || '').trim() || 'Reach out to us for special packages tailored to your project needs.'
+            };
+        };
+
         // Load settings
         const loadSettings = async () => {
             try {
@@ -3576,6 +3668,7 @@
                 // Load rental types
                 loadRentalTypes(settings.rentalTypes || []);
                 loadClassConfigForm(settings.classConfig || {});
+                loadEmailSettingsForm(settings.emailSettings || {});
 
                 categoryBindingPairs = Array.isArray(settings?.bookingCategoryBindings?.pairs)
                     ? settings.bookingCategoryBindings.pairs.map((pair) => ({
@@ -3633,6 +3726,7 @@
                     rate: parseFloat(document.getElementById('gstRate').value) / 100 || 0.18, // Convert percentage to decimal
                     displayName: document.getElementById('gstDisplayName').value || 'GST'
                 },
+                emailSettings: collectEmailSettingsFromForm(),
                 classConfig: collectClassConfigFromForm(),
                 instagramEmbeds: collectInstagramEmbeds(),
                 serviceGroupingConfig: collectServiceGroupingConfig()

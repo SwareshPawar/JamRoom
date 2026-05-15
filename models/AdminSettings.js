@@ -334,6 +334,32 @@ const adminSettingsSchema = new mongoose.Schema({
       default: 'GST'
     }
   },
+  emailSettings: {
+    bookingTermsTitle: {
+      type: String,
+      trim: true,
+      default: 'Booking Terms'
+    },
+    bookingTerms: [{
+      type: String,
+      trim: true
+    }],
+    offerBadgeText: {
+      type: String,
+      trim: true,
+      default: 'Special Offer'
+    },
+    offerLine: {
+      type: String,
+      trim: true,
+      default: 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.'
+    },
+    offerNote: {
+      type: String,
+      trim: true,
+      default: 'Reach out to us for special packages tailored to your project needs.'
+    }
+  },
   classConfig: {
     enabled: {
       type: Boolean,
@@ -725,6 +751,38 @@ adminSettingsSchema.statics.getSettings = async function() {
   }
   if (!settings.studioPhone) {
     settings.studioPhone = '+919970011855';
+    needsSave = true;
+  }
+
+  const defaultEmailSettings = {
+    bookingTermsTitle: 'Booking Terms',
+    bookingTerms: [
+      '50% advance payment is required to confirm and block your booking slot.',
+      'Additional studio time or scope changes are billed at the applicable quoted rate.',
+      'Cancellation within 24 hours of the scheduled session is non-refundable.',
+      'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.',
+      'This quotation is valid for 7 days, subject to slot and team availability at confirmation.'
+    ],
+    offerBadgeText: 'Special Offer',
+    offerLine: 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.',
+    offerNote: 'Reach out to us for special packages tailored to your project needs.'
+  };
+
+  const normalizedEmailSettings = {
+    ...defaultEmailSettings,
+    ...(settings.emailSettings && typeof settings.emailSettings === 'object' ? settings.emailSettings : {})
+  };
+
+  normalizedEmailSettings.bookingTerms = Array.isArray(normalizedEmailSettings.bookingTerms)
+    ? normalizedEmailSettings.bookingTerms.map((term) => String(term || '').trim()).filter(Boolean)
+    : defaultEmailSettings.bookingTerms;
+
+  if (normalizedEmailSettings.bookingTerms.length === 0) {
+    normalizedEmailSettings.bookingTerms = defaultEmailSettings.bookingTerms;
+  }
+
+  if (JSON.stringify(settings.emailSettings || {}) !== JSON.stringify(normalizedEmailSettings)) {
+    settings.emailSettings = normalizedEmailSettings;
     needsSave = true;
   }
 
