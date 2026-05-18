@@ -232,18 +232,27 @@
                     ? `${this.escapeHtml(item.date)} | ${this.escapeHtml(item.startTime)} - ${this.escapeHtml(item.endTime)} | ${Number(item.slotCount || 0)} slots`
                     : `${this.escapeHtml(item.displayDate || item.date || '')} | ${this.escapeHtml(item.startTime || '')} - ${this.escapeHtml(item.endTime || '')}`;
 
+                const descriptionText = item.type === 'event'
+                    ? this.escapeHtml(item.description || 'No description provided.')
+                    : `Host: ${this.escapeHtml(item.firstName || 'Artist')}${item.caption ? ` | ${this.escapeHtml(item.caption)}` : ''}`;
+
                 return `
                     <article class="open-event-item ${isSelected ? 'selected' : ''}" data-item-key="${itemKey}">
                         <div class="open-event-item-main">
-                            <p class="open-event-type-pill ${item.type === 'event' ? 'open-event-type-pill-event' : 'open-event-type-pill-session'}">${typeLabel}</p>
-                            <h3 class="open-event-item-title">${this.escapeHtml(item.title || (item.type === 'event' ? 'Open Event' : 'Open JamRoom Session'))}</h3>
-                            <p class="open-event-item-meta">${summary}</p>
-                            ${item.type === 'event'
-                                ? `<p class="open-event-item-description">${this.escapeHtml(item.description || 'No description provided.')}</p>`
-                                : `<p class="open-event-item-description">Host: ${this.escapeHtml(item.firstName || 'Artist')}${item.caption ? ` | ${this.escapeHtml(item.caption)}` : ''}</p>`}
-                        </div>
-                        <div>
-                            <button type="button" class="btn btn-secondary open-event-view-btn" data-item-type="${item.type}" data-item-id="${item.id}">${ctaLabel}</button>
+                            <div class="open-event-item-header">
+                                <div class="open-event-item-info">
+                                    <p class="open-event-type-pill ${item.type === 'event' ? 'open-event-type-pill-event' : 'open-event-type-pill-session'}">${typeLabel}</p>
+                                    <h3 class="open-event-item-title">${this.escapeHtml(item.title || (item.type === 'event' ? 'Open Event' : 'Open JamRoom Session'))}</h3>
+                                    <p class="open-event-item-meta">${summary}</p>
+                                </div>
+                                <div class="open-event-item-actions">
+                                    <button type="button" class="btn btn-secondary open-event-view-btn" data-item-type="${item.type}" data-item-id="${item.id}">${ctaLabel}</button>
+                                    <button type="button" class="open-event-desc-toggle" aria-expanded="false" title="Show description">&#9660;</button>
+                                </div>
+                            </div>
+                            <div class="open-event-item-description-panel" hidden>
+                                <p class="open-event-item-description">${descriptionText}</p>
+                            </div>
                         </div>
                     </article>
                 `;
@@ -422,9 +431,37 @@
 
         bindHandlers() {
             document.addEventListener('click', async (event) => {
+                const descToggle = event.target.closest('.open-event-desc-toggle');
+                const cardClick = event.target.closest('.open-event-item');
+                const isViewBtn = event.target.closest('.open-event-view-btn');
+                const isBookBtn = event.target.closest('.open-event-book-btn');
+                const isCancelBtn = event.target.closest('.open-event-cancel-btn');
+                const isJoinBtn = event.target.closest('.open-session-join-btn');
+                const isPresenceBtn = event.target.closest('.open-session-presence-btn');
+
+                // Toggle description when clicking the arrow OR anywhere on the card
+                // (but not when clicking action buttons)
+                if ((descToggle || cardClick) && !isViewBtn && !isBookBtn && !isCancelBtn && !isJoinBtn && !isPresenceBtn) {
+                    const card = (descToggle || cardClick).closest('.open-event-item');
+                    const panel = card?.querySelector('.open-event-item-description-panel');
+                    const toggle = card?.querySelector('.open-event-desc-toggle');
+                    if (!panel) return;
+                    const isExpanded = toggle?.getAttribute('aria-expanded') === 'true';
+                    if (isExpanded) {
+                        panel.hidden = true;
+                        toggle?.setAttribute('aria-expanded', 'false');
+                        toggle?.classList.remove('open');
+                    } else {
+                        panel.hidden = false;
+                        toggle?.setAttribute('aria-expanded', 'true');
+                        toggle?.classList.add('open');
+                    }
+                    return;
+                }
+
                 const viewBtn = event.target.closest('.open-event-view-btn');
                 if (viewBtn) {
-                    await this.selectItem(viewBtn.dataset.itemType, viewBtn.dataset.itemId, true);
+                    await this.selectItem(viewBtn.dataset.itemType, viewBtn.dataset.itemId, true, viewBtn);
                     return;
                 }
 
@@ -532,7 +569,7 @@
             this.renderer.setAuthLinks(window.location.href);
         }
 
-        async selectItem(type, id, pushHistory) {
+        async selectItem(type, id, pushHistory, triggerBtn = null) {
             if (!type || !id) return;
 
             this.selectedItem = { type, id };
@@ -543,23 +580,36 @@
             this.renderer.renderDiscoveryList(this.getCombinedItems(), this.selectedKey());
 
             if (type === 'event') {
-                await this.showEventInModal(id);
+                await this.showEventInModal(id, triggerBtn);
                 return;
             }
 
             await this.showSessionInModal(id);
         }
 
-        async showEventInModal(eventId) {
+        async showEventInModal(eventId, triggerBtn = null) {
+            const originalBtnText = triggerBtn?.textContent || '';
             try {
+                // Immediate feedback: button loading state + modal opens with spinner
+                if (triggerBtn) {
+                    triggerBtn.disabled = true;
+                    triggerBtn.textContent = 'Loading...';
+                }
+                this.renderer.showLoading('Loading slots...');
+                this.renderer.openDetailModal();
+
                 const details = await this.api.getEvent(eventId);
                 const eventData = details?.event;
                 const slotData = Array.isArray(details?.slots) ? details.slots : [];
                 this.renderer.renderEventDetailsModal(eventData, slotData);
-                this.renderer.openDetailModal();
             } catch (error) {
                 console.error('Failed to load open event details:', error);
-                this.renderer.setStatus('Could not load event slots.');
+                this.renderer.showLoading('Could not load event slots. Please try again.');
+            } finally {
+                if (triggerBtn) {
+                    triggerBtn.disabled = false;
+                    triggerBtn.textContent = originalBtnText;
+                }
             }
         }
 

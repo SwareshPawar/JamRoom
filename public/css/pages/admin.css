@@ -1345,6 +1345,20 @@
     color: var(--text-color);
 }
 
+.open-event-slot-booked {
+    border-left: 3px solid color-mix(in srgb, var(--primary-color) 60%, transparent);
+}
+
+.open-event-slot-free {
+    border-left: 3px solid color-mix(in srgb, #16a34a 60%, transparent);
+    background: color-mix(in srgb, #16a34a 4%, var(--surface-1));
+}
+
+.open-event-slot-badge-free {
+    background: color-mix(in srgb, #16a34a 16%, var(--surface-elevated)) !important;
+    border-color: color-mix(in srgb, #16a34a 28%, var(--border-color-light)) !important;
+}
+
 .open-event-booking-card p {
     margin: 0;
     color: var(--text-color-light);

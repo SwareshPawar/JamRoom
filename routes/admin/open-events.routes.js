@@ -551,11 +551,49 @@ router.get('/open-events/:id/bookings', protect, isAdmin, async (req, res) => {
     }).populate('userId', 'name email mobile').sort({ slotIndex: 1, createdAt: 1 });
 
     const startMinutes = parseTimeToMinutes(event.startTime);
+    const slotCount = event.getSlotCount();
+
+    // Build a map of booked slot indices for quick lookup
+    const bookedBySlot = new Map(
+      bookings.map((b) => [Number(b.slotIndex), b])
+    );
+
+    // Build full slot list (all slots, both booked and free)
+    const slots = Array.from({ length: slotCount }, (_, index) => {
+      const slotStartTime = formatMinutesToTime(startMinutes + (index * event.slotDuration));
+      const slotEndTime = formatMinutesToTime(startMinutes + ((index + 1) * event.slotDuration));
+      const booking = bookedBySlot.get(index);
+      if (booking) {
+        return {
+          slotIndex: index,
+          slotStartTime,
+          slotEndTime,
+          booked: true,
+          id: booking._id,
+          userId: booking.userId,
+          userFirstName: booking.userFirstName,
+          userFullName: String(booking.userId?.name || '').trim(),
+          userName: String(booking.userId?.name || booking.userFirstName || '').trim(),
+          userEmail: String(booking.userId?.email || '').trim(),
+          userPhone: String(booking.userId?.mobile || '').trim(),
+          createdAt: booking.createdAt
+        };
+      }
+      return {
+        slotIndex: index,
+        slotStartTime,
+        slotEndTime,
+        booked: false
+      };
+    });
 
     res.json({
       success: true,
       event: eventSummary(event, bookings.length),
       count: bookings.length,
+      slotCount,
+      slots,
+      // Legacy bookings array for backward compat
       bookings: bookings.map((booking) => ({
         id: booking._id,
         slotIndex: booking.slotIndex,
@@ -714,6 +752,107 @@ router.delete('/open-events/:id', protect, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Delete open event error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete open event' });
+  }
+});
+
+// Free (cancel) a specific booking slot — admin only
+router.delete('/open-events/:id/bookings/:bookingId', protect, isAdmin, async (req, res) => {
+  try {
+    const { id: eventId, bookingId } = req.params;
+
+    const event = await OpenEvent.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Open event not found' });
+    }
+
+    const booking = await OpenEventBooking.findOne({ _id: bookingId, eventId: event._id });
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found for this event' });
+    }
+
+    booking.status = 'cancelled';
+    booking.cancelledAt = new Date();
+    await booking.save();
+
+    res.json({ success: true, message: 'Slot freed successfully' });
+  } catch (error) {
+    console.error('Admin free open event slot error:', error);
+    res.status(500).json({ success: false, message: 'Failed to free slot' });
+  }
+});
+
+// Admin book a slot for a registered user
+router.post('/open-events/:id/bookings', protect, isAdmin, async (req, res) => {
+  try {
+    const { id: eventId } = req.params;
+    const { userId, slotIndex } = req.body;
+
+    if (userId === undefined || slotIndex === undefined) {
+      return res.status(400).json({ success: false, message: 'userId and slotIndex are required' });
+    }
+
+    const event = await OpenEvent.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Open event not found' });
+    }
+
+    const slotCount = event.getSlotCount();
+    const parsedSlotIndex = Number(slotIndex);
+    if (Number.isNaN(parsedSlotIndex) || parsedSlotIndex < 0 || parsedSlotIndex >= slotCount) {
+      return res.status(400).json({ success: false, message: 'Invalid slot index' });
+    }
+
+    const user = await User.findById(userId).select('name email mobile');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Check if slot is already taken
+    const existingBooking = await OpenEventBooking.findOne({
+      eventId: event._id,
+      slotIndex: parsedSlotIndex,
+      status: 'confirmed'
+    });
+    if (existingBooking) {
+      return res.status(409).json({ success: false, message: 'This slot is already booked' });
+    }
+
+    // Check if user already has a slot in this event
+    const userExistingBooking = await OpenEventBooking.findOne({
+      eventId: event._id,
+      userId,
+      status: 'confirmed'
+    });
+    if (userExistingBooking) {
+      return res.status(409).json({ success: false, message: 'This user already has a slot booked in this event' });
+    }
+
+    const firstName = String(user.name || '').trim().split(/\s+/)[0] || 'Guest';
+    const booking = await OpenEventBooking.create({
+      eventId: event._id,
+      slotIndex: parsedSlotIndex,
+      userId,
+      userFirstName: firstName,
+      status: 'confirmed'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Slot booked successfully',
+      booking: {
+        id: booking._id,
+        slotIndex: booking.slotIndex,
+        userId: booking.userId,
+        userFullName: user.name,
+        userEmail: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Admin book open event slot error:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Slot or user conflict — booking already exists' });
+    }
+    res.status(500).json({ success: false, message: 'Failed to book slot' });
   }
 });
 

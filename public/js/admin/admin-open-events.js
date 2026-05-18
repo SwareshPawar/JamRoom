@@ -3,6 +3,8 @@
     let openEventsCache = [];
     let editingOpenEventId = '';
     let draftStatusPending = false;
+    let openEventUsersCache = [];
+    let currentViewingEventId = '';
 
     const formatDateTimeLabel = (event) => `${event.date} | ${event.startTime} - ${event.endTime}`;
 
@@ -146,6 +148,7 @@
                 <p>Status: <strong>${escapeHtml(event.status)}</strong> | Slots: ${event.slotCount} | Booked: ${event.bookingCount || 0}</p>
                 <div class="booking-table-actions">
                     <button type="button" class="btn btn-warning btn-sm admin-open-event-edit-btn" data-event-id="${event.id}" title="Edit this event">✏️ Edit</button>
+                    <button type="button" class="btn btn-secondary btn-sm admin-open-event-copy-btn" data-event-id="${event.id}" title="Create a copy of this event as a new draft">📋 Copy</button>
                     <button type="button" class="btn btn-info btn-sm admin-open-event-details-btn" data-event-id="${event.id}" data-event-title="${escapeHtml(event.title)}" title="View slot bookings">📋 Bookings</button>
                     <button type="button" class="btn btn-success btn-sm admin-open-event-notify-btn" data-event-id="${event.id}" title="Send to all users">📧 Notify</button>
                     <button type="button" class="btn btn-secondary btn-sm admin-open-event-test-email-btn" data-event-id="${event.id}" title="Send test email">🧪 Test</button>
@@ -191,13 +194,14 @@
         container.innerHTML = nonDraftEvents.map((event) => renderEventCard(event)).join('');
     };
 
-    const renderEventDetailsModal = (eventSummary, bookings) => {
+    const renderEventDetailsModal = (eventSummary, slots, users) => {
         const titleEl = document.getElementById('openEventBookingsModalTitle');
         const bodyEl = document.getElementById('openEventBookingsModalBody');
         const modalEl = document.getElementById('openEventBookingsModal');
         if (!bodyEl || !modalEl) return;
 
-        const detailsRows = Array.isArray(bookings) ? bookings : [];
+        const allSlots = Array.isArray(slots) ? slots : [];
+        const bookedCount = allSlots.filter((s) => s.booked).length;
 
         if (titleEl) {
             titleEl.textContent = eventSummary?.title
@@ -205,27 +209,73 @@
                 : 'Open Event Slot Bookings';
         }
 
+        const usersSelectOptions = Array.isArray(users) && users.length > 0
+            ? `<option value="">Select user...</option>${users.map((u) => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join('')}`
+            : '<option value="">No users available</option>';
+
         bodyEl.innerHTML = `
-            <p class="open-event-bookings-summary">${escapeHtml(formatDateTimeLabel(eventSummary || {}))} | Total bookings: ${detailsRows.length}</p>
+            <p class="open-event-bookings-summary">${escapeHtml(formatDateTimeLabel(eventSummary || {}))} | Booked: ${bookedCount} / ${allSlots.length}</p>
             <div class="open-event-bookings-list">
-                ${detailsRows.length === 0
-                    ? '<div class="open-event-booking-empty">No slot bookings yet for this event.</div>'
-                    : detailsRows.map((booking) => `
-                        <article class="open-event-booking-card">
-                            <div class="open-event-booking-slot">
-                                <span class="open-event-booking-slot-badge">Slot ${Number(booking.slotIndex) + 1}</span>
-                                <span class="open-event-booking-time">${escapeHtml(booking.slotStartTime || '--:--')} - ${escapeHtml(booking.slotEndTime || '--:--')}</span>
-                            </div>
-                            <p><strong>Full Name:</strong> ${escapeHtml(booking.userFullName || booking.userName || booking.userFirstName || 'User')}</p>
-                            <p><strong>Email:</strong> ${escapeHtml(booking.userEmail || 'Not available')}</p>
-                            ${booking.userPhone ? `<p><strong>Phone:</strong> ${escapeHtml(booking.userPhone)}</p>` : ''}
-                            <p><strong>Booked At:</strong> ${booking.createdAt ? new Date(booking.createdAt).toLocaleString('en-IN') : 'N/A'}</p>
-                        </article>
-                    `).join('')
+                ${allSlots.length === 0
+                    ? '<div class="open-event-booking-empty">No slots configured for this event.</div>'
+                    : allSlots.map((slot) => {
+                        if (slot.booked) {
+                            return `
+                                <article class="open-event-booking-card open-event-slot-booked">
+                                    <div class="open-event-booking-slot">
+                                        <span class="open-event-booking-slot-badge">Slot ${Number(slot.slotIndex) + 1}</span>
+                                        <span class="open-event-booking-time">${escapeHtml(slot.slotStartTime || '--:--')} - ${escapeHtml(slot.slotEndTime || '--:--')}</span>
+                                    </div>
+                                    <p><strong>Full Name:</strong> ${escapeHtml(slot.userFullName || slot.userName || slot.userFirstName || 'User')}</p>
+                                    <p><strong>Email:</strong> ${escapeHtml(slot.userEmail || 'Not available')}</p>
+                                    ${slot.userPhone ? `<p><strong>Phone:</strong> ${escapeHtml(slot.userPhone)}</p>` : ''}
+                                    <p><strong>Booked At:</strong> ${slot.createdAt ? new Date(slot.createdAt).toLocaleString('en-IN') : 'N/A'}</p>
+                                    <div class="booking-table-actions" style="margin-top:8px;">
+                                        <button type="button" class="btn btn-danger btn-sm admin-open-event-free-slot-btn"
+                                            data-event-id="${escapeHtml(currentViewingEventId)}"
+                                            data-booking-id="${escapeHtml(String(slot.id || ''))}"
+                                            title="Free this slot (cancel booking)">🗑️ Free Slot</button>
+                                    </div>
+                                </article>`;
+                        }
+                        return `
+                            <article class="open-event-booking-card open-event-slot-free">
+                                <div class="open-event-booking-slot">
+                                    <span class="open-event-booking-slot-badge open-event-slot-badge-free">Slot ${Number(slot.slotIndex) + 1}</span>
+                                    <span class="open-event-booking-time">${escapeHtml(slot.slotStartTime || '--:--')} - ${escapeHtml(slot.slotEndTime || '--:--')}</span>
+                                    <span style="color:#16a34a;font-weight:600;margin-left:8px;">Free</span>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+                                    <select id="open-event-slot-user-${slot.slotIndex}" class="form-control" style="flex:1;min-width:180px;max-width:320px;">
+                                        ${usersSelectOptions}
+                                    </select>
+                                    <button type="button" id="open-event-slot-book-btn-${slot.slotIndex}" class="btn btn-primary btn-sm admin-open-event-book-slot-btn"
+                                        data-event-id="${escapeHtml(currentViewingEventId)}"
+                                        data-slot-index="${slot.slotIndex}"
+                                        title="Book this slot for the selected user">Book Slot</button>
+                                </div>
+                            </article>`;
+                    }).join('')
                 }
             </div>
         `;
 
+        modalEl.classList.add('show');
+    };
+
+    const showOpenEventDetailsLoading = (eventTitle = '') => {
+        const titleEl = document.getElementById('openEventBookingsModalTitle');
+        const bodyEl = document.getElementById('openEventBookingsModalBody');
+        const modalEl = document.getElementById('openEventBookingsModal');
+        if (!bodyEl || !modalEl) return;
+
+        if (titleEl) {
+            titleEl.textContent = eventTitle
+                ? `${eventTitle} - Slot Bookings`
+                : 'Open Event Slot Bookings';
+        }
+
+        bodyEl.innerHTML = '<div class="open-event-booking-empty">Loading slot bookings...</div>';
         modalEl.classList.add('show');
     };
 
@@ -380,8 +430,12 @@
 
     const loadOpenEventDetails = async (eventId) => {
         try {
-            const response = await request(`/api/admin/open-events/${encodeURIComponent(eventId)}/bookings`);
-            renderEventDetailsModal(response?.event || {}, response?.bookings || []);
+            currentViewingEventId = String(eventId);
+            const [response, users] = await Promise.all([
+                request(`/api/admin/open-events/${encodeURIComponent(eventId)}/bookings`),
+                loadOpenEventUsers()
+            ]);
+            renderEventDetailsModal(response?.event || {}, response?.slots || [], users);
         } catch (error) {
             console.error('Failed to load open event booking details:', error);
             showAlert(error.message || 'Failed to load open event details', 'error');
@@ -535,6 +589,104 @@
         }
     };
 
+    const copyOpenEvent = (eventId) => {
+        const sourceEvent = openEventsCache.find((e) => String(e.id) === String(eventId));
+        if (!sourceEvent) {
+            showAlert('Event not found.', 'error');
+            return;
+        }
+
+        // Pre-fill the create form with the source event's data, forcing draft status
+        editingOpenEventId = '';
+        draftStatusPending = false;
+
+        const titleInput = document.getElementById('openEventTitle');
+        const descriptionInput = document.getElementById('openEventDescription');
+        const dateInput = document.getElementById('openEventDate');
+        const startSelect = document.getElementById('openEventStartTime');
+        const endSelect = document.getElementById('openEventEndTime');
+        const statusSelect = document.getElementById('openEventStatus');
+
+        if (titleInput) titleInput.value = `Copy of ${sourceEvent.title}`;
+        if (descriptionInput) descriptionInput.value = sourceEvent.description || '';
+        if (dateInput) dateInput.value = sourceEvent.date || '';
+        if (statusSelect) statusSelect.value = 'draft';
+
+        populateOpenEventStartOptions();
+        if (startSelect) startSelect.value = sourceEvent.startTime || '';
+        populateOpenEventEndOptions();
+        if (endSelect) endSelect.value = sourceEvent.endTime || '';
+
+        const modal = document.getElementById('openEventModal');
+        const titleEl = document.getElementById('openEventModalTitle');
+        if (modal) {
+            modal.classList.add('show');
+            if (titleEl) titleEl.textContent = 'Create Copy (New Draft)';
+        }
+        document.body.style.overflow = 'hidden';
+    };
+
+    const loadOpenEventUsers = async () => {
+        if (openEventUsersCache.length > 0) return openEventUsersCache;
+        try {
+            const response = await request('/api/admin/users');
+            const users = Array.isArray(response?.users) ? response.users : [];
+            openEventUsersCache = users.map((u) => ({
+                id: String(u._id || u.id || ''),
+                name: String(u.name || '').trim(),
+                email: String(u.email || '').trim()
+            })).filter((u) => u.id && u.name);
+            return openEventUsersCache;
+        } catch (error) {
+            console.error('Failed to load users for open event booking:', error);
+            return [];
+        }
+    };
+
+    const freeOpenEventSlot = async (eventId, bookingId) => {
+        try {
+            await request(`/api/admin/open-events/${encodeURIComponent(eventId)}/bookings/${encodeURIComponent(bookingId)}`, {
+                method: 'DELETE'
+            });
+            showAlert('Slot freed successfully.');
+            await loadOpenEventDetails(eventId);
+        } catch (error) {
+            console.error('Failed to free slot:', error);
+            showAlert(error.message || 'Failed to free slot', 'error');
+        }
+    };
+
+    const adminBookOpenEventSlot = async (eventId, slotIndex) => {
+        const selectEl = document.getElementById(`open-event-slot-user-${slotIndex}`);
+        const userId = selectEl?.value;
+        if (!userId) {
+            showAlert('Please select a user to book this slot.', 'error');
+            return;
+        }
+
+        const bookBtn = document.getElementById(`open-event-slot-book-btn-${slotIndex}`);
+        const originalText = bookBtn?.textContent || 'Book';
+        try {
+            if (bookBtn) {
+                bookBtn.disabled = true;
+                bookBtn.textContent = 'Booking...';
+            }
+            await request(`/api/admin/open-events/${encodeURIComponent(eventId)}/bookings`, {
+                method: 'POST',
+                body: { userId, slotIndex }
+            });
+            showAlert('Slot booked successfully.');
+            await loadOpenEventDetails(eventId);
+        } catch (error) {
+            console.error('Failed to book slot:', error);
+            showAlert(error.message || 'Failed to book slot', 'error');
+            if (bookBtn) {
+                bookBtn.disabled = false;
+                bookBtn.textContent = originalText;
+            }
+        }
+    };
+
     const bindEvents = () => {
         const form = document.getElementById('openEventCreateForm');
         if (form && !form.dataset.bound) {
@@ -555,6 +707,14 @@
                     const { eventId } = editButton.dataset;
                     if (!eventId) return;
                     startEditingEvent(eventId);
+                    return;
+                }
+
+                const copyButton = event.target.closest('.admin-open-event-copy-btn');
+                if (copyButton) {
+                    const { eventId } = copyButton.dataset;
+                    if (!eventId) return;
+                    copyOpenEvent(eventId);
                     return;
                 }
 
@@ -622,11 +782,50 @@
 
             document.body.addEventListener('click', async (event) => {
                 const detailsButton = event.target.closest('.admin-open-event-details-btn');
-                if (!detailsButton) return;
+                if (detailsButton) {
+                    const { eventId, eventTitle } = detailsButton.dataset;
+                    if (!eventId) return;
+                    const originalText = detailsButton.textContent;
+                    detailsButton.disabled = true;
+                    detailsButton.textContent = 'Loading...';
+                    showOpenEventDetailsLoading(eventTitle || '');
+                    try {
+                        await loadOpenEventDetails(eventId);
+                    } finally {
+                        detailsButton.disabled = false;
+                        detailsButton.textContent = originalText;
+                    }
+                    return;
+                }
 
-                const { eventId } = detailsButton.dataset;
-                if (!eventId) return;
-                await loadOpenEventDetails(eventId);
+                const freeSlotButton = event.target.closest('.admin-open-event-free-slot-btn');
+                if (freeSlotButton) {
+                    const { eventId, bookingId } = freeSlotButton.dataset;
+                    if (!eventId || !bookingId) return;
+                    if (typeof showConfirmationModal === 'function') {
+                        showConfirmationModal(
+                            'Free Slot',
+                            'Are you sure you want to free this slot? The booking will be cancelled.',
+                            'Free Slot',
+                            () => {
+                                void freeOpenEventSlot(eventId, bookingId);
+                            }
+                        );
+                        return;
+                    }
+                    const confirmed = window.confirm('Are you sure you want to free this slot? The booking will be cancelled.');
+                    if (!confirmed) return;
+                    await freeOpenEventSlot(eventId, bookingId);
+                    return;
+                }
+
+                const bookSlotButton = event.target.closest('.admin-open-event-book-slot-btn');
+                if (bookSlotButton) {
+                    const { eventId, slotIndex } = bookSlotButton.dataset;
+                    if (!eventId || slotIndex === undefined) return;
+                    await adminBookOpenEventSlot(eventId, Number(slotIndex));
+                    return;
+                }
             });
             document.body.dataset.adminOpenEventsBound = 'true';
         }
@@ -669,7 +868,10 @@
         openOpenEventModal,
         closeOpenEventModal,
         submitOpenEventWithStatus,
-        deleteOpenEvent
+        deleteOpenEvent,
+        copyOpenEvent,
+        freeOpenEventSlot,
+        adminBookOpenEventSlot
     };
 
     window.loadOpenEvents = loadOpenEvents;
@@ -678,6 +880,7 @@
     window.closeOpenEventModal = closeOpenEventModal;
     window.submitOpenEventWithStatus = submitOpenEventWithStatus;
     window.deleteOpenEvent = deleteOpenEvent;
+    window.copyOpenEvent = copyOpenEvent;
 
     document.addEventListener('DOMContentLoaded', init);
 })();

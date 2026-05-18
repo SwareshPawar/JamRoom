@@ -29,7 +29,7 @@
     <script src="/js/admin/admin-bookings-edit.js"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
-    <script src="/js/admin/admin-open-events.js?v=20260513h"></script>
+    <script src="/js/admin/admin-open-events.js?v=20260518a"></script>
     <script src="/js/vendor/flatpickr.min.js"></script>
     
     <!-- Admin-specific styles -->
@@ -1804,7 +1804,13 @@
             document.getElementById(tab + 'Tab').classList.add('active');
 
             if (tab === 'bookings') loadBookings();
-            if (tab === 'openEvents') loadOpenEvents();
+            if (tab === 'openEvents') {
+                if (window.AdminOpenEvents && typeof window.AdminOpenEvents.loadOpenEvents === 'function') {
+                    window.AdminOpenEvents.loadOpenEvents();
+                } else {
+                    console.error('AdminOpenEvents module is not available.');
+                }
+            }
             if (tab === 'calendar') initCalendar();
             if (tab === 'revenue') loadRevenue();
             if (tab === 'blocked') loadBlockedTimes();
@@ -1812,6 +1818,47 @@
             if (tab === 'users') loadUsersManagementList();
             if (tab === 'savedQuotations') loadSavedQuotations();
             if (tab === 'deletedRecords') loadDeletedRecords(true);
+        };
+
+        // Keep inline handlers stable even if module init timing changes.
+        window.loadOpenEvents = (...args) => {
+            if (window.AdminOpenEvents && typeof window.AdminOpenEvents.loadOpenEvents === 'function') {
+                return window.AdminOpenEvents.loadOpenEvents(...args);
+            }
+            console.error('AdminOpenEvents module is not available.');
+            return Promise.resolve();
+        };
+
+        window.openOpenEventModal = (...args) => {
+            if (window.AdminOpenEvents && typeof window.AdminOpenEvents.openOpenEventModal === 'function') {
+                return window.AdminOpenEvents.openOpenEventModal(...args);
+            }
+            console.error('AdminOpenEvents module is not available.');
+            return undefined;
+        };
+
+        window.closeOpenEventModal = (...args) => {
+            if (window.AdminOpenEvents && typeof window.AdminOpenEvents.closeOpenEventModal === 'function') {
+                return window.AdminOpenEvents.closeOpenEventModal(...args);
+            }
+            console.error('AdminOpenEvents module is not available.');
+            return undefined;
+        };
+
+        window.submitOpenEventWithStatus = (...args) => {
+            if (window.AdminOpenEvents && typeof window.AdminOpenEvents.submitOpenEventWithStatus === 'function') {
+                return window.AdminOpenEvents.submitOpenEventWithStatus(...args);
+            }
+            console.error('AdminOpenEvents module is not available.');
+            return undefined;
+        };
+
+        window.switchOpenEventsTab = (...args) => {
+            if (window.AdminOpenEvents && typeof window.AdminOpenEvents.switchOpenEventsTab === 'function') {
+                return window.AdminOpenEvents.switchOpenEventsTab(...args);
+            }
+            console.error('AdminOpenEvents module is not available.');
+            return Promise.resolve();
         };
 
         // Settings sub-tab switching

@@ -94,9 +94,13 @@
     border-radius: 12px;
     padding: 14px;
     background: var(--surface-elevated, #ffffff);
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.open-event-item:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--primary-color) 10%, transparent);
 }
 
 .open-event-item.selected {
@@ -106,7 +110,59 @@
 
 .open-event-item-main {
     display: grid;
+    gap: 8px;
+}
+
+.open-event-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.open-event-item-info {
+    display: grid;
     gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.open-event-item-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.open-event-desc-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: var(--surface-1, #f9fafb);
+    color: var(--text-color-light, #6b7280);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: transform 0.2s ease, background 0.15s;
+    padding: 0;
+}
+
+.open-event-desc-toggle:hover {
+    background: color-mix(in srgb, var(--primary-color) 10%, var(--surface-1));
+    border-color: color-mix(in srgb, var(--primary-color) 30%, var(--border-color));
+    color: var(--text-color);
+}
+
+.open-event-desc-toggle.open {
+    transform: rotate(180deg);
+}
+
+.open-event-item-description-panel {
+    padding-top: 2px;
 }
 
 .open-event-type-pill {
