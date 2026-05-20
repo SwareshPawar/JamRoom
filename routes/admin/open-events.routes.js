@@ -207,7 +207,7 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, recipien
   a[x-apple-data-detectors],u + #body a,#MessageViewBody a{color:inherit !important;text-decoration:inherit !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important}
   .wrap{max-width:760px;margin:0 auto;padding:20px 12px}
   .card{background:linear-gradient(180deg,#071127 0%,#0b1630 100%);border-radius:24px;overflow:hidden;border:1px solid rgba(123,97,255,0.16);box-shadow:0 20px 50px rgba(0,0,0,0.35)}
-  .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:22px 24px 18px;color:#fff}
+  .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0f7ec0 100%);padding:22px 24px 18px;color:#fff}
   .hdr-table{width:100%;border-collapse:collapse}
   .hdr-left{vertical-align:top;padding-right:14px}
   .hdr-right{vertical-align:top;width:210px}

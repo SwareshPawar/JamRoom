@@ -32,7 +32,7 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
   a[x-apple-data-detectors],u + #body a,#MessageViewBody a{color:inherit !important;text-decoration:inherit !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important}
   .eq{max-width:760px;margin:0 auto;padding:12px}
   .card{background:#fff;border-radius:16px;overflow:hidden;border:1px solid #dbe5f0}
-  .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:20px}
+  .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0f7ec0 100%);color:#fff;padding:20px}
   .hdr-table{width:100%;border-collapse:collapse}
   .hdr-left{vertical-align:top;padding-right:14px}
   .hdr-right{vertical-align:top;width:210px}

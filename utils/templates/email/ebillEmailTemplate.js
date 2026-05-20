@@ -90,7 +90,7 @@ const buildEbillEmailHtml = ({
   a[x-apple-data-detectors],u + #body a,#MessageViewBody a{color:inherit !important;text-decoration:inherit !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important}
   .eq{max-width:660px;margin:0 auto;padding:12px}
   .card{background:#fff;border-radius:22px;overflow:hidden;border:1px solid #d2e2fb;box-shadow:0 18px 40px rgba(30,58,138,0.14)}
-  .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0e7490 100%);color:#fff;padding:20px;position:relative}
+  .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0f7ec0 100%);color:#fff;padding:20px;position:relative}
   .hdr:after{content:'';position:absolute;inset:auto 0 0 0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)}
   .hdr:before{content:'';position:absolute;top:-90px;right:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.27) 0%,rgba(255,255,255,0) 70%)}
   .hdr h2{margin:0 0 6px 0;font-size:20px;color:#fff}
