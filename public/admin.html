@@ -23,13 +23,13 @@
     <!-- Client-side PDF Generation -->
     <script src="/js/client-pdf-generator.js"></script>
     <!-- Admin extraction modules -->
-    <script src="/js/admin/admin-dashboard.js"></script>
-    <script src="/js/admin/admin-bookings.js"></script>
+    <script src="/js/admin/admin-dashboard.js?v=20260520b"></script>
+    <script src="/js/admin/admin-bookings.js?v=20260520a"></script>
     <script src="/js/admin/admin-bookings-actions.js"></script>
     <script src="/js/admin/admin-bookings-edit.js"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
-    <script src="/js/admin/admin-open-events.js?v=20260518a"></script>
+    <script src="/js/admin/admin-open-events.js?v=20260520d"></script>
     <script src="/js/vendor/flatpickr.min.js"></script>
     
     <!-- Admin-specific styles -->
@@ -44,27 +44,72 @@
 
     <div class="dashboard">
         <!-- Statistics -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Total Bookings</h3>
-                <div class="number stat-number-loading" id="totalBookings" aria-live="polite">Loading...</div>
-            </div>
-            <div class="stat-card">
-                <h3>Pending Approval</h3>
-                <div class="number stat-number-loading" id="pendingBookings" aria-live="polite">Loading...</div>
-            </div>
-            <div class="stat-card">
-                <h3>Confirmed</h3>
-                <div class="number stat-number-loading" id="confirmedBookings" aria-live="polite">Loading...</div>
-            </div>
-            <div class="stat-card">
-                <h3>Total Revenue</h3>
-                <div class="number stat-number-loading" id="totalRevenue" aria-live="polite">Loading...</div>
-            </div>
-            <div class="stat-card stat-card-outstanding">
-                <h3>Total Outstanding</h3>
-                <div class="number stat-number-loading" id="totalUnpaidAmount" aria-live="polite">Loading...</div>
-            </div>
+        <div class="kpi-rows">
+            <section class="kpi-row-section">
+                <h3 class="kpi-row-title">Primary KPIs</h3>
+                <div class="stats-grid stats-grid-4">
+                    <div class="stat-card">
+                        <h3>Total Bookings</h3>
+                        <div class="number stat-number-loading" id="totalBookings" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Confirmed</h3>
+                        <div class="number stat-number-loading" id="confirmedBookings" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Monthly Revenue</h3>
+                        <div class="number stat-number-loading" id="monthlyRevenue" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card stat-card-outstanding">
+                        <h3>Outstanding Payments</h3>
+                        <div class="number stat-number-loading" id="totalUnpaidAmount" aria-live="polite">Loading...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="kpi-row-section">
+                <h3 class="kpi-row-title">Business Health</h3>
+                <div class="stats-grid stats-grid-4">
+                    <div class="stat-card">
+                        <h3>Room Utilization %</h3>
+                        <div class="number stat-number-loading" id="roomUtilizationPct" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Revenue Growth %</h3>
+                        <div class="number stat-number-loading" id="revenueGrowthPct" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>New Customers</h3>
+                        <div class="number stat-number-loading" id="newCustomers" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Repeat Customers</h3>
+                        <div class="number stat-number-loading" id="repeatCustomers" aria-live="polite">Loading...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="kpi-row-section">
+                <h3 class="kpi-row-title">Operations</h3>
+                <div class="stats-grid stats-grid-4">
+                    <div class="stat-card">
+                        <h3>Upcoming Sessions</h3>
+                        <div class="number stat-number-loading" id="upcomingSessions" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Pending Approval</h3>
+                        <div class="number stat-number-loading" id="pendingBookings" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Cancellations</h3>
+                        <div class="number stat-number-loading" id="cancellations" aria-live="polite">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Avg Booking Duration</h3>
+                        <div class="number stat-number-loading" id="avgBookingDuration" aria-live="polite">Loading...</div>
+                    </div>
+                </div>
+            </section>
         </div>
 
         <!-- Tabs -->
@@ -85,7 +130,10 @@
             <div id="bookingsTab" class="tab-content active">
                 <div class="admin-toolbar">
                     <h2>Manage Bookings</h2>
-                    <button class="btn btn-primary" onclick="showCreateBookingModal()">➕ Create Booking</button>
+                    <div>
+                        <button class="btn btn-secondary" onclick="loadBookings()">Refresh</button>
+                        <button class="btn btn-primary" onclick="showCreateBookingModal()">➕ Create Booking</button>
+                    </div>
                 </div>
                 <div id="bookingAlert" class="alert"></div>
                 <div id="bookingsLoading" class="loading">Loading bookings...</div>
@@ -101,7 +149,7 @@
 
                 <div class="settings-tabs-nav" id="openEventsTabsNav">
                     <button type="button" class="settings-tab-btn active" data-open-events-tab="events" onclick="switchOpenEventsTab('events', this)">🎤 Open Event</button>
-                    <button type="button" class="settings-tab-btn" data-open-events-tab="drafts" onclick="switchOpenEventsTab('drafts', this)">📝 Draft Open Events</button>
+                    <button type="button" class="settings-tab-btn" data-open-events-tab="drafts" onclick="switchOpenEventsTab('drafts', this)">🗂️ Event List</button>
                 </div>
 
                 <div class="settings-tab-pane active" data-open-events-pane="events">
@@ -119,11 +167,37 @@
                 <div class="settings-tab-pane" data-open-events-pane="drafts">
                     <div class="section" id="openEventDraftTemplatesSection">
                         <div class="admin-toolbar">
-                            <h3>Draft Open Events</h3>
+                            <h3>Event List</h3>
                             <button type="button" class="btn btn-secondary" onclick="loadOpenEvents()">Refresh</button>
+                        </div>
+                        <div class="admin-open-event-list-controls">
+                            <input type="text" id="openEventListSearch" class="users-search-input" placeholder="Search by title, notes, status, date">
+                            <select id="openEventListStatusFilter" class="users-search-input" style="max-width: 180px;">
+                                <option value="all">All Statuses</option>
+                                <option value="draft">Draft</option>
+                                <option value="published">Published</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                            <select id="openEventListSort" class="users-search-input" style="max-width: 220px;">
+                                <option value="date_desc">Date: Newest First</option>
+                                <option value="date_asc">Date: Oldest First</option>
+                                <option value="title_asc">Title: A to Z</option>
+                                <option value="status_asc">Status: A to Z</option>
+                                <option value="updated_desc">Recently Updated</option>
+                            </select>
                         </div>
                         <div id="openEventDraftPanel" class="open-event-bookings-list"></div>
                     </div>
+                </div>
+            </div>
+
+            <div id="openEventInfoModal" class="modal admin-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="openEventInfoModalTitle">Open Event Details</h2>
+                        <button type="button" class="close" onclick="closeOpenEventInfoModal()">&times;</button>
+                    </div>
+                    <div class="modal-body" id="openEventInfoModalBody"></div>
                 </div>
             </div>
 
@@ -140,9 +214,17 @@
                                 <label for="openEventTitle">Title*</label>
                                 <input type="text" id="openEventTitle" required maxlength="120" placeholder="Open Mic Friday">
                             </div>
-                            <div class="form-group">
+                            <div class="form-group admin-open-event-textarea-group">
+                                <label for="openEventQuickFacts">Quick Facts</label>
+                                <textarea id="openEventQuickFacts" rows="4" maxlength="1200" placeholder="Add key event facts. Each new line becomes a bullet in emails."></textarea>
+                            </div>
+                            <div class="form-group admin-open-event-textarea-group">
                                 <label for="openEventDescription">Description</label>
-                                <textarea id="openEventDescription" rows="3" maxlength="1000" placeholder="Tell performers what this event is about."></textarea>
+                                <textarea id="openEventDescription" rows="4" maxlength="1000" placeholder="Tell performers what this event is about. Each new line becomes a bullet in emails."></textarea>
+                            </div>
+                            <div class="form-group admin-open-event-textarea-group">
+                                <label for="openEventNotes">Notes</label>
+                                <textarea id="openEventNotes" rows="4" maxlength="1500" placeholder="Add event notes, instructions, or things to carry. Each new line becomes a bullet in emails."></textarea>
                             </div>
                             <div class="form-group">
                                 <label for="openEventDate">Date*</label>
@@ -163,6 +245,7 @@
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" onclick="closeOpenEventModal()">Cancel</button>
                                 <button type="button" class="btn btn-outline" id="openEventSaveDraftBtn" onclick="submitOpenEventWithStatus('draft')">Save as Draft</button>
+                                <button type="button" class="btn btn-outline admin-hidden" id="openEventMoveToDraftBtn" onclick="moveEditingOpenEventToDraft()">Move to Draft</button>
                                 <button type="submit" class="btn btn-primary" id="openEventCreateSubmit">Create Open Event</button>
                             </div>
                         </form>
@@ -172,7 +255,10 @@
 
             <!-- Calendar Tab -->
             <div id="calendarTab" class="tab-content">
-                <h2>Booking Calendar</h2>
+                <div class="admin-toolbar">
+                    <h2>Booking Calendar</h2>
+                    <button class="btn btn-secondary" onclick="loadCalendar()">Refresh</button>
+                </div>
                 <div id="calendarAlert" class="alert"></div>
                 <div class="calendar-controls calendar-controls-spaced">
                     <select id="calendarMonth">
@@ -200,7 +286,10 @@
 
             <!-- Revenue Tab -->
             <div id="revenueTab" class="tab-content">
-                <h2>Revenue Analytics</h2>
+                <div class="admin-toolbar">
+                    <h2>Revenue Analytics</h2>
+                    <button class="btn btn-secondary" onclick="loadRevenue()">Refresh</button>
+                </div>
                 <div id="revenueAlert" class="alert"></div>
                 
                 <!-- Revenue Filters -->
@@ -272,8 +361,13 @@
 
             <!-- Blocked Times Tab -->
             <div id="blockedTab" class="tab-content">
-                <h2>Blocked Time Slots</h2>
-                <button class="btn btn-primary" onclick="showBlockTimeModal()">+ Block New Time</button>
+                <div class="admin-toolbar">
+                    <h2>Blocked Time Slots</h2>
+                    <div>
+                        <button class="btn btn-secondary" onclick="loadBlockedTimes()">Refresh</button>
+                        <button class="btn btn-primary" onclick="showBlockTimeModal()">+ Block New Time</button>
+                    </div>
+                </div>
                 <select id="blockedDeletedFilter" class="users-search-input" style="max-width: 170px; margin-left: 10px;">
                     <option value="active" selected>Active Blocks</option>
                     <option value="deleted">Deleted Blocks</option>
@@ -286,7 +380,10 @@
 
             <!-- Settings Tab -->
             <div id="settingsTab" class="tab-content">
-                <h2>Admin Settings</h2>
+                <div class="admin-toolbar">
+                    <h2>Admin Settings</h2>
+                    <button class="btn btn-secondary" onclick="loadSettings()">Refresh</button>
+                </div>
                 <div id="settingsAlert" class="alert"></div>
                 
                 <!-- Settings Sub-tabs Navigation -->
@@ -572,7 +669,7 @@
 
                     <div class="users-card">
                         <div class="users-card-header">
-                            <h3>Registered Users</h3>
+                            <h3>Registered Users <span id="usersManagementCount" class="text-muted-xs">(0)</span></h3>
                             <div class="users-table-controls">
                                 <input type="text" id="usersSearchInput" class="users-search-input" placeholder="Search by name, email, mobile">
                                 <select id="usersDeletedFilter" class="users-search-input" style="max-width: 170px;">
@@ -1892,6 +1989,7 @@
 
         const loadUsersManagementList = async () => {
             const tableContainer = document.getElementById('usersManagementTable');
+            const usersCountEl = document.getElementById('usersManagementCount');
             if (!tableContainer) return;
 
             tableContainer.innerHTML = window.JamRoomUtils?.getSectionLoaderMarkup
@@ -1915,8 +2013,14 @@
                 const result = await res.json();
                 usersManagementData = Array.isArray(result.users) ? result.users : [];
                 usersManagementById = new Map(usersManagementData.map((user) => [String(user._id), user]));
+                if (usersCountEl) {
+                    usersCountEl.textContent = `(${Number(result.count) || usersManagementData.length})`;
+                }
                 renderUsersManagementTable(usersManagementData);
             } catch (error) {
+                if (usersCountEl) {
+                    usersCountEl.textContent = '(0)';
+                }
                 tableContainer.innerHTML = `<div class="text-danger">${error.message}</div>`;
             }
         };

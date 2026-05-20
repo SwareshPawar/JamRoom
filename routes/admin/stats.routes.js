@@ -11,6 +11,14 @@ const { protect } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/admin');
 const { computeCollectedAmount } = require('../../utils/adminHelpers');
 
+const parseTimeToMinutes = (timeValue) => {
+  const [hourPart, minutePart] = String(timeValue || '').split(':');
+  const hours = Number(hourPart);
+  const minutes = Number(minutePart);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return NaN;
+  return (hours * 60) + minutes;
+};
+
 // @route   GET /api/admin/debug-pdf
 // @desc    Debug PDF generation environment (for production troubleshooting)
 // @access  Private/Admin
@@ -257,18 +265,28 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.get('/stats', protect, isAdmin, async (req, res) => {
   try {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const daysInThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
     const [
       totalBookings,
       pendingBookingApprovals,
       confirmedBookings,
       confirmedPaymentBookings,
       pendingSlotApprovalAgg,
-      recentBookings
+      recentBookings,
+      upcomingSessions,
+      cancellations,
+      settings
     ] = await Promise.all([
       Booking.countDocuments(),
       Booking.countDocuments({ bookingStatus: 'PENDING' }),
       Booking.countDocuments({ bookingStatus: 'CONFIRMED' }),
-      Booking.find({ bookingStatus: 'CONFIRMED' }).select('price paymentStatus amountPaid'),
+      Booking.find({ bookingStatus: 'CONFIRMED' }).select('price paymentStatus amountPaid date duration userId'),
       Booking.aggregate([
         {
           $match: {
@@ -299,7 +317,13 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
       Booking.find()
         .populate('userId', 'name email')
         .sort({ createdAt: -1 })
-        .limit(5)
+        .limit(5),
+      Booking.countDocuments({ bookingStatus: 'CONFIRMED', date: { $gte: todayStart } }),
+      Booking.countDocuments({
+        bookingStatus: { $in: ['CANCELLED', 'REJECTED'] },
+        date: { $gte: thisMonthStart, $lt: nextMonthStart }
+      }),
+      AdminSettings.getSettings()
     ]);
 
     const pendingSlotApprovals = Number(pendingSlotApprovalAgg?.[0]?.total || 0);
@@ -312,14 +336,80 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
         amountPaid: booking.amountPaid
       });
       const due = Math.max(0, Number(booking.price || 0) - collected);
+      const bookingDate = booking?.date ? new Date(booking.date) : null;
+      const bookingDuration = Number(booking?.duration || 0);
+      const userId = String(booking?.userId || '');
 
       acc.totalRevenue += collected;
       if (due > 0) {
         acc.totalUnpaidAmount += due;
       }
 
+      if (userId) {
+        const current = acc.customerStats.get(userId) || {
+          count: 0,
+          firstBookingDate: null,
+          hasThisMonthBooking: false
+        };
+
+        current.count += 1;
+        if (!current.firstBookingDate || (bookingDate && bookingDate < current.firstBookingDate)) {
+          current.firstBookingDate = bookingDate;
+        }
+        if (bookingDate && bookingDate >= thisMonthStart && bookingDate < nextMonthStart) {
+          current.hasThisMonthBooking = true;
+        }
+
+        acc.customerStats.set(userId, current);
+      }
+
+      if (bookingDate && bookingDate >= thisMonthStart && bookingDate < nextMonthStart) {
+        acc.thisMonthRevenue += collected;
+        acc.thisMonthConfirmedDuration += bookingDuration;
+        acc.thisMonthConfirmedCount += 1;
+      } else if (bookingDate && bookingDate >= lastMonthStart && bookingDate < thisMonthStart) {
+        acc.lastMonthRevenue += collected;
+      }
+
       return acc;
-    }, { totalRevenue: 0, totalUnpaidAmount: 0 });
+    }, {
+      totalRevenue: 0,
+      totalUnpaidAmount: 0,
+      thisMonthRevenue: 0,
+      lastMonthRevenue: 0,
+      thisMonthConfirmedDuration: 0,
+      thisMonthConfirmedCount: 0,
+      customerStats: new Map()
+    });
+
+    const startMinutes = parseTimeToMinutes(settings?.businessHours?.startTime || '09:00');
+    const endMinutes = parseTimeToMinutes(settings?.businessHours?.endTime || '22:00');
+    const operatingMinutesPerDay = Number.isNaN(startMinutes) || Number.isNaN(endMinutes)
+      ? 13 * 60
+      : Math.max(0, endMinutes - startMinutes);
+    const monthlyCapacityHours = (operatingMinutesPerDay / 60) * daysInThisMonth;
+    const roomUtilizationPct = monthlyCapacityHours > 0
+      ? (statsTotals.thisMonthConfirmedDuration / monthlyCapacityHours) * 100
+      : 0;
+
+    const revenueGrowthPct = statsTotals.lastMonthRevenue > 0
+      ? ((statsTotals.thisMonthRevenue - statsTotals.lastMonthRevenue) / statsTotals.lastMonthRevenue) * 100
+      : (statsTotals.thisMonthRevenue > 0 ? 100 : 0);
+
+    let newCustomers = 0;
+    let repeatCustomers = 0;
+    statsTotals.customerStats.forEach((customer) => {
+      if (customer.count >= 2) {
+        repeatCustomers += 1;
+      }
+      if (customer.firstBookingDate && customer.firstBookingDate >= thisMonthStart && customer.firstBookingDate < nextMonthStart) {
+        newCustomers += 1;
+      }
+    });
+
+    const avgBookingDuration = statsTotals.thisMonthConfirmedCount > 0
+      ? statsTotals.thisMonthConfirmedDuration / statsTotals.thisMonthConfirmedCount
+      : 0;
 
     res.json({
       success: true,
@@ -330,7 +420,16 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
         pendingSlotApprovals,
         confirmedBookings,
         totalRevenue: statsTotals.totalRevenue,
+        thisMonthRevenue: statsTotals.thisMonthRevenue,
+        lastMonthRevenue: statsTotals.lastMonthRevenue,
         totalUnpaidAmount: statsTotals.totalUnpaidAmount,
+        roomUtilizationPct,
+        revenueGrowthPct,
+        newCustomers,
+        repeatCustomers,
+        upcomingSessions,
+        cancellations,
+        avgBookingDuration,
         recentBookings
       }
     });

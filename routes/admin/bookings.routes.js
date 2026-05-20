@@ -114,6 +114,36 @@ const resolveDeletedFilterMode = (value) => {
   return 'active';
 };
 
+const resolveBookingListPreset = (value) => {
+  const normalized = String(value || 'active').trim().toLowerCase();
+
+  switch (normalized) {
+    case 'pending':
+      return { deletedMode: 'active', bookingStatus: 'PENDING' };
+    case 'confirmed':
+      return { deletedMode: 'active', bookingStatus: 'CONFIRMED' };
+    case 'rejected':
+      return { deletedMode: 'active', bookingStatus: 'REJECTED' };
+    case 'cancelled':
+      return { deletedMode: 'active', bookingStatus: 'CANCELLED' };
+    case 'paid':
+      return { deletedMode: 'active', paymentStatus: 'PAID' };
+    case 'partial':
+      return { deletedMode: 'active', paymentStatus: 'PARTIAL' };
+    case 'payment_pending':
+      return { deletedMode: 'active', paymentStatus: 'PENDING' };
+    case 'refunded':
+      return { deletedMode: 'active', paymentStatus: 'REFUNDED' };
+    case 'deleted':
+      return { deletedMode: 'deleted' };
+    case 'all':
+      return { deletedMode: 'all' };
+    case 'active':
+    default:
+      return { deletedMode: 'active', excludeBookingStatus: 'REJECTED' };
+  }
+};
+
 // @route   GET /api/admin/bookings/calendar
 // @desc    Get bookings formatted for calendar view
 // @access  Private/Admin
@@ -225,7 +255,8 @@ router.get('/availability/:date', protect, isAdmin, async (req, res) => {
 router.get('/bookings', protect, isAdmin, async (req, res) => {
   try {
     const { status, date, startDate, endDate, q, sortBy, deleted } = req.query;
-    const deletedFilterMode = resolveDeletedFilterMode(deleted);
+    const filterPreset = resolveBookingListPreset(deleted);
+    const deletedFilterMode = resolveDeletedFilterMode(filterPreset.deletedMode);
     const includeDeleted = deletedFilterMode !== 'active';
 
     const parsedPage = Number.parseInt(req.query.page, 10);
@@ -241,6 +272,14 @@ router.get('/bookings', protect, isAdmin, async (req, res) => {
 
     if (status) {
       query.bookingStatus = status;
+    } else if (filterPreset.bookingStatus) {
+      query.bookingStatus = filterPreset.bookingStatus;
+    } else if (filterPreset.excludeBookingStatus) {
+      query.bookingStatus = { $ne: filterPreset.excludeBookingStatus };
+    }
+
+    if (filterPreset.paymentStatus) {
+      query.paymentStatus = filterPreset.paymentStatus;
     }
 
     if (date) {

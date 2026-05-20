@@ -132,7 +132,9 @@ const buildSlots = ({ event, confirmedBookings, myBookingSlotIndex, includeBooke
 const eventSummary = (event, bookingCount = 0) => ({
   id: event._id,
   title: event.title,
+  quickFacts: event.quickFacts,
   description: event.description,
+  notes: event.notes,
   date: event.date,
   startTime: event.startTime,
   endTime: event.endTime,

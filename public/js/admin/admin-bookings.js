@@ -170,6 +170,20 @@
         classLessonContext: null
     };
 
+    const bookingFilterOptions = [
+        { value: 'active', label: 'Active Bookings' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'confirmed', label: 'Confirmed' },
+        { value: 'paid', label: 'Paid' },
+        { value: 'partial', label: 'Partially Paid' },
+        { value: 'payment_pending', label: 'Payment Pending' },
+        { value: 'refunded', label: 'Refunded' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'cancelled', label: 'Cancelled' },
+        { value: 'deleted', label: 'Deleted' },
+        { value: 'all', label: 'All Records' }
+    ];
+
     const getVisibleBookingIds = () => (Array.isArray(state.allBookings) ? state.allBookings : [])
         .map((booking) => String(booking?._id || '').trim())
         .filter(Boolean);
@@ -755,9 +769,9 @@
                     <option value="status_asc" ${state.sortBy === 'status_asc' ? 'selected' : ''}>Status: A to Z</option>
                 </select>
                 <select id="bookingsDeletedFilter" class="bookings-sort-select">
-                    <option value="active" ${state.deletedFilter === 'active' ? 'selected' : ''}>Active</option>
-                    <option value="deleted" ${state.deletedFilter === 'deleted' ? 'selected' : ''}>Deleted</option>
-                    <option value="all" ${state.deletedFilter === 'all' ? 'selected' : ''}>All</option>
+                    ${bookingFilterOptions.map((option) => `
+                        <option value="${option.value}" ${state.deletedFilter === option.value ? 'selected' : ''}>${option.label}</option>
+                    `).join('')}
                 </select>
                 <select id="bookingsPageSize" class="bookings-limit-select">
                     <option value="5" ${state.pageSize === 5 ? 'selected' : ''}>Show 5</option>
@@ -1643,8 +1657,6 @@
             hideLoading();
         }
     };
-
-    window.AdminBookings = window.AdminBookings || {};
         const approveSlotRequest = async (bookingId, lessonId) => {
             const deps = state.loadDeps;
             if (!deps?.apiUrl) { alert('Unable to approve slot. Please refresh.'); return; }

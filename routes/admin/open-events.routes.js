@@ -39,6 +39,47 @@ const formatTime12Hour = (time24) => {
   return `${hour12}:${String(minutesNum).padStart(2, '0')} ${suffix}`;
 };
 
+const escapeHtml = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const parseEmailBulletLines = (value) => String(value || '')
+  .split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter(Boolean);
+
+const resolveRecipientDisplayName = (recipientName = '', recipientEmail = '') => {
+  const normalizedName = String(recipientName || '').trim();
+  if (normalizedName) return normalizedName;
+
+  const emailLocalPart = String(recipientEmail || '').trim().split('@')[0] || '';
+  return emailLocalPart || 'there';
+};
+
+const renderEmailBulletSection = (title, value, accentClass) => {
+  const lines = parseEmailBulletLines(value);
+  if (lines.length === 0) return '';
+
+  return `
+    <div class="detail-card ${accentClass}">
+      <div class="detail-card-title">${escapeHtml(title)}</div>
+      <ul class="detail-list">
+        ${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+};
+
+const renderEmailDescriptionParagraph = (value) => {
+  const lines = parseEmailBulletLines(value);
+  if (lines.length === 0) return '';
+
+  return `<p class="description-copy">${lines.map((line) => escapeHtml(line)).join('<br><br>')}</p>`;
+};
+
 const toIstDateTime = (dateValue, timeValue) => new Date(`${dateValue}T${timeValue}:00${IST_OFFSET}`);
 
 const formatWeekdayInIst = (dateValue) => {
@@ -53,7 +94,10 @@ const formatWeekdayInIst = (dateValue) => {
 
 const buildOpenEventCalendarInvite = ({ event, settings, recipients = [] }) => generateCalendarInvite({
   title: `Swar JRS - ${event.title}`,
-  description: event.description || 'Open Event schedule from Swar JamRoom.',
+  description: [
+    String(event.description || '').trim(),
+    String(event.notes || '').trim()
+  ].filter(Boolean).join('\n\n') || 'Open Event schedule from Swar JamRoom.',
   location: settings?.studioAddress || DEFAULT_STUDIO_ADDRESS,
   startDate: event.date,
   startTime: event.startTime,
@@ -105,7 +149,7 @@ const resolveOpenEventNotificationContext = async (eventId) => {
   };
 };
 
-const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context }) => {
+const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, recipientEmail, context }) => {
   const { event, openSlots, confirmedBookings, eventLink } = context;
   const studioName = settings?.studioName || 'JamRoom';
   const studioAddress = settings?.studioAddress || DEFAULT_STUDIO_ADDRESS;
@@ -121,6 +165,10 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
   const extraSlotCount = Math.max(0, openSlots.length - slotPreview.length);
   const bookedPreview = confirmedBookings.slice(0, 6);
   const extraBookedCount = Math.max(0, confirmedBookings.length - bookedPreview.length);
+  const quickFactsSectionHtml = renderEmailBulletSection('Quick Facts', event.quickFacts, 'facts');
+  const descriptionParagraphHtml = renderEmailDescriptionParagraph(event.description);
+  const notesSectionHtml = renderEmailBulletSection('Notes', event.notes, 'notes');
+  const resolvedRecipientName = resolveRecipientDisplayName(recipientName, recipientEmail);
 
   const openSlotCardsHtml = slotPreview.length > 0
     ? slotPreview.map((slot) => `
@@ -149,9 +197,14 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+<meta name="x-apple-disable-message-reformatting">
 <style>
   :root{color-scheme:light only}
+  html{background:#060b1b;color:#ffffff}
   body{margin:0;padding:0;background:#060b1b;font-family:Arial,sans-serif;color:#ffffff;-webkit-text-size-adjust:100%}
+  body,table,td,div,p,li,span,strong,a{-webkit-text-size-adjust:100%}
+  a[x-apple-data-detectors],u + #body a,#MessageViewBody a{color:inherit !important;text-decoration:inherit !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important}
   .wrap{max-width:760px;margin:0 auto;padding:20px 12px}
   .card{background:linear-gradient(180deg,#071127 0%,#0b1630 100%);border-radius:24px;overflow:hidden;border:1px solid rgba(123,97,255,0.16);box-shadow:0 20px 50px rgba(0,0,0,0.35)}
   .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:22px 24px 18px;color:#fff}
@@ -169,6 +222,7 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
   .lead{font-size:15px;line-height:1.7;color:#ffffff;margin:0 0 10px 0}
   .lead-muted{font-size:15px;line-height:1.7;color:rgba(255,255,255,0.92);margin:0 0 14px 0}
   .lead-muted strong{color:#fbbf24}
+  .description-copy{margin:0 0 18px 0;padding:0 0 0 14px;border-left:3px solid #fbbf24;font-size:16px;line-height:1.85;color:#f8fafc;font-weight:500;letter-spacing:0.01em;text-shadow:0 1px 12px rgba(15,23,42,0.22)}
   .hero{border:1px solid rgba(192,38,211,0.6);border-radius:18px;padding:18px 18px 14px;background:linear-gradient(135deg,rgba(76,29,149,0.7) 0%,rgba(17,24,39,0.92) 65%);margin:0 0 16px 0}
   .hero-table{width:100%;border-collapse:collapse}
   .hero-star{font-size:54px;line-height:1;color:#fbbf24;padding-right:14px;vertical-align:top}
@@ -193,9 +247,15 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
   .slot-more{font-size:12px;margin:4px 0 0 0}
   .slot-more.booked{color:#b91c1c}
   .slot-more.open{color:#166534}
-  .facts{border:1px solid rgba(124,58,237,0.42);border-radius:18px;padding:18px;background:linear-gradient(135deg,rgba(49,46,129,0.9) 0%,rgba(15,23,42,0.96) 100%);margin:0 0 14px 0}
-  .facts-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#c4b5fd;font-weight:900;margin:0 0 8px 0}
-  .facts-text{font-size:13px;line-height:1.7;color:#ffffff;margin:0}
+  .detail-card{border-radius:18px;padding:18px;margin:0 0 14px 0;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.96)}
+  .detail-card.facts{border-color:rgba(124,58,237,0.42);background:linear-gradient(135deg,#eef2ff 0%,#f7f3ff 100%)}
+  .detail-card.description{border-color:#bfdbfe;background:linear-gradient(180deg,#eff6ff 0%,#f8fbff 100%)}
+  .detail-card.notes{border-color:#fed7aa;background:linear-gradient(180deg,#fff7ed 0%,#fffaf5 100%)}
+  .detail-card-title{font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:900;margin:0 0 10px 0;color:#1e3a8a}
+  .detail-card.facts .detail-card-title{color:#5b21b6}
+  .detail-card.notes .detail-card-title{color:#9a3412}
+  .detail-list{margin:0;padding-left:20px;color:#1f2937}
+  .detail-list li{margin:0 0 8px 0;font-size:14px;line-height:1.65}
   .cta{border:1px solid rgba(255,255,255,0.16);border-radius:18px;padding:18px;background:#ffffff}
   .cta-table{width:100%;border-collapse:collapse}
   .cta-left{vertical-align:middle;padding-right:12px}
@@ -227,9 +287,21 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
     .slot-chip{min-width:unset;width:auto}
     .cta-btn{display:block;text-align:center;margin-top:10px}
   }
+  @media (prefers-color-scheme: dark){
+    html,body,.wrap{background:#060b1b !important;color:#ffffff !important}
+    .card{background:linear-gradient(180deg,#071127 0%,#0b1630 100%) !important;border-color:rgba(123,97,255,0.16) !important}
+    .body,.hdr,.footer,.hero,.snapshot{color:#ffffff !important}
+    .lead,.lead-muted,.description-copy,.hero-title,.hero-text,.snapshot-date-main,.snapshot-time-sub,.snapshot-open-kicker,.snapshot-open-value{color:#ffffff !important}
+    .momentum,.detail-card,.cta{background:#ffffff !important;color:#1f2937 !important}
+    .momentum-title,.detail-card-title,.cta-kicker,.cta-title{color:#312e81 !important}
+    .momentum-copy,.detail-list,.detail-list li,.cta-copy{color:#475569 !important}
+    .cta-btn,.cta-btn:visited,.cta-btn:hover,.cta-btn:active{color:#ffffff !important}
+    .link-pill.directions{color:#1d4ed8 !important}
+    .link-pill.review{color:#92400e !important}
+  }
 </style>
 </head>
-<body>
+<body id="body">
   <div class="wrap">
     <div class="card">
       <div class="hdr">
@@ -261,7 +333,7 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
         </table>
       </div>
       <div class="body">
-        <p class="lead"><strong>Hi ${recipientName || 'there'},</strong></p>
+        <p class="lead"><strong>Hi ${escapeHtml(resolvedRecipientName)},</strong></p>
         <p class="lead">You're invited to ${event.title}${eventWeekday ? ` this ${eventWeekday}` : ''}.</p>
         <p class="lead-muted">Short set. <strong>Big energy.</strong> Grab your spot now.</p>
 
@@ -276,6 +348,8 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
             </tr>
           </table>
         </div>
+
+        ${descriptionParagraphHtml}
 
         <div class="snapshot">
           <div class="snapshot-head">Event Snapshot</div>
@@ -306,10 +380,8 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
           </div>
         </div>
 
-        <div class="facts">
-          <div class="facts-title">Quick Facts</div>
-          <p class="facts-text">10-minute performance per slot. Carry your instrument. No prior stage experience required. Calendar invite attached.</p>
-        </div>
+        ${quickFactsSectionHtml}
+        ${notesSectionHtml}
 
         <div class="cta">
           <table class="cta-table" cellpadding="0" cellspacing="0" border="0">
@@ -343,7 +415,9 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, context 
 const eventSummary = (event, bookingCount = 0) => ({
   id: event._id,
   title: event.title,
+  quickFacts: event.quickFacts,
   description: event.description,
+  notes: event.notes,
   date: event.date,
   startTime: event.startTime,
   endTime: event.endTime,
@@ -357,7 +431,7 @@ const eventSummary = (event, bookingCount = 0) => ({
 
 router.post('/open-events', protect, isAdmin, async (req, res) => {
   try {
-    const { title, description = '', date, startTime, endTime, status = 'draft' } = req.body;
+    const { title, quickFacts = '', description = '', notes = '', date, startTime, endTime, status = 'draft' } = req.body;
 
     if (!title || !date || !startTime || !endTime) {
       return res.status(400).json({
@@ -378,7 +452,9 @@ router.post('/open-events', protect, isAdmin, async (req, res) => {
 
     const event = await OpenEvent.create({
       title: String(title).trim(),
+      quickFacts: String(quickFacts || '').trim(),
       description: String(description || '').trim(),
+      notes: String(notes || '').trim(),
       date,
       startTime,
       endTime,
@@ -431,7 +507,7 @@ router.get('/open-events', protect, isAdmin, async (_req, res) => {
 
 router.patch('/open-events/:id', protect, isAdmin, async (req, res) => {
   try {
-    const allowedFields = ['title', 'description', 'date', 'startTime', 'endTime', 'status'];
+    const allowedFields = ['title', 'quickFacts', 'description', 'notes', 'date', 'startTime', 'endTime', 'status'];
     const updates = {};
 
     allowedFields.forEach((field) => {
@@ -650,6 +726,7 @@ router.post('/open-events/:id/notify-users', protect, isAdmin, async (req, res) 
         html: buildOpenEventNotificationEmailHtml({
           settings,
           recipientName: recipient.name,
+          recipientEmail: recipient.email,
           context
         }),
         attachments: [{
@@ -693,24 +770,52 @@ router.post('/open-events/:id/test-email', protect, isAdmin, async (req, res) =>
       if (normalized) testRecipients.add(normalized);
     });
 
-    const recipients = Array.from(testRecipients);
-    if (recipients.length === 0) {
+    const recipientEmails = Array.from(testRecipients);
+    if (recipientEmails.length === 0) {
       return res.status(400).json({ success: false, message: 'No admin email found for test notification' });
     }
+
+    const normalizedRecipientEmails = recipientEmails
+      .map((email) => String(email || '').trim().toLowerCase())
+      .filter(Boolean);
+
+    const matchingUsers = await User.find({
+      email: { $in: normalizedRecipientEmails }
+    }).select('name email');
+
+    const nameByEmail = new Map(
+      matchingUsers.map((user) => [
+        String(user?.email || '').trim().toLowerCase(),
+        String(user?.name || '').trim()
+      ])
+    );
+
+    if (reqUserEmail && req.user?.name) {
+      nameByEmail.set(reqUserEmail.toLowerCase(), String(req.user.name).trim());
+    }
+
+    const recipients = recipientEmails.map((email) => {
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      return {
+        email,
+        name: nameByEmail.get(normalizedEmail) || ''
+      };
+    });
 
     const calendarInvite = buildOpenEventCalendarInvite({
       event: context.event,
       settings,
-      recipients
+      recipients: recipients.map((recipient) => recipient.email)
     });
 
     await Promise.all(
-      recipients.map((email) => sendEmail({
-        to: email,
+      recipients.map((recipient) => sendEmail({
+        to: recipient.email,
         subject: `[TEST] Open Event: ${context.event.title} (${context.event.date})`,
         html: buildOpenEventNotificationEmailHtml({
           settings,
-          recipientName: 'Admin',
+          recipientName: recipient.name,
+          recipientEmail: recipient.email,
           context
         }),
         attachments: [{
@@ -724,7 +829,7 @@ router.post('/open-events/:id/test-email', protect, isAdmin, async (req, res) =>
     res.json({
       success: true,
       message: `Test email sent to ${recipients.length} admin recipient(s)`,
-      recipients
+      recipients: recipients.map((recipient) => recipient.email)
     });
   } catch (error) {
     console.error('Admin test open event email error:', error);

@@ -20,8 +20,16 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+<meta name="x-apple-disable-message-reformatting">
 <style>
+  :root{color-scheme:light only}
+  html{background:#eef2f7;color:#1f2937}
   body{margin:0;padding:0;background:#eef2f7;font-family:Arial,sans-serif;color:#1f2937}
+  body,table,td,div,p,li,span,strong,a{-webkit-text-size-adjust:100%}
+  a[x-apple-data-detectors],u + #body a,#MessageViewBody a{color:inherit !important;text-decoration:inherit !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important}
   .eq{max-width:760px;margin:0 auto;padding:12px}
   .card{background:#fff;border-radius:16px;overflow:hidden;border:1px solid #dbe5f0}
   .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#fff;padding:20px}
@@ -59,9 +67,29 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
   .notes-card{background:#fff;border:1px solid #dbe5f0;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
   .notes-hd{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px}
   .footer{font-size:11px;line-height:1.8;color:#64748b;border-top:1px solid #e5e7eb;padding-top:12px}
+  @media only screen and (max-width: 620px){
+    .eq{padding:8px}
+    .card{border-radius:14px}
+    .hdr{padding:16px}
+    .body{padding:14px}
+    .hdr-table,.hdr-table tbody,.hdr-table tr,.hdr-table td,.two-col,.two-col tbody,.two-col tr,.two-col td{display:block;width:100% !important}
+    .hdr-left,.hdr-right,.col-left,.col-right{display:block;width:100% !important;padding:0 !important}
+    .hdr-right,.col-right{margin-top:12px}
+    .sc,.tc,.cta,.terms,.offer,.notes-card{border-radius:12px}
+  }
+  @media (prefers-color-scheme: dark){
+    html,body,.eq{background:#eef2f7 !important;color:#1f2937 !important}
+    .card,.body,.sc,.tc,.cta,.terms,.offer,.notes-card,.footer{background-color:#ffffff !important;color:#1f2937 !important}
+    .hdr,.hdr h2,.hdr .cl,.order-kicker,.order-line{color:#ffffff !important}
+    .hdr{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%) !important}
+    .sc-title,.cta-title,.notes-hd{color:#0f172a !important}
+    .sc-sub,.tc-sub,.cta-body,.footer,.footer a{color:#475569 !important}
+    .tc{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%) !important;border-color:#bfdbfe !important}
+    .offer{background:linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%) !important}
+  }
 </style>
 </head>
-<body>
+<body id="body">
 <div class="eq">
   <div class="card">
     <div class="hdr">

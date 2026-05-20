@@ -102,13 +102,18 @@ const buildInvoiceStyleEmail = ({
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+<meta name="x-apple-disable-message-reformatting">
 <style>
   :root{color-scheme:light only}
+  html{background:#eef5ff;color:#1f2937}
   body{margin:0;padding:0;background:
     radial-gradient(circle at 15% 15%,rgba(56,189,248,0.22) 0%,rgba(56,189,248,0) 46%),
     radial-gradient(circle at 85% 5%,rgba(129,140,248,0.22) 0%,rgba(129,140,248,0) 44%),
     linear-gradient(180deg,#e9f1ff 0%,#eef5ff 36%,#f7fbff 100%);
     font-family:'Trebuchet MS','Segoe UI',Verdana,sans-serif;color:#1f2937;-webkit-text-size-adjust:100%}
+  body,table,td,div,p,li,span,strong,a{-webkit-text-size-adjust:100%}
+  a[x-apple-data-detectors],u + #body a,#MessageViewBody a{color:inherit !important;text-decoration:inherit !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important}
   .eq{max-width:760px;margin:0 auto;padding:14px}
   .card{background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #cfdef7;box-shadow:0 20px 46px rgba(15,23,42,0.16)}
   .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0f7ec0 100%);color:#fff;padding:22px;position:relative}
@@ -172,9 +177,22 @@ const buildInvoiceStyleEmail = ({
     .summary-value{font-size:13px}
     .summary-grid{grid-template-columns:1fr}
   }
+  @media (prefers-color-scheme: dark){
+    html,body,.eq{background:#eef5ff !important;color:#1f2937 !important}
+    .card,.body,.section-card,.summary-item,.highlight,.terms,.offer,.footer{background-color:#ffffff !important;color:#1f2937 !important}
+    .card{border-color:#cfdef7 !important;box-shadow:0 20px 46px rgba(15,23,42,0.16) !important}
+    .hdr,.hdr h2,.hdr .cl,.order-kicker,.order-line{color:#ffffff !important}
+    .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0f7ec0 100%) !important}
+    .hero{background:linear-gradient(120deg,#e0f2fe 0%,#eef2ff 54%,#f8fafc 100%) !important;border-color:#93c5fd !important}
+    .hero h3,.section-card h3,.highlight h3,.summary-value,.cta-card h3,.footer,.footer a{color:#0f172a !important}
+    .hero p,.highlight p,.detail-list,.detail-list li,.summary-label{color:#475569 !important}
+    .cta-card{background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%) !important;border-color:#1d4ed8 !important}
+    .cta-card h3,.cta-card h4,.cta-card strong{color:#ffffff !important}
+    .cta-card p,.cta-card li,.cta-card span,.cta-card div,.cta-card a{color:#dbeafe !important}
+  }
 </style>
 </head>
-<body>
+<body id="body">
   <div class="eq">
     <div class="card">
       <div class="hdr">

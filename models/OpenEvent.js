@@ -13,6 +13,18 @@ const openEventSchema = new mongoose.Schema({
     default: '',
     maxlength: 1000
   },
+  quickFacts: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: 1200
+  },
+  notes: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: 1500
+  },
   date: {
     type: String,
     required: [true, 'Date is required'],

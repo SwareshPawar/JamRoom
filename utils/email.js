@@ -23,8 +23,20 @@ const wrapEmailHtml = (bodyContent) => `<!DOCTYPE html>
   <!-- Force light mode on Apple Mail / iOS Mail -->
   <meta name="color-scheme" content="light">
   <meta name="supported-color-schemes" content="light">
+  <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+  <meta name="x-apple-disable-message-reformatting">
   <style>
     :root { color-scheme: light only; supported-color-schemes: light; }
+    html { background-color: #eef2f7; color: #1f2937; }
+    body, table, td, div, p, li, span, strong, a { -webkit-text-size-adjust: 100%; }
+    a[x-apple-data-detectors], u + #body a, #MessageViewBody a {
+      color: inherit !important;
+      text-decoration: inherit !important;
+      font-size: inherit !important;
+      font-family: inherit !important;
+      font-weight: inherit !important;
+      line-height: inherit !important;
+    }
 
     /* Mobile-first responsive adjustments */
     @media only screen and (max-width: 620px) {
@@ -75,7 +87,7 @@ const wrapEmailHtml = (bodyContent) => `<!DOCTYPE html>
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:#eef2f7;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<body id="body" style="margin:0;padding:0;background-color:#eef2f7;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
   <table class="email-wrapper" role="presentation" cellpadding="0" cellspacing="0" width="100%"
     style="background-color:#eef2f7;margin:0;padding:0;">
     <tr>

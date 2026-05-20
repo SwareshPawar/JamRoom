@@ -17,6 +17,7 @@ const buildTimeSlots = (startHour = 9, endHour = 23) => {
 };
 
 const allTimeSlots = buildTimeSlots();
+const SAME_DAY_BOOKING_BUFFER_MINUTES = 120;
 
 const getLocalDateString = (date = new Date()) => {
     const year = date.getFullYear();
@@ -32,8 +33,13 @@ const hasFutureStartSlotsForToday = (selectedDate) => {
         return true;
     }
 
-    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-    return allTimeSlots.some((slot) => (slot.hour * 60) > currentTimeInMinutes);
+    const minimumStartMinutes = getMinimumSameDayStartMinutes(now);
+    return allTimeSlots.some((slot) => (slot.hour * 60) >= minimumStartMinutes);
+};
+
+const getMinimumSameDayStartMinutes = (date = new Date()) => {
+    const bufferedMinutes = (date.getHours() * 60) + date.getMinutes() + SAME_DAY_BOOKING_BUFFER_MINUTES;
+    return Math.ceil(bufferedMinutes / 60) * 60;
 };
 
 let availabilityRequestSeq = 0;
@@ -133,8 +139,7 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     try {
         const now = new Date();
         const todayStr = getLocalDateString(now);
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
+        const minimumStartMinutes = getMinimumSameDayStartMinutes(now);
 
         const unavailableRanges = getHourlyUnavailableRanges(availabilityData);
 
@@ -144,14 +149,9 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         let hasAvailableSlots = false;
 
         allTimeSlots.forEach(slot => {
-            // Skip past times for today
             if (selectedDate === todayStr) {
-                // Convert current time and slot time to minutes for accurate comparison
-                const currentTimeInMinutes = currentHour * 60 + currentMinute;
-                const slotTimeInMinutes = slot.hour * 60; // Slot minutes are always 0 (:00)
-
-                // Skip slots that are in the past
-                if (slotTimeInMinutes <= currentTimeInMinutes) {
+                const slotTimeInMinutes = slot.hour * 60;
+                if (slotTimeInMinutes < minimumStartMinutes) {
                     return;
                 }
             }

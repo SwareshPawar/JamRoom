@@ -76,13 +76,18 @@ const buildEbillEmailHtml = ({
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+<meta name="x-apple-disable-message-reformatting">
 <style>
   :root{color-scheme:light only}
+  html{background:#eff5ff;color:#1f2937}
   body{margin:0;padding:0;background:
     radial-gradient(circle at 8% 8%,rgba(34,211,238,0.2) 0%,rgba(34,211,238,0) 38%),
     radial-gradient(circle at 90% 4%,rgba(99,102,241,0.22) 0%,rgba(99,102,241,0) 44%),
     linear-gradient(180deg,#eaf1ff 0%,#eff5ff 40%,#f7fbff 100%);
     font-family:'Trebuchet MS','Segoe UI',Verdana,sans-serif;color:#1f2937;-webkit-text-size-adjust:100%}
+  body,table,td,div,p,li,span,strong,a{-webkit-text-size-adjust:100%}
+  a[x-apple-data-detectors],u + #body a,#MessageViewBody a{color:inherit !important;text-decoration:inherit !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important}
   .eq{max-width:660px;margin:0 auto;padding:12px}
   .card{background:#fff;border-radius:22px;overflow:hidden;border:1px solid #d2e2fb;box-shadow:0 18px 40px rgba(30,58,138,0.14)}
   .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0e7490 100%);color:#fff;padding:20px;position:relative}
@@ -137,15 +142,33 @@ const buildEbillEmailHtml = ({
     .card{border-radius:18px}
     .hdr{padding:16px}
     .body{padding:14px}
+    .hdr-table,.hdr-table tbody,.hdr-table tr,.hdr-table td{display:block;width:100% !important}
+    .hdr-left,.hdr-right{display:block;width:100% !important;padding:0 !important}
+    .hdr-right{margin-top:12px}
     .detail-grid{grid-template-columns:1fr}
     .status-card-table,.status-card-table tbody,.status-card-table tr,.status-card-table td{display:block;width:100%}
     .status-card-table td{padding:0 !important}
     .status-card-right{margin-top:10px}
     .booking-card,.notes-card,.cta,.totals-card,.payment-card,.sc{border-radius:12px}
+    .totals-table td,.totals-table tr{display:block;width:100%}
+    .totals-table td:last-child{text-align:left;white-space:normal;padding-top:0}
+  }
+  @media (prefers-color-scheme: dark){
+    html,body,.eq{background:#eff5ff !important;color:#1f2937 !important}
+    .card,.body,.booking-card,.notes-card,.cta,.totals-card,.payment-card,.sc,.terms,.offer,.footer,.attach.ok,.attach.warn{color:#1f2937 !important}
+    .card,.body,.booking-card,.notes-card,.totals-card,.footer{background-color:#ffffff !important}
+    .hdr,.hdr h2,.hdr .cl,.order-kicker,.order-line{color:#ffffff !important}
+    .hdr{background:linear-gradient(135deg,#0b1123 0%,#1d3f72 45%,#0e7490 100%) !important}
+    .detail-label,.sc-kicker{color:#64748b !important}
+    .detail-value,.sc-title,.totals-table td,.booking-card h3{color:#0f172a !important}
+    .sc-sub,.footer,.footer a{color:#475569 !important}
+    .cta{background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%) !important;border-color:#1d4ed8 !important}
+    .cta h3{color:#ffffff !important}
+    .cta p,.cta a,.cta span,.cta strong{color:#dbeafe !important}
   }
 </style>
 </head>
-<body>
+<body id="body">
 <div class="eq">
   <div class="card">
     <div class="hdr">
