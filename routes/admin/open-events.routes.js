@@ -256,7 +256,7 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, recipien
   .detail-card.notes .detail-card-title{color:#9a3412}
   .detail-list{margin:0;padding-left:20px;color:#1f2937}
   .detail-list li{margin:0 0 8px 0;font-size:14px;line-height:1.65}
-  .cta{border:1px solid rgba(255,255,255,0.16);border-radius:18px;padding:18px;background:#ffffff}
+  .cta{border:1px solid rgba(255,255,255,0.16);border-radius:18px;padding:18px;background:#ffffff;margin:0 0 14px 0}
   .cta-table{width:100%;border-collapse:collapse}
   .cta-left{vertical-align:middle;padding-right:12px}
   .cta-right{vertical-align:middle;text-align:right}
@@ -380,9 +380,6 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, recipien
           </div>
         </div>
 
-        ${quickFactsSectionHtml}
-        ${notesSectionHtml}
-
         <div class="cta">
           <table class="cta-table" cellpadding="0" cellspacing="0" border="0">
             <tr>
@@ -401,6 +398,9 @@ const buildOpenEventNotificationEmailHtml = ({ settings, recipientName, recipien
             <a href="${REVIEW_LINK}" target="_blank" rel="noopener noreferrer" class="link-pill review">Review on Google</a>
           </div>
         </div>
+
+        ${quickFactsSectionHtml}
+        ${notesSectionHtml}
       </div>
       <div class="footer">
         <div>A calendar invite is attached to this email.</div>

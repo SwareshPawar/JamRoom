@@ -72,6 +72,8 @@ const formatTime12Hour = (time24) => {
   return `${hour12}:${String(minutesNum).padStart(2, '0')} ${suffix}`;
 };
 
+const formatTimeRange12Hour = (startTime, endTime) => `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
+
 const resolveUserIdFromAuthorization = (authorizationHeader) => {
   try {
     if (!authorizationHeader || !String(authorizationHeader).startsWith('Bearer ')) {
@@ -117,6 +119,9 @@ const buildSlots = ({ event, confirmedBookings, myBookingSlotIndex, includeBooke
       index,
       startTime: slotStartTime,
       endTime: slotEndTime,
+      startTimeLabel: formatTime12Hour(slotStartTime),
+      endTimeLabel: formatTime12Hour(slotEndTime),
+      timeLabel: formatTimeRange12Hour(slotStartTime, slotEndTime),
       status,
       bookedByName: includeBookedNames && booking
         ? String(booking.userId?.name || booking.userFirstName || '').trim()
@@ -138,6 +143,9 @@ const eventSummary = (event, bookingCount = 0) => ({
   date: event.date,
   startTime: event.startTime,
   endTime: event.endTime,
+  startTimeLabel: formatTime12Hour(event.startTime),
+  endTimeLabel: formatTime12Hour(event.endTime),
+  timeLabel: formatTimeRange12Hour(event.startTime, event.endTime),
   slotDuration: event.slotDuration,
   slotCount: event.getSlotCount(),
   status: event.status,

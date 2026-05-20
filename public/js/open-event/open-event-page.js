@@ -143,6 +143,26 @@
     }
 
     class OpenEventRenderer {
+        formatTime12Hour(time24) {
+            const [hoursRaw, minutesRaw] = String(time24 || '').split(':');
+            const hoursNum = Number(hoursRaw);
+            const minutesNum = Number(minutesRaw);
+            if (Number.isNaN(hoursNum) || Number.isNaN(minutesNum)) return String(time24 || '');
+            const suffix = hoursNum >= 12 ? 'PM' : 'AM';
+            const hour12 = hoursNum % 12 || 12;
+            return `${hour12}:${String(minutesNum).padStart(2, '0')} ${suffix}`;
+        }
+
+        formatTimeRange12Hour(startTime, endTime) {
+            return `${this.formatTime12Hour(startTime)} - ${this.formatTime12Hour(endTime)}`;
+        }
+
+        formatEventTimeLabel(item) {
+            const startLabel = item?.startTimeLabel || this.formatTime12Hour(item?.startTime);
+            const endLabel = item?.endTimeLabel || this.formatTime12Hour(item?.endTime);
+            return `${startLabel} - ${endLabel}`;
+        }
+
                 showLoading(message = 'Processing...') {
                     if (!this.detailBodyEl) return;
                     this.detailBodyEl.innerHTML = `<div class="open-event-loading"><span class="loading-spinner"></span> ${this.escapeHtml(message)}</div>`;
@@ -229,8 +249,8 @@
                 const typeLabel = item.type === 'event' ? 'Open Event' : 'JamRoom Session';
                 const ctaLabel = item.type === 'event' ? 'View Slots' : 'Join Session';
                 const summary = item.type === 'event'
-                    ? `${this.escapeHtml(item.date)} | ${this.escapeHtml(item.startTime)} - ${this.escapeHtml(item.endTime)} | ${Number(item.slotCount || 0)} slots`
-                    : `${this.escapeHtml(item.displayDate || item.date || '')} | ${this.escapeHtml(item.startTime || '')} - ${this.escapeHtml(item.endTime || '')}`;
+                    ? `${this.escapeHtml(item.date)} | ${this.escapeHtml(this.formatEventTimeLabel(item))} | ${Number(item.slotCount || 0)} slots`
+                    : `${this.escapeHtml(item.displayDate || item.date || '')} | ${this.escapeHtml(this.formatTimeRange12Hour(item.startTime, item.endTime))}`;
 
                 const descriptionText = item.type === 'event'
                     ? this.escapeHtml(item.description || 'No description provided.')
@@ -275,7 +295,7 @@
             if (!this.modalTitleEl || !this.metaEl || !this.detailBodyEl) return;
 
             this.modalTitleEl.textContent = event?.title || 'Open Event Details';
-            this.metaEl.textContent = `${event?.date || ''} | ${event?.startTime || ''} - ${event?.endTime || ''} | ${Number(event?.slotCount || 0)} slot(s)`;
+            this.metaEl.textContent = `${event?.date || ''} | ${this.formatEventTimeLabel(event)} | ${Number(event?.slotCount || 0)} slot(s)`;
 
             const safeSlots = Array.isArray(slots) ? slots : [];
             this.detailBodyEl.innerHTML = `
@@ -296,7 +316,7 @@
                         if (isMine && !isPast) {
                             actionHtml = `<button type="button" class="btn btn-danger btn-sm open-event-cancel-btn" data-event-id="${event.id}">Cancel My Slot</button>`;
                         } else if (!isBooked && !isPast) {
-                            actionHtml = `<button type="button" class="btn btn-primary btn-sm open-event-book-btn" data-event-id="${event.id}" data-slot-index="${slot.index}" data-slot-label="${this.escapeHtml(slot.startTime)} - ${this.escapeHtml(slot.endTime)}">Book Slot</button>`;
+                            actionHtml = `<button type="button" class="btn btn-primary btn-sm open-event-book-btn" data-event-id="${event.id}" data-slot-index="${slot.index}" data-slot-label="${this.escapeHtml(slot.timeLabel || this.formatTimeRange12Hour(slot.startTime, slot.endTime))}">Book Slot</button>`;
                         }
 
                         const stateText = isMine
@@ -313,7 +333,7 @@
 
                         return `
                             <div class="${classes}">
-                                <p class="open-event-slot-label">${this.escapeHtml(slot.startTime)} - ${this.escapeHtml(slot.endTime)}</p>
+                                <p class="open-event-slot-label">${this.escapeHtml(slot.timeLabel || this.formatTimeRange12Hour(slot.startTime, slot.endTime))}</p>
                                 <p class="open-event-slot-state">${stateText}</p>
                                 ${adminMetaHtml}
                                 ${actionHtml}
@@ -328,7 +348,7 @@
             if (!this.modalTitleEl || !this.metaEl || !this.detailBodyEl) return;
 
             this.modalTitleEl.textContent = session?.title || 'Open JamRoom Session';
-            this.metaEl.textContent = `${session?.displayDate || session?.date || ''} | ${session?.startTime || ''} - ${session?.endTime || ''}`;
+            this.metaEl.textContent = `${session?.displayDate || session?.date || ''} | ${this.formatTimeRange12Hour(session?.startTime, session?.endTime)}`;
 
             const mediaPreviewHtml = this.buildMediaPreview(session?.mediaType, session?.mediaUrl);
             const disabledAttr = isAuthenticated ? '' : 'disabled';

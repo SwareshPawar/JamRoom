@@ -9,7 +9,19 @@
     let eventListStatusFilter = 'all';
     let eventListSort = 'date_desc';
 
-    const formatDateTimeLabel = (event) => `${event.date} | ${event.startTime} - ${event.endTime}`;
+    const formatTime12Hour = (time24) => {
+        const [hoursRaw, minutesRaw] = String(time24 || '').split(':');
+        const hoursNum = Number(hoursRaw);
+        const minutesNum = Number(minutesRaw);
+        if (Number.isNaN(hoursNum) || Number.isNaN(minutesNum)) return String(time24 || '');
+        const suffix = hoursNum >= 12 ? 'PM' : 'AM';
+        const hour12 = hoursNum % 12 || 12;
+        return `${hour12}:${String(minutesNum).padStart(2, '0')} ${suffix}`;
+    };
+
+    const formatTimeRange12Hour = (startTime, endTime) => `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
+
+    const formatDateTimeLabel = (event) => `${event.date} | ${formatTimeRange12Hour(event.startTime, event.endTime)}`;
 
     const getTodayYmd = () => {
         const now = new Date();
@@ -438,7 +450,7 @@
                                 <article class="open-event-booking-card open-event-slot-booked">
                                     <div class="open-event-booking-slot">
                                         <span class="open-event-booking-slot-badge">Slot ${Number(slot.slotIndex) + 1}</span>
-                                        <span class="open-event-booking-time">${escapeHtml(slot.slotStartTime || '--:--')} - ${escapeHtml(slot.slotEndTime || '--:--')}</span>
+                                            <span class="open-event-booking-time">${escapeHtml(slot.timeLabel || formatTimeRange12Hour(slot.slotStartTime || '--:--', slot.slotEndTime || '--:--'))}</span>
                                     </div>
                                     <p><strong>Full Name:</strong> ${escapeHtml(slot.userFullName || slot.userName || slot.userFirstName || 'User')}</p>
                                     <p><strong>Email:</strong> ${escapeHtml(slot.userEmail || 'Not available')}</p>
@@ -456,7 +468,7 @@
                             <article class="open-event-booking-card open-event-slot-free">
                                 <div class="open-event-booking-slot">
                                     <span class="open-event-booking-slot-badge open-event-slot-badge-free">Slot ${Number(slot.slotIndex) + 1}</span>
-                                    <span class="open-event-booking-time">${escapeHtml(slot.slotStartTime || '--:--')} - ${escapeHtml(slot.slotEndTime || '--:--')}</span>
+                                        <span class="open-event-booking-time">${escapeHtml(slot.timeLabel || formatTimeRange12Hour(slot.slotStartTime || '--:--', slot.slotEndTime || '--:--'))}</span>
                                     <span style="color:#16a34a;font-weight:600;margin-left:8px;">Free</span>
                                 </div>
                                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;">
