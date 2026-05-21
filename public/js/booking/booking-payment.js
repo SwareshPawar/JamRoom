@@ -53,11 +53,57 @@ const PAYMENT_SECTION_HTML = `
         </div>
 
         <div class="booking-payment-footer">
+            <a id="notifyApprovalBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary payment-notify-btn" hidden>Notify for Approval on WhatsApp</a>
             <a id="paymentGuideLink" href="/payment-info.html" class="btn btn-primary payment-guide-btn">Open Payment Guide</a>
             <button id="paymentDoneBtn" class="btn btn-secondary payment-close-btn" type="button">Done</button>
         </div>
     </div>
 </div>`;
+
+const sanitizeWhatsappNumber = (value) => {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length === 10) return `91${digits}`;
+    if (digits.length === 12 && digits.startsWith('91')) return digits;
+    return digits;
+};
+
+const buildWhatsappLink = (phone, message) => {
+    const normalizedPhone = sanitizeWhatsappNumber(phone);
+    if (!normalizedPhone) return '';
+    return `https://wa.me/${encodeURIComponent(normalizedPhone)}?text=${encodeURIComponent(String(message || '').trim())}`;
+};
+
+let cachedPaymentContactInfo = null;
+
+const resolvePaymentContactInfo = async () => {
+    if (cachedPaymentContactInfo) {
+        return cachedPaymentContactInfo;
+    }
+
+    const inMemoryContactInfo = window.adminSettings?.contactInfo || null;
+    if (inMemoryContactInfo && String(inMemoryContactInfo.whatsappNumber || '').trim()) {
+        cachedPaymentContactInfo = inMemoryContactInfo;
+        return cachedPaymentContactInfo;
+    }
+
+    try {
+        const response = await fetch('/api/bookings/settings', { cache: 'no-store' });
+        const payload = await response.json();
+        if (!response.ok || !payload?.success) {
+            return inMemoryContactInfo || {};
+        }
+
+        const resolvedContactInfo = payload?.settings?.contactInfo || {};
+        if (resolvedContactInfo && String(resolvedContactInfo.whatsappNumber || '').trim()) {
+            cachedPaymentContactInfo = resolvedContactInfo;
+        }
+
+        return resolvedContactInfo;
+    } catch (_error) {
+        return inMemoryContactInfo || {};
+    }
+};
 
 const injectPaymentSection = () => {
     if (document.getElementById('bookingPaymentModal')) return;
@@ -90,7 +136,7 @@ const injectPaymentSection = () => {
     section._openBookingPaymentModal = openModal;
 };
 
-const renderBookingPaymentSection = (bookingResponse) => {
+const renderBookingPaymentSection = async (bookingResponse) => {
     injectPaymentSection();
 
     if (!bookingResponse || !bookingResponse.upiDetails) {
@@ -98,6 +144,10 @@ const renderBookingPaymentSection = (bookingResponse) => {
     }
 
     const { upiId, amount, upiName } = bookingResponse.upiDetails;
+    const bookingId = bookingResponse.booking && bookingResponse.booking._id ? bookingResponse.booking._id : '-';
+    const contactInfo = await resolvePaymentContactInfo();
+    const businessWhatsapp = String(contactInfo.whatsappNumber || '').trim();
+    const customerName = String(bookingResponse?.booking?.userName || window.currentUser?.name || 'Customer').trim();
 
     const setText = (id, value) => {
         const element = document.getElementById(id);
@@ -109,7 +159,7 @@ const renderBookingPaymentSection = (bookingResponse) => {
     setText('upiId', upiId);
     setText('upiAmountCopy', `₹${amount}`);
     setText('upiName', upiName);
-    setText('bookingPaymentId', bookingResponse.booking && bookingResponse.booking._id ? bookingResponse.booking._id : '-');
+    setText('bookingPaymentId', bookingId);
 
     const paymentManager = window.PaymentManager
         ? new window.PaymentManager({ upiId, upiName, amount })
@@ -164,8 +214,21 @@ const renderBookingPaymentSection = (bookingResponse) => {
 
     const paymentGuideLink = document.getElementById('paymentGuideLink');
     if (paymentGuideLink) {
-        const bookingId = bookingResponse.booking && bookingResponse.booking._id ? bookingResponse.booking._id : '';
         paymentGuideLink.href = `/payment-info.html?bookingId=${encodeURIComponent(String(bookingId))}&amount=${encodeURIComponent(String(amount))}`;
+    }
+
+    const notifyApprovalBtn = document.getElementById('notifyApprovalBtn');
+    if (notifyApprovalBtn) {
+        const approvalMessage = `Hi SwarJRS, I have completed payment for booking request ${bookingId}. Please review and approve. Name: ${customerName}. Amount: INR ${amount}.`;
+        const notifyLink = buildWhatsappLink(businessWhatsapp, approvalMessage);
+
+        if (notifyLink) {
+            notifyApprovalBtn.href = notifyLink;
+            notifyApprovalBtn.hidden = false;
+        } else {
+            notifyApprovalBtn.href = '#';
+            notifyApprovalBtn.hidden = true;
+        }
     }
 
     const upiSection = document.getElementById('bookingPaymentModal');

@@ -203,6 +203,82 @@
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
 }
 
+.home-contact-section {
+    margin-top: 28px;
+    border: 1px solid color-mix(in srgb, #22c55e 36%, var(--border-color));
+    border-radius: 14px;
+    padding: 18px;
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, #22c55e 14%, var(--surface-elevated)) 0%,
+        color-mix(in srgb, #16a34a 8%, var(--surface-1)) 100%
+    );
+    box-shadow: 0 12px 28px color-mix(in srgb, #22c55e 22%, transparent);
+    text-align: center;
+}
+
+.home-contact-section h3 {
+    margin: 0;
+}
+
+.home-contact-subtitle {
+    margin: 6px 0 10px;
+    color: var(--text-secondary);
+}
+
+.home-contact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
+.home-whatsapp-btn {
+    background: linear-gradient(135deg, #25d366 0%, #1fb857 100%);
+    color: #ffffff;
+    border: 1px solid color-mix(in srgb, #1fb857 78%, #0f5e2e 22%);
+    box-shadow: 0 8px 18px color-mix(in srgb, #25d366 36%, transparent);
+}
+
+.home-whatsapp-btn:hover,
+.home-whatsapp-btn:focus-visible {
+    background: linear-gradient(135deg, #22c55e 0%, #169c49 100%);
+    color: #ffffff;
+}
+
+.home-contact-link {
+    text-decoration: none;
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--secondary-color) 32%, var(--border-color));
+    border-radius: 999px;
+    padding: 7px 12px;
+    background: var(--surface-1);
+}
+
+.home-contact-link:hover,
+.home-contact-link:focus-visible {
+    border-color: color-mix(in srgb, var(--secondary-color) 56%, var(--border-color));
+}
+
+.home-contact-address {
+    margin-top: 12px;
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    color: var(--text-color);
+    border-top: 1px dashed color-mix(in srgb, #22c55e 38%, var(--border-color));
+    padding-top: 10px;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.home-contact-address:hover,
+.home-contact-address:focus-visible {
+    color: color-mix(in srgb, #166534 72%, var(--text-color));
+}
+
 
 /* Navigation styles are now in shared.css */
 .open-events-promo {

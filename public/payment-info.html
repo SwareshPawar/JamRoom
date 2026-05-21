@@ -72,6 +72,16 @@
                     <li>If direct app open fails, use copy or QR options.</li>
                 </ul>
             </section>
+
+            <section id="paymentContactSection" class="panel payment-contact" aria-labelledby="paymentContactTitle" hidden>
+                <h3 id="paymentContactTitle">Contact Us</h3>
+                <p class="payment-contact-subtitle">Need help with payment confirmation or approval? Reach us directly.</p>
+                <div class="payment-contact-actions">
+                    <a id="paymentWhatsappBtn" class="btn btn-secondary" href="#" target="_blank" rel="noopener noreferrer" hidden>Chat on WhatsApp</a>
+                    <a id="paymentEmailLink" class="payment-contact-link" href="#" hidden>Email</a>
+                    <a id="paymentPhoneLink" class="payment-contact-link" href="#" hidden>Call</a>
+                </div>
+            </section>
         </main>
 
         <footer class="app-footer">
@@ -165,6 +175,61 @@
             });
         }
 
+        function sanitizeWhatsappNumber(value) {
+            const digits = String(value || '').replace(/\D/g, '');
+            if (!digits) return '';
+            if (digits.length === 10) return `91${digits}`;
+            if (digits.length === 12 && digits.startsWith('91')) return digits;
+            return digits;
+        }
+
+        function renderPaymentContact(contactInfo = {}) {
+            const section = document.getElementById('paymentContactSection');
+            const whatsappBtn = document.getElementById('paymentWhatsappBtn');
+            const emailLink = document.getElementById('paymentEmailLink');
+            const phoneLink = document.getElementById('paymentPhoneLink');
+
+            if (!section || !whatsappBtn || !emailLink || !phoneLink) {
+                return;
+            }
+
+            const whatsappNumber = sanitizeWhatsappNumber(contactInfo.whatsappNumber);
+            const whatsappLabel = String(contactInfo.whatsappLabel || '').trim() || 'Chat on WhatsApp';
+            const email = String(contactInfo.email || '').trim();
+            const phone = String(contactInfo.phone || '').trim();
+
+            const whatsappMessage = 'Hi SwarJRS, I need help with payment confirmation and booking approval.';
+            const whatsappHref = whatsappNumber
+                ? `https://wa.me/${encodeURIComponent(whatsappNumber)}?text=${encodeURIComponent(whatsappMessage)}`
+                : '';
+
+            if (whatsappHref) {
+                whatsappBtn.hidden = false;
+                whatsappBtn.href = whatsappHref;
+                whatsappBtn.textContent = whatsappLabel;
+            } else {
+                whatsappBtn.hidden = true;
+            }
+
+            if (email) {
+                emailLink.hidden = false;
+                emailLink.href = `mailto:${email}`;
+                emailLink.textContent = `Email: ${email}`;
+            } else {
+                emailLink.hidden = true;
+            }
+
+            if (phone) {
+                phoneLink.hidden = false;
+                phoneLink.href = `tel:${phone.replace(/\s+/g, '')}`;
+                phoneLink.textContent = `Phone: ${phone}`;
+            } else {
+                phoneLink.hidden = true;
+            }
+
+            section.hidden = !(whatsappHref || email || phone);
+        }
+
         async function loadPaymentInfo() {
             const context = getQueryContext();
             renderBookingContext(context);
@@ -183,6 +248,7 @@
 
                 const upiId = data.paymentInfo.upiId || 'Not configured';
                 const upiName = data.paymentInfo.upiName || 'Swaresh Pawar';
+                renderPaymentContact(data.paymentInfo.contactInfo || {});
 
                 document.getElementById('upiId').textContent = upiId;
                 document.getElementById('upiName').textContent = upiName;

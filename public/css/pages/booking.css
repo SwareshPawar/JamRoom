@@ -52,6 +52,43 @@ body:not(.booking-preload) .main-content {
     padding-bottom: 34px;
 }
 
+.booking-contact-section {
+    margin-top: 16px;
+    border: 1px solid color-mix(in srgb, var(--secondary-color) 35%, var(--border-color));
+    background: color-mix(in srgb, var(--secondary-color) 8%, var(--surface-1));
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.booking-contact-section h3 {
+    margin: 0;
+}
+
+.booking-contact-subtitle {
+    margin: 6px 0 10px;
+    color: var(--text-color-light);
+}
+
+.booking-contact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    align-items: center;
+}
+
+.booking-contact-link {
+    color: var(--text-color);
+    text-decoration: none;
+    border: 1px solid color-mix(in srgb, var(--secondary-color) 32%, var(--border-color));
+    border-radius: 999px;
+    padding: 6px 10px;
+    background: var(--surface-elevated);
+}
+
+.booking-contact-link:hover {
+    border-color: color-mix(in srgb, var(--secondary-color) 56%, var(--border-color));
+}
+
 #myBookingsSection {
     border: 1px solid var(--border-color);
     background: color-mix(in srgb, var(--surface-elevated) 88%, var(--surface-1));
@@ -1402,6 +1439,7 @@ input[type="checkbox"].rental-checkbox:focus-visible {
 }
 
 .payment-close-btn,
+.payment-notify-btn,
 .payment-guide-btn {
     margin: 0;
 }

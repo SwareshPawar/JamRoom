@@ -9,6 +9,8 @@ const getSlotRequestTimeSlots = () => window.allTimeSlots || [];
 const slotRequestAvailabilityCache = new Map();
 const myBookingsById = new Map();
 let slotRequestFlatpickrLoadPromise = null;
+let cachedPublicContactInfo = null;
+let publicContactInfoPromise = null;
 
 const resolveApiUrl = () => {
     if (typeof API_URL === 'string' && API_URL.trim()) {
@@ -46,6 +48,73 @@ const escapeBookingHtml = (value) => String(value ?? '')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+const normalizeWhatsAppNumber = (value) => {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length === 10) return `91${digits}`;
+    if (digits.length === 12 && digits.startsWith('91')) return digits;
+    return digits;
+};
+
+const loadPublicContactInfo = async () => {
+    if (cachedPublicContactInfo) {
+        return cachedPublicContactInfo;
+    }
+
+    if (publicContactInfoPromise) {
+        return publicContactInfoPromise;
+    }
+
+    publicContactInfoPromise = (async () => {
+        try {
+            const apiBase = resolveApiUrl();
+            const response = await fetch(`${apiBase}/api/bookings/settings`, { cache: 'no-store' });
+            const payload = await response.json();
+            if (!response.ok || !payload?.success) {
+                return null;
+            }
+
+            const contactInfo = payload?.settings?.contactInfo || {};
+            const normalizedNumber = normalizeWhatsAppNumber(contactInfo.whatsappNumber);
+            if (!normalizedNumber) {
+                return null;
+            }
+
+            cachedPublicContactInfo = {
+                whatsappNumber: normalizedNumber,
+                whatsappLabel: String(contactInfo.whatsappLabel || '').trim() || 'Notify on WhatsApp'
+            };
+
+            return cachedPublicContactInfo;
+        } catch (_error) {
+            return null;
+        } finally {
+            publicContactInfoPromise = null;
+        }
+    })();
+
+    return publicContactInfoPromise;
+};
+
+const buildBookingNotifyWhatsAppLink = (booking, bookingTitle, contactInfo) => {
+    const whatsappNumber = normalizeWhatsAppNumber(contactInfo?.whatsappNumber);
+    if (!whatsappNumber || !booking?._id) {
+        return '';
+    }
+
+    const bookingStatus = String(booking?.bookingStatus || 'PENDING').toUpperCase();
+    const message = [
+        'Hi SwarJRS,',
+        `Please review my booking request ${booking._id}.`,
+        `Booking: ${bookingTitle || booking.rentalType || 'Booking'}`,
+        `Status: ${bookingStatus}`,
+        `Date: ${formatBookingDate(booking.date)}`,
+        `Time: ${formatBookingTime(booking.startTime)} - ${formatBookingTime(booking.endTime)}`
+    ].join('\n');
+
+    return `https://wa.me/${encodeURIComponent(whatsappNumber)}?text=${encodeURIComponent(message)}`;
+};
 
 const normalizePaymentStatus = (statusValue) => {
     const normalized = String(statusValue || '').toUpperCase();
@@ -652,6 +721,7 @@ const loadMyBookings = async (options = {}) => {
     }
 
     try {
+        const publicContactInfo = await loadPublicContactInfo();
         let allBookings = prefetchedBookings;
         if (!allBookings) {
             const token = localStorage.getItem('token');
@@ -746,13 +816,19 @@ const loadMyBookings = async (options = {}) => {
                     ? booking.rentals.filter((r) => r && r.name).map((r) => r.name)
                     : [];
                 const classSession = booking.classSession || {};
-                const bookingTitle = classSession.isClassBooking
-                    ? (classSession.selectedClassItemName || classSession.instrument || 'Music Class')
-                    : (isOpenEventBooking
-                        ? (booking?.openEvent?.title || 'Open Event Slot')
-                        : (bookingItemNames.length > 0
-                            ? `${bookingItemNames.slice(0, 2).join(', ')}${bookingItemNames.length > 2 ? ` +${bookingItemNames.length - 2}` : ''}`
-                            : (booking.rentalType || 'Booking')));
+                let bookingTitle = booking.rentalType || 'Booking';
+
+                if (classSession.isClassBooking) {
+                    bookingTitle = classSession.selectedClassItemName || classSession.instrument || 'Music Class';
+                } else if (isOpenEventBooking) {
+                    bookingTitle = (booking.openEvent && booking.openEvent.title) || 'Open Event Slot';
+                } else if (bookingItemNames.length > 0) {
+                    const visibleItemNames = bookingItemNames.slice(0, 2).join(', ');
+                    const additionalItemsCount = bookingItemNames.length - 2;
+                    bookingTitle = additionalItemsCount > 0
+                        ? `${visibleItemNames} +${additionalItemsCount}`
+                        : visibleItemNames;
+                }
 
                 const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
                     ? `${formatBookingDate(booking.perDayStartDate)}<br><small>to ${formatBookingDate(booking.perDayEndDate)}</small>`
@@ -765,6 +841,14 @@ const loadMyBookings = async (options = {}) => {
                     `<button onclick="openUserBookingDetails('${booking._id}')" class="btn btn-primary btn-sm">Details</button>`,
                     (isOpenEventBooking && booking?.openEvent?.id)
                         ? `<a href="/open-event.html?item=event:${booking.openEvent.id}" class="btn btn-secondary btn-sm">Open Event</a>`
+                        : '',
+                    !isOpenEventBooking && (booking.bookingStatus === 'PENDING' || paymentSnapshot.paymentStatus === 'PENDING') && publicContactInfo
+                        ? (() => {
+                            const notifyLink = buildBookingNotifyWhatsAppLink(booking, bookingTitle, publicContactInfo);
+                            if (!notifyLink) return '';
+                            const notifyLabel = escapeBookingHtml(publicContactInfo.whatsappLabel || 'Notify on WhatsApp');
+                            return `<a href="${notifyLink}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm">${notifyLabel}</a>`;
+                        })()
                         : '',
                     !isOpenEventBooking && booking.bookingStatus === 'PENDING'
                         ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger btn-sm">Cancel</button>`

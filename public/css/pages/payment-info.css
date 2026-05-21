@@ -94,6 +94,37 @@
     color: var(--text-color-light);
 }
 
+.payment-contact {
+    border: 1px solid color-mix(in srgb, var(--secondary-color) 32%, var(--border-color-light));
+    background: color-mix(in srgb, var(--secondary-color) 8%, var(--surface-elevated));
+}
+
+.payment-contact-subtitle {
+    margin: 6px 0 10px;
+    color: var(--text-color-light);
+}
+
+.payment-contact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.payment-contact-link {
+    text-decoration: none;
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--secondary-color) 30%, var(--border-color));
+    border-radius: 999px;
+    padding: 7px 12px;
+    background: var(--surface-1);
+}
+
+.payment-contact-link:hover,
+.payment-contact-link:focus-visible {
+    border-color: color-mix(in srgb, var(--secondary-color) 56%, var(--border-color));
+}
+
 @media (max-width: 768px) {
     .payment-layout {
         padding: 12px;

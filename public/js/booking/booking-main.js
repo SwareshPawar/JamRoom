@@ -64,6 +64,72 @@
             return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
         };
 
+        const sanitizeWhatsappNumber = (value) => {
+            const digits = String(value || '').replace(/\D/g, '');
+            if (!digits) return '';
+            if (digits.length === 10) return `91${digits}`;
+            if (digits.length === 12 && digits.startsWith('91')) return digits;
+            return digits;
+        };
+
+        const renderBookingContactSection = (settingsData = null) => {
+            const contactSection = document.getElementById('bookingContactSection');
+            const whatsappBtn = document.getElementById('bookingWhatsappBtn');
+            const emailLink = document.getElementById('bookingEmailLink');
+            const phoneLink = document.getElementById('bookingPhoneLink');
+
+            if (!contactSection || !whatsappBtn || !emailLink || !phoneLink) {
+                return;
+            }
+
+            const resolvedSettings = settingsData || window.adminSettings || {};
+            const contactInfo = resolvedSettings.contactInfo || {};
+
+            const phone = String(contactInfo.phone || '').trim();
+            const email = String(contactInfo.email || '').trim();
+            const whatsappRaw = String(contactInfo.whatsappNumber || '').trim();
+            const whatsappLabel = String(contactInfo.whatsappLabel || '').trim() || 'Chat on WhatsApp';
+            const whatsappNumber = sanitizeWhatsappNumber(whatsappRaw);
+
+            const whatsappMessage = 'Hi SwarJRS, I need help with my booking and approval.';
+            const whatsappHref = whatsappNumber
+                ? `https://wa.me/${encodeURIComponent(whatsappNumber)}?text=${encodeURIComponent(whatsappMessage)}`
+                : '';
+
+            if (whatsappHref) {
+                whatsappBtn.href = whatsappHref;
+                whatsappBtn.textContent = whatsappLabel;
+                whatsappBtn.hidden = false;
+            } else {
+                whatsappBtn.hidden = true;
+                whatsappBtn.href = '#';
+            }
+
+            if (email) {
+                emailLink.hidden = false;
+                emailLink.href = `mailto:${email}`;
+                emailLink.textContent = `Email: ${email}`;
+            } else {
+                emailLink.hidden = true;
+                emailLink.href = '#';
+            }
+
+            if (phone) {
+                const telValue = phone.replace(/\s+/g, '');
+                phoneLink.hidden = false;
+                phoneLink.href = `tel:${telValue}`;
+                phoneLink.textContent = `Phone: ${phone}`;
+            } else {
+                phoneLink.hidden = true;
+                phoneLink.href = '#';
+            }
+
+            const hasAnyContact = Boolean(whatsappHref || email || phone);
+            contactSection.hidden = !hasAnyContact;
+        };
+
+        window.renderBookingContactSection = renderBookingContactSection;
+
         // Loading functions using shared utils
         const showLoading = (message = 'Processing...') => {
             if (window.JamRoomUtils) {

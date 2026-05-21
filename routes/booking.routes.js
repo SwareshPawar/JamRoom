@@ -1704,6 +1704,18 @@ router.get('/settings', async (req, res) => {
     const settings = await AdminSettings.getSettings();
     const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
     const bookingModes = deriveAvailableBookingModes(rentalTypes);
+    const publicContact = settings?.publicContact && typeof settings.publicContact === 'object'
+      ? settings.publicContact
+      : {};
+    const configuredBusinessWhatsapp = String(settings?.whatsappNotifications?.businessNumber || '').trim();
+    const fallbackPhone = String(settings?.studioPhone || '').trim();
+    const fallbackEmail = String(settings?.adminEmails?.[0] || '').trim();
+    const fallbackAddress = String(settings?.studioAddress || '').trim();
+    const contactPhone = String(publicContact?.phone || '').trim() || fallbackPhone;
+    const contactEmail = String(publicContact?.email || '').trim() || fallbackEmail;
+    const contactWhatsapp = String(publicContact?.whatsappNumber || '').trim() || configuredBusinessWhatsapp || contactPhone;
+    const contactWhatsappLabel = String(publicContact?.whatsappLabel || '').trim() || 'Chat on WhatsApp';
+    const contactAddress = fallbackAddress;
     
     res.json({
       success: true,
@@ -1711,8 +1723,16 @@ router.get('/settings', async (req, res) => {
         rentalTypes,
         bookingCategoryBindings: settings.bookingCategoryBindings || { pairs: [] },
         bookingModes,
+        studioAddress: fallbackAddress,
         gstConfig: settings.gstConfig || { enabled: false, rate: 0.18, displayName: 'GST' },
-        classConfig: normalizeClassConfig(settings)
+        classConfig: normalizeClassConfig(settings),
+        contactInfo: {
+          whatsappNumber: contactWhatsapp,
+          whatsappLabel: contactWhatsappLabel,
+          phone: contactPhone,
+          email: contactEmail,
+          address: contactAddress
+        }
       }
     });
   } catch (error) {
@@ -1745,12 +1765,31 @@ router.get('/instagram-embeds', async (req, res) => {
 router.get('/payment-info', async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
+    const publicContact = settings?.publicContact && typeof settings.publicContact === 'object'
+      ? settings.publicContact
+      : {};
+    const configuredBusinessWhatsapp = String(settings?.whatsappNotifications?.businessNumber || '').trim();
+    const fallbackPhone = String(settings?.studioPhone || '').trim();
+    const fallbackEmail = String(settings?.adminEmails?.[0] || '').trim();
+    const fallbackAddress = String(settings?.studioAddress || '').trim();
+    const contactPhone = String(publicContact?.phone || '').trim() || fallbackPhone;
+    const contactEmail = String(publicContact?.email || '').trim() || fallbackEmail;
+    const contactWhatsapp = String(publicContact?.whatsappNumber || '').trim() || configuredBusinessWhatsapp || contactPhone;
+    const contactWhatsappLabel = String(publicContact?.whatsappLabel || '').trim() || 'Chat on WhatsApp';
+    const contactAddress = fallbackAddress;
     
     res.json({
       success: true,
       paymentInfo: {
         upiId: settings.upiId || 'Not configured',
         upiName: getDisplayUpiName(settings),
+        contactInfo: {
+          whatsappNumber: contactWhatsapp,
+          whatsappLabel: contactWhatsappLabel,
+          phone: contactPhone,
+          email: contactEmail,
+          address: contactAddress
+        }
         // Don't expose other sensitive admin settings
       }
     });

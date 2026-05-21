@@ -120,6 +120,7 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
       slotDuration,
       studioName,
       studioAddress,
+      publicContact,
       gstConfig,
       emailSettings,
       classConfig,
@@ -156,6 +157,7 @@ router.put('/settings', protect, isAdmin, async (req, res) => {
       if (slotDuration) settings.slotDuration = slotDuration;
       if (studioName) settings.studioName = studioName;
       if (studioAddress) settings.studioAddress = studioAddress;
+      if (publicContact !== undefined) settings.publicContact = publicContact;
       if (gstConfig) settings.gstConfig = gstConfig;
       if (emailSettings !== undefined) settings.emailSettings = emailSettings;
       if (classConfig) settings.classConfig = classConfig;

@@ -1802,6 +1802,10 @@ const loadSettings = async () => {
         if (typeof window.refreshBookingTypeOptions === 'function') {
             window.refreshBookingTypeOptions();
         }
+
+        if (typeof window.renderBookingContactSection === 'function') {
+            window.renderBookingContactSection(settings);
+        }
     } catch (error) {
         console.error('Failed to load settings:', error);
 
@@ -1816,6 +1820,10 @@ const loadSettings = async () => {
 
             if (typeof window.refreshBookingTypeOptions === 'function') {
                 window.refreshBookingTypeOptions();
+            }
+
+            if (typeof window.renderBookingContactSection === 'function') {
+                window.renderBookingContactSection(settings);
             }
 
             showAlert('Loaded last saved booking settings. Some recent catalog changes may require refresh.', 'warning');

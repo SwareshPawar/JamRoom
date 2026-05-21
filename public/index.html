@@ -45,6 +45,10 @@
                             <span aria-hidden="true">⭐</span>
                             <span>Review on Google</span>
                         </a>
+                        <a class="hero-google-link" id="homeContactScrollBtn" href="#homeContactSection">
+                            <span aria-hidden="true">☎</span>
+                            <span>Contact Us</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -82,6 +86,17 @@
                     <a href="/payment-info.html" class="btn btn-secondary cta-btn">View Payment Guide</a>
                 </div>
             </div>
+
+            <section id="homeContactSection" class="home-contact-section" aria-labelledby="homeContactTitle" hidden>
+                <h3 id="homeContactTitle">Contact Us</h3>
+                <p class="home-contact-subtitle">Need help with bookings or approvals? Reach out anytime.</p>
+                <div class="home-contact-actions">
+                    <a id="homeWhatsappBtn" class="btn home-whatsapp-btn" href="#" target="_blank" rel="noopener noreferrer" hidden>Chat on WhatsApp</a>
+                    <a id="homeEmailLink" class="home-contact-link" href="#" hidden>Email</a>
+                    <a id="homePhoneLink" class="home-contact-link" href="#" hidden>Call</a>
+                </div>
+                    <a id="homeAddressLink" class="home-contact-address" target="_blank" rel="noopener noreferrer" hidden></a>
+            </section>
         </main>
 
         <footer class="app-footer">
@@ -329,6 +344,102 @@
                 }
             };
 
+            const sanitizeWhatsappNumber = (value) => {
+                const digits = String(value || '').replace(/\D/g, '');
+                if (!digits) return '';
+                if (digits.length === 10) return `91${digits}`;
+                if (digits.length === 12 && digits.startsWith('91')) return digits;
+                return digits;
+            };
+
+            const renderHomeContact = (contactInfo = {}) => {
+                const section = document.getElementById('homeContactSection');
+                const whatsappBtn = document.getElementById('homeWhatsappBtn');
+                const emailLink = document.getElementById('homeEmailLink');
+                const phoneLink = document.getElementById('homePhoneLink');
+                const addressLink = document.getElementById('homeAddressLink');
+                if (!section || !whatsappBtn || !emailLink || !phoneLink || !addressLink) return;
+
+                const whatsappNumber = sanitizeWhatsappNumber(contactInfo.whatsappNumber);
+                const whatsappLabel = String(contactInfo.whatsappLabel || '').trim() || 'Chat on WhatsApp';
+                const email = String(contactInfo.email || '').trim();
+                const phone = String(contactInfo.phone || '').trim();
+                const address = String(contactInfo.address || contactInfo.fallbackAddress || '').trim();
+
+                const whatsappMessage = 'Hi SwarJRS, I need help with booking details.';
+                const whatsappHref = whatsappNumber
+                    ? `https://wa.me/${encodeURIComponent(whatsappNumber)}?text=${encodeURIComponent(whatsappMessage)}`
+                    : '';
+
+                if (whatsappHref) {
+                    whatsappBtn.hidden = false;
+                    whatsappBtn.href = whatsappHref;
+                    whatsappBtn.textContent = whatsappLabel;
+                } else {
+                    whatsappBtn.hidden = true;
+                }
+
+                if (email) {
+                    emailLink.hidden = false;
+                    emailLink.href = `mailto:${email}`;
+                    emailLink.textContent = `Email: ${email}`;
+                } else {
+                    emailLink.hidden = true;
+                }
+
+                if (phone) {
+                    phoneLink.hidden = false;
+                    phoneLink.href = `tel:${phone.replace(/\s+/g, '')}`;
+                    phoneLink.textContent = `Phone: ${phone}`;
+                } else {
+                    phoneLink.hidden = true;
+                }
+
+                if (address) {
+                    addressLink.hidden = false;
+                    addressLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+                    addressLink.textContent = `Address: ${address}`;
+                } else {
+                    addressLink.hidden = true;
+                    addressLink.removeAttribute('href');
+                    addressLink.textContent = '';
+                }
+
+                section.hidden = !(whatsappHref || email || phone || address);
+            };
+
+            const loadHomeContactInfo = async () => {
+                try {
+                    const response = await fetch('/api/bookings/settings', { cache: 'no-store' });
+                    const payload = await response.json();
+                    if (!response.ok || !payload?.success) return;
+                    const contactInfo = payload?.settings?.contactInfo || {};
+                    const fallbackAddress = String(payload?.settings?.studioAddress || '').trim();
+                    renderHomeContact({ ...contactInfo, fallbackAddress });
+                } catch (error) {
+                    console.error('Failed to load home contact info:', error);
+                }
+            };
+
+            const scrollToHomeContactSection = () => {
+                const contactSection = document.getElementById('homeContactSection');
+                if (!contactSection) return;
+                contactSection.hidden = false;
+                contactSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (window.history && typeof window.history.replaceState === 'function') {
+                    window.history.replaceState(null, '', '#homeContactSection');
+                }
+            };
+
+            const bindHomeContactScrollAction = () => {
+                const contactScrollBtn = document.getElementById('homeContactScrollBtn');
+                if (!contactScrollBtn) return;
+                contactScrollBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    scrollToHomeContactSection();
+                });
+            };
+
             // Set up lazy loading for Instagram section.
             // The showcase starts hidden, so observing it directly is unreliable.
             const instagramShowcase = document.getElementById('instagramShowcase');
@@ -336,6 +447,15 @@
                 const visibleAnchor = document.querySelector('.cta') || document.querySelector('main') || document.body;
 
                 LazyLoader.observeElement(visibleAnchor, triggerInstagramLoad, { rootMargin: '240px' });
+            }
+
+            await loadHomeContactInfo();
+            bindHomeContactScrollAction();
+
+            if (window.location.hash === '#homeContactSection') {
+                requestAnimationFrame(() => {
+                    scrollToHomeContactSection();
+                });
             }
 
             try {
