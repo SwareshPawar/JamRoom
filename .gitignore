@@ -1,8 +1,38 @@
 node_modules/
 .env
+.env.*
+!.env.example
 .DS_Store
 *.log
 .vscode/
 dist/
 build/
 .vercel
+
+# Secrets and credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.crt
+*.cer
+id_rsa
+id_ed25519
+.npmrc
+.pypirc
+
+# Caches and test output
+coverage/
+.nyc_output/
+.cache/
+
+# OS/editor
+Thumbs.db
+.idea/
+
+# Local runtime data
+tmp/
+temp/
+*.pid
+*.seed
