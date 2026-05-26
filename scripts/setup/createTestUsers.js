@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 // Connect to MongoDB
@@ -19,21 +18,29 @@ const User = require('../../models/User');
 const createTestUsers = async () => {
     await connectDB();
 
+    const testUserEmail = String(process.env.TEST_USER_EMAIL || 'testuser@example.com').trim().toLowerCase();
+    const testUserMobile = String(process.env.TEST_USER_MOBILE || '9876543210').trim();
+    const testUserPassword = String(process.env.TEST_USER_PASSWORD || 'TestUser@123').trim();
+
+    const testAdminEmail = String(process.env.TEST_ADMIN_EMAIL || 'testadmin@example.com').trim().toLowerCase();
+    const testAdminMobile = String(process.env.TEST_ADMIN_MOBILE || '9876543211').trim();
+    const testAdminPassword = String(process.env.TEST_ADMIN_PASSWORD || 'TestAdmin@123').trim();
+
     // Test User Credentials
     const testUser = {
         name: 'Test User',
-        email: 'testuser@jamroom.com',
-        phone: '9876543210',
-        password: 'TestUser@123',
+        email: testUserEmail,
+        mobile: testUserMobile,
+        password: testUserPassword,
         role: 'user'
     };
 
     // Test Admin Credentials
     const testAdmin = {
         name: 'Test Admin',
-        email: 'testadmin@jamroom.com',
-        phone: '9876543211',
-        password: 'TestAdmin@123',
+        email: testAdminEmail,
+        mobile: testAdminMobile,
+        password: testAdminPassword,
         role: 'admin'
     };
 

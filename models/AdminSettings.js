@@ -238,7 +238,7 @@ const adminSettingsSchema = new mongoose.Schema({
     // Business number (primary admin)
     businessNumber: {
       type: String,
-      default: '+919970011855'
+      default: ''
     },
     // Additional notification numbers
     notificationNumbers: [{
@@ -301,13 +301,13 @@ const adminSettingsSchema = new mongoose.Schema({
   },
   studioPhone: {
     type: String,
-    default: '+919970011855'
+    default: ''
   },
   publicContact: {
     whatsappNumber: {
       type: String,
       trim: true,
-      default: '+919970011855'
+      default: ''
     },
     whatsappLabel: {
       type: String,
@@ -323,7 +323,7 @@ const adminSettingsSchema = new mongoose.Schema({
     phone: {
       type: String,
       trim: true,
-      default: '+919970011855'
+      default: ''
     }
   },
   businessHours: {
@@ -560,12 +560,12 @@ adminSettingsSchema.statics.getSettings = async function() {
       adminEmails: [],
       studioName: 'Swar JamRoom & Music Studio',
       studioAddress: 'Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
-      studioPhone: '+919970011855',
+      studioPhone: '',
       publicContact: {
-        whatsappNumber: '+919970011855',
+        whatsappNumber: '',
         whatsappLabel: 'Chat on WhatsApp',
         email: '',
-        phone: '+919970011855'
+        phone: ''
       },
       classConfig: {
         enabled: true,
@@ -725,39 +725,8 @@ adminSettingsSchema.statics.getSettings = async function() {
       },
       whatsappNotifications: {
         enabled: true,
-        businessNumber: '+919970011855',
-        notificationNumbers: [
-          {
-            number: '+919970011855',
-            role: 'Admin Staff',
-            notifications: {
-              bookingRequests: true,
-              bookingConfirmations: true,
-              paymentUpdates: true,
-              cancellations: true
-            }
-          },
-          {
-            number: '+919970011855',
-            role: 'Sound Engineer',
-            notifications: {
-              bookingRequests: true,
-              bookingConfirmations: true,
-              paymentUpdates: false,
-              cancellations: true
-            }
-          },
-          {
-            number: '+919970011855',
-            role: 'Maintenance Person',
-            notifications: {
-              bookingRequests: true,
-              bookingConfirmations: true,
-              paymentUpdates: false,
-              cancellations: true
-            }
-          }
-        ],
+        businessNumber: '',
+        notificationNumbers: [],
         businessNotifications: {
           bookingRequests: true,
           bookingConfirmations: true,
@@ -772,7 +741,7 @@ adminSettingsSchema.statics.getSettings = async function() {
   let needsSave = false;
   const defaultStudioName = 'Swar JamRoom & Music Studio';
   const defaultStudioAddress = 'Swar Jam Room and Music Studio - SwarJRS, Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057';
-  const defaultStudioPhone = '+919970011855';
+  const defaultStudioPhone = '';
 
   const normalizedStudioName = String(settings.studioName || '').trim();
   if (!normalizedStudioName) {

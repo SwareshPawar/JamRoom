@@ -8,6 +8,13 @@
     let eventListSearchTerm = '';
     let eventListStatusFilter = 'all';
     let eventListSort = 'date_desc';
+    let openEventNotifyState = {
+        eventId: '',
+        eventTitle: '',
+        mode: 'all',
+        users: [],
+        selectedEmails: new Set()
+    };
 
     const formatTime12Hour = (time24) => {
         const [hoursRaw, minutesRaw] = String(time24 || '').split(':');
@@ -751,7 +758,211 @@
         }
     };
 
-    const sendOpenEventNotification = async (eventId) => {
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+    const parseEmailListFromInput = (value) => Array.from(new Set(
+        String(value || '')
+            .split(/[\n,;]+/)
+            .map((entry) => String(entry || '').trim().toLowerCase())
+            .filter(Boolean)
+    ));
+
+    const getOpenEventNotifyElements = () => ({
+        modal: document.getElementById('openEventNotifyModal'),
+        title: document.getElementById('openEventNotifyModalTitle'),
+        form: document.getElementById('openEventNotifyForm'),
+        modeAll: document.getElementById('openEventNotifyModeAll'),
+        modeSelected: document.getElementById('openEventNotifyModeSelected'),
+        modeHelp: document.getElementById('openEventNotifyModeHelp'),
+        selectedSection: document.getElementById('openEventNotifySelectedSection'),
+        selectedCount: document.getElementById('openEventNotifySelectedCount'),
+        userSearch: document.getElementById('openEventNotifyUserSearch'),
+        userList: document.getElementById('openEventNotifyUserList'),
+        customSection: document.getElementById('openEventNotifyCustomSection'),
+        customEmails: document.getElementById('openEventNotifyCustomEmails')
+    });
+
+    const getOpenEventNotifySelectedMode = () => {
+        const checked = document.querySelector('input[name="openEventNotifyRecipientMode"]:checked');
+        return String(checked?.value || 'all');
+    };
+
+    const updateOpenEventNotifySelectedCount = () => {
+        const { selectedCount } = getOpenEventNotifyElements();
+        if (!selectedCount) return;
+        const total = openEventNotifyState.selectedEmails.size;
+        selectedCount.textContent = `${total} user${total !== 1 ? 's' : ''} selected`;
+    };
+
+    const getFilteredOpenEventNotifyUsers = () => {
+        const { userSearch } = getOpenEventNotifyElements();
+        const searchValue = String(userSearch?.value || '').trim().toLowerCase();
+        const users = Array.isArray(openEventNotifyState.users) ? openEventNotifyState.users : [];
+        if (!searchValue) return users;
+
+        return users.filter((user) => {
+            const name = String(user?.name || '').toLowerCase();
+            const email = String(user?.email || '').toLowerCase();
+            return name.includes(searchValue) || email.includes(searchValue);
+        });
+    };
+
+    const renderOpenEventNotifyUsers = () => {
+        const { userList } = getOpenEventNotifyElements();
+        if (!userList) return;
+
+        const users = getFilteredOpenEventNotifyUsers();
+        if (users.length === 0) {
+            userList.innerHTML = '<p class="admin-open-event-notify-empty">No users found for this search.</p>';
+            updateOpenEventNotifySelectedCount();
+            return;
+        }
+
+        userList.innerHTML = users.map((user) => {
+            const email = String(user.email || '').toLowerCase();
+            const isChecked = openEventNotifyState.selectedEmails.has(email);
+            return `
+                <label class="admin-open-event-notify-user-item">
+                    <input type="checkbox" class="open-event-notify-user-checkbox" data-email="${escapeHtml(email)}" ${isChecked ? 'checked' : ''}>
+                    <span class="admin-open-event-notify-user-item-name">${escapeHtml(user.name || 'User')}</span>
+                    <span class="admin-open-event-notify-user-item-email">${escapeHtml(email)}</span>
+                </label>
+            `;
+        }).join('');
+
+        updateOpenEventNotifySelectedCount();
+    };
+
+    const syncOpenEventNotifyModeView = () => {
+        const { selectedSection, customSection, modeHelp } = getOpenEventNotifyElements();
+        const mode = getOpenEventNotifySelectedMode();
+        openEventNotifyState.mode = mode;
+
+        if (selectedSection) {
+            selectedSection.classList.toggle('admin-hidden', mode !== 'selected');
+        }
+        if (customSection) {
+            customSection.classList.toggle('admin-hidden', mode !== 'custom');
+        }
+
+        if (modeHelp) {
+            if (mode === 'selected') {
+                modeHelp.textContent = 'Choose one or more registered users from the list below.';
+            } else if (mode === 'custom') {
+                modeHelp.textContent = 'Enter custom email addresses separated by commas.';
+            } else {
+                modeHelp.textContent = 'Notification will be sent to all registered users with an email address.';
+            }
+        }
+    };
+
+    const closeOpenEventNotifyModal = () => {
+        const { modal, userSearch, customEmails } = getOpenEventNotifyElements();
+        if (modal) {
+            modal.classList.remove('show');
+        }
+        if (userSearch) userSearch.value = '';
+        if (customEmails) customEmails.value = '';
+        document.body.style.overflow = '';
+    };
+
+    const openOpenEventNotifyModal = async (eventId, eventTitle) => {
+        const { modal, title, modeAll, modeSelected } = getOpenEventNotifyElements();
+        if (!modal) return;
+
+        const users = await loadOpenEventUsers();
+        const usersWithEmail = users
+            .map((user) => ({
+                ...user,
+                email: String(user?.email || '').trim().toLowerCase()
+            }))
+            .filter((user) => user.email && EMAIL_REGEX.test(user.email))
+            .sort((left, right) => String(left.name || '').localeCompare(String(right.name || '')));
+
+        openEventNotifyState = {
+            eventId: String(eventId || ''),
+            eventTitle: String(eventTitle || 'this event'),
+            mode: 'all',
+            users: usersWithEmail,
+            selectedEmails: new Set()
+        };
+
+        if (title) {
+            title.textContent = `Send Notification - ${openEventNotifyState.eventTitle}`;
+        }
+        if (modeAll) modeAll.checked = true;
+        if (modeSelected) modeSelected.disabled = usersWithEmail.length === 0;
+
+        renderOpenEventNotifyUsers();
+        syncOpenEventNotifyModeView();
+
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    };
+
+    const buildOpenEventNotifyRecipientOptions = () => {
+        const { customEmails } = getOpenEventNotifyElements();
+        const mode = getOpenEventNotifySelectedMode();
+
+        if (mode === 'all') {
+            return {
+                recipientMode: 'all',
+                confirmationMessage:
+                    `⚠️ SEND NOTIFICATION TO ALL USERS\n\n` +
+                    `This will send the event notification for "${openEventNotifyState.eventTitle}" to ALL users in the system.\n\n` +
+                    'Continue?'
+            };
+        }
+
+        if (mode === 'selected') {
+            const selectedEmails = Array.from(openEventNotifyState.selectedEmails);
+            if (selectedEmails.length === 0) {
+                throw new Error('Please select at least one user.');
+            }
+
+            return {
+                recipientMode: 'selected',
+                selectedEmails,
+                confirmationMessage:
+                    `Send notification for "${openEventNotifyState.eventTitle}" to ${selectedEmails.length} selected user(s)?`
+            };
+        }
+
+        if (mode === 'custom') {
+            const customEmailList = parseEmailListFromInput(customEmails?.value || '');
+            const validCustomEmails = customEmailList.filter((email) => EMAIL_REGEX.test(email));
+            if (validCustomEmails.length === 0) {
+                throw new Error('Please enter at least one valid custom email address.');
+            }
+
+            return {
+                recipientMode: 'custom',
+                customEmails: validCustomEmails,
+                confirmationMessage:
+                    `Send notification for "${openEventNotifyState.eventTitle}" to ${validCustomEmails.length} custom recipient(s)?`
+            };
+        }
+
+        throw new Error('Invalid recipient mode selected.');
+    };
+
+    const submitOpenEventNotify = async (event) => {
+        event.preventDefault();
+
+        try {
+            const recipientOptions = buildOpenEventNotifyRecipientOptions();
+            const confirmed = window.confirm(recipientOptions.confirmationMessage || 'Send notification?');
+            if (!confirmed) return;
+
+            const eventId = openEventNotifyState.eventId;
+            closeOpenEventNotifyModal();
+            await sendOpenEventNotification(eventId, recipientOptions);
+        } catch (error) {
+            showAlert(error.message || 'Failed to collect notification recipients.', 'error');
+        }
+    };
+
+    const sendOpenEventNotification = async (eventId, recipientOptions = { recipientMode: 'all' }) => {
         const button = document.querySelector(`.admin-open-event-notify-btn[data-event-id="${eventId}"]`);
         const originalText = button?.textContent || 'Send Notification';
         
@@ -763,7 +974,8 @@
             setLoading(true);
 
             const response = await request(`/api/admin/open-events/${encodeURIComponent(eventId)}/notify-users`, {
-                method: 'POST'
+                method: 'POST',
+                body: recipientOptions
             });
 
             setLoading(false);
@@ -952,6 +1164,67 @@
             form.dataset.bound = 'true';
         }
 
+        const notifyForm = document.getElementById('openEventNotifyForm');
+        if (notifyForm && !notifyForm.dataset.bound) {
+            notifyForm.addEventListener('submit', submitOpenEventNotify);
+            notifyForm.dataset.bound = 'true';
+        }
+
+        const notifyUserSearch = document.getElementById('openEventNotifyUserSearch');
+        if (notifyUserSearch && !notifyUserSearch.dataset.bound) {
+            notifyUserSearch.addEventListener('input', renderOpenEventNotifyUsers);
+            notifyUserSearch.dataset.bound = 'true';
+        }
+
+        const notifyUserList = document.getElementById('openEventNotifyUserList');
+        if (notifyUserList && !notifyUserList.dataset.bound) {
+            notifyUserList.addEventListener('change', (evt) => {
+                const checkbox = evt.target.closest('.open-event-notify-user-checkbox');
+                if (!checkbox) return;
+
+                const email = String(checkbox.dataset.email || '').trim().toLowerCase();
+                if (!email) return;
+
+                if (checkbox.checked) {
+                    openEventNotifyState.selectedEmails.add(email);
+                } else {
+                    openEventNotifyState.selectedEmails.delete(email);
+                }
+                updateOpenEventNotifySelectedCount();
+            });
+            notifyUserList.dataset.bound = 'true';
+        }
+
+        const notifySelectAllButton = document.getElementById('openEventNotifySelectAllBtn');
+        if (notifySelectAllButton && !notifySelectAllButton.dataset.bound) {
+            notifySelectAllButton.addEventListener('click', () => {
+                getFilteredOpenEventNotifyUsers().forEach((user) => {
+                    const email = String(user.email || '').toLowerCase();
+                    if (email) {
+                        openEventNotifyState.selectedEmails.add(email);
+                    }
+                });
+                renderOpenEventNotifyUsers();
+            });
+            notifySelectAllButton.dataset.bound = 'true';
+        }
+
+        const notifyClearButton = document.getElementById('openEventNotifyClearBtn');
+        if (notifyClearButton && !notifyClearButton.dataset.bound) {
+            notifyClearButton.addEventListener('click', () => {
+                openEventNotifyState.selectedEmails.clear();
+                renderOpenEventNotifyUsers();
+            });
+            notifyClearButton.dataset.bound = 'true';
+        }
+
+        const notifyModeInputs = document.querySelectorAll('input[name="openEventNotifyRecipientMode"]');
+        notifyModeInputs.forEach((input) => {
+            if (input.dataset.bound) return;
+            input.addEventListener('change', syncOpenEventNotifyModeView);
+            input.dataset.bound = 'true';
+        });
+
         const eventListSearchInput = document.getElementById('openEventListSearch');
         if (eventListSearchInput && !eventListSearchInput.dataset.bound) {
             eventListSearchInput.addEventListener('input', () => {
@@ -1040,13 +1313,7 @@
                     if (!eventId) return;
                     const event_data = openEventsCache.find((e) => String(e.id) === String(eventId));
                     const eventTitle = event_data?.title || 'this event';
-                    const confirmed = window.confirm(
-                        `⚠️ SEND NOTIFICATION TO ALL USERS\n\n` +
-                        `This will send the event notification for "${eventTitle}" to ALL users in the system.\n\n` +
-                        `Continue?`
-                    );
-                    if (!confirmed) return;
-                    await sendOpenEventNotification(eventId);
+                    await openOpenEventNotifyModal(eventId, eventTitle);
                     return;
                 }
 
@@ -1134,6 +1401,10 @@
                     await adminBookOpenEventSlot(eventId, Number(slotIndex));
                     return;
                 }
+
+                if (event.target.id === 'openEventNotifyModal') {
+                    closeOpenEventNotifyModal();
+                }
             });
             document.body.dataset.adminOpenEventsBound = 'true';
         }
@@ -1176,6 +1447,7 @@
         openOpenEventModal,
         closeOpenEventModal,
         closeOpenEventInfoModal,
+        closeOpenEventNotifyModal,
         submitOpenEventWithStatus,
         deleteOpenEvent,
         copyOpenEvent,
@@ -1188,6 +1460,7 @@
     window.openOpenEventModal = openOpenEventModal;
     window.closeOpenEventModal = closeOpenEventModal;
     window.closeOpenEventInfoModal = closeOpenEventInfoModal;
+    window.closeOpenEventNotifyModal = closeOpenEventNotifyModal;
     window.submitOpenEventWithStatus = submitOpenEventWithStatus;
     window.deleteOpenEvent = deleteOpenEvent;
     window.copyOpenEvent = copyOpenEvent;

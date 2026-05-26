@@ -1,4 +1,6 @@
 const BRAND_LOGO_EMAIL_URL = 'https://jam-room-mu.vercel.app/icons/jamroom-brand-logo.png';
+const DEFAULT_DIRECTIONS_LINK = 'https://www.google.com/maps?um=1&ie=UTF-8&fb=1&gl=in&sa=X&geocode=KQcHWSfEucI7MSXW6zBFUZ9O&daddr=Zen+Business+Center+-+202,+Bhumkar+Chowk+Rd,+above+Cafe+Coffee+Day,+Shankar+Kalat+Nagar,+Wakad,+Pune,+Pimpri-Chinchwad,+Maharashtra+411057';
+const DEFAULT_GOOGLE_REVIEW_LINK = 'https://g.page/r/CSXW6zBFUZ9OEBM/review';
 
 const BOOKING_TERMS = [
   '50% advance payment is required to confirm and block your booking slot.',
@@ -7,6 +9,12 @@ const BOOKING_TERMS = [
   'All production work includes up to 2 rounds of revisions, provided the revision request is submitted within 25 days of the initial delivery date. Requests received after this period may be subject to additional charges.',
   'This quotation is valid for 7 days, subject to slot and team availability at confirmation.'
 ];
+
+const buildWhatsAppLink = (phoneNumber) => {
+  const digits = String(phoneNumber || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return `https://wa.me/${digits}`;
+};
 
 const buildEbillEmailHtml = ({
   settings,
@@ -68,6 +76,8 @@ const buildEbillEmailHtml = ({
       || 'Combo Offer: Book 6 studio hours and get 1 additional studio hour complimentary on confirmation.';
     const offerNote = String(emailSettings.offerNote || '').trim()
       || 'Reach out to us for special packages tailored to your project needs.';
+    const contactWhatsAppNumber = String(settings?.publicContact?.whatsappNumber || '').trim();
+    const contactWhatsAppLink = buildWhatsAppLink(contactWhatsAppNumber);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -125,6 +135,10 @@ const buildEbillEmailHtml = ({
   .cta{background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%);border:1px solid #1d4ed8}
   .cta h3{margin:0 0 6px 0;font-size:14px;color:#ffffff}
   .cta p{margin:0;font-size:13px;line-height:1.7;color:#dbeafe}
+  .quick-actions{background:linear-gradient(130deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:14px;padding:12px 14px;margin:0 0 12px 0;box-shadow:0 10px 24px rgba(30,64,175,0.08)}
+  .quick-actions h3{margin:0 0 8px 0;font-size:14px;color:#1e3a8a}
+  .quick-actions-row{display:flex;flex-wrap:wrap;gap:8px}
+  .quick-action-btn{display:inline-block;background:#1d4ed8;color:#ffffff !important;text-decoration:none !important;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:800;letter-spacing:0.2px;border:1px solid #1d4ed8}
   .attach{border-radius:10px;padding:10px 12px;margin:0 0 12px 0;font-size:13px;line-height:1.6}
   .attach.ok{background:#e8f5e8;border:1px solid #4caf50;color:#2e7d32}
   .attach.warn{background:#fff3e0;border:1px solid #ffcc02;color:#92400e}
@@ -150,6 +164,10 @@ const buildEbillEmailHtml = ({
     .status-card-table td{padding:0 !important}
     .status-card-right{margin-top:10px}
     .booking-card,.notes-card,.cta,.totals-card,.payment-card,.sc{border-radius:12px}
+    .quick-actions{border-radius:12px}
+    .quick-actions-row{display:block}
+    .quick-action-btn{display:block;text-align:center;margin-bottom:8px}
+    .quick-action-btn:last-child{margin-bottom:0}
     .totals-table td,.totals-table tr{display:block;width:100%}
     .totals-table td:last-child{text-align:left;white-space:normal;padding-top:0}
   }
@@ -165,6 +183,8 @@ const buildEbillEmailHtml = ({
     .cta{background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%) !important;border-color:#1d4ed8 !important}
     .cta h3{color:#ffffff !important}
     .cta p,.cta a,.cta span,.cta strong{color:#dbeafe !important}
+    .quick-actions{background:linear-gradient(130deg,#eff6ff 0%,#f8fafc 100%) !important;border-color:#bfdbfe !important}
+    .quick-action-btn{background:#1d4ed8 !important;color:#ffffff !important;border-color:#1d4ed8 !important}
   }
 </style>
 </head>
@@ -252,6 +272,16 @@ const buildEbillEmailHtml = ({
       <div class="cta">
         <h3>Need assistance?</h3>
         <p>If you need help with payment confirmation, receipt details, or booking updates, please reply to this email and our team will assist you promptly.</p>
+      </div>
+      <div class="quick-actions">
+        <h3>Quick Links</h3>
+        <div class="quick-actions-row">
+          ${contactWhatsAppLink
+            ? `<a class="quick-action-btn" href="${contactWhatsAppLink}" target="_blank" rel="noopener noreferrer">Contact on WhatsApp</a>`
+            : ''}
+          <a class="quick-action-btn" href="${DEFAULT_DIRECTIONS_LINK}" target="_blank" rel="noopener noreferrer">Get Directions</a>
+          <a class="quick-action-btn" href="${DEFAULT_GOOGLE_REVIEW_LINK}" target="_blank" rel="noopener noreferrer">Review on Google</a>
+        </div>
       </div>
       ${!pdfAttached
         ? `<div class="attach warn">PDF invoice could not be attached due to a technical issue. You can download your invoice from <a href="${frontendBookingUrl}" style="color:#1d4ed8;font-weight:700;text-decoration:none;">your JamRoom account</a>.</div>`

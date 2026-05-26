@@ -20,47 +20,11 @@ const ensureBaselineStore = (app) => {
   return app.locals.performanceBaseline;
 };
 
-// Simple WhatsApp test without database dependency
-const testWhatsApp = async (mobile, message) => {
-  try {
-    // Test with console log first (no API required)
-    console.log('🧪 WhatsApp Test Message:');
-    console.log('To:', mobile);
-    console.log('Message:', message);
-    console.log('Timestamp:', new Date().toISOString());
-    
-    // Try Twilio if configured
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-      const twilio = require('twilio');
-      const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      
-      let whatsappNumber = mobile.replace(/[^\d]/g, '');
-      if (whatsappNumber.length === 10) {
-        whatsappNumber = '+91' + whatsappNumber;
-      } else if (whatsappNumber.length === 12 && whatsappNumber.startsWith('91')) {
-        whatsappNumber = '+' + whatsappNumber;
-      }
-      
-      const result = await client.messages.create({
-        body: message,
-        from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886'}`,
-        to: `whatsapp:${whatsappNumber}`
-      });
-
-      return { success: true, provider: 'twilio', data: { sid: result.sid, status: result.status } };
-    }
-    
-    // If no API configured, return console success
-    return { 
-      success: true, 
-      provider: 'console', 
-      message: 'Message logged to console (no WhatsApp API configured)'
-    };
-  } catch (error) {
-    console.error('WhatsApp test error:', error);
-    return { success: false, error: error.message };
-  }
-};
+const testWhatsApp = async () => ({
+  success: false,
+  provider: 'disabled',
+  message: 'WhatsApp testing is disabled'
+});
 
 // @route   POST /api/test/whatsapp
 // @desc    Test WhatsApp functionality
@@ -69,38 +33,14 @@ router.post('/whatsapp', async (req, res) => {
   try {
     const { mobile, message } = req.body;
     
-    if (!mobile) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mobile number is required'
-      });
-    }
-
-    const testMessage = message || `🧪 JamRoom WhatsApp Test
-
-This is a test message from your JamRoom booking system.
-
-✅ If you received this WhatsApp message, the integration is working correctly!
-📱 Your number: ${mobile}
-⏰ Test time: ${new Date().toLocaleString('en-IN')}
-
-Next steps:
-1. Set up your WhatsApp API credentials in .env file
-2. Configure notification recipients in admin panel
-3. Test booking notifications
-
-JamRoom Team 🎵`;
-
-    const result = await testWhatsApp(mobile, testMessage);
+    const result = await testWhatsApp(mobile, message);
     
     res.json({
-      success: result.success,
-      message: result.success ? 'WhatsApp test completed' : 'WhatsApp test failed',
+      success: false,
+      message: 'WhatsApp test route is disabled',
       details: result,
       instructions: {
-        console: 'Check your terminal/console for the message details',
-        twilio: result.provider === 'twilio' ? 'Message sent via Twilio WhatsApp API' : null,
-        setup: result.provider === 'console' ? 'Configure TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env to send actual WhatsApp messages' : null
+        status: 'WhatsApp providers are disabled in this environment.'
       }
     });
   } catch (error) {
@@ -117,31 +57,16 @@ JamRoom Team 🎵`;
 // @access  Public (for testing)
 router.get('/whatsapp-config', (req, res) => {
   const config = {
-    twilio: {
-      configured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
-      accountSid: process.env.TWILIO_ACCOUNT_SID ? 'Set' : 'Not set',
-      authToken: process.env.TWILIO_AUTH_TOKEN ? 'Set' : 'Not set',
-      whatsappNumber: process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886 (default sandbox)'
-    },
-    msg91: {
-      configured: !!process.env.MSG91_API_KEY,
-      apiKey: process.env.MSG91_API_KEY ? 'Set' : 'Not set'
-    },
-    meta: {
-      configured: !!(process.env.META_WHATSAPP_TOKEN && process.env.META_WHATSAPP_PHONE_ID),
-      token: process.env.META_WHATSAPP_TOKEN ? 'Set' : 'Not set',
-      phoneId: process.env.META_WHATSAPP_PHONE_ID ? 'Set' : 'Not set'
-    }
+    status: 'disabled',
+    reason: 'WhatsApp providers are disabled'
   };
 
   res.json({
-    success: true,
-    message: 'WhatsApp configuration status',
+    success: false,
+    message: 'WhatsApp configuration route is disabled',
     config,
     recommendations: {
-      quickStart: 'Use Twilio WhatsApp Sandbox for immediate testing',
-      production: 'Set up Meta WhatsApp Business API for production use',
-      fallback: 'Configure multiple providers for reliability'
+      nextStep: 'Re-enable WhatsApp module when provider setup is ready.'
     }
   });
 });
@@ -164,7 +89,7 @@ router.post('/dummy-booking', async (req, res) => {
     const testBooking = {
       userName: req.body.userName || 'Test Customer',
       userEmail: req.body.userEmail || 'test@example.com',
-      userMobile: req.body.userMobile || '+919172706306',
+      userMobile: req.body.userMobile || '',
       date: tomorrow,
       startTime: '14:00',
       endTime: '16:00',
@@ -184,6 +109,9 @@ router.post('/dummy-booking', async (req, res) => {
 
     // Get admin settings for notifications
     const settings = await AdminSettings.getSettings();
+    if (!testBooking.userMobile) {
+      testBooking.userMobile = String(settings?.publicContact?.whatsappNumber || settings?.publicContact?.phone || '').trim();
+    }
 
     // Format date for display
     const displayDate = tomorrow.toLocaleDateString('en-IN', {
@@ -368,7 +296,7 @@ router.post('/admin-booking', async (req, res) => {
     const testAdminBooking = {
       userName: req.body.userName || 'Admin Test Customer',
       userEmail: req.body.userEmail || 'admintest@example.com',
-      userMobile: req.body.userMobile || '+919172706306',
+      userMobile: req.body.userMobile || '',
       date: testDate.toISOString().split('T')[0],
       startTime: '15:00',
       endTime: '17:00',
@@ -415,6 +343,9 @@ router.post('/admin-booking', async (req, res) => {
 
     // Get admin settings for notifications
     const settings = await AdminSettings.getSettings();
+    if (!testAdminBooking.userMobile) {
+      testAdminBooking.userMobile = String(settings?.publicContact?.whatsappNumber || settings?.publicContact?.phone || '').trim();
+    }
 
     // Format date for display
     const displayDate = testDate.toLocaleDateString('en-IN', {

@@ -17,8 +17,7 @@ const {
   normalizeIndianMobile,
   isValidIndianMobile,
   DEFAULT_ADMIN_CREATED_USER_PASSWORD,
-  DEFAULT_APP_LOGIN_URL,
-  ADMIN_DELETE_OWNER_EMAIL
+  DEFAULT_APP_LOGIN_URL
 } = require('../../utils/adminHelpers');
 
 const resolveDeletedFilterMode = (value) => {
@@ -127,6 +126,7 @@ router.post('/users', protect, isAdmin, async (req, res) => {
           brandName: settings?.studioName || 'JamRoom',
           studioAddress: settings?.studioAddress || '',
           studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Admin Invite',
           label: 'Account Created by Admin',
@@ -362,7 +362,13 @@ router.delete('/users/:id', protect, isAdmin, async (req, res) => {
     }
 
     const requesterEmail = (req.user.email || '').trim().toLowerCase();
-    const canDeleteAdminUsers = requesterEmail === ADMIN_DELETE_OWNER_EMAIL;
+    const settings = await AdminSettings.getSettings();
+    const ownerAdminEmail = Array.isArray(settings?.adminEmails)
+      ? settings.adminEmails
+        .map((email) => String(email || '').trim().toLowerCase())
+        .find(Boolean)
+      : '';
+    const canDeleteAdminUsers = Boolean(ownerAdminEmail) && requesterEmail === ownerAdminEmail;
 
     if (user.role === 'admin' && !canDeleteAdminUsers) {
       return res.status(403).json({
@@ -372,7 +378,6 @@ router.delete('/users/:id', protect, isAdmin, async (req, res) => {
     }
 
     if (user.role === 'admin') {
-      const settings = await AdminSettings.getSettings();
       if (Array.isArray(settings.adminEmails)) {
         const targetEmail = (user.email || '').trim().toLowerCase();
         settings.adminEmails = settings.adminEmails.filter((email) => (email || '').trim().toLowerCase() !== targetEmail);
@@ -570,6 +575,7 @@ router.post('/make-admin', protect, isAdmin, async (req, res) => {
           brandName: settings?.studioName || 'JamRoom',
           studioAddress: settings?.studioAddress || '',
           studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Admin Access',
           label: 'Privileges Granted',

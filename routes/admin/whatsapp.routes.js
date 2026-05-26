@@ -10,6 +10,18 @@ const { protect } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/admin');
 const { sendWhatsApp } = require('../../utils/whatsapp');
 
+const getDefaultWhatsappSettings = (settings) => ({
+  enabled: true,
+  businessNumber: String(settings?.publicContact?.whatsappNumber || '').trim(),
+  notificationNumbers: [],
+  businessNotifications: {
+    bookingRequests: true,
+    bookingConfirmations: true,
+    paymentUpdates: true,
+    cancellations: true
+  }
+});
+
 // @route   GET /api/admin/whatsapp-settings
 // @desc    Get WhatsApp notification settings
 // @access  Private/Admin
@@ -19,17 +31,7 @@ router.get('/whatsapp-settings', protect, isAdmin, async (req, res) => {
 
     res.json({
       success: true,
-      whatsappSettings: settings.whatsappNotifications || {
-        enabled: true,
-        businessNumber: '+919172706306',
-        notificationNumbers: [],
-        businessNotifications: {
-          bookingRequests: true,
-          bookingConfirmations: true,
-          paymentUpdates: true,
-          cancellations: true
-        }
-      }
+      whatsappSettings: settings.whatsappNotifications || getDefaultWhatsappSettings(settings)
     });
   } catch (error) {
     console.error('Get WhatsApp settings error:', error);
@@ -95,17 +97,7 @@ router.post('/whatsapp-settings/add-contact', protect, isAdmin, async (req, res)
     const settings = await AdminSettings.getSettings();
 
     if (!settings.whatsappNotifications) {
-      settings.whatsappNotifications = {
-        enabled: true,
-        businessNumber: '+919172706306',
-        notificationNumbers: [],
-        businessNotifications: {
-          bookingRequests: true,
-          bookingConfirmations: true,
-          paymentUpdates: true,
-          cancellations: true
-        }
-      };
+      settings.whatsappNotifications = getDefaultWhatsappSettings(settings);
     }
 
     const existingContact = settings.whatsappNotifications.notificationNumbers.find(

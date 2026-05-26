@@ -1293,6 +1293,7 @@ router.post('/', protect, async (req, res) => {
           brandName: settings?.studioName || 'JamRoom',
           studioAddress: settings?.studioAddress || '',
           studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Booking Request',
           label: 'Received',
@@ -1372,6 +1373,7 @@ router.post('/', protect, async (req, res) => {
             brandName: settings?.studioName || 'JamRoom',
             studioAddress: settings?.studioAddress || '',
             studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
             studioEmail: settings?.adminEmails?.[0] || '',
             title: 'New Booking Request',
             label: 'Admin Review',
@@ -1707,13 +1709,10 @@ router.get('/settings', async (req, res) => {
     const publicContact = settings?.publicContact && typeof settings.publicContact === 'object'
       ? settings.publicContact
       : {};
-    const configuredBusinessWhatsapp = String(settings?.whatsappNotifications?.businessNumber || '').trim();
-    const fallbackPhone = String(settings?.studioPhone || '').trim();
-    const fallbackEmail = String(settings?.adminEmails?.[0] || '').trim();
     const fallbackAddress = String(settings?.studioAddress || '').trim();
-    const contactPhone = String(publicContact?.phone || '').trim() || fallbackPhone;
-    const contactEmail = String(publicContact?.email || '').trim() || fallbackEmail;
-    const contactWhatsapp = String(publicContact?.whatsappNumber || '').trim() || configuredBusinessWhatsapp || contactPhone;
+    const contactPhone = String(publicContact?.phone || '').trim();
+    const contactEmail = String(publicContact?.email || '').trim();
+    const contactWhatsapp = String(publicContact?.whatsappNumber || '').trim();
     const contactWhatsappLabel = String(publicContact?.whatsappLabel || '').trim() || 'Chat on WhatsApp';
     const contactAddress = fallbackAddress;
     
@@ -1768,13 +1767,10 @@ router.get('/payment-info', async (req, res) => {
     const publicContact = settings?.publicContact && typeof settings.publicContact === 'object'
       ? settings.publicContact
       : {};
-    const configuredBusinessWhatsapp = String(settings?.whatsappNotifications?.businessNumber || '').trim();
-    const fallbackPhone = String(settings?.studioPhone || '').trim();
-    const fallbackEmail = String(settings?.adminEmails?.[0] || '').trim();
     const fallbackAddress = String(settings?.studioAddress || '').trim();
-    const contactPhone = String(publicContact?.phone || '').trim() || fallbackPhone;
-    const contactEmail = String(publicContact?.email || '').trim() || fallbackEmail;
-    const contactWhatsapp = String(publicContact?.whatsappNumber || '').trim() || configuredBusinessWhatsapp || contactPhone;
+    const contactPhone = String(publicContact?.phone || '').trim();
+    const contactEmail = String(publicContact?.email || '').trim();
+    const contactWhatsapp = String(publicContact?.whatsappNumber || '').trim();
     const contactWhatsappLabel = String(publicContact?.whatsappLabel || '').trim() || 'Chat on WhatsApp';
     const contactAddress = fallbackAddress;
     
@@ -2080,6 +2076,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
             brandName: settings?.studioName || 'JamRoom',
             studioAddress: settings?.studioAddress || '',
             studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
             studioEmail: settings?.adminEmails?.[0] || '',
             title: 'Class Slot Request',
             label: 'Submitted',
@@ -2112,6 +2109,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
               brandName: settings?.studioName || 'JamRoom',
               studioAddress: settings?.studioAddress || '',
               studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
               studioEmail: settings?.adminEmails?.[0] || '',
               title: 'New Class Slot Request',
               label: 'Admin Review',
@@ -2224,6 +2222,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
           brandName: settings?.studioName || 'JamRoom',
           studioAddress: settings?.studioAddress || '',
           studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Cancellation Notice',
           label: 'Booking Cancelled',
@@ -2270,6 +2269,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
               brandName: settings?.studioName || 'JamRoom',
               studioAddress: settings?.studioAddress || '',
               studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
               studioEmail: settings?.adminEmails?.[0] || '',
               title: 'Cancellation Notice',
               label: 'Admin Notification',

@@ -133,24 +133,29 @@ app.use((err, req, res, next) => {
 const seedDatabase = async () => {
   try {
     console.log('Checking for seed data...');
+    const defaultAdminEmail = String(process.env.DEFAULT_ADMIN_EMAIL || '').trim().toLowerCase();
 
     if (ENABLE_DEFAULT_ADMIN_SEED) {
       // Optional local bootstrap path (disabled by default).
-      const adminExists = await User.findOne({ email: 'admin@jamroom.com' });
-
-      if (!adminExists) {
-        console.log('Creating default admin user...');
-        await User.create({
-          name: 'Admin',
-          email: 'admin@jamroom.com',
-          password: 'Admin@123', // Will be hashed automatically by pre-save hook
-          role: 'admin'
-        });
-        console.log('✅ Default admin user created');
-        console.log('📧 Email: admin@jamroom.com');
-        console.log('🔒 Password: Admin@123');
+      if (!defaultAdminEmail) {
+        console.log('⏭️ Skipping default admin user seed (DEFAULT_ADMIN_EMAIL is not set)');
       } else {
-        console.log('✅ Default admin user already exists');
+        const adminExists = await User.findOne({ email: defaultAdminEmail });
+
+        if (!adminExists) {
+          console.log('Creating default admin user...');
+          await User.create({
+            name: 'Admin',
+            email: defaultAdminEmail,
+            password: 'Admin@123', // Will be hashed automatically by pre-save hook
+            role: 'admin'
+          });
+          console.log('✅ Default admin user created');
+          console.log(`📧 Email: ${defaultAdminEmail}`);
+          console.log('🔒 Password: Admin@123');
+        } else {
+          console.log('✅ Default admin user already exists');
+        }
       }
     } else {
       console.log('⏭️ Skipping default admin user seed (ENABLE_DEFAULT_ADMIN_SEED is not true)');
@@ -181,7 +186,7 @@ const seedDatabase = async () => {
     if (ENABLE_DEFAULT_ADMIN_SEED) {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('🔑 DEFAULT ADMIN CREDENTIALS:');
-      console.log('   Email: admin@jamroom.com');
+      console.log(`   Email: ${defaultAdminEmail || 'Not configured'}`);
       console.log('   Password: Admin@123');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     }

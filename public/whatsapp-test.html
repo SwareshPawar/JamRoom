@@ -13,7 +13,7 @@
     <div class="test-container">
         <div class="header">
             <h1>📱 WhatsApp Test</h1>
-            <p>Test your WhatsApp notification setup</p>
+            <p>WhatsApp notifications are currently disabled</p>
         </div>
 
         <form id="testForm">
@@ -23,8 +23,8 @@
                     type="tel" 
                     id="mobile" 
                     name="mobile" 
-                    placeholder="+919172706306" 
-                    value="+919172706306"
+                    placeholder="+91XXXXXXXXXX" 
+                    value=""
                     required
                 >
             </div>
@@ -39,16 +39,16 @@
                 ></textarea>
             </div>
 
-            <button type="submit" class="btn" id="sendBtn">
-                Send Test WhatsApp Message
+            <button type="submit" class="btn" id="sendBtn" disabled>
+                WhatsApp Disabled
             </button>
 
-            <button type="button" class="btn btn-secondary" id="configBtn">
-                Check Configuration
+            <button type="button" class="btn btn-secondary" id="configBtn" disabled>
+                Configuration Disabled
             </button>
 
-            <button type="button" class="btn btn-accent" id="dummyBookingBtn">
-                🧪 Test Booking Notifications
+            <button type="button" class="btn btn-accent" id="dummyBookingBtn" disabled>
+                🧪 Booking Notifications Disabled
             </button>
         </form>
 
@@ -57,16 +57,11 @@
         <div id="configInfo" class="config-info is-hidden"></div>
 
         <div class="setup-steps">
-            <h3>🚀 Quick Setup Guide</h3>
+            <h3>WhatsApp Status</h3>
             <ol>
-                <li>Sign up for <a href="https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn" target="_blank">Twilio WhatsApp Sandbox</a> (free for testing)</li>
-                <li>Get your Account SID and Auth Token from Twilio Console</li>
-                <li>Add them to your .env file:
-                    <br><code>TWILIO_ACCOUNT_SID=your_account_sid</code>
-                    <br><code>TWILIO_AUTH_TOKEN=your_auth_token</code>
-                </li>
-                <li>Join the sandbox by sending "join" to the Twilio sandbox number</li>
-                <li>Test using this page!</li>
+                <li>All WhatsApp provider integrations are intentionally disabled.</li>
+                <li>No WhatsApp test messages or booking notifications will be sent.</li>
+                <li>Re-enable later when provider configuration is finalized.</li>
             </ol>
         </div>
 
@@ -90,173 +85,25 @@
             resultDiv.innerHTML = message;
         }
 
-        // Test WhatsApp message
+        // WhatsApp test controls are disabled intentionally.
         testForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            const mobile = document.getElementById('mobile').value;
-            const message = document.getElementById('message').value;
-
-            if (!mobile) {
-                showResult('Please enter a mobile number', false);
-                return;
-            }
-
-            sendBtn.disabled = true;
-            sendBtn.textContent = 'Sending...';
-
-            try {
-                const response = await fetch(`${API_URL}/api/test/whatsapp`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ mobile, message })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    let resultMessage = `✅ ${data.message}<br><br>`;
-                    
-                    if (data.details.provider === 'console') {
-                        resultMessage += `📝 Message logged to server console (check terminal)<br>`;
-                        resultMessage += `⚠️ To send actual WhatsApp messages, configure your Twilio credentials<br>`;
-                    } else if (data.details.provider === 'twilio') {
-                        resultMessage += `📱 WhatsApp message sent via Twilio!<br>`;
-                        resultMessage += `📧 Message ID: ${data.details.data?.sid}<br>`;
-                    }
-
-                    if (data.instructions) {
-                        resultMessage += `<br><strong>Instructions:</strong><br>`;
-                        Object.entries(data.instructions).forEach(([key, value]) => {
-                            if (value) resultMessage += `• ${value}<br>`;
-                        });
-                    }
-
-                    showResult(resultMessage, true);
-                } else {
-                    showResult(`❌ Test failed: ${data.message}`, false);
-                }
-            } catch (error) {
-                console.error('Test error:', error);
-                showResult(`❌ Error: ${error.message}`, false);
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.textContent = 'Send Test WhatsApp Message';
-            }
+            showResult('WhatsApp notifications are disabled in this environment.', false);
         });
 
         // Check configuration
         configBtn.addEventListener('click', async () => {
-            configBtn.disabled = true;
-            configBtn.textContent = 'Checking...';
-
-            try {
-                const response = await fetch(`${API_URL}/api/test/whatsapp-config`);
-                const data = await response.json();
-
-                if (data.success) {
-                    let configHtml = '<strong>📋 Configuration Status:</strong><br><br>';
-                    
-                    // Twilio config
-                    configHtml += `<strong>Twilio WhatsApp:</strong><br>`;
-                    configHtml += `• Configured: ${data.config.twilio.configured ? '✅ Yes' : '❌ No'}<br>`;
-                    configHtml += `• Account SID: ${data.config.twilio.accountSid}<br>`;
-                    configHtml += `• Auth Token: ${data.config.twilio.authToken}<br>`;
-                    configHtml += `• WhatsApp Number: ${data.config.twilio.whatsappNumber}<br><br>`;
-                    
-                    // MSG91 config
-                    configHtml += `<strong>MSG91 WhatsApp:</strong><br>`;
-                    configHtml += `• Configured: ${data.config.msg91.configured ? '✅ Yes' : '❌ No'}<br>`;
-                    configHtml += `• API Key: ${data.config.msg91.apiKey}<br><br>`;
-                    
-                    // Meta config
-                    configHtml += `<strong>Meta WhatsApp Business:</strong><br>`;
-                    configHtml += `• Configured: ${data.config.meta.configured ? '✅ Yes' : '❌ No'}<br>`;
-                    configHtml += `• Access Token: ${data.config.meta.token}<br>`;
-                    configHtml += `• Phone ID: ${data.config.meta.phoneId}<br>`;
-
-                    configInfoDiv.innerHTML = configHtml;
-                    configInfoDiv.style.display = 'block';
-                } else {
-                    showResult(`❌ Config check failed: ${data.message}`, false);
-                }
-            } catch (error) {
-                console.error('Config check error:', error);
-                showResult(`❌ Error checking config: ${error.message}`, false);
-            } finally {
-                configBtn.disabled = false;
-                configBtn.textContent = 'Check Configuration';
-            }
+            showResult('WhatsApp provider configuration is disabled.', false);
         });
 
         // Auto-check configuration on page load
         window.addEventListener('load', () => {
-            configBtn.click();
+            showResult('WhatsApp notifications are disabled. Re-enable later when needed.', false);
         });
 
         // Test dummy booking notifications
         dummyBookingBtn.addEventListener('click', async () => {
-            const mobile = document.getElementById('mobile').value || '+919172706306';
-            
-            dummyBookingBtn.disabled = true;
-            dummyBookingBtn.textContent = 'Testing Booking Notifications...';
-
-            try {
-                const response = await fetch(`${API_URL}/api/test/dummy-booking`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        userName: 'Test Customer',
-                        userEmail: 'test@example.com',
-                        userMobile: mobile,
-                        bandName: 'Test Band'
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    let resultMessage = `🎉 Booking notification test completed!<br><br>`;
-                    
-                    resultMessage += `<strong>📋 Booking Details:</strong><br>`;
-                    resultMessage += `• Customer: ${data.bookingDetails.customer}<br>`;
-                    resultMessage += `• Mobile: ${data.bookingDetails.mobile}<br>`;
-                    resultMessage += `• Date: ${data.bookingDetails.date}<br>`;
-                    resultMessage += `• Time: ${data.bookingDetails.time}<br>`;
-                    resultMessage += `• Amount: ₹${data.bookingDetails.amount}<br><br>`;
-                    
-                    resultMessage += `<strong>📱 WhatsApp Notifications:</strong><br>`;
-                    if (data.whatsappResult && Array.isArray(data.whatsappResult)) {
-                        data.whatsappResult.forEach(result => {
-                            const status = result.success ? '✅' : '❌';
-                            resultMessage += `• ${result.role} (${result.number}): ${status}<br>`;
-                        });
-                    } else {
-                        resultMessage += `• Result: ${data.whatsappResult.success ? '✅ Success' : '❌ Failed'}<br>`;
-                    }
-
-                    if (data.instructions) {
-                        resultMessage += `<br><strong>🔍 Next Steps:</strong><br>`;
-                        data.instructions.forEach(instruction => {
-                            resultMessage += `• ${instruction}<br>`;
-                        });
-                    }
-
-                    showResult(resultMessage, true);
-                } else {
-                    showResult(`❌ Booking notification test failed: ${data.message}`, false);
-                }
-            } catch (error) {
-                console.error('Booking test error:', error);
-                showResult(`❌ Error testing booking notifications: ${error.message}`, false);
-            } finally {
-                dummyBookingBtn.disabled = false;
-                dummyBookingBtn.textContent = '🧪 Test Booking Notifications';
-            }
+            showResult('Booking-related WhatsApp notifications are disabled.', false);
         });
     </script>
 </body>

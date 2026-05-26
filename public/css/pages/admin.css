@@ -1423,6 +1423,118 @@
     box-shadow: var(--shadow-xl);
 }
 
+#openEventNotifyModal .modal-content {
+    width: min(900px, 94vw);
+    max-width: 900px;
+    background: var(--surface-elevated);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-xl);
+}
+
+.admin-open-event-notify-form {
+    display: grid;
+    gap: 14px;
+}
+
+.admin-open-event-notify-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.admin-open-event-notify-mode-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color-light);
+    background: color-mix(in srgb, var(--surface-1) 84%, var(--surface-elevated));
+    cursor: pointer;
+}
+
+.admin-open-event-notify-mode-option input {
+    margin: 0;
+}
+
+.admin-open-event-notify-help-text {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.admin-open-event-notify-section {
+    display: grid;
+    gap: 10px;
+}
+
+.admin-open-event-notify-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.admin-open-event-notify-toolbar .users-search-input {
+    flex: 1;
+    min-width: 220px;
+}
+
+.admin-open-event-notify-toolbar-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-open-event-notify-user-list {
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid var(--border-color-light);
+    border-radius: 12px;
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+    background: color-mix(in srgb, var(--surface-1) 88%, var(--surface-elevated));
+}
+
+.admin-open-event-notify-user-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+}
+
+.admin-open-event-notify-user-item:hover {
+    border-color: var(--border-color-light);
+    background: color-mix(in srgb, var(--surface-elevated) 76%, var(--surface-1));
+}
+
+.admin-open-event-notify-user-item-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.admin-open-event-notify-user-item-email {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.admin-open-event-notify-count {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.93rem;
+}
+
+.admin-open-event-notify-empty {
+    margin: 0;
+    padding: 10px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
 #openEventInfoModalBody {
     display: grid;
     gap: 16px;
@@ -1709,6 +1821,25 @@
     #openEventInfoModal .modal-content {
         width: min(100%, 96vw);
         padding: 20px;
+    }
+
+    #openEventNotifyModal .modal-content {
+        width: min(100%, 96vw);
+        padding: 20px;
+    }
+
+    .admin-open-event-notify-mode-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-open-event-notify-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .admin-open-event-notify-toolbar .users-search-input {
+        min-width: 0;
+        width: 100%;
     }
 
     #openEventBookingsModal .modal-content {

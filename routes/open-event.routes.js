@@ -329,6 +329,7 @@ router.post('/:id/book', protect, async (req, res) => {
           brandName: studioName,
           studioAddress,
           studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
           studioEmail: adminEmail,
           title: 'Open Event Booking Confirmed',
           label: 'Confirmed',

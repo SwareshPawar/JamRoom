@@ -2,6 +2,10 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('../../models/User');
 
+const DEFAULT_ADMIN_NAME = String(process.env.DEFAULT_ADMIN_NAME || 'Admin User').trim();
+const DEFAULT_ADMIN_EMAIL = String(process.env.DEFAULT_ADMIN_EMAIL || 'admin@example.com').trim().toLowerCase();
+const DEFAULT_ADMIN_PASSWORD = String(process.env.DEFAULT_ADMIN_PASSWORD || 'ChangeMe@123').trim();
+
 const createAdminUser = async () => {
   try {
     const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
@@ -20,10 +24,10 @@ const createAdminUser = async () => {
     console.log('✓ Connected to MongoDB');
     
     // Check if user already exists
-    const existingUser = await User.findOne({ email: 'swareshpawar@gmail.com' });
+    const existingUser = await User.findOne({ email: DEFAULT_ADMIN_EMAIL });
     
     if (existingUser) {
-      console.log('⚠️  User already exists with email: swareshpawar@gmail.com');
+      console.log(`⚠️  User already exists with email: ${DEFAULT_ADMIN_EMAIL}`);
       console.log('Updating to admin role...');
       existingUser.role = 'admin';
       await existingUser.save();
@@ -31,16 +35,16 @@ const createAdminUser = async () => {
     } else {
       console.log('Creating new admin user...');
       const newUser = await User.create({
-        name: 'Swaresh Pawar',
-        email: 'swareshpawar@gmail.com',
-        password: 'Swar@123', // Will be hashed automatically by pre-save hook
+        name: DEFAULT_ADMIN_NAME,
+        email: DEFAULT_ADMIN_EMAIL,
+        password: DEFAULT_ADMIN_PASSWORD, // Will be hashed automatically by pre-save hook
         role: 'admin'
       });
       console.log('✅ Admin user created successfully!');
     }
     
-    console.log('\n📧 Email: swareshpawar@gmail.com');
-    console.log('🔒 Password: Swar@123');
+    console.log(`\n📧 Email: ${DEFAULT_ADMIN_EMAIL}`);
+    console.log(`🔒 Password: ${DEFAULT_ADMIN_PASSWORD}`);
     console.log('👑 Role: admin\n');
     
     await mongoose.connection.close();

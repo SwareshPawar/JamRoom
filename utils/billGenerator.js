@@ -413,7 +413,9 @@ const buildWhatsAppLink = (phoneNumber) => {
 const buildQuotationPresentationData = (data, settings) => {
   const studioName = settings?.studioName || 'JamRoom';
   const studioEmail = getPrimaryStudioEmail(settings);
-  const studioPhone = String(settings?.studioPhone || '+91 9970011855').trim();
+  const publicContactPhone = String(settings?.publicContact?.phone || '').trim();
+  const studioPhone = publicContactPhone || String(settings?.studioPhone || '').trim();
+  const publicWhatsappNumber = String(settings?.publicContact?.whatsappNumber || '').trim();
   const studioAddress = String(settings?.studioAddress || '').trim();
   const discountAmountValue = Math.max(0, Number(data?.discountAmount || 0));
   const discountNote = String(data?.discountNote || '').trim();
@@ -482,8 +484,9 @@ const buildQuotationPresentationData = (data, settings) => {
     studioName,
     studioAddress,
     studioPhone,
+    studioWhatsAppNumber: publicWhatsappNumber,
     studioEmail,
-    studioWhatsAppLink: buildWhatsAppLink(studioPhone),
+    studioWhatsAppLink: buildWhatsAppLink(publicWhatsappNumber),
     websiteUrl,
     logoDataUri: getQuotationLogoDataUri(),
     logoImageUrl: `${websiteUrl.replace(/\/$/, '')}/icons/${BRAND_LOGO_FILE_NAME}`,

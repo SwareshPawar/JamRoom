@@ -29,12 +29,12 @@
     <script src="/js/admin/admin-bookings-edit.js"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
-    <script src="/js/admin/admin-open-events.js?v=20260520d"></script>
+    <script src="/js/admin/admin-open-events.js?v=20260526a"></script>
     <script src="/js/vendor/flatpickr.min.js"></script>
     
     <!-- Admin-specific styles -->
     
-    <link rel="stylesheet" href="/css/pages/admin.css?v=20260513g">
+    <link rel="stylesheet" href="/css/pages/admin.css?v=20260526a">
 
 </head>
 <body>
@@ -198,6 +198,57 @@
                         <button type="button" class="close" onclick="closeOpenEventInfoModal()">&times;</button>
                     </div>
                     <div class="modal-body" id="openEventInfoModalBody"></div>
+                </div>
+            </div>
+
+            <div id="openEventNotifyModal" class="modal admin-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="openEventNotifyModalTitle">Send Open Event Notification</h2>
+                        <button type="button" class="close" onclick="closeOpenEventNotifyModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="openEventNotifyForm" class="admin-open-event-notify-form">
+                            <div class="admin-open-event-notify-mode-grid" role="radiogroup" aria-label="Recipient mode">
+                                <label class="admin-open-event-notify-mode-option">
+                                    <input type="radio" name="openEventNotifyRecipientMode" id="openEventNotifyModeAll" value="all" checked>
+                                    <span>All users</span>
+                                </label>
+                                <label class="admin-open-event-notify-mode-option">
+                                    <input type="radio" name="openEventNotifyRecipientMode" id="openEventNotifyModeSelected" value="selected">
+                                    <span>Selected users</span>
+                                </label>
+                                <label class="admin-open-event-notify-mode-option">
+                                    <input type="radio" name="openEventNotifyRecipientMode" id="openEventNotifyModeCustom" value="custom">
+                                    <span>Custom emails</span>
+                                </label>
+                            </div>
+
+                            <p id="openEventNotifyModeHelp" class="admin-open-event-notify-help-text"></p>
+
+                            <section id="openEventNotifySelectedSection" class="admin-open-event-notify-section admin-hidden">
+                                <div class="admin-open-event-notify-toolbar">
+                                    <input type="text" id="openEventNotifyUserSearch" class="users-search-input" placeholder="Search user by name or email">
+                                    <div class="admin-open-event-notify-toolbar-actions">
+                                        <button type="button" id="openEventNotifySelectAllBtn" class="btn btn-secondary btn-sm">Select All (Filtered)</button>
+                                        <button type="button" id="openEventNotifyClearBtn" class="btn btn-secondary btn-sm">Clear All</button>
+                                    </div>
+                                </div>
+                                <div id="openEventNotifyUserList" class="admin-open-event-notify-user-list"></div>
+                                <p id="openEventNotifySelectedCount" class="admin-open-event-notify-count">0 users selected</p>
+                            </section>
+
+                            <section id="openEventNotifyCustomSection" class="admin-open-event-notify-section admin-hidden">
+                                <label for="openEventNotifyCustomEmails">Custom email addresses (comma separated)</label>
+                                <textarea id="openEventNotifyCustomEmails" rows="4" maxlength="4000" placeholder="email1@example.com, email2@example.com"></textarea>
+                            </section>
+
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="closeOpenEventNotifyModal()">Cancel</button>
+                                <button type="submit" class="btn btn-primary" id="openEventNotifySubmitBtn">Send Notification</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
 
@@ -423,7 +474,7 @@
                         <h3 class="settings-section-title">📞 Public Contact Settings</h3>
                         <div class="form-group">
                             <label>Public WhatsApp Number</label>
-                            <input type="text" id="publicWhatsappNumber" placeholder="+919970011855">
+                            <input type="text" id="publicWhatsappNumber" placeholder="+91XXXXXXXXXX">
                             <small class="settings-help-text">Used on Home, Book Now, and Payment Info contact buttons.</small>
                         </div>
                         <div class="form-group">
@@ -436,7 +487,7 @@
                         </div>
                         <div class="form-group">
                             <label>Public Contact Phone</label>
-                            <input type="text" id="publicContactPhone" placeholder="+919970011855">
+                            <input type="text" id="publicContactPhone" placeholder="+91XXXXXXXXXX">
                         </div>
                         
                         <!-- GST Configuration Section -->
@@ -2881,7 +2932,12 @@
                 const role = user.role || 'user';
                 const currentUserId = currentUser?.id || currentUser?._id;
                 const currentUserEmail = (currentUser?.email || '').trim().toLowerCase();
-                const isOwnerAdmin = currentUserEmail === 'swareshpawar@gmail.com';
+                const ownerAdminEmail = Array.isArray(adminSettingsData?.adminEmails)
+                    ? adminSettingsData.adminEmails
+                        .map((email) => String(email || '').trim().toLowerCase())
+                        .find((email) => Boolean(email))
+                    : '';
+                const isOwnerAdmin = Boolean(ownerAdminEmail) && currentUserEmail === ownerAdminEmail;
                 const isCurrentUser = currentUserId && user._id === currentUserId;
                 const isAdminRow = role === 'admin';
                 const isDeletedRow = user.isDeleted === true;

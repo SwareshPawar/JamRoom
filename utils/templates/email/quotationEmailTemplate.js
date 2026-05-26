@@ -5,6 +5,15 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
+const DEFAULT_DIRECTIONS_LINK = 'https://www.google.com/maps?um=1&ie=UTF-8&fb=1&gl=in&sa=X&geocode=KQcHWSfEucI7MSXW6zBFUZ9O&daddr=Zen+Business+Center+-+202,+Bhumkar+Chowk+Rd,+above+Cafe+Coffee+Day,+Shankar+Kalat+Nagar,+Wakad,+Pune,+Pimpri-Chinchwad,+Maharashtra+411057';
+const DEFAULT_GOOGLE_REVIEW_LINK = 'https://g.page/r/CSXW6zBFUZ9OEBM/review';
+
+const buildWhatsAppLink = (phoneNumber) => {
+  const digits = String(phoneNumber || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return `https://wa.me/${digits}`;
+};
+
 const buildNotesBulletHtml = (value) => {
   const lines = String(value || '')
     .split(/\r?\n/)
@@ -56,6 +65,10 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
   .cta{background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin:0 0 14px 0}
   .cta-title{font-size:15px;font-weight:800;color:#0f172a;margin-bottom:8px}
   .cta-body{font-size:13px;line-height:1.8;color:#0f172a}
+  .quick-actions{background:linear-gradient(130deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;margin:0 0 14px 0}
+  .quick-actions-title{font-size:14px;font-weight:800;color:#0f172a;margin-bottom:8px}
+  .quick-actions-row{display:flex;flex-wrap:wrap;gap:8px}
+  .quick-action-btn{display:inline-block;background:#1d4ed8;color:#ffffff !important;text-decoration:none !important;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:800;letter-spacing:0.2px;border:1px solid #1d4ed8}
   .terms{background:#fff5f5;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:12px;padding:14px 16px;margin:0 0 12px 0}
   .terms-hd{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#dc2626;font-weight:800;margin-bottom:8px}
   .terms ul{margin:0;padding-left:16px;color:#7f1d1d}
@@ -76,6 +89,10 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
     .hdr-left,.hdr-right,.col-left,.col-right{display:block;width:100% !important;padding:0 !important}
     .hdr-right,.col-right{margin-top:12px}
     .sc,.tc,.cta,.terms,.offer,.notes-card{border-radius:12px}
+    .quick-actions{border-radius:12px}
+    .quick-actions-row{display:block}
+    .quick-action-btn{display:block;text-align:center;margin-bottom:8px}
+    .quick-action-btn:last-child{margin-bottom:0}
   }
   @media (prefers-color-scheme: dark){
     html,body,.eq{background:#eef2f7 !important;color:#1f2937 !important}
@@ -85,6 +102,8 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
     .sc-title,.cta-title,.notes-hd{color:#0f172a !important}
     .sc-sub,.tc-sub,.cta-body,.footer,.footer a{color:#475569 !important}
     .tc{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%) !important;border-color:#bfdbfe !important}
+    .quick-actions{background:linear-gradient(130deg,#eff6ff 0%,#f8fafc 100%) !important;border-color:#bfdbfe !important}
+    .quick-action-btn{background:#1d4ed8 !important;color:#ffffff !important;border-color:#1d4ed8 !important}
     .offer{background:linear-gradient(135deg,#fff7ed 0%,#fef3c7 100%) !important}
   }
 </style>
@@ -163,7 +182,17 @@ const buildQuotationEmailHtml = ({ quotationPresentation, recipientName = '', in
         <div class="cta-title">To confirm your booking</div>
         <div class="cta-body">
           <div>Reply with <strong>CONFIRM</strong>${individualEmail ? ' on this email' : ' on this email thread'}.</div>
-          <div>${quotationPresentation.studioWhatsAppLink ? `Or WhatsApp us at <a href="${quotationPresentation.studioWhatsAppLink}" style="color:#1d4ed8;font-weight:700;text-decoration:none;">${quotationPresentation.studioPhone}</a>.` : `Or contact us at <strong>${quotationPresentation.studioPhone}</strong>.`}</div>
+          <div>${quotationPresentation.studioWhatsAppLink ? `Or WhatsApp us at <a href="${quotationPresentation.studioWhatsAppLink}" style="color:#1d4ed8;font-weight:700;text-decoration:none;">${quotationPresentation.studioWhatsAppNumber || 'our support number'}</a>.` : `Or contact us at <strong>${quotationPresentation.studioPhone}</strong>.`}</div>
+        </div>
+      </div>
+      <div class="quick-actions">
+        <div class="quick-actions-title">Quick Links</div>
+        <div class="quick-actions-row">
+          ${quotationPresentation.studioWhatsAppLink
+            ? `<a class="quick-action-btn" href="${quotationPresentation.studioWhatsAppLink}" target="_blank" rel="noopener noreferrer">Contact on WhatsApp</a>`
+            : ''}
+          <a class="quick-action-btn" href="${DEFAULT_DIRECTIONS_LINK}" target="_blank" rel="noopener noreferrer">Get Directions</a>
+          <a class="quick-action-btn" href="${DEFAULT_GOOGLE_REVIEW_LINK}" target="_blank" rel="noopener noreferrer">Review on Google</a>
         </div>
       </div>
       <div class="terms">

@@ -11,7 +11,6 @@ const { sendEmail } = require('./email');
 const { buildInvoiceStyleEmail } = require('./templates/email/invoiceStyleEmailTemplate');
 const DEFAULT_ADMIN_CREATED_USER_PASSWORD = 'Qwerty123';
 const DEFAULT_APP_LOGIN_URL = 'https://jam-room-mu.vercel.app/';
-const ADMIN_DELETE_OWNER_EMAIL = 'swareshpawar@gmail.com';
 const IST_TIMEZONE = 'Asia/Kolkata';
 
 const buildBookingFooterEmailConfig = (settings = {}) => {
@@ -555,6 +554,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
         brandName: settings?.studioName || 'JamRoom',
         studioAddress: settings?.studioAddress || '',
         studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
         studioEmail: settings?.adminEmails?.[0] || '',
         title: 'Booking Confirmed',
         label: bookingStatusDisplayLabel,
@@ -613,6 +613,7 @@ const sendUnifiedBookingConfirmationEmails = async ({
             brandName: settings?.studioName || 'JamRoom',
             studioAddress: settings?.studioAddress || '',
             studioPhone: settings?.studioPhone || '',
+          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
             studioEmail: settings?.adminEmails?.[0] || '',
             title: 'Booking Approved',
             label: 'Admin Notification',
@@ -654,7 +655,6 @@ module.exports = {
   // Constants
   DEFAULT_ADMIN_CREATED_USER_PASSWORD,
   DEFAULT_APP_LOGIN_URL,
-  ADMIN_DELETE_OWNER_EMAIL,
   // Time
   formatTime12Hour,
   formatTimeRange12Hour,

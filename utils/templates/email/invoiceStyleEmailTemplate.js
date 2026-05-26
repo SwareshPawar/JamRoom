@@ -1,4 +1,6 @@
 const DEFAULT_BRAND_LOGO_URL = 'https://jam-room-mu.vercel.app/icons/jamroom-brand-logo.png';
+const DEFAULT_DIRECTIONS_LINK = 'https://www.google.com/maps?um=1&ie=UTF-8&fb=1&gl=in&sa=X&geocode=KQcHWSfEucI7MSXW6zBFUZ9O&daddr=Zen+Business+Center+-+202,+Bhumkar+Chowk+Rd,+above+Cafe+Coffee+Day,+Shankar+Kalat+Nagar,+Wakad,+Pune,+Pimpri-Chinchwad,+Maharashtra+411057';
+const DEFAULT_GOOGLE_REVIEW_LINK = 'https://g.page/r/CSXW6zBFUZ9OEBM/review';
 
 const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')
@@ -24,6 +26,12 @@ const buildBulletListHtml = (items = [], itemClass = 'list-item') => items
   .filter(Boolean)
   .map((item) => `<li class="${itemClass}">${item}</li>`)
   .join('');
+
+const buildWhatsAppLink = (phoneNumber) => {
+  const digits = String(phoneNumber || '').replace(/\D/g, '');
+  if (!digits) return '';
+  return `https://wa.me/${digits}`;
+};
 
 const DEFAULT_BOOKING_TERMS = [
   '50% advance payment is required to confirm and block your booking slot.',
@@ -57,6 +65,12 @@ const buildInvoiceStyleEmail = ({
   sectionsHtml = [],
   ctaTitle = '',
   ctaHtml = '',
+  contactWhatsAppNumber = '',
+  contactWhatsAppLabel = 'Contact on WhatsApp',
+  directionsUrl = '',
+  directionsLabel = 'Get Directions',
+  reviewUrl = '',
+  reviewLabel = 'Review on Google',
   termsTitle = '',
   terms = [],
   footerLines = [],
@@ -93,6 +107,23 @@ const buildInvoiceStyleEmail = ({
     ? footerLines.filter(Boolean).map((line) => `<div>${line}</div>`).join('')
     : '';
   const ctaBlock = ctaHtml ? `<div class="card section-card cta-card"><h3>${ctaTitle || 'Next Steps'}</h3>${ctaHtml}</div>` : '';
+  const resolvedWhatsAppLink = buildWhatsAppLink(contactWhatsAppNumber);
+  const resolvedDirectionsUrl = String(directionsUrl || DEFAULT_DIRECTIONS_LINK || '').trim();
+  const resolvedReviewUrl = String(reviewUrl || DEFAULT_GOOGLE_REVIEW_LINK || '').trim();
+  const quickActionButtons = [
+    resolvedWhatsAppLink
+      ? `<a href="${resolvedWhatsAppLink}" target="_blank" rel="noopener noreferrer" class="qa-btn">${escapeHtml(contactWhatsAppLabel)}</a>`
+      : '',
+    resolvedDirectionsUrl
+      ? `<a href="${resolvedDirectionsUrl}" target="_blank" rel="noopener noreferrer" class="qa-btn">${escapeHtml(directionsLabel)}</a>`
+      : '',
+    resolvedReviewUrl
+      ? `<a href="${resolvedReviewUrl}" target="_blank" rel="noopener noreferrer" class="qa-btn">${escapeHtml(reviewLabel)}</a>`
+      : ''
+  ].filter(Boolean);
+  const quickActionsBlock = quickActionButtons.length > 0
+    ? `<div class="card section-card quick-actions-card"><h3>Quick Links</h3><div class="qa-row">${quickActionButtons.join('')}</div></div>`
+    : '';
   const heroLines = [greeting ? `<h3>${greeting}</h3>` : '', intro].filter(Boolean).join('');
 
   return `<!DOCTYPE html>
@@ -163,6 +194,10 @@ const buildInvoiceStyleEmail = ({
   .cta-card h3,.cta-card h4,.cta-card strong{color:#ffffff !important}
   .cta-card p,.cta-card li,.cta-card span,.cta-card div,.cta-card a{color:#dbeafe !important}
   .cta-card a{font-weight:700;text-decoration:underline}
+  .quick-actions-card{background:linear-gradient(130deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe}
+  .qa-row{display:flex;flex-wrap:wrap;gap:8px}
+  .qa-btn{display:inline-block;background:#1d4ed8;color:#ffffff !important;text-decoration:none !important;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:800;letter-spacing:0.2px;border:1px solid #1d4ed8}
+  .qa-btn:hover{background:#1e40af !important;color:#ffffff !important}
   .footer{font-size:11px;line-height:1.8;color:#475569;border-top:1px solid #dbe5f0;padding-top:12px;word-break:break-word}
   .footer a{color:#1d4ed8;text-decoration:none;font-weight:700}
   @media only screen and (max-width: 620px){
@@ -176,6 +211,9 @@ const buildInvoiceStyleEmail = ({
     .summary-label{font-size:9px}
     .summary-value{font-size:13px}
     .summary-grid{grid-template-columns:1fr}
+    .qa-row{display:block}
+    .qa-btn{display:block;text-align:center;margin-bottom:8px}
+    .qa-btn:last-child{margin-bottom:0}
   }
   @media (prefers-color-scheme: dark){
     html,body,.eq{background:#eef5ff !important;color:#1f2937 !important}
@@ -189,6 +227,8 @@ const buildInvoiceStyleEmail = ({
     .cta-card{background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%) !important;border-color:#1d4ed8 !important}
     .cta-card h3,.cta-card h4,.cta-card strong{color:#ffffff !important}
     .cta-card p,.cta-card li,.cta-card span,.cta-card div,.cta-card a{color:#dbeafe !important}
+    .quick-actions-card{background:linear-gradient(130deg,#eff6ff 0%,#f8fafc 100%) !important;border-color:#bfdbfe !important}
+    .qa-btn{background:#1d4ed8 !important;color:#ffffff !important;border-color:#1d4ed8 !important}
   }
 </style>
 </head>
@@ -236,6 +276,7 @@ const buildInvoiceStyleEmail = ({
         ` : ''}
         ${sections}
         ${ctaBlock}
+        ${quickActionsBlock}
         ${attachmentNoticeHtml ? `<div class="section-card"><h3>Attachment</h3>${attachmentNoticeHtml}</div>` : ''}
         ${noteHtml ? `<div class="section-card"><h3>Additional Notes</h3>${noteHtml}</div>` : ''}
         ${shouldRenderBookingFooter ? `

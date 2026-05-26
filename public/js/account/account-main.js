@@ -321,101 +321,31 @@ function loadWhatsAppPreferences(user) {
 
     whatsappEnabled.checked = whatsapp.enabled;
     sandboxJoined.checked = whatsapp.sandboxJoined;
-
-    // Show setup section if enabled but not verified
-    if (whatsapp.enabled && !whatsapp.verified) {
-        whatsappSetup.style.display = 'block';
-        loadWhatsAppInstructions();
-    } else if (whatsapp.enabled) {
-        whatsappSetup.style.display = 'none';
-    }
+    whatsappEnabled.checked = false;
+    sandboxJoined.checked = false;
+    whatsappEnabled.disabled = true;
+    sandboxJoined.disabled = true;
+    whatsappSetup.style.display = 'none';
 
     // Update status
     updateWhatsAppStatus(whatsapp);
 
     // Add event listeners
     whatsappEnabled.addEventListener('change', function() {
-        if (this.checked) {
-            if (!user.mobile) {
-                showAlert('Please add a mobile number first to enable WhatsApp notifications');
-                this.checked = false;
-                return;
-            }
-            whatsappSetup.style.display = 'block';
-            loadWhatsAppInstructions();
-        } else {
-            whatsappSetup.style.display = 'none';
-        }
+        this.checked = false;
+        whatsappSetup.style.display = 'none';
+        showAlert('WhatsApp notifications are currently disabled');
     });
 }
 
 async function loadWhatsAppInstructions() {
-    try {
-        const response = await fetch(`${API_URL}/api/profile/whatsapp-setup`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            const instructions = data.setupInstructions;
-            const whatsappLink = `https://wa.me/14155238886?text=${encodeURIComponent(instructions.sandboxCode)}`;
-            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(whatsappLink)}`;
-
-            document.getElementById('setupInstructions').innerHTML = `
-                <div class="whatsapp-setup-card">
-                    <h4 class="whatsapp-setup-title">🚀 Quick Setup Options</h4>
-
-                    <div class="setup-option">
-                        <h5 class="whatsapp-option-title">📱 Option 1: One-Click Setup</h5>
-                        <p class="whatsapp-option-desc">Click the button below to open WhatsApp with the message ready:</p>
-                        <a href="${whatsappLink}" target="_blank" class="whatsapp-btn">
-                            📱 Open WhatsApp & Send Message
-                        </a>
-                    </div>
-
-                    <div class="setup-option qr">
-                        <h5 class="whatsapp-option-title">📷 Option 2: Scan QR Code</h5>
-                        <p class="whatsapp-option-desc">Scan this QR code with your phone's camera:</p>
-                        <div class="qr-container">
-                            <img src="${qrCodeUrl}" alt="WhatsApp Setup QR Code">
-                            <br><small class="qr-caption">Scan with your phone camera</small>
-                        </div>
-                    </div>
-
-                    <div class="setup-option manual">
-                        <h5 class="whatsapp-option-title">✍️ Option 3: Manual Setup</h5>
-                        <p class="whatsapp-option-desc">If the above options don't work, send manually:</p>
-                        <div class="code-block">
-                            <strong>Message:</strong> ${instructions.sandboxCode}<br>
-                            <strong>To:</strong> ${instructions.twilioNumber}
-                        </div>
-                        <ol class="whatsapp-steps">
-                            <li>Open WhatsApp on your phone</li>
-                            <li>Start a new chat with: <strong>${instructions.twilioNumber}</strong></li>
-                            <li>Send the message: <strong>${instructions.sandboxCode}</strong></li>
-                            <li>Wait for Twilio's confirmation message</li>
-                            <li>Return here and check the verification box below</li>
-                        </ol>
-                    </div>
-                </div>
-
-                <div class="whatsapp-notes">
-                    <h5 class="whatsapp-notes-title">📝 Important Notes:</h5>
-                    <ul class="whatsapp-notes-list">
-                        <li>Make sure you send from your registered mobile: <strong>${instructions.userMobile || 'your mobile number'}</strong></li>
-                        <li>You should receive a confirmation message from Twilio</li>
-                        <li>This is a one-time setup process</li>
-                        <li>You can disable notifications anytime from this page</li>
-                    </ul>
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error('Error loading WhatsApp instructions:', error);
-    }
+    const setupInstructions = document.getElementById('setupInstructions');
+    if (!setupInstructions) return;
+    setupInstructions.innerHTML = `
+        <div class="whatsapp-status-disabled">
+            WhatsApp notifications are currently disabled and will be enabled later if needed.
+        </div>
+    `;
 }
 
 function updateWhatsAppStatus(whatsapp) {
@@ -429,7 +359,7 @@ function updateWhatsAppStatus(whatsapp) {
             statusHTML = '<div class="whatsapp-status-pending">⚠️ Verification required</div>';
         }
     } else {
-        statusHTML = '<div class="whatsapp-status-disabled">WhatsApp notifications are disabled</div>';
+        statusHTML = '<div class="whatsapp-status-disabled">WhatsApp notifications are currently disabled</div>';
     }
 
     statusDiv.innerHTML = statusHTML;
@@ -437,42 +367,7 @@ function updateWhatsAppStatus(whatsapp) {
 
 // Save WhatsApp preferences
 document.getElementById('saveWhatsAppBtn').addEventListener('click', async function() {
-    try {
-        const enabled = document.getElementById('whatsappEnabled').checked;
-        const sandboxJoined = document.getElementById('sandboxJoined').checked;
-
-        if (enabled && !sandboxJoined) {
-            showAlert('Please complete the verification process first');
-            return;
-        }
-
-        const response = await fetch(`${API_URL}/api/profile/whatsapp`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                enabled,
-                sandboxJoined
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showAlert('WhatsApp preferences saved successfully!', 'success');
-            updateWhatsAppStatus(data.whatsappNotifications);
-            if (enabled && sandboxJoined) {
-                document.getElementById('whatsappSetup').style.display = 'none';
-            }
-        } else {
-            showAlert(data.message || 'Failed to save WhatsApp preferences');
-        }
-    } catch (error) {
-        console.error('Save WhatsApp preferences error:', error);
-        showAlert('Error saving WhatsApp preferences');
-    }
+    showAlert('WhatsApp notifications are currently disabled');
 });
 
 // Logout function

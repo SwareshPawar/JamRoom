@@ -80,6 +80,20 @@ const renderEmailDescriptionParagraph = (value) => {
   return `<p class="description-copy">${lines.map((line) => escapeHtml(line)).join('<br><br>')}</p>`;
 };
 
+const SIMPLE_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+const normalizeEmailInput = (input) => {
+  const rawEntries = Array.isArray(input)
+    ? input
+    : String(input || '').split(/[\n,;]+/);
+
+  return Array.from(new Set(
+    rawEntries
+      .map((entry) => String(entry || '').trim().toLowerCase())
+      .filter((email) => SIMPLE_EMAIL_REGEX.test(email))
+  ));
+};
+
 const toIstDateTime = (dateValue, timeValue) => new Date(`${dateValue}T${timeValue}:00${IST_OFFSET}`);
 
 const formatWeekdayInIst = (dateValue) => {
@@ -701,13 +715,62 @@ router.post('/open-events/:id/notify-users', protect, isAdmin, async (req, res) 
     }
 
     const settings = await AdminSettings.getSettings();
+    const recipientMode = String(req.body?.recipientMode || 'all').trim().toLowerCase();
     const users = await User.find({ email: { $exists: true, $ne: '' } }).select('name email');
-    const recipients = users
+    const registeredRecipients = users
       .map((user) => ({
         name: String(user?.name || '').trim(),
-        email: String(user?.email || '').trim()
+        email: String(user?.email || '').trim().toLowerCase()
       }))
-      .filter((user) => user.email);
+      .filter((user) => user.email && SIMPLE_EMAIL_REGEX.test(user.email));
+
+    const registeredRecipientByEmail = new Map(
+      registeredRecipients.map((recipient) => [recipient.email, recipient])
+    );
+
+    let recipients = [];
+
+    if (recipientMode === 'all') {
+      recipients = registeredRecipients;
+    } else if (recipientMode === 'selected') {
+      const selectedEmails = normalizeEmailInput(req.body?.selectedEmails);
+      if (selectedEmails.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide at least one selected email address'
+        });
+      }
+
+      const unknownSelectedEmails = selectedEmails.filter((email) => !registeredRecipientByEmail.has(email));
+      if (unknownSelectedEmails.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Selected email(s) not found in registered users: ${unknownSelectedEmails.slice(0, 10).join(', ')}`
+        });
+      }
+
+      recipients = selectedEmails
+        .map((email) => registeredRecipientByEmail.get(email))
+        .filter(Boolean);
+    } else if (recipientMode === 'custom') {
+      const customEmails = normalizeEmailInput(req.body?.customEmails);
+      if (customEmails.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide at least one valid custom email address'
+        });
+      }
+
+      recipients = customEmails.map((email) => ({
+        name: registeredRecipientByEmail.get(email)?.name || '',
+        email
+      }));
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid recipient mode. Use all, selected, or custom.'
+      });
+    }
 
     if (recipients.length === 0) {
       return res.status(400).json({ success: false, message: 'No users with email found for notification' });
@@ -743,6 +806,7 @@ router.post('/open-events/:id/notify-users', protect, isAdmin, async (req, res) 
     res.json({
       success: true,
       message: `Notification sent to ${sent} user(s)${failed > 0 ? `, ${failed} failed` : ''}`,
+      recipientMode,
       sent,
       failed,
       total: results.length
