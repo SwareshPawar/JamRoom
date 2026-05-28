@@ -64,6 +64,14 @@
             return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
         };
 
+        const sanitizeBookingWhatsappNumber = (value) => {
+            const digits = String(value || '').replace(/\D/g, '');
+            if (!digits) return '';
+            if (digits.length === 10) return `91${digits}`;
+            if (digits.length === 12 && digits.startsWith('91')) return digits;
+            return digits;
+        };
+
         const renderBookingContactSection = (settingsData = null) => {
             const contactSection = document.getElementById('bookingContactSection');
             const whatsappBtn = document.getElementById('bookingWhatsappBtn');
@@ -81,7 +89,7 @@
             const email = String(contactInfo.email || '').trim();
             const whatsappRaw = String(contactInfo.whatsappNumber || '').trim();
             const whatsappLabel = String(contactInfo.whatsappLabel || '').trim() || 'Chat on WhatsApp';
-            const whatsappNumber = sanitizeWhatsappNumber(whatsappRaw);
+            const whatsappNumber = sanitizeBookingWhatsappNumber(whatsappRaw);
 
             const whatsappMessage = 'Hi SwarJRS, I need help with my booking and approval.';
             const whatsappHref = whatsappNumber
@@ -189,6 +197,64 @@
         };
 
         const initBookingDatePickers = async () => {
+            const dateInputIds = ['bookingDate', 'perdayStartDate', 'perdayEndDate'];
+
+            const openDatePickerForInput = (inputEl) => {
+                if (!inputEl || inputEl.disabled) {
+                    return;
+                }
+
+                const picker = inputEl._flatpickr;
+                if (picker && typeof picker.open === 'function') {
+                    if (picker.altInput) {
+                        picker.altInput.focus({ preventScroll: true });
+                    } else {
+                        inputEl.focus({ preventScroll: true });
+                    }
+                    picker.open();
+                    return;
+                }
+
+                if (typeof inputEl.showPicker === 'function') {
+                    inputEl.showPicker();
+                    return;
+                }
+
+                inputEl.focus({ preventScroll: true });
+                inputEl.click();
+            };
+
+            const bindDateContainerClick = (inputEl) => {
+                if (!inputEl) {
+                    return;
+                }
+
+                const container = inputEl.closest('.form-group');
+                if (!container || container.dataset.datePickerClickBound === '1') {
+                    return;
+                }
+
+                container.dataset.datePickerClickBound = '1';
+                container.addEventListener('click', (event) => {
+                    const target = event.target;
+                    if (!(target instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    // Preserve native behavior when user directly clicks an actionable control.
+                    if (target.closest('button, a, select, textarea')) {
+                        return;
+                    }
+
+                    openDatePickerForInput(inputEl);
+                });
+            };
+
+            dateInputIds.forEach((inputId) => {
+                const inputEl = document.getElementById(inputId);
+                bindDateContainerClick(inputEl);
+            });
+
             const isFlatpickrReady = await ensureFlatpickrLoaded();
             if (!isFlatpickrReady) {
                 return;
@@ -203,8 +269,6 @@
                 instance.calendarContainer.classList.toggle('booking-date-calendar', true);
                 instance.calendarContainer.classList.toggle('booking-date-calendar-mobile', isMobileViewport);
             };
-
-            const dateInputIds = ['bookingDate', 'perdayStartDate', 'perdayEndDate'];
 
             dateInputIds.forEach((inputId) => {
                 const inputEl = document.getElementById(inputId);
@@ -260,6 +324,8 @@
                 window.addEventListener('resize', () => {
                     syncBookingDatePickerViewportState(picker);
                 });
+
+                bindDateContainerClick(inputEl);
             });
         };
 

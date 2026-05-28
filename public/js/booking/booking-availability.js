@@ -57,11 +57,56 @@ const setPerdayAvailabilityVisibility = (isVisible) => {
     view.hidden = !isVisible;
 };
 
+const formatTimeLabel = (timeValue) => {
+    const [rawHours, rawMinutes] = String(timeValue || '').split(':');
+    const hours = Number(rawHours);
+    const minutes = Number(rawMinutes);
+
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        return String(timeValue || '').trim();
+    }
+
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHour = hours % 12 || 12;
+    return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
+};
+
+const sortByStartTime = (items = []) => {
+    return [...items].sort((left, right) => timeToMinutes(left.startTime) - timeToMinutes(right.startTime));
+};
+
+const filterHistoricItemsForSelectedDate = (items = [], selectedDate) => {
+    const todayLocal = getLocalDateString(new Date());
+    if (!selectedDate || selectedDate !== todayLocal) {
+        return [...items];
+    }
+
+    const now = new Date();
+    const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+
+    return items.filter((item) => {
+        const endMinutes = timeToMinutes(item.endTime);
+        return endMinutes > nowMinutes;
+    });
+};
+
+const buildTimeRangeSummary = (items = [], emptyText) => {
+    if (!Array.isArray(items) || items.length === 0) {
+        return emptyText;
+    }
+
+    return items
+        .map((item) => `${formatTimeLabel(item.startTime)}-${formatTimeLabel(item.endTime)}`)
+        .join(', ');
+};
+
 const getHourlyUnavailableRanges = (availabilityData) => {
     const unavailableRanges = [];
+    const selectedDate = document.getElementById('bookingDate')?.value || '';
 
     if (availabilityData && Array.isArray(availabilityData.bookings)) {
-        availabilityData.bookings.forEach((booking) => {
+        const bookingsForConflicts = filterHistoricItemsForSelectedDate(availabilityData.bookings, selectedDate);
+        bookingsForConflicts.forEach((booking) => {
             if (booking.bookingStatus === 'CONFIRMED') {
                 unavailableRanges.push({
                     start: booking.startTime,
@@ -73,7 +118,8 @@ const getHourlyUnavailableRanges = (availabilityData) => {
     }
 
     if (availabilityData && Array.isArray(availabilityData.blockedTimes)) {
-        availabilityData.blockedTimes.forEach((blocked) => {
+        const blockedTimesForConflicts = filterHistoricItemsForSelectedDate(availabilityData.blockedTimes, selectedDate);
+        blockedTimesForConflicts.forEach((blocked) => {
             unavailableRanges.push({
                 start: blocked.startTime,
                 end: blocked.endTime,
@@ -526,33 +572,39 @@ const displayAvailability = (data) => {
     const bookings = Array.isArray(data?.bookings) ? data.bookings : [];
     const blockedTimes = Array.isArray(data?.blockedTimes) ? data.blockedTimes : [];
 
-    if (bookings.length === 0 && blockedTimes.length === 0) {
+    const upcomingBookings = filterHistoricItemsForSelectedDate(bookings, selectedDate);
+    const upcomingBlockedTimes = filterHistoricItemsForSelectedDate(blockedTimes, selectedDate);
+
+    if (upcomingBookings.length === 0 && upcomingBlockedTimes.length === 0) {
         if (!hasFutureStartSlotsForToday(selectedDate)) {
             container.innerHTML = '<div class="booking-theme-status booking-theme-status-muted">No slots left today. Choose another date.</div>';
             setHourlyAvailabilityVisibility(true);
             return;
         }
 
-        container.innerHTML = '<div class="booking-theme-status booking-theme-status-success">All time slots available for this date.</div>';
+        container.innerHTML = '<div class="booking-theme-status booking-theme-status-success">All time slots available.</div>';
         setHourlyAvailabilityVisibility(true);
         return;
     }
 
-    const confirmedBookings = bookings.filter((booking) => booking.bookingStatus === 'CONFIRMED');
-    const pendingBookings = bookings.filter((booking) => booking.bookingStatus !== 'CONFIRMED');
+    const confirmedBookings = sortByStartTime(
+        upcomingBookings.filter((booking) => booking.bookingStatus === 'CONFIRMED')
+    );
+    const sortedBlockedTimes = sortByStartTime(upcomingBlockedTimes);
 
-    const summaryParts = [];
-    if (confirmedBookings.length > 0) summaryParts.push(`${confirmedBookings.length} booked`);
-    if (blockedTimes.length > 0) summaryParts.push(`${blockedTimes.length} blocked`);
-    if (pendingBookings.length > 0) summaryParts.push(`${pendingBookings.length} pending`);
+    const occupiedRanges = sortByStartTime([
+        ...confirmedBookings,
+        ...sortedBlockedTimes
+    ]);
 
-    const hasHardConflicts = confirmedBookings.length > 0 || blockedTimes.length > 0;
-    const summaryClass = hasHardConflicts ? 'booking-theme-status-warning' : 'booking-theme-status-muted';
-    const summaryText = summaryParts.length > 0
-        ? `Availability summary: ${summaryParts.join(', ')}.`
-        : 'No schedule items.';
+    if (occupiedRanges.length === 0) {
+        container.innerHTML = '<div class="booking-theme-status booking-theme-status-success">All time slots available.</div>';
+        setHourlyAvailabilityVisibility(true);
+        return;
+    }
 
-    container.innerHTML = `<div class="booking-theme-status ${summaryClass}">${summaryText}</div>`;
+    const occupiedSummary = buildTimeRangeSummary(occupiedRanges, '');
+    container.innerHTML = `<div class="booking-theme-status booking-theme-status-warning">Unavailable: ${occupiedSummary}</div>`;
     setHourlyAvailabilityVisibility(true);
 };
 
