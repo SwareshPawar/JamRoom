@@ -64,14 +64,6 @@
             return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
         };
 
-        const sanitizeWhatsappNumber = (value) => {
-            const digits = String(value || '').replace(/\D/g, '');
-            if (!digits) return '';
-            if (digits.length === 10) return `91${digits}`;
-            if (digits.length === 12 && digits.startsWith('91')) return digits;
-            return digits;
-        };
-
         const renderBookingContactSection = (settingsData = null) => {
             const contactSection = document.getElementById('bookingContactSection');
             const whatsappBtn = document.getElementById('bookingWhatsappBtn');
