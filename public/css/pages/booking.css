@@ -311,6 +311,24 @@ body:not(.booking-preload) .main-content {
     text-align: left;
 }
 
+.booking-row .booking-catalog-note {
+    grid-column: 1 / -1;
+    margin: 0 0 2px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+    background: color-mix(in srgb, var(--primary-color) 10%, var(--surface-1));
+    color: var(--text-color-light);
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.booking-row .booking-catalog-note strong {
+    color: var(--primary-color);
+    letter-spacing: 0.01em;
+    margin-right: 3px;
+}
+
 .booking-type-combobox {
     position: relative;
 }

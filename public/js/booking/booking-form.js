@@ -960,7 +960,12 @@ const initBookingFormHandlers = () => {
         if (bookingTypeToggleEl) {
             bookingTypeToggleEl.addEventListener('click', () => {
                 const willOpen = bookingTypeDropdownEl.hidden;
-                renderBookingTypeSelectOptions({ query: bookingTypeEl.value });
+                if (willOpen) {
+                    bookingTypeEl.value = '';
+                    handleBookingTypeChange();
+                    renderBookingTypeSelectOptions();
+                }
+
                 setBookingTypeDropdownOpen(willOpen);
                 highlightedOptionIndex = -1;
                 if (willOpen) bookingTypeEl.focus();
