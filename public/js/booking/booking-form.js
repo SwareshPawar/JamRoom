@@ -958,17 +958,35 @@ const initBookingFormHandlers = () => {
         });
 
         if (bookingTypeToggleEl) {
-            bookingTypeToggleEl.addEventListener('click', () => {
-                const willOpen = bookingTypeDropdownEl.hidden;
-                if (willOpen) {
-                    bookingTypeEl.value = '';
-                    handleBookingTypeChange();
-                    renderBookingTypeSelectOptions();
+            let skipNextToggleClick = false;
+
+            const openCatalogToggleMenu = () => {
+                bookingTypeEl.value = '';
+                handleBookingTypeChange();
+                renderBookingTypeSelectOptions();
+                setBookingTypeDropdownOpen(true);
+                highlightedOptionIndex = -1;
+                bookingTypeEl.focus({ preventScroll: true });
+            };
+
+            bookingTypeToggleEl.addEventListener('pointerdown', (event) => {
+                // Handle touch/pointer first so mobile always clears and opens full list.
+                event.preventDefault();
+                event.stopPropagation();
+                skipNextToggleClick = true;
+                openCatalogToggleMenu();
+            });
+
+            bookingTypeToggleEl.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (skipNextToggleClick) {
+                    skipNextToggleClick = false;
+                    return;
                 }
 
-                setBookingTypeDropdownOpen(willOpen);
-                highlightedOptionIndex = -1;
-                if (willOpen) bookingTypeEl.focus();
+                // Keyboard-triggered click still needs the same behavior.
+                openCatalogToggleMenu();
             });
         }
 
