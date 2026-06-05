@@ -1326,6 +1326,16 @@
                         <div class="loading-inline-muted">Loading rental options...</div>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>Manual Items (Not in Catalog)</label>
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="addCreateCustomItemRow()">+ Add Manual Item</button>
+                    </div>
+                    <div id="createCustomItemsContainer" class="admin-rentals-panel">
+                        <div class="loading-inline-muted">No manual items added.</div>
+                    </div>
+                    <small class="settings-help-text">Manual items are added to booking totals and billing PDF/email as regular billed items.</small>
+                </div>
 
                 <div class="form-grid-3">
                     <div class="form-group">
@@ -1563,6 +1573,16 @@
                     <div id="quotationRentals" class="admin-rentals-panel">
                         <div class="loading-inline-muted">Loading rental options...</div>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>Manual Items (Not in Catalog)</label>
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="addQuotationCustomItemRow()">+ Add Manual Item</button>
+                    </div>
+                    <div id="quoteCustomItemsContainer" class="admin-rentals-panel">
+                        <div class="loading-inline-muted">No manual items added.</div>
+                    </div>
+                    <small class="settings-help-text">Use this when an item is not present in catalog. These items are included in quotation totals, PDF, and email.</small>
                 </div>
                 <div id="quoteItemsSummaryWrap" class="form-group" style="display:none;">
                     <label>Selected Items Summary</label>
@@ -5637,6 +5657,9 @@
                     }
                 })
                 .filter(Boolean);
+            const customItems = typeof collectCreateCustomRentals === 'function'
+                ? collectCreateCustomRentals({ strict: false })
+                : [];
 
             const hasDraftValue =
                 !!userId ||
@@ -5655,7 +5678,8 @@
                 amountPaid > 0 ||
                 !!paymentReference ||
                 !!paymentNote ||
-                rentals.length > 0;
+                rentals.length > 0 ||
+                customItems.length > 0;
 
             if (!hasDraftValue) return null;
 
@@ -5676,7 +5700,8 @@
                 amountPaid,
                 paymentReference,
                 paymentNote,
-                rentals
+                rentals,
+                customItems
             };
         };
 
@@ -5834,6 +5859,19 @@
                 }
 
                 applyCreateBookingRentalsDraft(draft.rentals || []);
+                const customContainer = document.getElementById('createCustomItemsContainer');
+                if (customContainer) {
+                    customContainer.innerHTML = '';
+                    createCustomItemCounter = 0;
+                }
+                (Array.isArray(draft.customItems) ? draft.customItems : []).forEach((item) => {
+                    if (typeof addCreateCustomItemRow === 'function') {
+                        addCreateCustomItemRow(item);
+                    }
+                });
+                if (customContainer && !customContainer.querySelector('.create-custom-item-row')) {
+                    renderCreateCustomItemsPlaceholder();
+                }
                 refreshCreateBookingTypeSelect();
                 updateCreateDurationDisplay();
                 recalculateCreateBookingTotals();
@@ -6018,9 +6056,138 @@
 
         const isValidQuoteEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 
+        let quotationCustomItemCounter = 0;
+
+        const normalizeManualRentalTypeValue = (value) => {
+            const normalized = String(value || '').trim().toLowerCase();
+            if (normalized === 'perday') return 'perday';
+            if (normalized === 'persession') return 'persession';
+            if (normalized === 'pertrack') return 'pertrack';
+            return 'inhouse';
+        };
+
+        const renderQuotationCustomItemsPlaceholder = () => {
+            const container = document.getElementById('quoteCustomItemsContainer');
+            if (!container) return;
+            if (container.querySelector('.quote-custom-item-row')) return;
+            container.innerHTML = '<div class="loading-inline-muted">No manual items added.</div>';
+        };
+
+        const buildQuotationCustomItemRowHtml = (rowId, item = {}) => {
+            const rentalType = normalizeManualRentalTypeValue(item.rentalType || 'inhouse');
+            const quantity = Math.max(1, Math.min(100, Number(item.quantity || 1)));
+            const price = Number(item.price || 0);
+            return `<div class="quote-custom-item-row" data-custom-row-id="${rowId}" style="padding:10px;border:1px dashed #d1d5db;border-radius:8px;margin-bottom:8px;">
+                <div class="form-grid-3">
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Item Name*</label>
+                        <input type="text" class="quote-custom-name" value="${escapeHtml(item.name || '')}" placeholder="e.g. Special Mic Setup" oninput="recalculateQuotationTotals()">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Category (optional)</label>
+                        <input type="text" class="quote-custom-category" value="${escapeHtml(item.category || '')}" placeholder="e.g. Custom Services" oninput="recalculateQuotationTotals()">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Billing Type</label>
+                        <select class="quote-custom-rental-type" onchange="recalculateQuotationTotals()">
+                            <option value="inhouse" ${rentalType === 'inhouse' ? 'selected' : ''}>Hourly (per hour)</option>
+                            <option value="perday" ${rentalType === 'perday' ? 'selected' : ''}>Per-day</option>
+                            <option value="persession" ${rentalType === 'persession' ? 'selected' : ''}>Per-session</option>
+                            <option value="pertrack" ${rentalType === 'pertrack' ? 'selected' : ''}>Per-track</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-grid-3" style="margin-top:8px;">
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Rate (₹)*</label>
+                        <input type="number" class="quote-custom-price" min="0" step="1" value="${Number.isFinite(price) ? String(Math.max(0, price)) : '0'}" placeholder="0" oninput="recalculateQuotationTotals()">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Quantity*</label>
+                        <input type="number" class="quote-custom-quantity" min="1" max="100" step="1" value="${quantity}" oninput="recalculateQuotationTotals()">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Action</label>
+                        <button type="button" class="btn btn-danger btn-sm" style="width:100%;" onclick="removeQuotationCustomItemRow('${rowId}')">Remove</button>
+                    </div>
+                </div>
+                <div style="margin-top:8px;">
+                    <label style="font-size:12px;color:#6b7280;">Description (optional)</label>
+                    <input type="text" class="quote-custom-description" value="${escapeHtml(item.description || '')}" placeholder="Optional description" oninput="recalculateQuotationTotals()">
+                </div>
+            </div>`;
+        };
+
+        function addQuotationCustomItemRow(item = {}) {
+            const container = document.getElementById('quoteCustomItemsContainer');
+            if (!container) return;
+            const rowId = `quote_custom_${++quotationCustomItemCounter}`;
+            if (container.querySelector('.loading-inline-muted')) {
+                container.innerHTML = '';
+            }
+            container.insertAdjacentHTML('beforeend', buildQuotationCustomItemRowHtml(rowId, item));
+            recalculateQuotationTotals();
+        }
+
+        function removeQuotationCustomItemRow(rowId) {
+            const row = Array.from(document.querySelectorAll('#quoteCustomItemsContainer .quote-custom-item-row'))
+                .find((el) => String(el.dataset.customRowId || '') === String(rowId || ''));
+            if (row) {
+                row.remove();
+            }
+            renderQuotationCustomItemsPlaceholder();
+            recalculateQuotationTotals();
+        }
+
+        const collectQuotationCustomRentals = ({ strict = true } = {}) => {
+            const rows = Array.from(document.querySelectorAll('#quoteCustomItemsContainer .quote-custom-item-row'));
+            const customRentals = [];
+
+            rows.forEach((row, index) => {
+                const name = String(row.querySelector('.quote-custom-name')?.value || '').trim();
+                const category = String(row.querySelector('.quote-custom-category')?.value || '').trim();
+                const description = String(row.querySelector('.quote-custom-description')?.value || '').trim();
+                const rentalType = normalizeManualRentalTypeValue(row.querySelector('.quote-custom-rental-type')?.value || 'inhouse');
+                const rawPrice = String(row.querySelector('.quote-custom-price')?.value || '').trim();
+                const rawQty = String(row.querySelector('.quote-custom-quantity')?.value || '').trim();
+                const rowNumber = index + 1;
+
+                const isEmptyRow = !name && !category && !description && rawPrice === '' && rawQty === '';
+                if (isEmptyRow) return;
+
+                if (!name) {
+                    if (strict) throw new Error(`Manual quotation item #${rowNumber}: name is required.`);
+                    return;
+                }
+
+                const parsedPrice = Number(rawPrice);
+                if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+                    if (strict) throw new Error(`Manual quotation item "${name}": enter a valid non-negative rate.`);
+                    return;
+                }
+
+                const parsedQty = Math.max(1, Math.min(100, parseInt(rawQty || '1', 10) || 1));
+                const qtyInput = row.querySelector('.quote-custom-quantity');
+                if (qtyInput) qtyInput.value = String(parsedQty);
+
+                customRentals.push({
+                    name,
+                    category,
+                    description,
+                    price: parsedPrice,
+                    quantity: parsedQty,
+                    rentalType,
+                    quantityEnabled: true
+                });
+            });
+
+            return customRentals;
+        };
+
         const resetQuotationForm = () => {
             const form = document.getElementById('quotationForm');
             if (form) form.reset();
+            quotationCustomItemCounter = 0;
             selectedQuotationUsers = [];
             activeQuotationTemplateId = '';
             activeQuotationTemplateName = '';
@@ -6068,6 +6235,11 @@
             const pds = document.getElementById('quotePerdayScheduleSection');
             if (inhs) inhs.style.display = '';
             if (pds) pds.style.display = '';
+            const customContainer = document.getElementById('quoteCustomItemsContainer');
+            if (customContainer) {
+                customContainer.innerHTML = '';
+                renderQuotationCustomItemsPlaceholder();
+            }
         };
 
         const applySavedQuotationTemplateToForm = (template) => {
@@ -6106,6 +6278,7 @@
                 (Array.isArray(template.rentals) ? template.rentals : [])
                     .map((item) => [getQuotationTemplateItemKey(item), item])
             );
+            const matchedTemplateKeys = new Set();
 
             document.querySelectorAll('#quotationRentals input[name="quotationRental"]').forEach((inputEl) => {
                 const rentalData = JSON.parse(decodeURIComponent(inputEl.dataset.rental || '{}'));
@@ -6113,6 +6286,9 @@
                 const matched = templateMap.get(key);
 
                 inputEl.checked = !!matched;
+                if (matched) {
+                    matchedTemplateKeys.add(key);
+                }
 
                 if (rentalData?.id) {
                     const qtyInput = document.getElementById(getQuotationQtyInputId(rentalData.id));
@@ -6130,6 +6306,31 @@
                     syncQuotationQuantityInputState(rentalData.id);
                 }
             });
+
+            const customContainer = document.getElementById('quoteCustomItemsContainer');
+            if (customContainer) {
+                customContainer.innerHTML = '';
+                quotationCustomItemCounter = 0;
+            }
+
+            const templateRentals = Array.isArray(template.rentals) ? template.rentals : [];
+            templateRentals.forEach((item) => {
+                const key = getQuotationTemplateItemKey(item);
+                if (!matchedTemplateKeys.has(key)) {
+                    addQuotationCustomItemRow({
+                        name: item?.name || '',
+                        category: item?.category || '',
+                        rentalType: item?.rentalType || 'inhouse',
+                        quantity: item?.quantity || 1,
+                        price: Number(item?.priceSnapshot ?? item?.price ?? 0),
+                        description: item?.description || ''
+                    });
+                }
+            });
+
+            if (customContainer && !customContainer.querySelector('.quote-custom-item-row')) {
+                renderQuotationCustomItemsPlaceholder();
+            }
 
             updateQuoteTypeFilter();
             recalculateQuotationTotals();
@@ -6428,7 +6629,6 @@
         const collectQuotationSelectedRentals = ({ strict = true } = {}) => {
             const selectedRentals = [];
             const inputs = document.querySelectorAll('#quotationRentals input[name="quotationRental"]:checked');
-            if (strict && inputs.length === 0) throw new Error('Please select at least one rental item for quotation.');
             inputs.forEach((input) => {
                 const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental || '{}'));
                 const rentalType = String(rentalData.rentalType || 'inhouse').toLowerCase();
@@ -6450,6 +6650,11 @@
                     quantity, rentalType, quantityEnabled
                 });
             });
+            const customRentals = collectQuotationCustomRentals({ strict });
+            if (customRentals.length > 0) {
+                selectedRentals.push(...customRentals);
+            }
+            if (strict && selectedRentals.length === 0) throw new Error('Please select at least one rental item for quotation.');
             const hasInhouse = selectedRentals.some((item) => item.rentalType === 'inhouse');
             const hasPerday = selectedRentals.some((item) => item.rentalType === 'perday');
             const inhouseSchedule = calculateQuoteInhouseDurationHours({ strict, required: hasInhouse });
@@ -6632,6 +6837,10 @@
                 }
 
                 const quoteData = collectQuotationSelectedRentals({ strict: true });
+                const selectedTypesForPayload = Array.from(new Set([
+                    ...getSelectedQuoteTypes(),
+                    ...quoteData.selectedRentals.map((item) => normalizeManualRentalTypeValue(item?.rentalType || 'inhouse'))
+                ]));
                 const rentalTypes = Array.isArray(createBookingSettings?.rentalTypes) ? createBookingSettings.rentalTypes : [];
                 const derivedLabel = typeof window.deriveAdminBookingTypeLabel === 'function'
                     ? window.deriveAdminBookingTypeLabel(quoteData.selectedRentals, rentalTypes) : '';
@@ -6651,7 +6860,7 @@
                         name: templateName,
                         quotation: {
                             rentalType: quoteLabel,
-                            selectedTypes: getSelectedQuoteTypes(),
+                            selectedTypes: selectedTypesForPayload,
                             discountAmount: Number(document.getElementById('quoteDiscountAmount')?.value || 0),
                             discountNote: String(document.getElementById('quoteDiscountNote')?.value || '').trim(),
                             rentals: quoteData.selectedRentals,
@@ -6725,6 +6934,10 @@
                     throw new Error('Template name is required when saving quotation template.');
                 }
                 const quoteData = collectQuotationSelectedRentals({ strict: true });
+                const selectedTypesForPayload = Array.from(new Set([
+                    ...getSelectedQuoteTypes(),
+                    ...quoteData.selectedRentals.map((item) => normalizeManualRentalTypeValue(item?.rentalType || 'inhouse'))
+                ]));
                 const rentalTypes = Array.isArray(createBookingSettings?.rentalTypes) ? createBookingSettings.rentalTypes : [];
                 const derivedLabel = typeof window.deriveAdminBookingTypeLabel === 'function'
                     ? window.deriveAdminBookingTypeLabel(quoteData.selectedRentals, rentalTypes) : '';
@@ -6743,7 +6956,7 @@
                         updateTemplateId: updateLoadedTemplate ? activeQuotationTemplateId : '',
                         quotation: {
                             rentalType: quoteLabel,
-                            selectedTypes: getSelectedQuoteTypes(),
+                            selectedTypes: selectedTypesForPayload,
                             discountAmount: Number(document.getElementById('quoteDiscountAmount')?.value || 0),
                             discountNote: String(document.getElementById('quoteDiscountNote')?.value || '').trim(),
                             rentals: quoteData.selectedRentals,
@@ -7391,6 +7604,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
         const resetCreateBookingForm = () => {
             const form = document.getElementById('createBookingForm');
             form.reset();
+            createCustomItemCounter = 0;
 
             const overrideCheckbox = document.getElementById('createDateTimeOverride');
             overrideCheckbox.checked = false;
@@ -7421,6 +7635,12 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             document.getElementById('createUserSearch').value = '';
             document.getElementById('createUserSelected').textContent = 'No user selected';
             document.getElementById('createUserTypeahead').style.display = 'none';
+
+            const customContainer = document.getElementById('createCustomItemsContainer');
+            if (customContainer) {
+                customContainer.innerHTML = '';
+                renderCreateCustomItemsPlaceholder();
+            }
 
             recalculateCreateBookingTotals();
         };
@@ -7543,6 +7763,139 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 document.getElementById('createBookingRentals').innerHTML = '<div class="text-danger">Error loading rental options</div>';
             }
         }
+
+        let createCustomItemCounter = 0;
+
+        const getCreateCustomDefaultRentalType = () => {
+            const mode = getCreateBookingMode();
+            if (mode === 'perday') return 'perday';
+            if (mode === 'persession') return 'persession';
+            if (mode === 'pertrack') return 'pertrack';
+            return 'inhouse';
+        };
+
+        const renderCreateCustomItemsPlaceholder = () => {
+            const container = document.getElementById('createCustomItemsContainer');
+            if (!container) return;
+            if (container.querySelector('.create-custom-item-row')) return;
+            container.innerHTML = '<div class="loading-inline-muted">No manual items added.</div>';
+        };
+
+        const buildCreateCustomItemRowHtml = (rowId, item = {}) => {
+            const rentalType = normalizeManualRentalTypeValue(item.rentalType || getCreateCustomDefaultRentalType());
+            const quantity = Math.max(1, Math.min(100, Number(item.quantity || 1)));
+            const price = Number(item.price || 0);
+            return `<div class="create-custom-item-row" data-custom-row-id="${rowId}" style="padding:10px;border:1px dashed #d1d5db;border-radius:8px;margin-bottom:8px;">
+                <div class="form-grid-3">
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Item Name*</label>
+                        <input type="text" class="create-custom-name" value="${escapeHtml(item.name || '')}" placeholder="e.g. Emergency Support" oninput="recalculateCreateBookingTotals();scheduleCreateBookingDraftSave();">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Category (optional)</label>
+                        <input type="text" class="create-custom-category" value="${escapeHtml(item.category || '')}" placeholder="e.g. Custom Services" oninput="recalculateCreateBookingTotals();scheduleCreateBookingDraftSave();">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Billing Type</label>
+                        <select class="create-custom-rental-type" onchange="recalculateCreateBookingTotals();scheduleCreateBookingDraftSave();">
+                            <option value="inhouse" ${rentalType === 'inhouse' ? 'selected' : ''}>Hourly (per hour)</option>
+                            <option value="perday" ${rentalType === 'perday' ? 'selected' : ''}>Per-day</option>
+                            <option value="persession" ${rentalType === 'persession' ? 'selected' : ''}>Per-session</option>
+                            <option value="pertrack" ${rentalType === 'pertrack' ? 'selected' : ''}>Per-track</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-grid-3" style="margin-top:8px;">
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Rate (₹)*</label>
+                        <input type="number" class="create-custom-price" min="0" step="1" value="${Number.isFinite(price) ? String(Math.max(0, price)) : '0'}" placeholder="0" oninput="recalculateCreateBookingTotals();scheduleCreateBookingDraftSave();">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Quantity*</label>
+                        <input type="number" class="create-custom-quantity" min="1" max="100" step="1" value="${quantity}" oninput="recalculateCreateBookingTotals();scheduleCreateBookingDraftSave();">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Action</label>
+                        <button type="button" class="btn btn-danger btn-sm" style="width:100%;" onclick="removeCreateCustomItemRow('${rowId}')">Remove</button>
+                    </div>
+                </div>
+                <div style="margin-top:8px;">
+                    <label style="font-size:12px;color:#6b7280;">Description (optional)</label>
+                    <input type="text" class="create-custom-description" value="${escapeHtml(item.description || '')}" placeholder="Optional description" oninput="recalculateCreateBookingTotals();scheduleCreateBookingDraftSave();">
+                </div>
+            </div>`;
+        };
+
+        function addCreateCustomItemRow(item = {}) {
+            const container = document.getElementById('createCustomItemsContainer');
+            if (!container) return;
+            const rowId = `create_custom_${++createCustomItemCounter}`;
+            if (container.querySelector('.loading-inline-muted')) {
+                container.innerHTML = '';
+            }
+            container.insertAdjacentHTML('beforeend', buildCreateCustomItemRowHtml(rowId, item));
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
+        }
+
+        function removeCreateCustomItemRow(rowId) {
+            const row = Array.from(document.querySelectorAll('#createCustomItemsContainer .create-custom-item-row'))
+                .find((el) => String(el.dataset.customRowId || '') === String(rowId || ''));
+            if (row) {
+                row.remove();
+            }
+            renderCreateCustomItemsPlaceholder();
+            recalculateCreateBookingTotals();
+            scheduleCreateBookingDraftSave();
+        }
+
+        const collectCreateCustomRentals = ({ strict = true } = {}) => {
+            const rows = Array.from(document.querySelectorAll('#createCustomItemsContainer .create-custom-item-row'));
+            const customRentals = [];
+
+            rows.forEach((row, index) => {
+                const name = String(row.querySelector('.create-custom-name')?.value || '').trim();
+                const category = String(row.querySelector('.create-custom-category')?.value || '').trim();
+                const description = String(row.querySelector('.create-custom-description')?.value || '').trim();
+                const rentalType = normalizeManualRentalTypeValue(row.querySelector('.create-custom-rental-type')?.value || 'inhouse');
+                const rawPrice = String(row.querySelector('.create-custom-price')?.value || '').trim();
+                const rawQty = String(row.querySelector('.create-custom-quantity')?.value || '').trim();
+                const rowNumber = index + 1;
+                const isEmptyRow = !name && !category && !description && rawPrice === '' && rawQty === '';
+                if (isEmptyRow) return;
+
+                if (!name) {
+                    if (strict) throw new Error(`Manual booking item #${rowNumber}: name is required.`);
+                    return;
+                }
+
+                const parsedPrice = Number(rawPrice);
+                if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+                    if (strict) throw new Error(`Manual booking item "${name}": enter a valid non-negative rate.`);
+                    return;
+                }
+
+                const parsedQty = Math.max(1, Math.min(100, parseInt(rawQty || '1', 10) || 1));
+                const qtyInput = row.querySelector('.create-custom-quantity');
+                if (qtyInput) qtyInput.value = String(parsedQty);
+
+                customRentals.push({
+                    name,
+                    category,
+                    description,
+                    price: parsedPrice,
+                    perdayPrice: rentalType === 'perday' ? parsedPrice : 0,
+                    quantity: parsedQty,
+                    rentalType,
+                    isRequired: false,
+                    fullId: `custom_manual_${index}`,
+                    quantityEnabled: true,
+                    maxQuantity: 100
+                });
+            });
+
+            return customRentals;
+        };
 
         function displayCreateBookingRentals(rentalTypes) {
             const container = document.getElementById('createBookingRentals');
@@ -7780,10 +8133,6 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             const selectedRentals = [];
             const rentalInputs = document.querySelectorAll('#createBookingRentals input[name="rental"]:checked');
 
-            if (strict && rentalInputs.length === 0) {
-                throw new Error('Please select at least one rental item.');
-            }
-
             rentalInputs.forEach((input) => {
                 const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental));
                 const quantityElement = document.getElementById(getRentalInputId(rentalData.id));
@@ -7813,6 +8162,15 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                     maxQuantity
                 });
             });
+
+            const customRentals = collectCreateCustomRentals({ strict });
+            if (customRentals.length > 0) {
+                selectedRentals.push(...customRentals);
+            }
+
+            if (strict && selectedRentals.length === 0) {
+                throw new Error('Please select at least one rental item.');
+            }
 
             let calculatedSubtotal = 0;
             selectedRentals.forEach((rental) => {

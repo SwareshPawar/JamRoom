@@ -6,7 +6,9 @@
 (() => {
     const state = {
         currentEditingBookingId: null,
-        currentEditingBookingData: null
+        currentEditingBookingData: null,
+        customEditRowCounter: 0,
+        deps: null
     };
 
     const getEditRentalInputId = (rentalId, deps) => `edit_${deps.getRentalInputId(rentalId)}`;
@@ -33,6 +35,137 @@
         });
 
         return existingMap;
+    };
+
+    const normalizeManualRentalType = (value) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (normalized === 'perday') return 'perday';
+        if (normalized === 'persession') return 'persession';
+        if (normalized === 'pertrack') return 'pertrack';
+        return 'inhouse';
+    };
+
+    const renderEditCustomItemsPlaceholder = () => {
+        const container = document.getElementById('editBookingManualRentals');
+        if (!container) return;
+        if (container.querySelector('.edit-manual-rental-row')) return;
+        container.innerHTML = '<div class="loading-inline-muted">No manual items added.</div>';
+    };
+
+    const buildEditCustomItemRowHtml = (rowId, item = {}, deps) => {
+        const rentalType = normalizeManualRentalType(item?.rentalType || 'inhouse');
+        const quantity = Math.max(1, Math.min(100, parseInt(item?.quantity, 10) || 1));
+        const price = Number(item?.price || 0);
+
+        return `
+            <div class="edit-manual-rental-row" data-manual-row-id="${rowId}" style="padding:10px;border:1px dashed #d1d5db;border-radius:8px;margin-bottom:8px;">
+                <div class="form-grid-3">
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Item Name*</label>
+                        <input type="text" class="edit-manual-name" value="${deps.escapeHtml(item?.name || '')}" placeholder="e.g. Custom Service">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Category (optional)</label>
+                        <input type="text" class="edit-manual-category" value="${deps.escapeHtml(item?.category || '')}" placeholder="e.g. Custom Services">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Billing Type</label>
+                        <select class="edit-manual-rental-type">
+                            <option value="inhouse" ${rentalType === 'inhouse' ? 'selected' : ''}>Hourly (per hour)</option>
+                            <option value="perday" ${rentalType === 'perday' ? 'selected' : ''}>Per-day</option>
+                            <option value="persession" ${rentalType === 'persession' ? 'selected' : ''}>Per-session</option>
+                            <option value="pertrack" ${rentalType === 'pertrack' ? 'selected' : ''}>Per-track</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-grid-3" style="margin-top:8px;">
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Rate (₹)*</label>
+                        <input type="number" class="edit-manual-price" min="0" step="1" value="${Number.isFinite(price) ? String(Math.max(0, price)) : '0'}" placeholder="0">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Quantity*</label>
+                        <input type="number" class="edit-manual-quantity" min="1" max="100" step="1" value="${quantity}">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#6b7280;">Action</label>
+                        <button type="button" class="btn btn-danger btn-sm" style="width:100%;" onclick="window.AdminBookingsEdit.removeCustomRentalRow('${rowId}')">Remove</button>
+                    </div>
+                </div>
+                <div style="margin-top:8px;">
+                    <label style="font-size:12px;color:#6b7280;">Description (optional)</label>
+                    <input type="text" class="edit-manual-description" value="${deps.escapeHtml(item?.description || '')}" placeholder="Optional description">
+                </div>
+            </div>
+        `;
+    };
+
+    const addEditManualRentalRow = (deps, item = {}) => {
+        const container = document.getElementById('editBookingManualRentals');
+        if (!container) return;
+
+        const rowId = `edit_manual_${++state.customEditRowCounter}`;
+        if (container.querySelector('.loading-inline-muted')) {
+            container.innerHTML = '';
+        }
+        container.insertAdjacentHTML('beforeend', buildEditCustomItemRowHtml(rowId, item, deps));
+    };
+
+    const removeEditManualRentalRow = (rowId, deps) => {
+        const row = Array.from(document.querySelectorAll('#editBookingManualRentals .edit-manual-rental-row'))
+            .find((el) => String(el.dataset.manualRowId || '') === String(rowId || ''));
+        if (row) {
+            row.remove();
+        }
+        renderEditCustomItemsPlaceholder();
+        recalculateEditBookingTotals(deps);
+    };
+
+    const collectManualEditRentals = (deps, { strict = false } = {}) => {
+        const rows = Array.from(document.querySelectorAll('#editBookingManualRentals .edit-manual-rental-row'));
+        const manualRentals = [];
+
+        rows.forEach((row, index) => {
+            const name = String(row.querySelector('.edit-manual-name')?.value || '').trim();
+            const category = String(row.querySelector('.edit-manual-category')?.value || '').trim();
+            const description = String(row.querySelector('.edit-manual-description')?.value || '').trim();
+            const rentalType = normalizeManualRentalType(row.querySelector('.edit-manual-rental-type')?.value || 'inhouse');
+            const rawPrice = String(row.querySelector('.edit-manual-price')?.value || '').trim();
+            const rawQty = String(row.querySelector('.edit-manual-quantity')?.value || '').trim();
+
+            const isEmpty = !name && !category && !description && rawPrice === '' && rawQty === '';
+            if (isEmpty) return;
+
+            if (!name) {
+                if (strict) throw new Error(`Manual item #${index + 1}: name is required.`);
+                return;
+            }
+
+            const parsedPrice = Number(rawPrice);
+            if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+                if (strict) throw new Error(`Manual item "${name}": enter a valid non-negative rate.`);
+                return;
+            }
+
+            const parsedQty = Math.max(1, Math.min(100, parseInt(rawQty || '1', 10) || 1));
+            const qtyInput = row.querySelector('.edit-manual-quantity');
+            if (qtyInput) qtyInput.value = String(parsedQty);
+
+            manualRentals.push({
+                name,
+                category,
+                price: parsedPrice,
+                perdayPrice: rentalType === 'perday' ? parsedPrice : 0,
+                quantity: parsedQty,
+                rentalType,
+                description,
+                isRequired: false,
+                quantityEnabled: true,
+                fullId: `manual_${index}`
+            });
+        });
+
+        return manualRentals;
     };
 
     const renderEditBookingRentals = (rentalTypes, booking, deps) => {
@@ -260,7 +393,24 @@
             html += '</div></details>';
         }
 
+        html += `
+            <details class="admin-rental-collapse" open>
+                <summary class="admin-rental-summary">Add Manual Items (Not in Catalog)</summary>
+                <div class="admin-rental-section-content">
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="window.AdminBookingsEdit.addCustomRentalRow()">+ Add Manual Item</button>
+                    </div>
+                    <div id="editBookingManualRentals" class="admin-rentals-panel">
+                        <div class="loading-inline-muted">No manual items added.</div>
+                    </div>
+                </div>
+            </details>
+        `;
+
         container.innerHTML = html;
+
+        state.customEditRowCounter = 0;
+        renderEditCustomItemsPlaceholder();
     };
 
     const collectSelectedEditRentals = (deps, { strict = false } = {}) => {
@@ -308,6 +458,11 @@
                 fullId: rentalData.id
             });
         });
+
+        const manualRentals = collectManualEditRentals(deps, { strict });
+        if (manualRentals.length > 0) {
+            selectedRentals.push(...manualRentals);
+        }
 
         if (strict && selectedRentals.length === 0) {
             throw new Error('Please select at least one rental item.');
@@ -491,6 +646,7 @@
     const openEditBooking = async (bookingId, bookingData, deps) => {
         try {
             state.currentEditingBookingId = bookingId;
+            state.deps = deps;
 
             const booking = typeof bookingData === 'string' ? JSON.parse(bookingData.replace(/&quot;/g, '"')) : bookingData;
             state.currentEditingBookingData = booking;
@@ -552,6 +708,14 @@
             }
 
             await loadEditBookingRentals(booking, deps);
+
+            const manualContainer = document.getElementById('editBookingManualRentals');
+            if (manualContainer && manualContainer.getAttribute('data-manual-listeners-bound') !== 'true') {
+                manualContainer.addEventListener('input', () => recalculateEditBookingTotals(deps));
+                manualContainer.addEventListener('change', () => recalculateEditBookingTotals(deps));
+                manualContainer.setAttribute('data-manual-listeners-bound', 'true');
+            }
+
             recalculateEditBookingTotals(deps);
 
             const modal = document.getElementById('editBookingModal');
@@ -680,6 +844,18 @@
     };
 
     window.AdminBookingsEdit = window.AdminBookingsEdit || {};
+
+    window.AdminBookingsEdit.addCustomRentalRow = () => {
+        if (!state.deps) return;
+        addEditManualRentalRow(state.deps, {});
+        recalculateEditBookingTotals(state.deps);
+    };
+
+    window.AdminBookingsEdit.removeCustomRentalRow = (rowId) => {
+        if (!state.deps) return;
+        removeEditManualRentalRow(rowId, state.deps);
+    };
+
     window.AdminBookingsEdit.openEditBooking = openEditBooking;
     window.AdminBookingsEdit.recalculateEditBookingTotals = recalculateEditBookingTotals;
     window.AdminBookingsEdit.submitEditBookingForm = submitEditBookingForm;

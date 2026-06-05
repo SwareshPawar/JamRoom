@@ -1671,6 +1671,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       const sanitizedRentals = [];
       for (const rental of rentals) {
         const rentalName = String(rental?.name || '').trim();
+        const rentalCategory = String(rental?.category || '').trim();
         const rentalPrice = Number(rental?.price);
         const rentalQuantity = parseInt(rental?.quantity, 10);
         const normalizedRentalTypeRaw = String(rental?.rentalType || 'inhouse').toLowerCase();
@@ -1678,6 +1679,8 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
           ? 'perday'
           : normalizedRentalTypeRaw === 'persession'
             ? 'persession'
+            : normalizedRentalTypeRaw === 'pertrack'
+              ? 'pertrack'
             : 'inhouse';
         const rentalDescription = String(rental?.description || '').trim();
 
@@ -1695,6 +1698,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
 
         sanitizedRentals.push({
           name: rentalName,
+          category: rentalCategory,
           price: rentalPrice,
           perdayPrice: rentalTypeValue === 'perday' ? rentalPrice : (Number(rental?.perdayPrice) || 0),
           quantity: rentalQuantity,
@@ -1706,7 +1710,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
 
       let calculatedSubtotal = 0;
       sanitizedRentals.forEach((rentalItem) => {
-        if (rentalItem.rentalType === 'perday' || rentalItem.rentalType === 'persession') {
+        if (rentalItem.rentalType === 'perday' || rentalItem.rentalType === 'persession' || rentalItem.rentalType === 'pertrack') {
           calculatedSubtotal += rentalItem.price * rentalItem.quantity;
         } else {
           calculatedSubtotal += rentalItem.price * rentalItem.quantity * booking.duration;
