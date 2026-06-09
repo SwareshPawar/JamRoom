@@ -5930,6 +5930,30 @@
 
         const getRentalInputId = (rentalId) => `quantity_${String(rentalId).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
+        // Render a +/- stepper for rental quantity inputs in the admin create/edit panels.
+        const adminQtyStepperHtml = (inputId, value, maxQty, disabled = false) => {
+            const disAttr = disabled ? 'disabled' : '';
+            // oninput delegates to adminChangeQty(id, 0) which just re-clamps and fires recalc.
+            return `<div class="admin-qty-stepper">
+                <button type="button" class="admin-qty-btn" onclick="adminChangeQty('${inputId}',-1)" ${disAttr}>−</button>
+                <input type="number" id="${inputId}" min="1" max="${maxQty}" value="${value}" ${disAttr} oninput="adminChangeQty('${inputId}',0);" style="width:44px;text-align:center;">
+                <button type="button" class="admin-qty-btn" onclick="adminChangeQty('${inputId}',1)" ${disAttr}>+</button>
+            </div>`;
+        };
+
+        const adminChangeQty = (inputId, delta) => {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const max = parseInt(input.max, 10) || 100;
+            const current = parseInt(input.value, 10) || 1;
+            input.value = Math.max(1, Math.min(max, current + delta));
+            // Trigger totals recalc for both create and edit panels.
+            if (typeof recalculateCreateBookingTotals === 'function') recalculateCreateBookingTotals();
+            if (typeof recalculateEditBookingTotals === 'function') recalculateEditBookingTotals();
+            if (typeof scheduleCreateBookingDraftSave === 'function') scheduleCreateBookingDraftSave();
+        };
+        window.adminChangeQty = adminChangeQty;
+
         const normalizeConfiguredMaxQuantity = (value, fallback = 10) => {
             const parsed = parseInt(value, 10);
             if (!Number.isFinite(parsed) || parsed < 1) return fallback;
@@ -7059,7 +7083,9 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 }))
                 : [];
 
-            return [...bookings, ...blockedTimes].filter((range) => range.start && range.end);
+            // Filter out zero-duration ranges (start === end) — these come from flat-rate
+            // (persession/pertrack) bookings that use a dummy time and don't occupy a real slot.
+            return [...bookings, ...blockedTimes].filter((range) => range.start && range.end && range.start !== range.end);
         };
 
         const getCreateTimelineRanges = (availabilityData) => {
@@ -7088,7 +7114,8 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 }))
                 : [];
 
-            return [...bookings, ...blockedTimes].filter((range) => range.start && range.end);
+            // Exclude zero-duration ranges — flat-rate bookings use a dummy time and have no real slot.
+            return [...bookings, ...blockedTimes].filter((range) => range.start && range.end && range.start !== range.end);
         };
 
         const isCreateTimeRangeUnavailable = (startTime, endTime, unavailableRanges) => {
@@ -8028,7 +8055,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                             </label>
                             <div class="admin-rental-qty">
                                 ${type.quantityEnabled === true
-                                    ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="${baseMaxQuantity}" value="1" ${isJamRoomBase ? 'disabled' : ''}>`
+                                    ? adminQtyStepperHtml(qtyInputId, 1, baseMaxQuantity, isJamRoomBase)
                                     : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
                                 }
                             </div>
@@ -8083,7 +8110,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                                 </label>
                                 <div class="admin-rental-qty">
                                     ${showQuantityControls
-                                        ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="1">`
+                                        ? adminQtyStepperHtml(qtyInputId, 1, maxQuantity)
                                         : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
                                     }
                                 </div>
@@ -8346,14 +8373,18 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 endTime = perDayReturnTime;
                 duration = Math.max(24, Number(perdayInfo.totalHours || (perDayDays * 24)));
             } else {
-                bookingDate = normalizeIsoDateInput(document.getElementById('createDate')?.value);
-                startTime = document.getElementById('createStartTime')?.value;
-                endTime = (bookingMode === 'persession' || bookingMode === 'pertrack')
-                    ? (startTime || '09:00')
+                const isFlatRate = bookingMode === 'persession' || bookingMode === 'pertrack';
+                // For flat-rate modes (session/track), date and time fields are hidden — supply safe defaults.
+                bookingDate = isFlatRate
+                    ? (new Date().toISOString().split('T')[0])
+                    : normalizeIsoDateInput(document.getElementById('createDate')?.value);
+                startTime = isFlatRate ? '09:00' : (document.getElementById('createStartTime')?.value || '');
+                endTime = isFlatRate
+                    ? '09:00'
                     : document.getElementById('createEndTime')?.value;
-                duration = (bookingMode === 'persession' || bookingMode === 'pertrack') ? 1 : pricingSummary.calculatedDuration;
-                if (!bookingDate) { showAlert('', 'Please select a valid booking date.', 'warning'); return; }
-                if (!startTime) { showAlert('', 'Please select a start time.', 'warning'); return; }
+                duration = isFlatRate ? 1 : pricingSummary.calculatedDuration;
+                if (!isFlatRate && !bookingDate) { showAlert('', 'Please select a valid booking date.', 'warning'); return; }
+                if (!isFlatRate && !startTime) { showAlert('', 'Please select a start time.', 'warning'); return; }
                 if (bookingMode === 'hourly' && !endTime) { showAlert('', 'Please select an end time.', 'warning'); return; }
                 if (bookingMode === 'hourly' && duration <= 0) { showAlert('', 'End time must be after start time.', 'warning'); return; }
                 if (!overrideDateTime && bookingMode === 'hourly') {
@@ -8396,6 +8427,8 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 return;
             }
 
+            // Flat-rate modes (persession/pertrack) don't occupy time slots — override date/time checks.
+            const isFlatRateMode = bookingMode === 'persession' || bookingMode === 'pertrack';
             const bookingData = {
                 userId,
                 bookingMode: bookingMode === 'perday' ? 'perday' : 'hourly',
@@ -8421,7 +8454,8 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 paymentNote: (document.getElementById('createPaymentNote')?.value || '').trim(),
                 bandName: formData.get('bandName') || '',
                 notes: formData.get('notes') || '',
-                overrideDateTime,
+                // Flat-rate modes (session/track) don't occupy a time slot — skip conflict checks.
+                overrideDateTime: overrideDateTime || isFlatRateMode,
                 ...(bookingMode === 'class' && { classLocation, classPreferredWeekday, classPreferredStartTime, classPlanMonths }),
                 ...(bookingMode === 'perday' && { perDayStartDate, perDayEndDate, perDayPickupTime, perDayReturnTime, perDayDays })
             };

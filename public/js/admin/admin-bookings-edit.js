@@ -13,6 +13,16 @@
 
     const getEditRentalInputId = (rentalId, deps) => `edit_${deps.getRentalInputId(rentalId)}`;
 
+    // +/- stepper for edit-panel quantity inputs. Re-uses adminChangeQty from global scope.
+    const editQtyStepperHtml = (inputId, value, maxQty, disabled = false) => {
+        const disAttr = disabled ? 'disabled' : '';
+        return `<div class="admin-qty-stepper">
+            <button type="button" class="admin-qty-btn" onclick="window.adminChangeQty('${inputId}',-1)" ${disAttr}>−</button>
+            <input type="number" id="${inputId}" min="1" max="${maxQty}" value="${value}" ${disAttr} style="width:44px;text-align:center;">
+            <button type="button" class="admin-qty-btn" onclick="window.adminChangeQty('${inputId}',1)" ${disAttr}>+</button>
+        </div>`;
+    };
+
     const normalizeConfiguredMaxQuantity = (value, fallback = 10) => {
         const parsed = parseInt(value, 10);
         if (!Number.isFinite(parsed) || parsed < 1) return fallback;
@@ -223,8 +233,7 @@
                             <span class="admin-rental-subtext">Base item</span>
                         </label>
                         <div class="admin-rental-qty">
-                            <label for="${qtyInputId}">Qty</label>
-                            <input type="number" id="${qtyInputId}" min="1" max="${baseMaxQuantity}" value="${baseQuantity}" ${isJamRoomBase ? 'disabled' : ''}>
+                            ${editQtyStepperHtml(qtyInputId, baseQuantity, baseMaxQuantity, isJamRoomBase)}
                         </div>
                     </div>
                 `;
@@ -290,7 +299,7 @@
                             </label>
                             <div class="admin-rental-qty">
                                 ${showQuantityControls
-                                    ? `<label for="${qtyInputId}">Qty</label><input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="${quantityValue}">`
+                                    ? editQtyStepperHtml(qtyInputId, quantityValue, maxQuantity)
                                     : `<span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span><input type="hidden" id="${qtyInputId}" value="1">`
                                 }
                             </div>
@@ -383,8 +392,7 @@
                             <span class="admin-rental-subtext">Previously saved item (not in current settings)</span>
                         </label>
                         <div class="admin-rental-qty">
-                            <label for="${qtyInputId}">Qty</label>
-                            <input type="number" id="${qtyInputId}" min="1" max="${maxQuantity}" value="${quantityValue}">
+                            ${editQtyStepperHtml(qtyInputId, quantityValue, maxQuantity)}
                         </div>
                     </div>
                 `;

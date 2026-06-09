@@ -161,7 +161,11 @@ const buildHourlySlotModeFilter = () => ({
         { bookingMode: null }
       ]
     },
+    // Exclude bookings with any perday rental.
     { rentals: { $not: { $elemMatch: { rentalType: 'perday' } } } },
+    // Must have at least one inhouse/hourly rental — purely flat-rate (persession/pertrack)
+    // bookings use a dummy time and do not occupy a real time slot.
+    { rentals: { $elemMatch: { rentalType: { $nin: ['persession', 'pertrack', 'perday'] } } } },
     {
       $or: [
         { perDayStartDate: { $exists: false } },
