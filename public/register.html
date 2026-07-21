@@ -37,9 +37,9 @@
             </div>
 
             <div class="form-group">
-                <label for="mobile">Mobile Number (Optional)</label>
-                <input type="tel" id="mobile" name="mobile" placeholder="+91XXXXXXXXXX or 10 digits" pattern="^(\+91[-\s]?)?[6-9]\d{9}$" title="Please enter a valid Indian mobile number">
-                <div class="password-hint">Indian mobile number (optional)</div>
+                <label for="mobile">Mobile / WhatsApp Number</label>
+                <input type="tel" id="mobile" name="mobile" required placeholder="+91XXXXXXXXXX or 10 digits" pattern="^(\+91[-\s]?)?[6-9]\d{9}$" title="Please enter a valid Indian mobile number">
+                <div class="password-hint">Required for booking updates and WhatsApp messages</div>
             </div>
 
             <div class="form-group">
@@ -119,18 +119,16 @@
             const confirmPassword = document.getElementById('confirmPassword').value;
 
             // Validation
-            if (!name || !email || !password || !confirmPassword) {
+            if (!name || !email || !mobile || !password || !confirmPassword) {
                 showAlert('Please fill in all required fields');
                 return;
             }
 
-            // Validate mobile if provided
-            if (mobile && mobile.trim() !== '') {
-                const mobilePattern = /^(\+91[-\s]?)?[6-9]\d{9}$/;
-                if (!mobilePattern.test(mobile.trim())) {
-                    showAlert('Please enter a valid Indian mobile number');
-                    return;
-                }
+            const normalizedMobile = mobile.trim();
+            const mobilePattern = /^(\+91[-\s]?)?[6-9]\d{9}$/;
+            if (!mobilePattern.test(normalizedMobile)) {
+                showAlert('Please enter a valid Indian mobile / WhatsApp number');
+                return;
             }
 
             if (password.length < 6) {
@@ -147,10 +145,7 @@
             submitBtn.textContent = 'Registering...';
 
             try {
-                const requestBody = { name, email, password };
-                if (mobile && mobile.trim() !== '') {
-                    requestBody.mobile = mobile.trim();
-                }
+                const requestBody = { name, email, password, mobile: normalizedMobile };
 
                 const response = await fetch(`${API_URL}/api/auth/register`, {
                     method: 'POST',

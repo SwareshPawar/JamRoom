@@ -174,7 +174,7 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
     startTimeSelect.innerHTML = '<option value="">Loading...</option>';
 
     if (!selectedDate) {
-        startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+        startTimeSelect.innerHTML = '<option value="" selected></option>';
         populateEndTimeSlots('', selectedDate, null);
         if (loadingEl) {
             loadingEl.style.display = 'none';
@@ -190,7 +190,7 @@ const populateStartTimeSlots = async (selectedDate, availabilityData) => {
         const unavailableRanges = getHourlyUnavailableRanges(availabilityData);
 
         // Reset and populate start time options
-        startTimeSelect.innerHTML = '<option value="">Pick time</option>';
+        startTimeSelect.innerHTML = '<option value="" selected></option>';
 
         let hasAvailableSlots = false;
 
@@ -295,7 +295,7 @@ const populateEndTimeSlots = (selectedStartTime, selectedDate, availabilityData 
     }
 
     if (!selectedDate) {
-        endTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+        endTimeSelect.innerHTML = '<option value="" selected></option>';
         endTimeSelect.disabled = true;
         endTimeSelect.value = '';
         if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
@@ -305,7 +305,7 @@ const populateEndTimeSlots = (selectedStartTime, selectedDate, availabilityData 
     }
 
     if (!selectedStartTime) {
-        endTimeSelect.innerHTML = '<option value="">Pick start time first</option>';
+        endTimeSelect.innerHTML = '<option value="" selected></option>';
         endTimeSelect.disabled = true;
         endTimeSelect.value = '';
         if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {
@@ -317,7 +317,7 @@ const populateEndTimeSlots = (selectedStartTime, selectedDate, availabilityData 
     const unavailableRanges = getHourlyUnavailableRanges(availabilityData);
     const selectedStartMinutes = timeToMinutes(selectedStartTime);
 
-    endTimeSelect.innerHTML = '<option value="">Pick end time</option>';
+    endTimeSelect.innerHTML = '<option value="" selected></option>';
 
     allTimeSlots.forEach((slot) => {
         if (timeToMinutes(slot.value) <= selectedStartMinutes) {
@@ -450,7 +450,7 @@ const loadAvailability = async (date) => {
         window.currentAvailabilityData = null;
 
         if (startTimeSelect) {
-            startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+            startTimeSelect.innerHTML = '<option value="" selected></option>';
             startTimeSelect.disabled = true;
         }
         populateEndTimeSlots('', '', null);

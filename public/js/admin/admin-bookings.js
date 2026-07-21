@@ -226,6 +226,133 @@
         return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     };
 
+    const getBookingDateValue = (booking) => {
+        const rawDate = booking?.date || booking?.bookingDate || booking?.slotDate || booking?.perDayStartDate || booking?.createdAt;
+        if (!rawDate) return null;
+
+        const parsed = new Date(rawDate);
+        if (Number.isNaN(parsed.getTime())) return null;
+        return parsed;
+    };
+
+    const buildFollowUpMessage = (booking, displayDate) => {
+        const customerName = String(booking?.userId?.name || booking?.userName || 'there').trim() || 'there';
+        const bookingLabel = displayDate || 'your booking';
+        return `Hi ${customerName}, this is JamRoom. We are following up on your booking for ${bookingLabel}. Please let us know if you would like us to confirm or update it.`;
+    };
+
+    const getFollowUpBookings = () => {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        return Array.isArray(state.allBookings)
+            ? state.allBookings
+                .filter((booking) => {
+                    const bookingDate = getBookingDateValue(booking);
+                    if (!bookingDate) return false;
+                    if (bookingDate < startOfMonth || bookingDate > endOfMonth) return false;
+
+                    const bookingStatus = String(booking?.bookingStatus || '').toUpperCase();
+                    const paymentStatus = String(booking?.paymentStatus || '').toUpperCase();
+                    const isOpenBooking = !['CANCELLED', 'REJECTED'].includes(bookingStatus);
+                    const isFutureBooking = bookingDate >= todayStart;
+                    const isUnpaidBooking = ['PENDING', 'PARTIAL'].includes(paymentStatus);
+
+                    return isOpenBooking && (isFutureBooking || isUnpaidBooking);
+                })
+                .sort((a, b) => {
+                    const dateA = getBookingDateValue(a);
+                    const dateB = getBookingDateValue(b);
+                    const dateDiff = (dateA ? dateA.getTime() : Number.MAX_SAFE_INTEGER) - (dateB ? dateB.getTime() : Number.MAX_SAFE_INTEGER);
+                    if (dateDiff !== 0) return dateDiff;
+                    const paymentRankA = ['PENDING', 'PARTIAL'].includes(String(a?.paymentStatus || '').toUpperCase()) ? 0 : 1;
+                    const paymentRankB = ['PENDING', 'PARTIAL'].includes(String(b?.paymentStatus || '').toUpperCase()) ? 0 : 1;
+                    return paymentRankA - paymentRankB;
+                })
+            : [];
+    };
+
+    const renderFollowUpBookingsPanel = () => {
+        const panelEl = document.getElementById('followUpBookingsPanel');
+        if (!panelEl) return;
+
+        const followUpBookings = getFollowUpBookings();
+        if (followUpBookings.length === 0) {
+            panelEl.innerHTML = `
+                <div class="followup-queue-card">
+                    <div class="followup-queue-header">
+                        <h3>📌 Follow-up Queue</h3>
+                        <span>${followUpBookings.length} bookings</span>
+                    </div>
+                    <p>No follow-up bookings right now.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const followUpCards = followUpBookings.map((booking) => {
+            const bookingDate = getBookingDateValue(booking);
+            const bookingDateText = bookingDate
+                ? bookingDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                : 'Date pending';
+
+            const customerName = String(booking?.userId?.name || booking?.userName || 'Customer').trim() || 'Customer';
+            const customerEmail = String(booking?.userId?.email || booking?.userEmail || '').trim();
+            const rawMobile = String(booking?.userMobile || booking?.userId?.mobile || '').trim();
+            const contactMobile = rawMobile.replace(/[^\d+]/g, '');
+            const bookingStatus = String(booking?.bookingStatus || 'PENDING').toUpperCase();
+            const paymentStatus = String(booking?.paymentStatus || 'PENDING').toUpperCase();
+            const rentalDetails = Array.isArray(booking?.rentals) && booking.rentals.length > 0
+                ? booking.rentals.map((item) => `${item?.name || 'Item'}${Number(item?.quantity || 1) > 1 ? ` x${item.quantity}` : ''}`).join(', ')
+                : String(booking?.rentalType || 'Booking').trim() || 'Booking';
+            const followUpMessage = buildFollowUpMessage(booking, bookingDateText);
+            const whatsAppHref = contactMobile
+                ? `https://wa.me/${encodeURIComponent(contactMobile)}?text=${encodeURIComponent(followUpMessage)}`
+                : '';
+            const bookingStatusClass = bookingStatus === 'REJECTED' ? 'rejected' : bookingStatus === 'CANCELLED' ? 'cancelled' : bookingStatus === 'CONFIRMED' ? 'confirmed' : 'pending';
+            const paymentStatusClass = paymentStatus === 'PAID' ? 'paid' : paymentStatus === 'PARTIAL' ? 'partial' : 'pending';
+
+            return `
+                <div class="followup-row booking-row-clickable">
+                    <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+                        <div style="min-width:0; flex:1;">
+                            <div style="font-weight:700; margin-bottom:4px; color: var(--text-color);">${escapeHtml(customerName)}</div>
+                            <div style="color:var(--text-color); margin-bottom:4px;">${escapeHtml(rentalDetails)} · ${escapeHtml(bookingDateText)}</div>
+                            <div style="font-size:0.9rem; color:var(--text-color); margin-bottom:6px;">${escapeHtml(customerEmail || 'No email on file')}</div>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <span class="status-badge status-${bookingStatusClass}">${escapeHtml(bookingStatus)}</span>
+                                <span class="status-badge status-${paymentStatusClass}">${escapeHtml(paymentStatus)}</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                            ${contactMobile
+                                ? `<a href="tel:${escapeHtml(contactMobile)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">📞 Call</a>`
+                                : '<span class="text-muted">No contact number</span>'}
+                            ${whatsAppHref
+                                ? `<a href="${whatsAppHref}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">💬 WhatsApp</a>`
+                                : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        panelEl.innerHTML = `
+            <div class="followup-queue-card">
+                <div class="followup-queue-header">
+                    <div>
+                        <h3>📌 Follow-up Queue</h3>
+                        <p>Current-month bookings that are still active, upcoming, or unpaid.</p>
+                    </div>
+                    <span>${followUpBookings.length} booking${followUpBookings.length === 1 ? '' : 's'}</span>
+                </div>
+                <div>${followUpCards}</div>
+            </div>
+        `;
+    };
+
     const normalizeTimeValue = (value) => {
         const raw = String(value || '').trim();
         const match = raw.match(/^(\d{1,2}):(\d{2})$/);
@@ -801,12 +928,24 @@
             return;
         }
 
+        const checkedRowIds = Array.from(document.querySelectorAll('.booking-row-select:checked'))
+            .map((checkbox) => String(checkbox.getAttribute('data-booking-id') || '').trim())
+            .filter(Boolean);
         const visibleSelectedIds = getVisibleBookingIds().filter((id) => state.selectedBookingIds.has(id));
         const deletableIds = visibleSelectedIds.filter((id) => {
             const booking = state.bookingsById.get(id);
             return booking && booking.isDeleted !== true;
         });
         const skippedCount = visibleSelectedIds.length - deletableIds.length;
+
+        console.groupCollapsed('[ManageBookings][BulkDelete] Selection Debug');
+        console.log('checkedRowIds (DOM):', checkedRowIds);
+        console.log('selectedBookingIds (state):', [...state.selectedBookingIds]);
+        console.log('visibleBookingIds (current page):', getVisibleBookingIds());
+        console.log('visibleSelectedIds (state ∩ visible):', visibleSelectedIds);
+        console.log('deletableIds (to backend):', deletableIds);
+        console.log('skippedCount:', skippedCount);
+        console.groupEnd();
 
         if (deletableIds.length === 0) {
             notifyBookingAlert('Select at least one active booking from the current page.', 'warning');
@@ -823,9 +962,25 @@
 
                 for (const bookingId of deletableIds) {
                     try {
-                        const res = await fetch(`${apiUrl}/api/admin/bookings/${bookingId}`, {
+                        const endpoint = `${apiUrl}/api/admin/bookings/${bookingId}`;
+                        const res = await fetch(endpoint, {
                             method: 'DELETE',
                             headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        let responseBody = null;
+                        try {
+                            responseBody = await res.clone().json();
+                        } catch (parseError) {
+                            responseBody = null;
+                        }
+
+                        console.log('[ManageBookings][BulkDelete] DELETE result', {
+                            bookingId,
+                            endpoint,
+                            ok: res.ok,
+                            status: res.status,
+                            body: responseBody
                         });
 
                         if (res.ok) {
@@ -834,6 +989,10 @@
                             failedCount += 1;
                         }
                     } catch (error) {
+                        console.error('[ManageBookings][BulkDelete] DELETE exception', {
+                            bookingId,
+                            message: error?.message || error
+                        });
                         failedCount += 1;
                     }
                 }
@@ -1105,6 +1264,8 @@
         state.allBookings.forEach((booking) => {
             state.bookingsById.set(String(booking._id), booking);
         });
+
+        renderFollowUpBookingsPanel();
 
         if (state.searchTerm === undefined || state.searchTerm === null) {
             state.searchTerm = '';

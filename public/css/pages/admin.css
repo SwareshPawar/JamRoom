@@ -28,6 +28,66 @@
     margin-bottom: 20px;
 }
 
+.followup-queue-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--warning-color);
+    border-radius: 16px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    padding: 20px 22px;
+    margin-bottom: 24px;
+    color: var(--text-color);
+}
+
+.followup-queue-card p {
+    color: var(--text-color-light);
+    margin-top: 0;
+}
+
+.followup-queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.followup-queue-header h3 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+.followup-queue-header p {
+    margin: 6px 0 0;
+    color: var(--text-color-light);
+}
+
+.followup-queue-header span {
+    background: var(--warning-color);
+    color: white;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.followup-row {
+    background: var(--surface-1);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+
+.followup-row:last-child {
+    margin-bottom: 0;
+}
+
+.followup-row:hover {
+    background: var(--surface-2);
+}
+
 .calendar-controls-spaced {
     margin-bottom: 20px;
 }

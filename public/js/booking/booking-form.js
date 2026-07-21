@@ -741,12 +741,12 @@ const bindBookingDateChange = (bookingDateEl) => {
         const endTimeSelect = document.getElementById('endTime');
 
         if (startTimeSelect) {
-            startTimeSelect.innerHTML = '<option value="">Pick date first</option>';
+            startTimeSelect.innerHTML = '<option value="" selected></option>';
             startTimeSelect.disabled = true;
             startTimeSelect.value = '';
 
             if (endTimeSelect) {
-                endTimeSelect.innerHTML = '<option value="">Pick start time first</option>';
+                endTimeSelect.innerHTML = '<option value="" selected></option>';
                 endTimeSelect.disabled = true;
                 endTimeSelect.value = '';
                 if (typeof endTimeSelect._refreshCustomTimeDropdown === 'function') {

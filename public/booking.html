@@ -107,11 +107,11 @@
                             <label for="startTime" id="startTimeLabel">Start Time*</label>
                             <div class="time-custom-select" id="startTimeCustom">
                                 <button type="button" class="time-custom-trigger" id="startTimeTrigger" disabled aria-haspopup="listbox" aria-expanded="false">
-                                    <span id="startTimeDisplay">Pick date first</span>
+                                    <span id="startTimeDisplay"></span>
                                     <span class="time-custom-caret" aria-hidden="true"></span>
                                 </button>
                                 <select id="startTime" required disabled aria-hidden="true" tabindex="-1">
-                                    <option value="">Pick date first</option>
+                                    <option value="" selected></option>
                                 </select>
                             </div>
                             <div id="startTimeLoading" class="loading-text start-time-loading">Loading...</div>
@@ -121,11 +121,11 @@
                             <label for="endTime" id="endTimeLabel">End Time*</label>
                             <div class="time-custom-select" id="endTimeCustom">
                                 <button type="button" class="time-custom-trigger" id="endTimeTrigger" disabled aria-haspopup="listbox" aria-expanded="false">
-                                    <span id="endTimeDisplay">Pick start time first</span>
+                                    <span id="endTimeDisplay"></span>
                                     <span class="time-custom-caret" aria-hidden="true"></span>
                                 </button>
                                 <select id="endTime" required disabled aria-hidden="true" tabindex="-1">
-                                    <option value="">Pick start time first</option>
+                                    <option value="" selected></option>
                                 </select>
                             </div>
                         </div>

@@ -20,12 +20,21 @@ const generateToken = (id) => {
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const mobile = typeof req.body.mobile === 'string' ? req.body.mobile.trim() : '';
 
     // Validation
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !mobile) {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields'
+      });
+    }
+
+    const mobilePattern = /^(\+91[-\s]?)?[6-9]\d{9}$/;
+    if (!mobilePattern.test(mobile)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid Indian mobile / WhatsApp number'
       });
     }
 
@@ -50,6 +59,7 @@ router.post('/register', async (req, res) => {
       name,
       email,
       password,
+      mobile,
       role: 'user'
     });
 
