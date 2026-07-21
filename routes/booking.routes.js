@@ -2153,8 +2153,10 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
       });
     }
 
-    // Check if user owns the booking
-    if (booking.userId.toString() !== req.user._id.toString()) {
+    const isAdminCancel = req.user.role === 'admin';
+    const isBookingOwner = booking.userId && booking.userId.toString() === req.user._id.toString();
+
+    if (!isBookingOwner && !isAdminCancel) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to cancel this booking'
@@ -2170,8 +2172,23 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
     }
 
     const wasConfirmedBefore = booking.bookingStatus === 'CONFIRMED';
+    const totalBookingValue = Math.max(0, Number(booking.price) || 0);
+    const cancellationPenalty = Math.round(totalBookingValue * 0.5 * 100) / 100;
+    const amountPaid = Math.max(0, Number(booking.amountPaid) || 0);
+    const refundAmount = Math.max(0, amountPaid - cancellationPenalty);
+    const penaltyNote = `A 50% cancellation penalty of ₹${cancellationPenalty.toFixed(2)} has been applied.`;
+    const refundNote = amountPaid > 0
+      ? `Based on your payment, the refundable amount is ₹${refundAmount.toFixed(2)}.`
+      : `No payment was received yet. The chargeable penalty amount is ₹${cancellationPenalty.toFixed(2)}.`;
 
     booking.bookingStatus = 'CANCELLED';
+    booking.paymentNote = [String(booking.paymentNote || '').trim(), penaltyNote, refundNote]
+      .filter(Boolean)
+      .join(' ');
+    if (amountPaid > 0) {
+      booking.paymentStatus = 'REFUNDED';
+    }
+
     if (wasConfirmedBefore) {
       if (!booking.calendarUid) {
         booking.calendarUid = buildBookingCalendarUid(booking._id);
@@ -2215,8 +2232,9 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
 
     // Send cancellation email to customer
     try {
+      const customerEmail = String(booking.userEmail || req.user.email || '').trim();
       await sendEmail({
-        to: req.user.email,
+        to: customerEmail,
         subject: 'Booking Cancelled - JamRoom',
         html: buildInvoiceStyleEmail({
           brandName: settings?.studioName || 'JamRoom',
@@ -2226,9 +2244,11 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
           studioEmail: settings?.adminEmails?.[0] || '',
           title: 'Cancellation Notice',
           label: 'Booking Cancelled',
-          greeting: `Hi ${req.user.name},`,
+          greeting: `Hi ${booking.userName || req.user.name || 'Customer'},`,
           introLines: [
-            'Your booking has been cancelled.'
+            'Your booking has been cancelled.',
+            penaltyNote,
+            refundNote
           ],
           summaryTitle: 'Cancelled Booking Details',
           summaryRows: [
@@ -2238,7 +2258,9 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
                   { label: 'Date', value: displayDate },
                   { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) }
                 ]),
-            { label: 'Rental Type', value: booking.rentalType }
+            { label: 'Rental Type', value: booking.rentalType },
+            { label: 'Penalty', value: `₹${cancellationPenalty.toFixed(2)}` },
+            { label: 'Refund Amount', value: `₹${refundAmount.toFixed(2)}` }
           ],
           ...buildBookingFooterEmailConfig(settings),
           ctaTitle: 'Calendar Note',
@@ -2274,7 +2296,7 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
               title: 'Cancellation Notice',
               label: 'Admin Notification',
               greeting: 'Hello Team,',
-              introLines: ['A confirmed booking has been cancelled by the customer.'],
+              introLines: [isAdminCancel ? 'A confirmed booking has been cancelled by an admin.' : 'A confirmed booking has been cancelled by the customer.'],
               summaryTitle: 'Details',
               summaryRows: [
                 { label: 'User', value: `${booking.userName} (${booking.userEmail})` },

@@ -118,7 +118,7 @@ const buildBookingNotifyWhatsAppLink = (booking, bookingTitle, contactInfo) => {
 
 const normalizePaymentStatus = (statusValue) => {
     const normalized = String(statusValue || '').toUpperCase();
-    if (['PENDING', 'PARTIAL', 'PAID'].includes(normalized)) {
+    if (['PENDING', 'PARTIAL', 'PAID', 'REFUNDED'].includes(normalized)) {
         return normalized;
     }
     return 'PENDING';
@@ -133,8 +133,12 @@ const getBookingPaymentSnapshot = (booking) => {
         ? total
         : paymentStatus === 'PARTIAL'
             ? Math.max(0, Math.min(total, amountPaidRaw))
-            : 0;
-    const remaining = Math.max(0, total - paid);
+            : paymentStatus === 'REFUNDED'
+                ? Math.max(0, Math.min(total, amountPaidRaw))
+                : 0;
+    const remaining = paymentStatus === 'REFUNDED'
+        ? 0
+        : Math.max(0, total - paid);
 
     return { paymentStatus, total, paid, remaining };
 };
@@ -850,7 +854,7 @@ const loadMyBookings = async (options = {}) => {
                             return `<a href="${notifyLink}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm">${notifyLabel}</a>`;
                         })()
                         : '',
-                    !isOpenEventBooking && booking.bookingStatus === 'PENDING'
+                    !isOpenEventBooking && (booking.bookingStatus === 'PENDING' || booking.bookingStatus === 'CONFIRMED')
                         ? `<button onclick="cancelBooking('${booking._id}')" class="btn btn-danger btn-sm">Cancel</button>`
                         : '',
                     !isOpenEventBooking && (booking.bookingStatus === 'CONFIRMED' || booking.bookingStatus === 'COMPLETED')
@@ -985,7 +989,7 @@ const cancelSlotRequest = async (bookingId, lessonId, btnEl) => {
 
 // Cancel booking
 const cancelBooking = async (bookingId) => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
+    if (!confirm('Cancelling this booking will incur a 50% penalty on the total booking value. Do you want to continue?')) return;
 
     try {
         showBookingLoadingOverlay('Cancelling booking...');
@@ -996,7 +1000,10 @@ const cancelBooking = async (bookingId) => {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (!res.ok) throw new Error('Failed to cancel booking');
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => null);
+            throw new Error(errorData?.message || 'Failed to cancel booking');
+        }
 
         showBookingAlert('Booking cancelled successfully', 'success');
         if (typeof window.refreshMyBookingsPage === 'function') {

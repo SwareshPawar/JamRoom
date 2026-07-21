@@ -552,8 +552,11 @@
                     ? `<button onclick="${stopOrClose}sendEBill('${booking._id}')" class="btn btn-primary btn-sm" title="Send eBill to customer and/or custom recipients">Send eBill</button>
                        <button onclick="${stopOrClose}downloadPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download PDF Bill">Download PDF</button>`
                     : ''}
+                ${!['CANCELLED', 'REJECTED'].includes(status)
+                    ? `<button onclick="${stopOrClose}cancelBooking('${booking._id}')" class="btn btn-danger btn-sm">Cancel</button>`
+                    : ''}
                 <button onclick="${stopOrClose}editBooking('${booking._id}', ${serializedBooking})" class="btn btn-warning btn-sm">Edit</button>
-                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Move to Deleted</button>
+                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Delete</button>
             </div>
         `;
     };
@@ -726,21 +729,16 @@
             <div class="booking-expand-body booking-modal-body">
                 <div class="booking-expand-grid">
                     <section class="booking-expand-panel admin-theme-info-card admin-theme-info-card-accent">
-                        <h4>Booking Details</h4>
+                        <h4>Booking Summary</h4>
                         <div class="booking-kv-grid">
-                            <p><strong>Booking ID:</strong> ${escapeHtml(booking._id || 'N/A')}</p>
-                            <p><strong>Mode:</strong> ${modeText}</p>
-                            <p><strong>Date/Range:</strong> ${dateText}</p>
+                            <p><strong>Date:</strong> ${dateText}</p>
                             <p><strong>Time:</strong> ${timeText}</p>
                             <p><strong>Duration:</strong> ${durationText}</p>
-                            <p><strong>Created:</strong> ${formatDateTime(booking.createdAt)}</p>
-                            <p><strong>Updated:</strong> ${formatDateTime(booking.updatedAt)}</p>
                             <p><strong>Booking Status:</strong> ${escapeHtml(booking.bookingStatus || 'N/A')}</p>
                             <p><strong>Payment Status:</strong> ${escapeHtml(paymentStatusText)}</p>
-                            <p><strong>Amount Received:</strong> ${isRejectedBooking ? 'N/A' : formatCurrency(collectedAmount)}</p>
+                            <p><strong>Total:</strong> ${formatCurrency(booking.price)}</p>
+                            <p><strong>Received:</strong> ${isRejectedBooking ? 'N/A' : formatCurrency(collectedAmount)}</p>
                             <p><strong>Outstanding:</strong> ${isRejectedBooking ? 'N/A' : formatCurrency(outstandingAmount)}</p>
-                            <p><strong>Payment Ref:</strong> ${escapeHtml(booking.paymentReference || 'N/A')}</p>
-                            <p><strong>Payment Note:</strong> ${escapeHtml(booking.paymentNote || 'N/A')}</p>
                         </div>
                     </section>
 
@@ -1576,6 +1574,36 @@
         );
     };
 
+    const cancelBooking = async (bookingId) => {
+        const deps = state.loadDeps;
+        if (!deps?.apiUrl) {
+            alert('Unable to cancel booking right now. Please refresh and try again.');
+            return;
+        }
+
+        if (!confirm('Cancelling this booking will incur a 50% penalty on the total booking value. Do you want to continue?')) return;
+
+        try {
+            showBookingLoading('Cancelling booking...');
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${deps.apiUrl}/api/bookings/${bookingId}/cancel`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.message || 'Unable to cancel booking');
+
+            showAlert('bookingAlert', 'Booking cancelled successfully.', 'success');
+            await loadBookings({ page: state.currentPage || 1, showLoader: false });
+        } catch (error) {
+            showAlert('bookingAlert', error.message || 'Unable to cancel booking', 'error');
+        } finally {
+            hideBookingLoading();
+        }
+    };
+
     const markClassLessonCompleted = async (bookingId, lessonId) => {
         openClassLessonCompletionModal(bookingId, lessonId);
     };
@@ -1900,6 +1928,7 @@
     window.AdminBookings.loadBookings = loadBookings;
     window.AdminBookings.approveBooking = approveBooking;
     window.AdminBookings.rejectBooking = rejectBooking;
+    window.AdminBookings.cancelBooking = cancelBooking;
     window.AdminBookings.markClassLessonCompleted = markClassLessonCompleted;
     window.AdminBookings.cancelClassLesson = cancelClassLesson;
     window.AdminBookings.submitClassLessonCompletion = submitClassLessonCompletion;
