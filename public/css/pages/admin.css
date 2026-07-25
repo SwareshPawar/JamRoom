@@ -557,6 +557,22 @@
     -webkit-overflow-scrolling: touch;
 }
 
+@media (min-width: 769px) {
+    #bookingsTable .table-container {
+        cursor: grab;
+        touch-action: pan-y;
+    }
+
+    #bookingsTable .table-container.dragging {
+        cursor: grabbing;
+        user-select: none;
+    }
+
+    #bookingsTable .table-container.dragging * {
+        user-select: none;
+    }
+}
+
 #bookingsTable .table-container table {
     min-width: 980px;
     margin: 0;

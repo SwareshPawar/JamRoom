@@ -1196,12 +1196,12 @@
                 : '';
 
             html += `
-                <tr class="booking-row-clickable" onclick="openBookingDetailsModal('${booking._id}')" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openBookingDetailsModal('${booking._id}'); }" tabindex="0">
+                <tr>
                     <td class="bookings-select-cell" onclick="event.stopPropagation();">
                         <input type="checkbox" class="booking-row-select" data-booking-id="${bookingId}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation();" aria-label="Select booking ${serialNo}">
                     </td>
                     <td class="table-serial-cell">${serialNo++}</td>
-                    <td>${escapeHtml(userName)}<br><small>${escapeHtml(userEmail)}</small></td>
+                    <td class="booking-details-cell" onclick="openBookingDetailsCell(event, '${bookingId}')" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openBookingDetailsCell(event, '${bookingId}'); }" tabindex="0">${escapeHtml(userName)}<br><small>${escapeHtml(userEmail)}</small></td>
                     <td>${dateText}</td>
                     <td>${timeText}</td>
                     <td>${durationText}</td>
@@ -1228,6 +1228,70 @@
         html += buildPaginationMarkup();
         tableEl.innerHTML = html;
         bindTableControls();
+        initBookingsTableDragScroll();
+    };
+
+    const initBookingsTableDragScroll = () => {
+        if (!window.matchMedia || !window.matchMedia('(min-width: 769px)').matches) {
+            return;
+        }
+
+        const container = document.querySelector('#bookingsTable .table-container');
+        if (!container || container.__dragScrollInitialized) return;
+
+        container.__dragScrollInitialized = true;
+        let isDragging = false;
+        let startX = 0;
+        let startScrollLeft = 0;
+
+        const setDragState = (value) => {
+            container.dataset.wasDragged = value ? 'true' : 'false';
+            if (value) {
+                container.classList.add('dragging');
+            } else {
+                container.classList.remove('dragging');
+            }
+        };
+
+        setDragState(false);
+
+        container.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0) return;
+            if (event.target.closest('a, button, input, textarea, select, label')) return;
+            isDragging = false;
+            container.dataset.wasDragged = 'false';
+            startX = event.clientX;
+            startScrollLeft = container.scrollLeft;
+        });
+
+        container.addEventListener('pointermove', (event) => {
+            if (event.buttons === 0) return;
+            const deltaX = event.clientX - startX;
+            if (!isDragging && Math.abs(deltaX) > 10) {
+                isDragging = true;
+                setDragState(true);
+            }
+            if (!isDragging) return;
+            event.preventDefault();
+            container.scrollLeft = startScrollLeft - deltaX;
+        });
+
+        const stopDrag = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            setDragState(false);
+        };
+
+        container.addEventListener('pointerup', stopDrag);
+        container.addEventListener('pointercancel', stopDrag);
+    };
+
+    const openBookingDetailsCell = (event, bookingId) => {
+        const container = document.querySelector('#bookingsTable .table-container');
+        if (container?.dataset.wasDragged === 'true') {
+            return;
+        }
+        openBookingDetailsModal(bookingId);
     };
 
     const setBookingsError = (message) => {
@@ -1941,6 +2005,7 @@
     window.cancelClassLesson = cancelClassLesson;
     window.submitClassLessonCompletion = submitClassLessonCompletion;
     window.approveSlotRequest = approveSlotRequest;
+    window.openBookingDetailsCell = openBookingDetailsCell;
     window.rejectSlotRequest = rejectSlotRequest;
     window.adminBookSlot = adminBookSlot;
     window.hideClassLessonCompletionModal = hideClassLessonCompletionModal;
