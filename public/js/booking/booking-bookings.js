@@ -846,6 +846,9 @@ const loadMyBookings = async (options = {}) => {
                     (isOpenEventBooking && booking?.openEvent?.id)
                         ? `<a href="/open-event.html?item=event:${booking.openEvent.id}" class="btn btn-secondary btn-sm">Open Event</a>`
                         : '',
+                    (isOpenEventBooking && booking?.openEvent?.id)
+                        ? `<button onclick="cancelOpenEventBooking('${booking.openEvent.id}')" class="btn btn-danger btn-sm">Cancel</button>`
+                        : '',
                     !isOpenEventBooking && (booking.bookingStatus === 'PENDING' || paymentSnapshot.paymentStatus === 'PENDING') && publicContactInfo
                         ? (() => {
                             const notifyLink = buildBookingNotifyWhatsAppLink(booking, bookingTitle, publicContactInfo);
@@ -1018,6 +1021,41 @@ const cancelBooking = async (bookingId) => {
     }
 };
 
+const cancelOpenEventBooking = async (eventId) => {
+    if (!eventId) {
+        showBookingAlert('Invalid open event booking.', 'error');
+        return;
+    }
+
+    if (!confirm('Do you want to cancel this open event slot booking?')) return;
+
+    try {
+        showBookingLoadingOverlay('Cancelling slot booking...');
+        const token = localStorage.getItem('token');
+        const apiBase = resolveApiUrl();
+        const res = await fetch(`${apiBase}/api/open-events/${eventId}/book`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => null);
+            throw new Error(errorData?.message || 'Failed to cancel slot booking');
+        }
+
+        showBookingAlert('Slot booking cancelled successfully', 'success');
+        if (typeof window.refreshMyBookingsPage === 'function') {
+            await window.refreshMyBookingsPage();
+        } else {
+            await loadMyBookings();
+        }
+    } catch (error) {
+        showBookingAlert(error.message || 'Failed to cancel slot booking', 'error');
+    } finally {
+        hideBookingLoadingOverlay();
+    }
+};
+
 // Download PDF bill for user
 const downloadUserPDF = async (bookingId) => {
     try {
@@ -1151,6 +1189,7 @@ window.loadSlotRequestTimeOptions = loadSlotRequestTimeOptions;
 window.submitSlotRequest = submitSlotRequest;
 window.cancelSlotRequest = cancelSlotRequest;
 window.cancelBooking = cancelBooking;
+window.cancelOpenEventBooking = cancelOpenEventBooking;
 window.downloadUserPDF = downloadUserPDF;
 window.switchBookingClassTab = switchBookingClassTab;
 window.loadLessonTrackerBookings = () => loadMyBookings({ classOnly: true });

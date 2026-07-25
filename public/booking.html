@@ -54,13 +54,19 @@
                         </div>
                     </div>
 
-                    <div class="form-group booking-hidden-initial booking-row" id="classLocationGroup">
-                        <label for="classLocation">Location*</label>
-                        <select id="classLocation">
-                            <option value="">Select location</option>
-                        </select>
-                        <small class="field-help">Class location.</small>
+                    <div class="booking-step-actions">
+                        <div></div>
+                        <button type="button" id="bookingCatalogNext" class="btn btn-secondary booking-step-btn" hidden disabled>Next &gt;</button>
                     </div>
+
+                    <div id="bookingStep2Section" class="booking-step-section booking-hidden-initial">
+                        <div class="form-group booking-hidden-initial booking-row" id="classLocationGroup">
+                            <label for="classLocation">Location*</label>
+                            <select id="classLocation">
+                                <option value="">Select location</option>
+                            </select>
+                            <small class="field-help">Class location.</small>
+                        </div>
 
                     <div class="form-group booking-hidden-initial booking-row" id="classPlanMonthsGroup">
                         <label for="classPlanMonths">Plan*</label>
@@ -213,7 +219,13 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary booking-submit-btn">Book</button>
+                    <div class="booking-step-actions">
+                        <div></div>
+                        <button type="button" id="bookingItemsNext" class="btn btn-secondary booking-step-btn" hidden disabled>Next &gt;</button>
+                    </div>
+                </div>
+
+                    <button type="submit" id="bookingSubmitButton" class="btn btn-primary booking-submit-btn booking-hidden-initial">Book</button>
                 </form>
 
                 <section id="bookingContactSection" class="booking-contact-section" aria-labelledby="bookingContactTitle" hidden>
@@ -263,10 +275,10 @@
         <script src="/js/booking/booking-auth.js"></script>
         <script src="/js/booking/booking-availability.js?v=20260528-2"></script>
         <script src="/js/booking/booking-pricing.js"></script>
-        <script src="/js/booking/booking-rentals.js?v=20260509-1"></script>
+        <script src="/js/booking/booking-rentals.js?v=20260725-2"></script>
         <script src="/js/booking/booking-api.js"></script>
     <script src="/js/booking/booking-payment.js?v=20260521b"></script>
-        <script src="/js/booking/booking-form.js"></script>
+        <script src="/js/booking/booking-form.js?v=20260725-1"></script>
         <script src="/js/booking/booking-main.js?v=20260528-2"></script>
     <script src="/js/shared/pwa-install.js"></script>
         <script src="/js/shared/perf-baseline.js"></script>

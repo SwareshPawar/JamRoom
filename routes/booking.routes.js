@@ -1468,12 +1468,37 @@ router.post('/', protect, async (req, res) => {
 // @access  Public
 router.get('/availability/perday-items', async (req, res) => {
   try {
+    let settings = null;
+    try {
+      settings = await AdminSettings.getSettings();
+    } catch (settingsError) {
+      console.error('Per-day availability settings load error:', settingsError);
+      settings = { rentalTypes: [] };
+    }
+
     const {
       startDate,
       endDate,
       pickupTime,
       returnTime
     } = req.query;
+
+    if (!startDate || !endDate || !pickupTime || !returnTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide startDate, endDate, pickupTime and returnTime'
+      });
+    }
+
+    const requestStartDateTime = parseDateTime(startDate, pickupTime);
+    const requestEndDateTime = parseDateTime(endDate, returnTime);
+    if (!requestStartDateTime || !requestEndDateTime || requestEndDateTime <= requestStartDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid per-day date/time range'
+      });
+    }
+
     const perdayInventoryNameKeys = new Set();
     const perdayCatalogItems = []; // [{name, maxQuantity}] for the response
     (Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : []).forEach((cat) => {
@@ -1536,7 +1561,8 @@ router.get('/availability/perday-items', async (req, res) => {
     console.error('Get per-day item availability error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Server error fetching per-day item availability'
+      message: 'Server error fetching per-day item availability',
+      details: error?.message || 'Unknown error'
     });
   }
 });
@@ -2198,127 +2224,131 @@ router.post('/:id/class-lessons/:lessonId/request-slot', protect, async (req, re
 
     await booking.save();
 
-    const displayDate = formatDateLongInIst(booking.date);
-
-    const isPerday = booking.bookingMode === 'perday';
-    const perdayRangeText = (booking.perDayStartDate && booking.perDayEndDate)
-      ? `${formatDateShortInIst(booking.perDayStartDate)} ${formatTime12Hour(booking.startTime)} to ${formatDateShortInIst(booking.perDayEndDate)} ${formatTime12Hour(booking.endTime)} (${booking.perDayDays || 1} day(s))`
-      : displayDate;
-
-    let cancellationInvite = null;
-    let settings = null;
-    let adminCancellationEmails = [];
-    if (wasConfirmedBefore) {
-      settings = await AdminSettings.getSettings();
-
-      const normalizedUserEmail = String(booking.userEmail || '').trim().toLowerCase();
-      adminCancellationEmails = getConfiguredAdminEmails(settings, normalizedUserEmail);
-
-      cancellationInvite = generateCalendarInvite({
-        title: `${settings.studioName || 'JamRoom'} Booking - ${booking.rentalType}`,
-        description: `Booking cancelled for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
-        location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
-        startDate: formatDateAsYmdInIst(new Date(booking.date)),
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        attendees: [booking.userEmail, ...adminCancellationEmails],
-        studioName: settings.studioName || 'JamRoom',
-        uid: booking.calendarUid,
-        sequence: booking.calendarSequence,
-        method: 'CANCEL',
-        status: 'CANCELLED'
-      });
-    }
-
-    // Send cancellation email to customer
     try {
-      const customerEmail = String(booking.userEmail || req.user.email || '').trim();
-      await sendEmail({
-        to: customerEmail,
-        subject: 'Booking Cancelled - JamRoom',
-        html: buildInvoiceStyleEmail({
-          brandName: settings?.studioName || 'JamRoom',
-          studioAddress: settings?.studioAddress || '',
-          studioPhone: settings?.studioPhone || '',
-          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
-          studioEmail: settings?.adminEmails?.[0] || '',
-          title: 'Cancellation Notice',
-          label: 'Booking Cancelled',
-          greeting: `Hi ${booking.userName || req.user.name || 'Customer'},`,
-          introLines: [
-            'Your booking has been cancelled.',
-            penaltyNote,
-            refundNote
-          ],
-          summaryTitle: 'Cancelled Booking Details',
-          summaryRows: [
-            ...(isPerday
-              ? [{ label: 'Per-day Range', value: perdayRangeText }]
-              : [
+      const displayDate = formatDateLongInIst(booking.date);
+
+      const isPerday = booking.bookingMode === 'perday';
+      const perdayRangeText = (booking.perDayStartDate && booking.perDayEndDate)
+        ? `${formatDateShortInIst(booking.perDayStartDate)} ${formatTime12Hour(booking.startTime)} to ${formatDateShortInIst(booking.perDayEndDate)} ${formatTime12Hour(booking.endTime)} (${booking.perDayDays || 1} day(s))`
+        : displayDate;
+
+      let cancellationInvite = null;
+      let settings = null;
+      let adminCancellationEmails = [];
+      if (wasConfirmedBefore) {
+        settings = await AdminSettings.getSettings();
+
+        const normalizedUserEmail = String(booking.userEmail || '').trim().toLowerCase();
+        adminCancellationEmails = getConfiguredAdminEmails(settings, normalizedUserEmail);
+
+        cancellationInvite = generateCalendarInvite({
+          title: `${settings.studioName || 'JamRoom'} Booking - ${booking.rentalType}`,
+          description: `Booking cancelled for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
+          location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
+          startDate: formatDateAsYmdInIst(new Date(booking.date)),
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          attendees: [booking.userEmail, ...adminCancellationEmails],
+          studioName: settings.studioName || 'JamRoom',
+          uid: booking.calendarUid,
+          sequence: booking.calendarSequence,
+          method: 'CANCEL',
+          status: 'CANCELLED'
+        });
+      }
+
+      // Send cancellation email to customer
+      try {
+        const customerEmail = String(booking.userEmail || req.user.email || '').trim();
+        await sendEmail({
+          to: customerEmail,
+          subject: 'Booking Cancelled - JamRoom',
+          html: buildInvoiceStyleEmail({
+            brandName: settings?.studioName || 'JamRoom',
+            studioAddress: settings?.studioAddress || '',
+            studioPhone: settings?.studioPhone || '',
+            contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
+            studioEmail: settings?.adminEmails?.[0] || '',
+            title: 'Cancellation Notice',
+            label: 'Booking Cancelled',
+            greeting: `Hi ${booking.userName || req.user.name || 'Customer'},`,
+            introLines: [
+              'Your booking has been cancelled.',
+              penaltyNote,
+              refundNote
+            ],
+            summaryTitle: 'Cancelled Booking Details',
+            summaryRows: [
+              ...(isPerday
+                ? [{ label: 'Per-day Range', value: perdayRangeText }]
+                : [
+                    { label: 'Date', value: displayDate },
+                    { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) }
+                  ]),
+              { label: 'Rental Type', value: booking.rentalType },
+              { label: 'Penalty', value: `₹${cancellationPenalty.toFixed(2)}` },
+              { label: 'Refund Amount', value: `₹${refundAmount.toFixed(2)}` }
+            ],
+            ...buildBookingFooterEmailConfig(settings),
+            ctaTitle: 'Calendar Note',
+            ctaHtml: cancellationInvite ? '<p>A cancellation calendar invite is attached to remove this slot from your calendar.</p>' : '<p>If you paid for this booking, please contact us for a refund.</p>'
+          }),
+          attachments: cancellationInvite
+            ? [{
+                filename: 'booking-cancelled.ics',
+                content: cancellationInvite,
+                contentType: 'text/calendar; charset=utf-8; method=CANCEL'
+              }]
+            : []
+        });
+      } catch (emailError) {
+        console.log('Cancellation email failed:', emailError.message);
+      }
+
+      // Send cancellation notifications to admin/staff recipients.
+      if (cancellationInvite && adminCancellationEmails.length > 0) {
+        const studioName = settings?.studioName || 'JamRoom';
+
+        for (const recipientEmail of adminCancellationEmails) {
+          try {
+            await sendEmail({
+              to: recipientEmail,
+              subject: `Booking Cancelled - ${studioName}`,
+              html: buildInvoiceStyleEmail({
+                brandName: settings?.studioName || 'JamRoom',
+                studioAddress: settings?.studioAddress || '',
+                studioPhone: settings?.studioPhone || '',
+                contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
+                studioEmail: settings?.adminEmails?.[0] || '',
+                title: 'Cancellation Notice',
+                label: 'Admin Notification',
+                greeting: 'Hello Team,',
+                introLines: [isAdminCancel ? 'A confirmed booking has been cancelled by an admin.' : 'A confirmed booking has been cancelled by the customer.'],
+                summaryTitle: 'Details',
+                summaryRows: [
+                  { label: 'User', value: `${booking.userName} (${booking.userEmail})` },
                   { label: 'Date', value: displayDate },
-                  { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) }
-                ]),
-            { label: 'Rental Type', value: booking.rentalType },
-            { label: 'Penalty', value: `₹${cancellationPenalty.toFixed(2)}` },
-            { label: 'Refund Amount', value: `₹${refundAmount.toFixed(2)}` }
-          ],
-          ...buildBookingFooterEmailConfig(settings),
-          ctaTitle: 'Calendar Note',
-          ctaHtml: cancellationInvite ? '<p>A cancellation calendar invite is attached to remove this slot from your calendar.</p>' : '<p>If you paid for this booking, please contact us for a refund.</p>'
-        }),
-        attachments: cancellationInvite
-          ? [{
-              filename: 'booking-cancelled.ics',
-              content: cancellationInvite,
-              contentType: 'text/calendar; charset=utf-8; method=CANCEL'
-            }]
-          : []
-      });
-    } catch (emailError) {
-      console.log('Cancellation email failed:', emailError.message);
-    }
-
-    // Send cancellation notifications to admin/staff recipients.
-    if (cancellationInvite && adminCancellationEmails.length > 0) {
-      const studioName = settings?.studioName || 'JamRoom';
-
-      for (const recipientEmail of adminCancellationEmails) {
-        try {
-          await sendEmail({
-            to: recipientEmail,
-            subject: `Booking Cancelled - ${studioName}`,
-            html: buildInvoiceStyleEmail({
-              brandName: settings?.studioName || 'JamRoom',
-              studioAddress: settings?.studioAddress || '',
-              studioPhone: settings?.studioPhone || '',
-          contactWhatsAppNumber: settings?.publicContact?.whatsappNumber || '',
-              studioEmail: settings?.adminEmails?.[0] || '',
-              title: 'Cancellation Notice',
-              label: 'Admin Notification',
-              greeting: 'Hello Team,',
-              introLines: [isAdminCancel ? 'A confirmed booking has been cancelled by an admin.' : 'A confirmed booking has been cancelled by the customer.'],
-              summaryTitle: 'Details',
-              summaryRows: [
-                { label: 'User', value: `${booking.userName} (${booking.userEmail})` },
-                { label: 'Date', value: displayDate },
-                { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) },
-                { label: 'Rental Type', value: booking.rentalType },
-                { label: 'Booking ID', value: booking._id }
-              ],
-              ...buildBookingFooterEmailConfig(settings),
-              ctaTitle: 'Calendar Note',
-              ctaHtml: '<p>The attached cancellation invite removes the slot from calendar apps.</p>'
-            }),
-            attachments: [{
-              filename: 'booking-cancelled.ics',
-              content: cancellationInvite,
-              contentType: 'text/calendar; charset=utf-8; method=CANCEL'
-            }]
-          });
-        } catch (emailError) {
-          console.log(`Admin/staff cancellation email failed for ${recipientEmail}:`, emailError.message);
+                  { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) },
+                  { label: 'Rental Type', value: booking.rentalType },
+                  { label: 'Booking ID', value: booking._id }
+                ],
+                ...buildBookingFooterEmailConfig(settings),
+                ctaTitle: 'Calendar Note',
+                ctaHtml: '<p>The attached cancellation invite removes the slot from calendar apps.</p>'
+              }),
+              attachments: [{
+                filename: 'booking-cancelled.ics',
+                content: cancellationInvite,
+                contentType: 'text/calendar; charset=utf-8; method=CANCEL'
+              }]
+            });
+          } catch (emailError) {
+            console.log(`Admin/staff cancellation email failed for ${recipientEmail}:`, emailError.message);
+          }
         }
       }
+    } catch (postCancelError) {
+      console.log('Post-cancellation notifications failed:', postCancelError.message);
     }
 
     res.json({

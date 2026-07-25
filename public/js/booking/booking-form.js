@@ -99,10 +99,22 @@ const getBookingTypeOptionValues = () => {
         .filter(Boolean);
 };
 
-const isKnownBookingTypeValue = (value) => {
+const resolveKnownBookingTypeValue = (value) => {
     const normalized = String(value || '').trim();
-    if (!normalized) return false;
-    return getBookingTypeOptionValues().includes(normalized);
+    if (!normalized) return '';
+
+    const lowerNormalized = normalized.toLowerCase();
+    const matchedOption = bookingTypeOptionsCache.find((option) => {
+        const optionValue = String(option?.value || '').trim();
+        const optionLabel = String(option?.label || option?.value || '').trim();
+        return optionValue.toLowerCase() === lowerNormalized || optionLabel.toLowerCase() === lowerNormalized;
+    });
+
+    return matchedOption ? String(matchedOption.value || '').trim() : '';
+};
+
+const isKnownBookingTypeValue = (value) => {
+    return !!resolveKnownBookingTypeValue(value);
 };
 
 const setBookingTypeDropdownOpen = (isOpen) => {
@@ -188,6 +200,10 @@ const refreshBookingTypeOptions = () => {
 
     if (typeof window.refreshClassLocationUI === 'function') {
         window.refreshClassLocationUI();
+    }
+
+    if (typeof window.refreshBookingStepButtons === 'function') {
+        window.refreshBookingStepButtons();
     }
 
     return options;
@@ -677,9 +693,158 @@ const resetBookingFormState = () => {
     }
 
     refreshBookingTypeOptions();
+    resetBookingStepFlow();
 
     clearBookingFormDraft();
 };
+
+const getBookingStepElements = () => {
+    return {
+        bookingCatalogNext: document.getElementById('bookingCatalogNext'),
+        bookingItemsNext: document.getElementById('bookingItemsNext'),
+        bookingSubmitButton: document.getElementById('bookingSubmitButton'),
+        bookingStep2Section: document.getElementById('bookingStep2Section')
+    };
+};
+
+const isBookingCatalogSelected = () => {
+    const bookingTypeEl = document.getElementById('bookingTypeSelect');
+    return !!(bookingTypeEl && resolveKnownBookingTypeValue(bookingTypeEl.value));
+};
+
+const isBookingStep2Ready = () => {
+    if (typeof selectedRentals !== 'undefined' && selectedRentals instanceof Map && selectedRentals.size > 0) {
+        return true;
+    }
+    return false;
+};
+
+const refreshBookingStepButtons = () => {
+    const {
+        bookingCatalogNext,
+        bookingItemsNext,
+        bookingSubmitButton,
+        bookingStep2Section
+    } = getBookingStepElements();
+
+    if (bookingCatalogNext) {
+        const catalogSelected = isBookingCatalogSelected();
+        bookingCatalogNext.hidden = !catalogSelected || (bookingStep2Section && !bookingStep2Section.classList.contains('booking-hidden-initial'));
+        bookingCatalogNext.disabled = !catalogSelected;
+    }
+
+    if (bookingItemsNext) {
+        const step2Visible = bookingStep2Section && !bookingStep2Section.classList.contains('booking-hidden-initial');
+        bookingItemsNext.hidden = !step2Visible || (bookingSubmitButton && !bookingSubmitButton.classList.contains('booking-hidden-initial'));
+        bookingItemsNext.disabled = !isBookingStep2Ready();
+    }
+
+    if (bookingSubmitButton) {
+        const step3Visible = bookingSubmitButton && !bookingSubmitButton.classList.contains('booking-hidden-initial');
+        if (!step3Visible) {
+            bookingSubmitButton.classList.add('booking-hidden-initial');
+        }
+    }
+};
+
+const showBookingStep2 = () => {
+    const {
+        bookingCatalogNext,
+        bookingItemsNext,
+        bookingSubmitButton,
+        bookingStep2Section
+    } = getBookingStepElements();
+
+    if (!bookingStep2Section) return;
+
+    bookingStep2Section.classList.remove('booking-hidden-initial');
+    if (bookingCatalogNext) {
+        bookingCatalogNext.hidden = true;
+    }
+    if (bookingItemsNext) {
+        bookingItemsNext.hidden = false;
+    }
+    if (bookingSubmitButton) {
+        bookingSubmitButton.classList.add('booking-hidden-initial');
+    }
+    refreshBookingStepButtons();
+    bookingStep2Section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+const showBookingStep3 = () => {
+    const {
+        bookingItemsNext,
+        bookingSubmitButton,
+        bookingStep2Section
+    } = getBookingStepElements();
+
+    if (!bookingStep2Section || !bookingSubmitButton) return;
+
+    bookingSubmitButton.classList.remove('booking-hidden-initial');
+    if (bookingItemsNext) {
+        bookingItemsNext.hidden = true;
+    }
+    bookingSubmitButton.focus({ preventScroll: true });
+};
+
+const resetBookingStepFlow = () => {
+    const {
+        bookingItemsNext,
+        bookingSubmitButton,
+        bookingStep2Section
+    } = getBookingStepElements();
+
+    if (bookingStep2Section) {
+        bookingStep2Section.classList.add('booking-hidden-initial');
+    }
+    if (bookingItemsNext) {
+        bookingItemsNext.hidden = true;
+    }
+    if (bookingSubmitButton) {
+        bookingSubmitButton.classList.add('booking-hidden-initial');
+    }
+
+    refreshBookingStepButtons();
+};
+
+const initializeBookingStepFlow = () => {
+    const bookingTypeEl = document.getElementById('bookingTypeSelect');
+    const bookingCatalogNext = document.getElementById('bookingCatalogNext');
+    const bookingItemsNext = document.getElementById('bookingItemsNext');
+
+    if (bookingCatalogNext) {
+        bookingCatalogNext.addEventListener('click', () => {
+            if (!isBookingCatalogSelected()) {
+                return;
+            }
+            showBookingStep2();
+        });
+    }
+
+    if (bookingItemsNext) {
+        bookingItemsNext.addEventListener('click', () => {
+            if (!isBookingStep2Ready()) {
+                return;
+            }
+            showBookingStep3();
+        });
+    }
+
+    if (bookingTypeEl) {
+        bookingTypeEl.addEventListener('input', () => {
+            refreshBookingStepButtons();
+        });
+
+        bookingTypeEl.addEventListener('change', () => {
+            refreshBookingStepButtons();
+        });
+    }
+
+    refreshBookingStepButtons();
+};
+
+window.refreshBookingStepButtons = refreshBookingStepButtons;
+window.initializeBookingStepFlow = initializeBookingStepFlow;
 
 const handleBookingFormSubmit = async (e) => {
     e.preventDefault();
@@ -865,18 +1030,26 @@ const initBookingFormHandlers = () => {
         };
 
         const handleBookingTypeChange = ({ strict = false } = {}) => {
-            const selectedCategory = String(bookingTypeEl.value || '').trim();
-            if (isKnownBookingTypeValue(selectedCategory) && typeof window.setActiveBookingCategory === 'function') {
-                window.setActiveBookingCategory(selectedCategory);
-                recordCatalogSelection(selectedCategory);
+            const rawCategory = String(bookingTypeEl.value || '').trim();
+            const normalizedCategory = resolveKnownBookingTypeValue(rawCategory);
+            const selectedCategory = normalizedCategory || rawCategory;
+
+            if (normalizedCategory && bookingTypeEl.value !== normalizedCategory) {
+                bookingTypeEl.value = normalizedCategory;
             }
 
-            if (strict && selectedCategory && !isKnownBookingTypeValue(selectedCategory)) {
+            if (normalizedCategory && typeof window.setActiveBookingCategory === 'function') {
+                window.setActiveBookingCategory(normalizedCategory);
+                recordCatalogSelection(normalizedCategory);
+            }
+
+            if (strict && selectedCategory && !normalizedCategory) {
                 bookingTypeEl.value = '';
                 renderBookingTypeSelectOptions();
                 if (typeof window.refreshClassLocationUI === 'function') {
                     window.refreshClassLocationUI();
                 }
+                resetBookingStepFlow();
                 return;
             }
 
@@ -891,6 +1064,12 @@ const initBookingFormHandlers = () => {
             }
             updatePriceDisplay();
             scheduleBookingFormDraftSave();
+
+            if (normalizedCategory) {
+                refreshBookingStepButtons();
+            } else {
+                resetBookingStepFlow();
+            }
         };
 
         bookingTypeEl.addEventListener('input', () => {
@@ -1108,7 +1287,10 @@ const initBookingFormHandlers = () => {
         bookingDateEl.setAttribute('min', today);
     }
 
+    initializeBookingStepFlow();
+
     refreshBookingTypeOptions();
+    refreshBookingStepButtons();
 
     if (bookingForm) {
         bookingForm.addEventListener('input', (event) => {

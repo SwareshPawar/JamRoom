@@ -421,9 +421,17 @@ const applyPerdayItemAvailability = () => {
             const item = rentalCatalog.perday.get(rentalKey);
             const checkbox = optionEl.querySelector('.rental-checkbox');
             if (!item || !checkbox) return;
+            const isBaseItem = isBaseRentalItem(item);
 
             if (item.rentalType !== 'perday') {
-                checkbox.disabled = false;
+                checkbox.disabled = isBaseItem;
+                if (isBaseItem) {
+                    checkbox.checked = true;
+                    optionEl.classList.add('selected');
+                    if (!perdaySelectedRentals.has(rentalKey)) {
+                        perdaySelectedRentals.set(rentalKey, buildSelectedRentalEntry(item, rentalKey, 1));
+                    }
+                }
                 optionEl.classList.remove('unavailable');
                 optionEl.removeAttribute('title');
                 return;
@@ -432,7 +440,7 @@ const applyPerdayItemAvailability = () => {
             const rentalNameKey = normalizeRentalNameKey(item.name);
             const isUnavailable = perdayUnavailableItems.has(rentalNameKey);
 
-            checkbox.disabled = isUnavailable;
+            checkbox.disabled = isUnavailable || isBaseItem;
             optionEl.classList.toggle('unavailable', isUnavailable);
 
             if (isUnavailable) {
@@ -446,6 +454,13 @@ const applyPerdayItemAvailability = () => {
                 }
             } else {
                 optionEl.removeAttribute('title');
+                if (isBaseItem) {
+                    checkbox.checked = true;
+                    optionEl.classList.add('selected');
+                    if (!perdaySelectedRentals.has(rentalKey)) {
+                        perdaySelectedRentals.set(rentalKey, buildSelectedRentalEntry(item, rentalKey, 1));
+                    }
+                }
             }
         });
 
@@ -869,6 +884,28 @@ const isQuantityControlEnabled = (item) => {
     return false;
 };
 
+const isBaseRentalItem = (item) => {
+    if (!item) return false;
+
+    const rentalKey = String(item.key || '').trim().toLowerCase();
+    const rentalName = String(item.name || '').trim().toLowerCase();
+    const rentalCategory = String(item.category || '').trim().toLowerCase();
+
+    const keyParts = rentalKey.split('__').map((part) => part.trim()).filter(Boolean);
+    const isSelfCategoryBaseKey = keyParts.length === 2 && keyParts[0] === keyParts[1];
+    const isSelfCategoryName = rentalName && rentalCategory && rentalName === rentalCategory;
+
+    if (item.isRequired) return true;
+    if (rentalKey.endsWith('_base')) return true;
+    if (rentalKey.includes('__base')) return true;
+    if (rentalName.includes('(base)')) return true;
+    if (rentalName === 'base') return true;
+    if (isSelfCategoryBaseKey) return true;
+    if (isSelfCategoryName) return true;
+
+    return false;
+};
+
 const buildRentalOptionHTML = (item, mode) => {
     const showQuantity = isQuantityControlEnabled(item);
     const priceUnit = item.rentalType === 'perday'
@@ -878,13 +915,14 @@ const buildRentalOptionHTML = (item, mode) => {
             : item.rentalType === 'pertrack'
                 ? '/track'
                 : '/hr';
-    const defaultChecked = item.isRequired ? 'checked' : '';
-    const defaultDisabled = item.isRequired ? 'disabled' : '';
-    const selectedClass = item.isRequired ? ' selected' : '';
+    const isBaseItem = isBaseRentalItem(item);
+    const defaultChecked = isBaseItem ? 'checked' : '';
+    const defaultDisabled = isBaseItem ? 'disabled' : '';
+    const selectedClass = isBaseItem ? ' selected' : '';
     const hasDescription = String(item.description || '').trim().length > 0;
 
     return `
-        <div class="rental-option ${item.isRequired ? 'base' : 'child'}${selectedClass}" data-rental-id="${item.key}" data-rental-mode="${mode}" onclick="if(!event.target.closest('.quantity-btn') && event.target.type !== 'checkbox' && !event.target.closest('.rental-details')){const cb=this.querySelector('.rental-checkbox');if(!cb.disabled){cb.checked=!cb.checked;toggleRental('${item.key}','${mode}');}}">
+        <div class="rental-option ${isBaseItem ? 'base' : 'child'}${selectedClass}" data-rental-id="${item.key}" data-rental-mode="${mode}" onclick="if(!event.target.closest('.quantity-btn') && event.target.type !== 'checkbox' && !event.target.closest('.rental-details')){const cb=this.querySelector('.rental-checkbox');if(!cb.disabled){cb.checked=!cb.checked;toggleRental('${item.key}','${mode}');}}">
             <input type="checkbox" class="rental-checkbox" ${defaultChecked} ${defaultDisabled} onchange="toggleRental('${item.key}', '${mode}')">
             <div class="rental-meta">
                 <div class="rental-name">${item.name}</div>
@@ -934,6 +972,35 @@ const renderRentalSection = (container, title, items, mode, { collapsedByDefault
 
     section.appendChild(content);
     container.appendChild(section);
+};
+
+const applyDefaultBaseSelections = (mode) => {
+    const selectedMap = getMapForMode(mode);
+    const catalog = rentalCatalog[mode];
+    if (!catalog) return;
+
+    catalog.forEach((item, rentalKey) => {
+        if (!isBaseRentalItem(item)) {
+            return;
+        }
+
+        const rentalDiv = document.querySelector(`[data-rental-id="${rentalKey}"][data-rental-mode="${mode}"]`);
+        const checkbox = rentalDiv?.querySelector('.rental-checkbox');
+        if (!rentalDiv || !checkbox) {
+            return;
+        }
+
+        checkbox.checked = true;
+        checkbox.disabled = true;
+        rentalDiv.classList.add('selected');
+
+        const quantityDisplay = rentalDiv.querySelector('.quantity-display');
+        if (quantityDisplay) {
+            quantityDisplay.textContent = '1';
+        }
+
+        selectedMap.set(rentalKey, buildSelectedRentalEntry(item, rentalKey, 1));
+    });
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -1413,14 +1480,15 @@ const categorizeRentalItems = () => {
         bookingCategoryModeMap.set(typeName, categoryMode);
 
         const hasSubItems = Array.isArray(type.subItems) && type.subItems.length > 0;
+        const basePrice = toNumber(type.basePrice, 0);
 
-        if (typeName === 'JamRoom' && toNumber(type.basePrice, 0) > 0 && categoryMode === 'hourly') {
-            addGroupedItem(hourlyGroups, typeName, {
+        if (basePrice > 0) {
+            addGroupedItem(categoryMode === 'perday' ? perdayGroups : hourlyGroups, typeName, {
                 key: `${typeName}_base`,
                 name: `${typeName} (Base)`,
                 category: typeName,
                 description: type.description || '',
-                price: toNumber(type.basePrice, 0),
+                price: basePrice,
                 rentalType: categoryRentalType,
                 isRequired: false,
                 quantityEnabled: type.quantityEnabled === true,
@@ -1429,20 +1497,6 @@ const categorizeRentalItems = () => {
         }
 
         if (!hasSubItems) {
-            if (typeName !== 'JamRoom' && toNumber(type.basePrice, 0) > 0) {
-                addGroupedItem(categoryMode === 'perday' ? perdayGroups : hourlyGroups, typeName, {
-                    key: `${typeName}__${typeName}`,
-                    name: typeName,
-                    category: typeName,
-                    description: type.description || '',
-                    price: toNumber(type.basePrice, 0),
-                    rentalType: categoryRentalType,
-                    isRequired: false,
-                    quantityEnabled: type.quantityEnabled === true,
-                    maxQuantity: getRentalMaxQuantity(type)
-                });
-            }
-
             return;
         }
 
@@ -1579,6 +1633,9 @@ const populateRentalTypes = () => {
         });
     }
 
+    applyDefaultBaseSelections('hourly');
+    applyDefaultBaseSelections('perday');
+
     switchBookingMode(activeMode);
     setActiveSelectionMap();
     applyPerdayItemAvailability();
@@ -1632,6 +1689,14 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
     const checkbox = rentalDiv?.querySelector('.rental-checkbox');
 
     if (!item || !rentalDiv || !checkbox) return;
+
+    if (isBaseRentalItem(item)) {
+        checkbox.checked = true;
+        checkbox.disabled = true;
+        selectedMap.set(rentalKey, buildSelectedRentalEntry(item, rentalKey, 1));
+        rentalDiv.classList.add('selected');
+        return;
+    }
 
     if (mode === 'perday' && checkbox.checked && perdayUnavailableItems.has(normalizeRentalNameKey(item.name))) {
         checkbox.checked = false;
@@ -1697,6 +1762,9 @@ const toggleRental = (rentalKey, mode = 'hourly') => {
 
     if (typeof window.scheduleBookingFormDraftSave === 'function') {
         window.scheduleBookingFormDraftSave();
+    }
+    if (typeof window.refreshBookingStepButtons === 'function') {
+        window.refreshBookingStepButtons();
     }
 };
 

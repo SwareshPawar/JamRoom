@@ -24,9 +24,9 @@
     <script src="/js/client-pdf-generator.js"></script>
     <!-- Admin extraction modules -->
     <script src="/js/admin/admin-dashboard.js?v=20260520b"></script>
-    <script src="/js/admin/admin-bookings.js?v=20260610e"></script>
+    <script src="/js/admin/admin-bookings.js?v=20260725-2"></script>
     <script src="/js/admin/admin-bookings-actions.js"></script>
-    <script src="/js/admin/admin-bookings-edit.js"></script>
+    <script src="/js/admin/admin-bookings-edit.js?v=20260725-1"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
     <script src="/js/admin/admin-open-events.js?v=20260526a"></script>
@@ -1727,6 +1727,8 @@
                 onConfirm();
             };
         };
+
+        window.showConfirmationModal = showConfirmationModal;
 
         const formatDate = (dateStr) => {
             const date = new Date(dateStr);

@@ -150,6 +150,23 @@
         }
     };
 
+    const confirmBookingAction = ({ title, message, confirmText = 'Confirm' }) => {
+        return new Promise((resolve) => {
+            if (typeof window.showConfirmationModal === 'function') {
+                window.showConfirmationModal(
+                    title,
+                    message,
+                    confirmText,
+                    () => resolve(true),
+                    false
+                );
+                return;
+            }
+
+            resolve(confirm(message));
+        });
+    };
+
     const state = {
         bookingsById: new Map(),
         allBookings: [],
@@ -1640,7 +1657,12 @@
             return;
         }
 
-        if (!confirm('Cancelling this booking will incur a 50% penalty on the total booking value. Do you want to continue?')) return;
+        const shouldProceed = await confirmBookingAction({
+            title: 'Cancel Booking',
+            message: 'Cancelling this booking will incur a 50% penalty on the total booking value. Do you want to continue?',
+            confirmText: 'Cancel Booking'
+        });
+        if (!shouldProceed) return;
 
         try {
             showBookingLoading('Cancelling booking...');
@@ -1674,7 +1696,12 @@
             return;
         }
 
-        if (!confirm('Cancel this lesson? This cannot be undone.')) return;
+        const shouldProceed = await confirmBookingAction({
+            title: 'Cancel Lesson',
+            message: 'Cancel this lesson? This cannot be undone.',
+            confirmText: 'Cancel Lesson'
+        });
+        if (!shouldProceed) return;
 
         try {
             showBookingLoading('Cancelling lesson...');
@@ -1998,6 +2025,7 @@
     window.AdminBookings.quickUpdateBookingPayment = quickUpdateBookingPayment;
     window.AdminBookings.openBookingDetailsModal = openBookingDetailsModal;
     window.AdminBookings.openBookingPaymentDetails = openBookingPaymentDetails;
+    window.cancelBooking = cancelBooking;
     window.syncQuickPaymentForBookingModal = syncQuickPaymentForBookingModal;
     window.openBookingPaymentDetails = openBookingPaymentDetails;
     window.openBookingDetailsModal = openBookingDetailsModal;
