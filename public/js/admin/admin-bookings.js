@@ -295,43 +295,38 @@
         const followUpCards = followUpBookings.map((booking) => {
             const bookingDate = getBookingDateValue(booking);
             const bookingDateText = bookingDate
-                ? bookingDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                ? bookingDate.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
                 : 'Date pending';
 
             const customerName = String(booking?.userId?.name || booking?.userName || 'Customer').trim() || 'Customer';
-            const customerEmail = String(booking?.userId?.email || booking?.userEmail || '').trim();
             const rawMobile = String(booking?.userMobile || booking?.userId?.mobile || '').trim();
             const contactMobile = rawMobile.replace(/[^\d+]/g, '');
             const bookingStatus = String(booking?.bookingStatus || 'PENDING').toUpperCase();
             const paymentStatus = String(booking?.paymentStatus || 'PENDING').toUpperCase();
-            const rentalDetails = Array.isArray(booking?.rentals) && booking.rentals.length > 0
-                ? booking.rentals.map((item) => `${item?.name || 'Item'}${Number(item?.quantity || 1) > 1 ? ` x${item.quantity}` : ''}`).join(', ')
-                : String(booking?.rentalType || 'Booking').trim() || 'Booking';
             const followUpMessage = buildFollowUpMessage(booking, bookingDateText);
             const whatsAppHref = contactMobile
                 ? `https://wa.me/${encodeURIComponent(contactMobile)}?text=${encodeURIComponent(followUpMessage)}`
                 : '';
             const bookingStatusClass = bookingStatus === 'REJECTED' ? 'rejected' : bookingStatus === 'CANCELLED' ? 'cancelled' : bookingStatus === 'CONFIRMED' ? 'confirmed' : 'pending';
             const paymentStatusClass = paymentStatus === 'PAID' ? 'paid' : paymentStatus === 'PARTIAL' ? 'partial' : 'pending';
+            const bookingTimeText = booking.startTime && booking.endTime
+                ? `${escapeHtml(state.formatTime ? state.formatTime(booking.startTime) : booking.startTime)} - ${escapeHtml(state.formatTime ? state.formatTime(booking.endTime) : booking.endTime)}`
+                : 'Time pending';
 
             return `
                 <div class="followup-row booking-row-clickable">
-                    <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
-                        <div style="min-width:0; flex:1;">
-                            <div style="font-weight:700; margin-bottom:4px; color: var(--text-color);">${escapeHtml(customerName)}</div>
-                            <div style="color:var(--text-color); margin-bottom:4px;">${escapeHtml(rentalDetails)} · ${escapeHtml(bookingDateText)}</div>
-                            <div style="font-size:0.9rem; color:var(--text-color); margin-bottom:6px;">${escapeHtml(customerEmail || 'No email on file')}</div>
-                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <span class="status-badge status-${bookingStatusClass}">${escapeHtml(bookingStatus)}</span>
-                                <span class="status-badge status-${paymentStatusClass}">${escapeHtml(paymentStatus)}</span>
-                            </div>
+                    <div class="followup-row-main">
+                        <div class="followup-row-summary">
+                            <div class="followup-row-title">${escapeHtml(customerName)}</div>
+                            <div class="followup-row-subtitle">Date: ${escapeHtml(bookingDateText)}</div>
+                            <div class="followup-row-subtitle">Time: ${bookingTimeText}</div>
                         </div>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                        <div class="followup-row-actions">
                             ${contactMobile
-                                ? `<a href="tel:${escapeHtml(contactMobile)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">📞 Call</a>`
+                                ? `<a href="tel:${escapeHtml(contactMobile)}" target="_blank" rel="noopener noreferrer" class="followup-action" title="Call customer">📞 Call</a>`
                                 : '<span class="text-muted">No contact number</span>'}
                             ${whatsAppHref
-                                ? `<a href="${whatsAppHref}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">💬 WhatsApp</a>`
+                                ? `<a href="${whatsAppHref}" target="_blank" rel="noopener noreferrer" class="followup-action followup-action-primary" title="WhatsApp customer">💬 WhatsApp</a>`
                                 : ''}
                         </div>
                     </div>

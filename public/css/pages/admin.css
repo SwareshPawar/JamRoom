@@ -78,6 +78,8 @@
     border-radius: 12px;
     padding: 14px 16px;
     margin-bottom: 12px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .followup-row:last-child {
@@ -86,6 +88,135 @@
 
 .followup-row:hover {
     background: var(--surface-2);
+}
+
+.followup-queue-card {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.followup-queue-card .followup-row {
+    min-width: 0;
+}
+
+.followup-queue-card .followup-row .btn {
+    white-space: normal;
+}
+
+.followup-row-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.followup-row-summary {
+    min-width: 0;
+    flex: 1 1 0;
+}
+
+.followup-row-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--text-color);
+}
+
+.followup-row-subtitle,
+.followup-row-email {
+    color: var(--text-color);
+    margin-bottom: 6px;
+}
+
+.followup-row-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.followup-row-actions {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.followup-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 92px;
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-1);
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 0.95rem;
+    gap: 6px;
+}
+
+.followup-action:hover,
+.followup-action:focus-visible {
+    background: var(--surface-2);
+    border-color: var(--primary-color);
+}
+
+.followup-action-primary {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+@media (max-width: 768px) {
+    .followup-row-main {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .followup-row-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .followup-action {
+        min-width: 0;
+        width: auto;
+    }
+
+    .followup-row-actions .followup-action {
+        flex: 1 1 auto;
+    }
+    .followup-queue-card {
+        padding: 16px 18px;
+    }
+
+    .followup-queue-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .followup-queue-header span {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+
+    .followup-row {
+        padding: 12px 14px;
+    }
+
+    .followup-row > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .followup-row .btn {
+        width: 100%;
+        max-width: 100%;
+    }
 }
 
 .calendar-controls-spaced {
