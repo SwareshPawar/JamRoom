@@ -1121,7 +1121,7 @@
                             ? `/ <span class="status-badge status-${paymentStatusClass}">${escapeHtml(booking.paymentStatus || 'PENDING')}</span>`
                             : ''}
                     </td>
-                    <td>${buildBookingActionsMarkup(booking, { context: 'table', includeView: false })}</td>
+                    <td>${buildBookingActionsMarkup(booking, { context: 'table', includeView: true })}</td>
                 </tr>
             `;
         });
