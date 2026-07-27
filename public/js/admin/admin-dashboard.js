@@ -20,6 +20,121 @@
         'avgBookingDuration'
     ];
 
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const formatDateLabel = (value) => {
+        if (!value) return 'Date TBD';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'Date TBD';
+        return date.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
+    const formatTimeLabel = (timeValue) => {
+        const raw = String(timeValue || '').trim();
+        if (!raw) return '';
+        if (/\b(am|pm)\b/i.test(raw)) return raw.toUpperCase();
+        const [hoursPart, minutesPart] = raw.split(':');
+        const hours = Number(hoursPart);
+        const minutes = Number(minutesPart);
+        if (Number.isNaN(hours) || Number.isNaN(minutes)) return raw;
+        const suffix = hours >= 12 ? 'PM' : 'AM';
+        const normalizedHours = hours % 12 || 12;
+        return `${normalizedHours}:${String(minutes).padStart(2, '0')} ${suffix}`;
+    };
+
+    const normalizeMobile = (value) => String(value || '').replace(/\D/g, '');
+
+    const buildFollowupSchedule = (item = {}) => {
+        const isPerday = String(item.bookingMode || '').toLowerCase() === 'perday';
+        if (isPerday) {
+            const start = formatDateLabel(item.perDayStartDate || item.date);
+            const end = formatDateLabel(item.perDayEndDate || item.date);
+            return `${start} to ${end} • ${Math.max(1, Number(item.perDayDays) || 1)} day(s)`;
+        }
+
+        const date = formatDateLabel(item.date);
+        const startTime = formatTimeLabel(item.startTime);
+        const endTime = formatTimeLabel(item.endTime);
+        const duration = Math.max(0, Number(item.duration) || 0);
+        const timeRange = startTime && endTime ? `${startTime} - ${endTime}` : (startTime || endTime || 'Time TBD');
+        return `${date} • ${timeRange}${duration > 0 ? ` • ${duration}h` : ''}`;
+    };
+
+    const buildFollowupQueueMarkup = (queue = []) => {
+        const items = Array.isArray(queue) ? queue : [];
+        if (items.length === 0) {
+            return `
+                <section class="followup-queue-card">
+                    <div class="followup-queue-header">
+                        <div>
+                            <h3>Follow-up Queue</h3>
+                            <p>No bookings currently need follow-up.</p>
+                        </div>
+                        <span>0 items</span>
+                    </div>
+                </section>
+            `;
+        }
+
+        const rows = items.map((item) => {
+            const mobile = normalizeMobile(item.userMobile);
+            const callHref = mobile ? `tel:${mobile}` : '';
+            const whatsappHref = mobile ? `https://wa.me/${mobile}` : '';
+            const dueAmount = Math.max(0, Number(item.price || 0) - Number(item.amountPaid || 0));
+
+            return `
+                <div class="followup-row">
+                    <div class="followup-row-main">
+                        <div class="followup-row-summary">
+                            <div class="followup-row-title">${escapeHtml(item.userName || 'Customer')} • ${escapeHtml(item.title || 'Needs follow-up')}</div>
+                            <div class="followup-row-type">${escapeHtml(item.rentalType || 'Booking')}</div>
+                            <div class="followup-row-schedule">${escapeHtml(buildFollowupSchedule(item))}</div>
+                            <div class="followup-row-badges">
+                                ${dueAmount > 0 ? `<span class="status-badge">Due ₹${escapeHtml(String(dueAmount))}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="followup-row-actions">
+                            ${callHref
+                                ? `<a class="followup-action" href="${callHref}">Call</a>`
+                                : ''}
+                            ${whatsappHref
+                                ? `<a class="followup-action" href="${whatsappHref}" target="_blank" rel="noopener noreferrer">WhatsApp</a>`
+                                : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <section class="followup-queue-card">
+                <div class="followup-queue-header">
+                    <div>
+                        <h3>Follow-up Queue</h3>
+                        <p>Bookings that need approval, payment follow-up, or quick action.</p>
+                    </div>
+                    <span>${items.length} item${items.length === 1 ? '' : 's'}</span>
+                </div>
+                ${rows}
+            </section>
+        `;
+    };
+
+    const renderFollowupQueue = (queue = []) => {
+        const container = document.getElementById('followupQueueContainer');
+        if (!container) return;
+        container.innerHTML = buildFollowupQueueMarkup(queue);
+    };
+
     const setOutstandingState = (value) => {
         const card = document.querySelector('.stat-card-outstanding');
         if (!card) return;
@@ -135,6 +250,7 @@
         setText('avgBookingDuration', `${toNumber(stats.avgBookingDuration ?? 0).toFixed(1)}h`);
         setOutstandingState(stats.totalUnpaidAmount ?? 0);
         applyKpiTones(stats);
+        renderFollowupQueue(stats.followupQueue || []);
     };
 
     const renderStatsUnavailable = () => {
@@ -153,6 +269,7 @@
         setText('avgBookingDuration', 'N/A');
         setOutstandingState(null);
         clearAllKpiTones();
+        renderFollowupQueue([]);
     };
 
     const loadStats = async ({ apiUrl }) => {
@@ -179,5 +296,14 @@
     };
 
     window.AdminDashboard = window.AdminDashboard || {};
+    window.AdminDashboard.openFollowupBooking = (bookingId) => {
+        if (typeof window.switchTab === 'function') {
+            window.switchTab('bookings');
+        }
+
+        if (typeof window.openBookingDetailsModal === 'function') {
+            window.openBookingDetailsModal(bookingId);
+        }
+    };
     window.AdminDashboard.loadStats = loadStats;
 })();

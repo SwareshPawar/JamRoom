@@ -19,6 +19,68 @@ const parseTimeToMinutes = (timeValue) => {
   return (hours * 60) + minutes;
 };
 
+const buildFollowupQueueItem = (booking, todayStart) => {
+  if (!booking) return null;
+
+  const bookingStatus = String(booking.bookingStatus || '').toUpperCase();
+  const paymentStatus = String(booking.paymentStatus || '').toUpperCase();
+  const bookingDate = booking?.date ? new Date(booking.date) : null;
+  const perDayStartDate = booking?.perDayStartDate ? new Date(booking.perDayStartDate) : null;
+  const perDayEndDate = booking?.perDayEndDate ? new Date(booking.perDayEndDate) : null;
+  const referenceDate = perDayStartDate || bookingDate;
+  const isUpcoming = referenceDate instanceof Date && !Number.isNaN(referenceDate.getTime())
+    ? referenceDate >= todayStart
+    : false;
+
+  let priority = 99;
+  let title = 'Needs follow-up';
+  let subtitle = 'Review this booking in the manage bookings table.';
+
+  if (bookingStatus === 'PENDING') {
+    priority = 1;
+    title = 'Pending approval';
+    subtitle = 'This booking request is waiting for admin confirmation.';
+  } else if (bookingStatus === 'CONFIRMED' && paymentStatus === 'PARTIAL') {
+    priority = 2;
+    title = 'Partial payment pending';
+    subtitle = 'Follow up with the customer to collect the remaining balance.';
+  } else if (bookingStatus === 'CONFIRMED' && paymentStatus === 'PENDING' && isUpcoming) {
+    priority = 3;
+    title = 'Advance payment pending';
+    subtitle = 'Upcoming confirmed booking without payment received.';
+  } else if (bookingStatus === 'CONFIRMED' && paymentStatus === 'PENDING') {
+    priority = 4;
+    title = 'Payment pending';
+    subtitle = 'Confirmed booking still shows pending payment.';
+  } else {
+    return null;
+  }
+
+  return {
+    _id: booking._id,
+    userName: booking.userName || booking.userId?.name || 'N/A',
+    userEmail: booking.userEmail || booking.userId?.email || '',
+    userMobile: booking.userMobile || booking.userId?.mobile || '',
+    bookingStatus,
+    paymentStatus,
+    rentalType: booking.rentalType || 'Booking',
+    bookingMode: booking.bookingMode || 'hourly',
+    date: booking.date || null,
+    startTime: booking.startTime || '',
+    endTime: booking.endTime || '',
+    duration: Number(booking.duration || 0),
+    perDayStartDate: booking.perDayStartDate || null,
+    perDayEndDate: booking.perDayEndDate || null,
+    perDayDays: Number(booking.perDayDays || 1),
+    amountPaid: Number(booking.amountPaid || 0),
+    price: Number(booking.price || 0),
+    title,
+    subtitle,
+    priority,
+    reasonKey: `${bookingStatus}-${paymentStatus}`
+  };
+};
+
 // @route   GET /api/admin/debug-pdf
 // @desc    Debug PDF generation environment (for production troubleshooting)
 // @access  Private/Admin
@@ -279,6 +341,7 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
       confirmedPaymentBookings,
       pendingSlotApprovalAgg,
       recentBookings,
+      followupQueueBookings,
       upcomingSessions,
       cancellations,
       settings
@@ -318,6 +381,17 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
         .populate('userId', 'name email')
         .sort({ createdAt: -1 })
         .limit(5),
+      Booking.find({
+        isDeleted: { $ne: true },
+        $or: [
+          { bookingStatus: 'PENDING' },
+          { bookingStatus: 'CONFIRMED', paymentStatus: { $in: ['PENDING', 'PARTIAL'] } }
+        ]
+      })
+        .populate('userId', 'name email mobile')
+        .select('userName userEmail userMobile bookingStatus paymentStatus rentalType bookingMode date startTime endTime duration perDayStartDate perDayEndDate perDayDays amountPaid price userId')
+        .sort({ date: 1, createdAt: -1 })
+        .limit(8),
       Booking.countDocuments({ bookingStatus: 'CONFIRMED', date: { $gte: todayStart } }),
       Booking.countDocuments({
         bookingStatus: { $in: ['CANCELLED', 'REJECTED'] },
@@ -411,6 +485,15 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
       ? statsTotals.thisMonthConfirmedDuration / statsTotals.thisMonthConfirmedCount
       : 0;
 
+    const followupQueue = followupQueueBookings
+      .map((booking) => buildFollowupQueueItem(booking, todayStart))
+      .filter(Boolean)
+      .sort((left, right) => {
+        if (left.priority !== right.priority) return left.priority - right.priority;
+        return new Date(left.date || left.perDayStartDate || 0).getTime() - new Date(right.date || right.perDayStartDate || 0).getTime();
+      })
+      .slice(0, 6);
+
     res.json({
       success: true,
       stats: {
@@ -430,7 +513,8 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
         upcomingSessions,
         cancellations,
         avgBookingDuration,
-        recentBookings
+        recentBookings,
+        followupQueue
       }
     });
   } catch (error) {
