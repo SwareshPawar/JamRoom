@@ -181,8 +181,48 @@ const buildQuotationRateIndex = (settings) => {
   return index;
 };
 
+const buildQuotationCategoryIndex = (settings) => {
+  const byNameAndType = new Map();
+  const byName = new Map();
+  const rentalTypes = Array.isArray(settings?.rentalTypes) ? settings.rentalTypes : [];
+
+  const pushByName = (nameKey, categoryName) => {
+    const existing = byName.get(nameKey);
+    if (!existing) {
+      byName.set(nameKey, new Set([categoryName]));
+      return;
+    }
+    existing.add(categoryName);
+  };
+
+  rentalTypes.forEach((category) => {
+    const categoryName = String(category?.name || '').trim();
+    if (!categoryName) return;
+
+    const categoryNameKey = categoryName.toLowerCase();
+    const categoryRentalType = normalizeRentalTypeValue(category?.rentalType);
+
+    byNameAndType.set(`${categoryNameKey}|${categoryRentalType}`, categoryName);
+    pushByName(categoryNameKey, categoryName);
+
+    const subItems = Array.isArray(category?.subItems) ? category.subItems : [];
+    subItems.forEach((subItem) => {
+      const itemName = String(subItem?.name || '').trim();
+      if (!itemName) return;
+      const itemNameKey = itemName.toLowerCase();
+      const mode = normalizeRentalTypeValue(subItem?.rentalType || categoryRentalType);
+
+      byNameAndType.set(`${itemNameKey}|${mode}`, categoryName);
+      pushByName(itemNameKey, categoryName);
+    });
+  });
+
+  return { byNameAndType, byName };
+};
+
 const sanitizeQuotationRentals = (rawRentals = [], settings = null) => {
   const rateIndex = settings ? buildQuotationRateIndex(settings) : null;
+  const categoryIndex = settings ? buildQuotationCategoryIndex(settings) : null;
   const sanitizedRentals = [];
 
   for (const rental of Array.isArray(rawRentals) ? rawRentals : []) {
@@ -201,9 +241,23 @@ const sanitizeQuotationRentals = (rawRentals = [], settings = null) => {
       throw new Error(`Invalid price for quotation item: ${rentalName}`);
     }
 
+    let resolvedCategory = rentalCategory;
+    if (!resolvedCategory && categoryIndex) {
+      const nameKey = rentalName.toLowerCase();
+      const byNameAndTypeKey = `${nameKey}|${rentalType}`;
+      resolvedCategory = categoryIndex.byNameAndType.get(byNameAndTypeKey) || '';
+
+      if (!resolvedCategory) {
+        const categoryCandidates = categoryIndex.byName.get(nameKey);
+        if (categoryCandidates && categoryCandidates.size === 1) {
+          resolvedCategory = [...categoryCandidates][0];
+        }
+      }
+    }
+
     let resolvedPrice = snapshotPrice;
     if (rateIndex) {
-      const key = getQuotationRateKey(rentalCategory, rentalName, rentalType);
+      const key = getQuotationRateKey(resolvedCategory, rentalName, rentalType);
       if (rateIndex.has(key)) {
         resolvedPrice = Number(rateIndex.get(key) || 0);
       }
@@ -211,7 +265,7 @@ const sanitizeQuotationRentals = (rawRentals = [], settings = null) => {
 
     sanitizedRentals.push({
       name: rentalName,
-      category: rentalCategory,
+      category: resolvedCategory,
       description: rentalDescription,
       rentalType,
       quantity: rentalQuantity,

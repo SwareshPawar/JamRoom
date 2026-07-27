@@ -175,6 +175,34 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         || resolveClassItemCategory(classItemName)
         || 'Class Plans';
 
+    const resolveRentalCategoryFromCatalog = (item = {}) => {
+        const providedCategory = String(item?.category || '').trim();
+        if (providedCategory) return providedCategory;
+
+        const itemName = String(item?.name || '').trim().toLowerCase();
+        if (!itemName || !Array.isArray(settings?.rentalTypes)) return providedCategory;
+
+        for (const rentalType of settings.rentalTypes) {
+            if (rentalType?.deletedAt) continue;
+            const categoryName = String(rentalType?.name || '').trim();
+            if (!categoryName) continue;
+
+            if (categoryName.toLowerCase() === itemName) {
+                return categoryName;
+            }
+
+            const subItems = Array.isArray(rentalType?.subItems) ? rentalType.subItems : [];
+            for (const subItem of subItems) {
+                if (subItem?.deletedAt) continue;
+                if (String(subItem?.name || '').trim().toLowerCase() === itemName) {
+                    return categoryName;
+                }
+            }
+        }
+
+        return providedCategory;
+    };
+
     const groupedServiceItems = isClassPlanBooking
         ? [{
             id: classSession?.itemId || 'class-plan',
@@ -186,7 +214,10 @@ const generateUnifiedPDFHTML = (booking, settings) => {
             quantityEnabled: true,
             price: classPlanBaseFee
         }]
-        : (Array.isArray(booking.rentals) ? booking.rentals : []);
+        : (Array.isArray(booking.rentals) ? booking.rentals : []).map((item) => ({
+            ...item,
+            category: resolveRentalCategoryFromCatalog(item)
+        }));
 
     const groupedServices = groupedServiceItems.length > 0
         ? buildServiceGroupSummary(groupedServiceItems, billingCalculation, settings?.serviceGroupingConfig || {})

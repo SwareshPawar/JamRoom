@@ -152,6 +152,12 @@ const getServiceGroupingConfig = (config = {}) => {
   };
 };
 
+const buildCategoryGroupKey = (rawCategory = '') => {
+  const normalized = String(rawCategory || '').trim().toLowerCase();
+  if (!normalized) return '';
+  return `catalog-category:${normalized.replace(/[^a-z0-9]+/g, '-')}`;
+};
+
 const classifyServiceItem = (item = {}, config = {}) => {
   const rawName = String(item?.name || '').trim();
   const rawCategory = String(item?.category || '').trim();
@@ -198,6 +204,21 @@ const classifyServiceItem = (item = {}, config = {}) => {
     };
   }
 
+  // Priority 3: backend catalog category fallback.
+  // If a rental category exists (from AdminSettings.rentalTypes), surface it directly
+  // as its own section so newly-added categories show up without extra mapping work.
+  if (rawCategory) {
+    return {
+      groupKey: buildCategoryGroupKey(rawCategory),
+      groupTitle: rawCategory,
+      groupSubtitle: 'Category from Rentals Pricing',
+      dynamicGroup: true,
+      title: rawName || rawCategory,
+      description: `${rawCategory} support tailored to your quotation requirements.`,
+      order: 120
+    };
+  }
+
   const resolvedRentalType = normalizeRentalType(item?.rentalType);
   let fallbackGroupKey = normalizedConfig.defaultGroupKey;
   if (['persession', 'pertrack'].includes(resolvedRentalType)) {
@@ -224,12 +245,23 @@ const buildServiceGroupSummary = (items = [], calculation = {}, config = {}) => 
 
   (Array.isArray(items) ? items : []).forEach((item) => {
     const meta = classifyServiceItem(item, normalizedConfig);
-    const groupMeta = groupMetaMap.get(meta.groupKey) || groupMetaMap.get(normalizedConfig.defaultGroupKey) || {
-      key: normalizedConfig.defaultGroupKey,
-      icon: '',
-      title: 'Services',
-      subtitle: 'Booking services'
-    };
+    const dynamicGroupMeta = meta.dynamicGroup
+      ? {
+        key: meta.groupKey,
+        icon: '',
+        title: meta.groupTitle || 'Services',
+        subtitle: meta.groupSubtitle || 'Booking services'
+      }
+      : null;
+    const groupMeta = groupMetaMap.get(meta.groupKey)
+      || dynamicGroupMeta
+      || groupMetaMap.get(normalizedConfig.defaultGroupKey)
+      || {
+        key: normalizedConfig.defaultGroupKey,
+        icon: '',
+        title: 'Services',
+        subtitle: 'Booking services'
+      };
     const group = map.get(meta.groupKey) || {
       key: groupMeta.key,
       icon: groupMeta.icon,
@@ -265,6 +297,11 @@ const buildServiceGroupSummary = (items = [], calculation = {}, config = {}) => 
 
   return groupOrder
     .map((key) => map.get(key))
+    .concat(
+      [...map.keys()]
+        .filter((key) => !groupOrder.includes(key))
+        .map((key) => map.get(key))
+    )
     .filter(Boolean)
     .map((group) => ({
       ...group,
