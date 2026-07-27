@@ -475,40 +475,48 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
+    grid-auto-rows: minmax(40px, auto);
     align-items: stretch;
-    min-width: 148px;
-    max-width: 168px;
+    min-width: 184px;
+    max-width: 184px;
 }
 
 .booking-table-actions .btn {
     width: 100%;
     min-width: 0;
-    padding: 5px 8px;
-    font-size: 0.78rem;
+    min-height: 40px;
+    padding: 5px 6px;
+    font-size: 0.76rem;
     text-align: center;
-    white-space: normal;
-    line-height: 1.2;
+    white-space: nowrap;
+    line-height: 1.1;
 }
 
 @media (max-width: 768px) {
     .booking-table-actions {
         gap: 6px;
+        min-width: 176px;
+        max-width: 176px;
     }
 
     .booking-table-actions .btn {
-        padding: 6px 8px;
-        font-size: 0.76rem;
+        min-height: 38px;
+        padding: 6px 6px;
+        font-size: 0.72rem;
     }
 }
 
 @media (max-width: 480px) {
     .booking-table-actions {
         gap: 6px;
+        min-width: 168px;
+        max-width: 168px;
     }
 
     .booking-table-actions .btn {
-        padding: 6px 8px;
-        font-size: 0.75rem;
+        min-height: 36px;
+        padding: 6px 6px;
+        font-size: 0.7rem;
     }
 }
 
@@ -630,8 +638,8 @@
 
 #bookingsTable table th:last-child,
 #bookingsTable table td:last-child {
-    width: 168px;
-    min-width: 168px;
+    width: 200px;
+    min-width: 200px;
 }
 
 @media (min-width: 992px) {
@@ -640,11 +648,14 @@
         position: sticky;
         right: 0;
         z-index: 3;
-        background: var(--surface-0);
+    }
+
+    #bookingsTable table td:last-child {
+        background: inherit;
     }
 
     #bookingsTable table thead th:last-child {
-        background: color-mix(in srgb, var(--surface-0) 88%, var(--border-color-light));
+        background: var(--surface-1);
     }
 }
 

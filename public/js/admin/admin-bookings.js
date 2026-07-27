@@ -426,7 +426,7 @@
                        <button onclick="${stopOrClose}downloadPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download PDF Bill">Download PDF</button>`
                     : ''}
                 <button onclick="${stopOrClose}editBooking('${booking._id}', ${serializedBooking})" class="btn btn-warning btn-sm">Edit</button>
-                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Move to Deleted</button>
+                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Delete</button>
             </div>
         `;
     };
