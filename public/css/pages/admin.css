@@ -474,49 +474,50 @@
 .booking-table-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-    grid-auto-rows: minmax(40px, auto);
+    gap: 3px;
+    grid-auto-rows: minmax(26px, auto);
     align-items: stretch;
-    min-width: 184px;
-    max-width: 184px;
+    min-width: 132px;
+    max-width: 132px;
 }
 
 .booking-table-actions .btn {
     width: 100%;
     min-width: 0;
-    min-height: 40px;
-    padding: 5px 6px;
-    font-size: 0.76rem;
+    min-height: 26px;
+    padding: 0;
+    font-size: 0.63rem;
     text-align: center;
     white-space: nowrap;
-    line-height: 1.1;
+    line-height: 1;
 }
 
 @media (max-width: 768px) {
     .booking-table-actions {
-        gap: 6px;
-        min-width: 176px;
-        max-width: 176px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 3px;
+        min-width: 120px;
+        max-width: 120px;
     }
 
     .booking-table-actions .btn {
-        min-height: 38px;
-        padding: 6px 6px;
-        font-size: 0.72rem;
+        min-height: 24px;
+        padding: 0;
+        font-size: 0.6rem;
     }
 }
 
 @media (max-width: 480px) {
     .booking-table-actions {
-        gap: 6px;
-        min-width: 168px;
-        max-width: 168px;
+        gap: 2px;
+        min-width: 112px;
+        max-width: 112px;
     }
 
     .booking-table-actions .btn {
-        min-height: 36px;
-        padding: 6px 6px;
-        font-size: 0.7rem;
+        min-height: 22px;
+        padding: 0;
+        font-size: 0.56rem;
     }
 }
 
@@ -638,8 +639,24 @@
 
 #bookingsTable table th:last-child,
 #bookingsTable table td:last-child {
-    width: 200px;
-    min-width: 200px;
+    width: 148px;
+    min-width: 148px;
+}
+
+@media (max-width: 768px) {
+    #bookingsTable table th:last-child,
+    #bookingsTable table td:last-child {
+        width: 136px;
+        min-width: 136px;
+    }
+}
+
+@media (max-width: 480px) {
+    #bookingsTable table th:last-child,
+    #bookingsTable table td:last-child {
+        width: 128px;
+        min-width: 128px;
+    }
 }
 
 @media (min-width: 992px) {
@@ -2470,9 +2487,7 @@ table {
         white-space: nowrap;
     }
 
-    /* Keep Type visible; hide status/payment on medium screens */
-    #bookingsTable table th:nth-child(7),
-    #bookingsTable table td:nth-child(7),
+    /* On medium screens, keep Manage Bookings status/payment visible; only hide Revenue type */
     #revenueTable table th:nth-child(5),
     #revenueTable table td:nth-child(5) {
         display: none;
@@ -2495,8 +2510,6 @@ table {
 
     #bookingsTable table th:nth-child(6),
     #bookingsTable table td:nth-child(6),
-    #bookingsTable table th:nth-child(7),
-    #bookingsTable table td:nth-child(7),
     #revenueTable table th:nth-child(5),
     #revenueTable table td:nth-child(5),
     #revenueTable table th:nth-child(6),
@@ -2583,6 +2596,24 @@ table td small {
 .status-refunded {
     background: color-mix(in srgb, var(--secondary-color) 25%, transparent);
     color: var(--text-color);
+}
+
+#bookingsTable .booking-status-payment-cell {
+    min-width: 120px;
+}
+
+#bookingsTable .booking-status-payment-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+#bookingsTable .booking-status-payment-stack .status-badge {
+    display: inline-flex;
+    padding: 4px 10px;
+    font-size: 0.78em;
+    line-height: 1.1;
 }
 
 .bookings-expand-list {

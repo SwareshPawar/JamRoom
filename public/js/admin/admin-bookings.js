@@ -406,8 +406,8 @@
         if (isDeleted) {
             return `
                 <div class="${actionClass}">
-                    <button onclick="${stopOrClose}restoreBooking('${booking._id}')" class="btn btn-success btn-sm">Restore</button>
-                    <button onclick="${stopOrClose}permanentlyDeleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Permanent Delete</button>
+                    <button onclick="${stopOrClose}restoreBooking('${booking._id}')" class="btn btn-success btn-sm">Undo</button>
+                    <button onclick="${stopOrClose}permanentlyDeleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Purge</button>
                 </div>
             `;
         }
@@ -415,18 +415,18 @@
         return `
             <div class="${actionClass}">
                 ${includeView
-                    ? `<button onclick="openBookingPaymentDetails('${booking._id}', event)" class="btn btn-primary btn-sm">Payment</button>`
+                    ? `<button onclick="openBookingPaymentDetails('${booking._id}', event)" class="btn btn-primary btn-sm">Pay</button>`
                     : ''}
                 ${status === 'PENDING'
-                    ? `<button onclick="${stopOrClose}approveBooking('${booking._id}')" class="btn btn-success btn-sm">Approve</button>
-                       <button onclick="${stopOrClose}rejectBooking('${booking._id}')" class="btn btn-danger btn-sm">Reject</button>`
+                    ? `<button onclick="${stopOrClose}approveBooking('${booking._id}')" class="btn btn-success btn-sm">OK</button>
+                       <button onclick="${stopOrClose}rejectBooking('${booking._id}')" class="btn btn-danger btn-sm">No</button>`
                     : ''}
                 ${status === 'CONFIRMED'
-                    ? `<button onclick="${stopOrClose}sendEBill('${booking._id}')" class="btn btn-primary btn-sm" title="Send eBill to customer and/or custom recipients">Send eBill</button>
-                       <button onclick="${stopOrClose}downloadPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download PDF Bill">Download PDF</button>`
+                    ? `<button onclick="${stopOrClose}sendEBill('${booking._id}')" class="btn btn-primary btn-sm" title="Send eBill to customer and/or custom recipients">eBill</button>
+                       <button onclick="${stopOrClose}downloadPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download PDF Bill">PDF</button>`
                     : ''}
                 <button onclick="${stopOrClose}editBooking('${booking._id}', ${serializedBooking})" class="btn btn-warning btn-sm">Edit</button>
-                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Delete</button>
+                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Del</button>
             </div>
         `;
     };
@@ -1115,11 +1115,13 @@
                         <strong>${formatCurrency(totalAmount)}</strong>
                         ${shouldShowPending ? `<br><small>Pending: ${formatCurrency(pendingAmount)}</small>` : ''}
                     </td>
-                    <td>
-                        <span class="status-badge status-${statusClass}">${escapeHtml(booking.bookingStatus || 'N/A')}</span>
-                        ${showPaymentBadge
-                            ? `/ <span class="status-badge status-${paymentStatusClass}">${escapeHtml(booking.paymentStatus || 'PENDING')}</span>`
-                            : ''}
+                    <td class="booking-status-payment-cell">
+                        <div class="booking-status-payment-stack">
+                            <span class="status-badge status-${statusClass}">${escapeHtml(booking.bookingStatus || 'N/A')}</span>
+                            ${showPaymentBadge
+                                ? `<span class="status-badge status-${paymentStatusClass}">${escapeHtml(booking.paymentStatus || 'PENDING')}</span>`
+                                : ''}
+                        </div>
                     </td>
                     <td>${buildBookingActionsMarkup(booking, { context: 'table', includeView: true })}</td>
                 </tr>
