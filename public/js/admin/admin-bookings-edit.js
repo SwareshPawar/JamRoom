@@ -55,6 +55,26 @@
         return 'inhouse';
     };
 
+    const getCategoryRentalType = (type = {}) => {
+        const explicitType = normalizeManualRentalType(type?.rentalType || '');
+        if (String(type?.rentalType || '').trim()) {
+            return explicitType;
+        }
+
+        const subItems = Array.isArray(type?.subItems) ? type.subItems : [];
+        if (subItems.some((subItem) => normalizeManualRentalType(subItem?.rentalType) === 'perday')) {
+            return 'perday';
+        }
+        if (subItems.some((subItem) => normalizeManualRentalType(subItem?.rentalType) === 'persession')) {
+            return 'persession';
+        }
+        if (subItems.some((subItem) => normalizeManualRentalType(subItem?.rentalType) === 'pertrack')) {
+            return 'pertrack';
+        }
+
+        return 'inhouse';
+    };
+
     const renderEditCustomItemsPlaceholder = () => {
         const container = document.getElementById('editBookingManualRentals');
         if (!container) return;
@@ -195,28 +215,34 @@
         rentalTypes.forEach((type) => {
             html += `<details class="admin-rental-collapse"><summary class="admin-rental-summary">${deps.escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
 
-            if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0) {
+            const categoryRentalType = getCategoryRentalType(type);
+
+            if (Number(type.basePrice || 0) > 0) {
                 const baseId = `${type.name}_base`;
                 const qtyInputId = getEditRentalInputId(baseId, deps);
-                const isJamRoomBase = type.name === 'JamRoom';
-                const baseKey = getRentalMatchKey(`${type.name} (Base)`, 'inhouse');
-                const matchedBase = existingMap.get(baseKey);
+                const baseKey = getRentalMatchKey(`${type.name} (Base)`, categoryRentalType);
+                const legacyKey = getRentalMatchKey(type.name, categoryRentalType);
+                const legacyInhouseKey = getRentalMatchKey(type.name, 'inhouse');
+                const matchedBase = existingMap.get(baseKey) || existingMap.get(legacyKey) || existingMap.get(legacyInhouseKey);
                 const baseMaxQuantity = normalizeConfiguredMaxQuantity(type.maxQuantity, 10);
 
                 if (matchedBase) {
                     usedExistingKeys.add(baseKey);
+                    usedExistingKeys.add(legacyKey);
+                    usedExistingKeys.add(legacyInhouseKey);
                 }
 
                 const basePrice = matchedBase ? Number(matchedBase.price || type.basePrice) : type.basePrice;
                 const baseQuantity = Math.max(1, Math.min(baseMaxQuantity, parseInt(matchedBase?.quantity, 10) || 1));
+                const basePriceUnit = categoryRentalType === 'perday' ? '/day' : categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
 
                 const encodedBaseData = encodeURIComponent(JSON.stringify({
                     id: baseId,
                     name: `${type.name} (Base)`,
                     category: type.name,
                     price: basePrice,
-                    perdayPrice: 0,
-                    rentalType: 'inhouse',
+                    perdayPrice: categoryRentalType === 'perday' ? basePrice : 0,
+                    rentalType: categoryRentalType,
                     description: matchedBase?.description || type.description || '',
                     isRequired: false,
                     isBase: true,
@@ -229,11 +255,11 @@
                     <div class="admin-rental-row base">
                         <input type="checkbox" id="edit_rental_${qtyInputId}" name="editRental" data-rental="${encodedBaseData}" ${shouldCheckBase ? 'checked' : ''}>
                         <label for="edit_rental_${qtyInputId}" class="admin-rental-meta">
-                            🏠 ${deps.escapeHtml(type.name)} (Base) - ₹${basePrice}/hr
+                            🏠 ${deps.escapeHtml(type.name)} (Base) - ₹${basePrice}${basePriceUnit}
                             <span class="admin-rental-subtext">Base item</span>
                         </label>
                         <div class="admin-rental-qty">
-                            ${editQtyStepperHtml(qtyInputId, baseQuantity, baseMaxQuantity, isJamRoomBase)}
+                            ${editQtyStepperHtml(qtyInputId, baseQuantity, baseMaxQuantity, false)}
                         </div>
                     </div>
                 `;
@@ -306,44 +332,6 @@
                         </div>
                     `;
                 });
-            } else if (type.name !== 'JamRoom' && type.basePrice && type.basePrice > 0) {
-                const itemId = `${type.name}__${type.name}`;
-                const qtyInputId = getEditRentalInputId(itemId, deps);
-                const matchKey = getRentalMatchKey(type.name, 'inhouse');
-                const matchedRental = existingMap.get(matchKey);
-
-                if (matchedRental) {
-                    usedExistingKeys.add(matchKey);
-                }
-
-                const effectivePrice = matchedRental ? Number(matchedRental.price || type.basePrice) : type.basePrice;
-                const encodedRentalData = encodeURIComponent(JSON.stringify({
-                    id: itemId,
-                    name: type.name,
-                    category: type.name,
-                    price: effectivePrice,
-                    perdayPrice: 0,
-                    rentalType: 'inhouse',
-                    description: matchedRental?.description || type.description || '',
-                    isRequired: false,
-                    isBase: false,
-                    quantityEnabled: matchedRental?.quantityEnabled === true || type.quantityEnabled === true,
-                    allowCustomQuantity: false
-                }));
-
-                html += `
-                    <div class="admin-rental-row child">
-                        <input type="checkbox" id="edit_rental_${qtyInputId}" name="editRental" data-rental="${encodedRentalData}" ${matchedRental ? 'checked' : ''}>
-                        <label for="edit_rental_${qtyInputId}" class="admin-rental-meta">
-                            🔗 ${deps.escapeHtml(type.name)} - ₹${effectivePrice}/hr
-                            <span class="admin-rental-subtext">Category base price item</span>
-                        </label>
-                        <div class="admin-rental-qty">
-                            <span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span>
-                            <input type="hidden" id="${qtyInputId}" value="1">
-                        </div>
-                    </div>
-                `;
             }
 
             html += '</div></details>';

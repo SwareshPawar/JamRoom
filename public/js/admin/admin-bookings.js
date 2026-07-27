@@ -150,23 +150,6 @@
         }
     };
 
-    const confirmBookingAction = ({ title, message, confirmText = 'Confirm' }) => {
-        return new Promise((resolve) => {
-            if (typeof window.showConfirmationModal === 'function') {
-                window.showConfirmationModal(
-                    title,
-                    message,
-                    confirmText,
-                    () => resolve(true),
-                    false
-                );
-                return;
-            }
-
-            resolve(confirm(message));
-        });
-    };
-
     const state = {
         bookingsById: new Map(),
         allBookings: [],
@@ -241,128 +224,6 @@
     const getTodayYmd = () => {
         const today = new Date();
         return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    };
-
-    const getBookingDateValue = (booking) => {
-        const rawDate = booking?.date || booking?.bookingDate || booking?.slotDate || booking?.perDayStartDate || booking?.createdAt;
-        if (!rawDate) return null;
-
-        const parsed = new Date(rawDate);
-        if (Number.isNaN(parsed.getTime())) return null;
-        return parsed;
-    };
-
-    const buildFollowUpMessage = (booking, displayDate) => {
-        const customerName = String(booking?.userId?.name || booking?.userName || 'there').trim() || 'there';
-        const bookingLabel = displayDate || 'your booking';
-        return `Hi ${customerName}, this is JamRoom. We are following up on your booking for ${bookingLabel}. Please let us know if you would like us to confirm or update it.`;
-    };
-
-    const getFollowUpBookings = () => {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        return Array.isArray(state.allBookings)
-            ? state.allBookings
-                .filter((booking) => {
-                    const bookingDate = getBookingDateValue(booking);
-                    if (!bookingDate) return false;
-                    if (bookingDate < startOfMonth || bookingDate > endOfMonth) return false;
-
-                    const bookingStatus = String(booking?.bookingStatus || '').toUpperCase();
-                    const paymentStatus = String(booking?.paymentStatus || '').toUpperCase();
-                    const isOpenBooking = !['CANCELLED', 'REJECTED'].includes(bookingStatus);
-                    const isFutureBooking = bookingDate >= todayStart;
-                    const isUnpaidBooking = ['PENDING', 'PARTIAL'].includes(paymentStatus);
-
-                    return isOpenBooking && (isFutureBooking || isUnpaidBooking);
-                })
-                .sort((a, b) => {
-                    const dateA = getBookingDateValue(a);
-                    const dateB = getBookingDateValue(b);
-                    const dateDiff = (dateA ? dateA.getTime() : Number.MAX_SAFE_INTEGER) - (dateB ? dateB.getTime() : Number.MAX_SAFE_INTEGER);
-                    if (dateDiff !== 0) return dateDiff;
-                    const paymentRankA = ['PENDING', 'PARTIAL'].includes(String(a?.paymentStatus || '').toUpperCase()) ? 0 : 1;
-                    const paymentRankB = ['PENDING', 'PARTIAL'].includes(String(b?.paymentStatus || '').toUpperCase()) ? 0 : 1;
-                    return paymentRankA - paymentRankB;
-                })
-            : [];
-    };
-
-    const renderFollowUpBookingsPanel = () => {
-        const panelEl = document.getElementById('followUpBookingsPanel');
-        if (!panelEl) return;
-
-        const followUpBookings = getFollowUpBookings();
-        if (followUpBookings.length === 0) {
-            panelEl.innerHTML = `
-                <div class="followup-queue-card">
-                    <div class="followup-queue-header">
-                        <h3>📌 Follow-up Queue</h3>
-                        <span>${followUpBookings.length} bookings</span>
-                    </div>
-                    <p>No follow-up bookings right now.</p>
-                </div>
-            `;
-            return;
-        }
-
-        const followUpCards = followUpBookings.map((booking) => {
-            const bookingDate = getBookingDateValue(booking);
-            const bookingDateText = bookingDate
-                ? bookingDate.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
-                : 'Date pending';
-
-            const customerName = String(booking?.userId?.name || booking?.userName || 'Customer').trim() || 'Customer';
-            const rawMobile = String(booking?.userMobile || booking?.userId?.mobile || '').trim();
-            const contactMobile = rawMobile.replace(/[^\d+]/g, '');
-            const bookingStatus = String(booking?.bookingStatus || 'PENDING').toUpperCase();
-            const paymentStatus = String(booking?.paymentStatus || 'PENDING').toUpperCase();
-            const followUpMessage = buildFollowUpMessage(booking, bookingDateText);
-            const whatsAppHref = contactMobile
-                ? `https://wa.me/${encodeURIComponent(contactMobile)}?text=${encodeURIComponent(followUpMessage)}`
-                : '';
-            const bookingStatusClass = bookingStatus === 'REJECTED' ? 'rejected' : bookingStatus === 'CANCELLED' ? 'cancelled' : bookingStatus === 'CONFIRMED' ? 'confirmed' : 'pending';
-            const paymentStatusClass = paymentStatus === 'PAID' ? 'paid' : paymentStatus === 'PARTIAL' ? 'partial' : 'pending';
-            const bookingTimeText = booking.startTime && booking.endTime
-                ? `${escapeHtml(state.formatTime ? state.formatTime(booking.startTime) : booking.startTime)} - ${escapeHtml(state.formatTime ? state.formatTime(booking.endTime) : booking.endTime)}`
-                : 'Time pending';
-
-            return `
-                <div class="followup-row booking-row-clickable">
-                    <div class="followup-row-main">
-                        <div class="followup-row-summary">
-                            <div class="followup-row-title">${escapeHtml(customerName)}</div>
-                            <div class="followup-row-subtitle">Date: ${escapeHtml(bookingDateText)}</div>
-                            <div class="followup-row-subtitle">Time: ${bookingTimeText}</div>
-                        </div>
-                        <div class="followup-row-actions">
-                            ${contactMobile
-                                ? `<a href="tel:${escapeHtml(contactMobile)}" target="_blank" rel="noopener noreferrer" class="followup-action" title="Call customer">📞 Call</a>`
-                                : '<span class="text-muted">No contact number</span>'}
-                            ${whatsAppHref
-                                ? `<a href="${whatsAppHref}" target="_blank" rel="noopener noreferrer" class="followup-action followup-action-primary" title="WhatsApp customer">💬 WhatsApp</a>`
-                                : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        panelEl.innerHTML = `
-            <div class="followup-queue-card">
-                <div class="followup-queue-header">
-                    <div>
-                        <h3>📌 Follow-up Queue</h3>
-                        <p>Current-month bookings that are still active, upcoming, or unpaid.</p>
-                    </div>
-                    <span>${followUpBookings.length} booking${followUpBookings.length === 1 ? '' : 's'}</span>
-                </div>
-                <div>${followUpCards}</div>
-            </div>
-        `;
     };
 
     const normalizeTimeValue = (value) => {
@@ -564,11 +425,8 @@
                     ? `<button onclick="${stopOrClose}sendEBill('${booking._id}')" class="btn btn-primary btn-sm" title="Send eBill to customer and/or custom recipients">Send eBill</button>
                        <button onclick="${stopOrClose}downloadPDF('${booking._id}')" class="btn btn-secondary btn-sm" title="Download PDF Bill">Download PDF</button>`
                     : ''}
-                ${!['CANCELLED', 'REJECTED'].includes(status)
-                    ? `<button onclick="${stopOrClose}cancelBooking('${booking._id}')" class="btn btn-danger btn-sm">Cancel</button>`
-                    : ''}
                 <button onclick="${stopOrClose}editBooking('${booking._id}', ${serializedBooking})" class="btn btn-warning btn-sm">Edit</button>
-                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Delete</button>
+                <button onclick="${stopOrClose}deleteBooking('${booking._id}')" class="btn btn-danger btn-sm">Move to Deleted</button>
             </div>
         `;
     };
@@ -741,16 +599,21 @@
             <div class="booking-expand-body booking-modal-body">
                 <div class="booking-expand-grid">
                     <section class="booking-expand-panel admin-theme-info-card admin-theme-info-card-accent">
-                        <h4>Booking Summary</h4>
+                        <h4>Booking Details</h4>
                         <div class="booking-kv-grid">
-                            <p><strong>Date:</strong> ${dateText}</p>
+                            <p><strong>Booking ID:</strong> ${escapeHtml(booking._id || 'N/A')}</p>
+                            <p><strong>Mode:</strong> ${modeText}</p>
+                            <p><strong>Date/Range:</strong> ${dateText}</p>
                             <p><strong>Time:</strong> ${timeText}</p>
                             <p><strong>Duration:</strong> ${durationText}</p>
+                            <p><strong>Created:</strong> ${formatDateTime(booking.createdAt)}</p>
+                            <p><strong>Updated:</strong> ${formatDateTime(booking.updatedAt)}</p>
                             <p><strong>Booking Status:</strong> ${escapeHtml(booking.bookingStatus || 'N/A')}</p>
                             <p><strong>Payment Status:</strong> ${escapeHtml(paymentStatusText)}</p>
-                            <p><strong>Total:</strong> ${formatCurrency(booking.price)}</p>
-                            <p><strong>Received:</strong> ${isRejectedBooking ? 'N/A' : formatCurrency(collectedAmount)}</p>
+                            <p><strong>Amount Received:</strong> ${isRejectedBooking ? 'N/A' : formatCurrency(collectedAmount)}</p>
                             <p><strong>Outstanding:</strong> ${isRejectedBooking ? 'N/A' : formatCurrency(outstandingAmount)}</p>
+                            <p><strong>Payment Ref:</strong> ${escapeHtml(booking.paymentReference || 'N/A')}</p>
+                            <p><strong>Payment Note:</strong> ${escapeHtml(booking.paymentNote || 'N/A')}</p>
                         </div>
                     </section>
 
@@ -1178,7 +1041,7 @@
             return;
         }
 
-        html += '<div class="table-container"><table><thead><tr><th class="bookings-select-col">Select</th><th>#</th><th>User</th><th>Date</th><th>Time</th><th>Duration</th><th>Type</th><th>Price</th><th>Status/Payment</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+        html += '<div class="table-container"><table><thead><tr><th class="bookings-select-col">Select</th><th>#</th><th>User</th><th>Schedule</th><th>Type</th><th>Price</th><th>Status/Payment</th><th>Actions</th></tr></thead><tbody>';
 
         let serialNo = ((Math.max(1, state.currentPage) - 1) * Math.max(1, state.pageSize)) + 1;
         visible.forEach((booking) => {
@@ -1202,32 +1065,55 @@
             const showPaymentBadge = normalizedBookingStatus !== 'REJECTED';
             const userName = booking.userId?.name || booking.userName || 'N/A';
             const userEmail = booking.userId?.email || booking.userEmail || 'N/A';
-            const createdDate = booking.createdAt ? formatDateTime(booking.createdAt) : 'N/A';
-            const rentalSummary = booking.rentals && booking.rentals.length > 0
-                ? booking.rentals.map((r) => `${escapeHtml(r.name)} x ${Math.max(1, Number(r.quantity) || 1)}`).join('<br>')
-                : escapeHtml(booking.rentalType || 'N/A');
-            const adjustment = getBookingAdjustment(booking);
-            const adjustmentLabel = adjustment.signedValue < 0 ? 'Discount' : 'Surcharge';
-            const adjustmentLine = adjustment.signedValue !== 0
-                ? `<br>${adjustmentLabel}: ${adjustment.signedValue < 0 ? '-' : '+'}${formatCurrency(Math.abs(adjustment.signedValue))}`
-                : '';
+            const scheduleSummary = `
+                <div class="booking-schedule-cell">
+                    <div class="booking-schedule-date">${dateText}</div>
+                    <div class="booking-schedule-time">${timeText}</div>
+                    <div class="booking-schedule-duration">${durationText}</div>
+                </div>
+            `;
+            const typeSummary = (() => {
+                const rentals = Array.isArray(booking.rentals) ? booking.rentals : [];
+                if (rentals.length === 0) {
+                    return escapeHtml(booking.rentalType || booking.bookingMode || 'N/A');
+                }
+
+                const categories = [...new Set(
+                    rentals
+                        .map((rental) => String(rental?.category || '').trim())
+                        .filter(Boolean)
+                )];
+
+                if (categories.length > 0) {
+                    return categories.map((name) => escapeHtml(name)).join('<br>');
+                }
+
+                const names = [...new Set(
+                    rentals
+                        .map((rental) => String(rental?.name || '').trim().replace(/\s*\(base\)\s*/ig, ''))
+                        .filter(Boolean)
+                )];
+                return names.length > 0
+                    ? names.map((name) => escapeHtml(name)).join('<br>')
+                    : escapeHtml(booking.rentalType || booking.bookingMode || 'N/A');
+            })();
+            const totalAmount = Math.max(0, Number(booking.price || 0));
+            const amountPaid = Math.max(0, Number(booking.amountPaid || 0));
+            const pendingAmount = Math.max(0, totalAmount - amountPaid);
+            const shouldShowPending = pendingAmount > 0 && !['REJECTED', 'CANCELLED'].includes(normalizedBookingStatus);
 
             html += `
-                <tr>
+                <tr class="booking-row-clickable" onclick="openBookingDetailsModal('${booking._id}')" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openBookingDetailsModal('${booking._id}'); }" tabindex="0">
                     <td class="bookings-select-cell" onclick="event.stopPropagation();">
                         <input type="checkbox" class="booking-row-select" data-booking-id="${bookingId}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation();" aria-label="Select booking ${serialNo}">
                     </td>
                     <td class="table-serial-cell">${serialNo++}</td>
-                    <td class="booking-details-cell" onclick="openBookingDetailsCell(event, '${bookingId}')" onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openBookingDetailsCell(event, '${bookingId}'); }" tabindex="0">${escapeHtml(userName)}<br><small>${escapeHtml(userEmail)}</small></td>
-                    <td>${dateText}</td>
-                    <td>${timeText}</td>
-                    <td>${durationText}</td>
-                    <td>${rentalSummary}</td>
+                    <td>${escapeHtml(userName)}<br><small>${escapeHtml(userEmail)}</small></td>
+                    <td>${scheduleSummary}</td>
+                    <td>${typeSummary}</td>
                     <td>
-                        ${formatCurrency(booking.price)}
-                        ${booking.subtotal !== undefined && booking.taxAmount !== undefined
-                            ? `<br><small>Subtotal: ${formatCurrency(booking.subtotal)}<br>Tax: ${formatCurrency(booking.taxAmount)}${adjustmentLine}</small>`
-                            : ''}
+                        <strong>${formatCurrency(totalAmount)}</strong>
+                        ${shouldShowPending ? `<br><small>Pending: ${formatCurrency(pendingAmount)}</small>` : ''}
                     </td>
                     <td>
                         <span class="status-badge status-${statusClass}">${escapeHtml(booking.bookingStatus || 'N/A')}</span>
@@ -1235,8 +1121,7 @@
                             ? `/ <span class="status-badge status-${paymentStatusClass}">${escapeHtml(booking.paymentStatus || 'PENDING')}</span>`
                             : ''}
                     </td>
-                    <td><small>${escapeHtml(createdDate)}</small></td>
-                    <td>${buildBookingActionsMarkup(booking, { context: 'table', includeView: true })}</td>
+                    <td>${buildBookingActionsMarkup(booking, { context: 'table', includeView: false })}</td>
                 </tr>
             `;
         });
@@ -1245,70 +1130,6 @@
         html += buildPaginationMarkup();
         tableEl.innerHTML = html;
         bindTableControls();
-        initBookingsTableDragScroll();
-    };
-
-    const initBookingsTableDragScroll = () => {
-        if (!window.matchMedia || !window.matchMedia('(min-width: 769px)').matches) {
-            return;
-        }
-
-        const container = document.querySelector('#bookingsTable .table-container');
-        if (!container || container.__dragScrollInitialized) return;
-
-        container.__dragScrollInitialized = true;
-        let isDragging = false;
-        let startX = 0;
-        let startScrollLeft = 0;
-
-        const setDragState = (value) => {
-            container.dataset.wasDragged = value ? 'true' : 'false';
-            if (value) {
-                container.classList.add('dragging');
-            } else {
-                container.classList.remove('dragging');
-            }
-        };
-
-        setDragState(false);
-
-        container.addEventListener('pointerdown', (event) => {
-            if (event.button !== 0) return;
-            if (event.target.closest('a, button, input, textarea, select, label')) return;
-            isDragging = false;
-            container.dataset.wasDragged = 'false';
-            startX = event.clientX;
-            startScrollLeft = container.scrollLeft;
-        });
-
-        container.addEventListener('pointermove', (event) => {
-            if (event.buttons === 0) return;
-            const deltaX = event.clientX - startX;
-            if (!isDragging && Math.abs(deltaX) > 10) {
-                isDragging = true;
-                setDragState(true);
-            }
-            if (!isDragging) return;
-            event.preventDefault();
-            container.scrollLeft = startScrollLeft - deltaX;
-        });
-
-        const stopDrag = () => {
-            if (!isDragging) return;
-            isDragging = false;
-            setDragState(false);
-        };
-
-        container.addEventListener('pointerup', stopDrag);
-        container.addEventListener('pointercancel', stopDrag);
-    };
-
-    const openBookingDetailsCell = (event, bookingId) => {
-        const container = document.querySelector('#bookingsTable .table-container');
-        if (container?.dataset.wasDragged === 'true') {
-            return;
-        }
-        openBookingDetailsModal(bookingId);
     };
 
     const setBookingsError = (message) => {
@@ -1338,8 +1159,6 @@
         state.allBookings.forEach((booking) => {
             state.bookingsById.set(String(booking._id), booking);
         });
-
-        renderFollowUpBookingsPanel();
 
         if (state.searchTerm === undefined || state.searchTerm === null) {
             state.searchTerm = '';
@@ -1650,41 +1469,6 @@
         );
     };
 
-    const cancelBooking = async (bookingId) => {
-        const deps = state.loadDeps;
-        if (!deps?.apiUrl) {
-            alert('Unable to cancel booking right now. Please refresh and try again.');
-            return;
-        }
-
-        const shouldProceed = await confirmBookingAction({
-            title: 'Cancel Booking',
-            message: 'Cancelling this booking will incur a 50% penalty on the total booking value. Do you want to continue?',
-            confirmText: 'Cancel Booking'
-        });
-        if (!shouldProceed) return;
-
-        try {
-            showBookingLoading('Cancelling booking...');
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${deps.apiUrl}/api/bookings/${bookingId}/cancel`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data?.message || 'Unable to cancel booking');
-
-            showAlert('bookingAlert', 'Booking cancelled successfully.', 'success');
-            await loadBookings({ page: state.currentPage || 1, showLoader: false });
-        } catch (error) {
-            showAlert('bookingAlert', error.message || 'Unable to cancel booking', 'error');
-        } finally {
-            hideBookingLoading();
-        }
-    };
-
     const markClassLessonCompleted = async (bookingId, lessonId) => {
         openClassLessonCompletionModal(bookingId, lessonId);
     };
@@ -1696,12 +1480,7 @@
             return;
         }
 
-        const shouldProceed = await confirmBookingAction({
-            title: 'Cancel Lesson',
-            message: 'Cancel this lesson? This cannot be undone.',
-            confirmText: 'Cancel Lesson'
-        });
-        if (!shouldProceed) return;
+        if (!confirm('Cancel this lesson? This cannot be undone.')) return;
 
         try {
             showBookingLoading('Cancelling lesson...');
@@ -2014,7 +1793,6 @@
     window.AdminBookings.loadBookings = loadBookings;
     window.AdminBookings.approveBooking = approveBooking;
     window.AdminBookings.rejectBooking = rejectBooking;
-    window.AdminBookings.cancelBooking = cancelBooking;
     window.AdminBookings.markClassLessonCompleted = markClassLessonCompleted;
     window.AdminBookings.cancelClassLesson = cancelClassLesson;
     window.AdminBookings.submitClassLessonCompletion = submitClassLessonCompletion;
@@ -2025,7 +1803,6 @@
     window.AdminBookings.quickUpdateBookingPayment = quickUpdateBookingPayment;
     window.AdminBookings.openBookingDetailsModal = openBookingDetailsModal;
     window.AdminBookings.openBookingPaymentDetails = openBookingPaymentDetails;
-    window.cancelBooking = cancelBooking;
     window.syncQuickPaymentForBookingModal = syncQuickPaymentForBookingModal;
     window.openBookingPaymentDetails = openBookingPaymentDetails;
     window.openBookingDetailsModal = openBookingDetailsModal;
@@ -2033,7 +1810,6 @@
     window.cancelClassLesson = cancelClassLesson;
     window.submitClassLessonCompletion = submitClassLessonCompletion;
     window.approveSlotRequest = approveSlotRequest;
-    window.openBookingDetailsCell = openBookingDetailsCell;
     window.rejectSlotRequest = rejectSlotRequest;
     window.adminBookSlot = adminBookSlot;
     window.hideClassLessonCompletionModal = hideClassLessonCompletionModal;

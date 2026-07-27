@@ -428,13 +428,15 @@
     gap: 6px;
     align-items: center;
     justify-content: flex-start;
-    min-width: 240px;
+    min-width: 170px;
 }
 
 .booking-table-actions .btn {
     white-space: nowrap;
-    flex: 1 1 calc(50% - 3px);
-    min-width: 96px;
+    flex: 1 1 auto;
+    min-width: 78px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
 }
 
 @media (max-width: 768px) {
@@ -574,8 +576,45 @@
 }
 
 #bookingsTable .table-container table {
-    min-width: 980px;
+    min-width: 860px;
     margin: 0;
+}
+
+#bookingsTable table th,
+#bookingsTable table td {
+    padding: 8px 6px;
+    vertical-align: top;
+}
+
+@media (min-width: 992px) {
+    #bookingsTable table td:last-child,
+    #bookingsTable table th:last-child {
+        position: sticky;
+        right: 0;
+        z-index: 3;
+        background: var(--surface-0);
+    }
+
+    #bookingsTable table thead th:last-child {
+        background: color-mix(in srgb, var(--surface-0) 88%, var(--border-color-light));
+    }
+}
+
+.booking-schedule-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.25;
+}
+
+.booking-schedule-date {
+    font-weight: 600;
+}
+
+.booking-schedule-time,
+.booking-schedule-duration {
+    color: var(--text-color-light);
+    font-size: 0.83rem;
 }
 
 .revenue-breakdown-row {
@@ -2372,9 +2411,9 @@ table {
         white-space: nowrap;
     }
 
-    /* Only hide booking/revenue Type column on medium screens */
-    #bookingsTable table th:nth-child(5),
-    #bookingsTable table td:nth-child(5),
+    /* Keep Type visible; hide status/payment on medium screens */
+    #bookingsTable table th:nth-child(7),
+    #bookingsTable table td:nth-child(7),
     #revenueTable table th:nth-child(5),
     #revenueTable table td:nth-child(5) {
         display: none;
@@ -2395,11 +2434,10 @@ table {
         padding: 6px 4px;
     }
 
-    /* Hide booking/revenue Type and Price columns on very small screens */
-    #bookingsTable table th:nth-child(5),
-    #bookingsTable table td:nth-child(5),
     #bookingsTable table th:nth-child(6),
     #bookingsTable table td:nth-child(6),
+    #bookingsTable table th:nth-child(7),
+    #bookingsTable table td:nth-child(7),
     #revenueTable table th:nth-child(5),
     #revenueTable table td:nth-child(5),
     #revenueTable table th:nth-child(6),
@@ -2423,12 +2461,16 @@ table {
 }
 
 table th,
-table td {
+        min-width: 0;
     padding: 14px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
     font-size: 0.98em;
 }
+
+    #bookingsTable .table-container table {
+        min-width: 620px;
+    }
 
 table th {
     background: var(--surface-1);

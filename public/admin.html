@@ -24,9 +24,9 @@
     <script src="/js/client-pdf-generator.js"></script>
     <!-- Admin extraction modules -->
     <script src="/js/admin/admin-dashboard.js?v=20260520b"></script>
-    <script src="/js/admin/admin-bookings.js?v=20260725-2"></script>
+    <script src="/js/admin/admin-bookings.js?v=20260610e"></script>
     <script src="/js/admin/admin-bookings-actions.js"></script>
-    <script src="/js/admin/admin-bookings-edit.js?v=20260725-1"></script>
+    <script src="/js/admin/admin-bookings-edit.js?v=20260727-1"></script>
     <script src="/js/admin/admin-calendar.js"></script>
     <script src="/js/admin/admin-revenue.js"></script>
     <script src="/js/admin/admin-open-events.js?v=20260526a"></script>
@@ -34,7 +34,7 @@
     
     <!-- Admin-specific styles -->
     
-    <link rel="stylesheet" href="/css/pages/admin.css?v=20260526a">
+    <link rel="stylesheet" href="/css/pages/admin.css?v=20260727a">
 
 </head>
 <body>
@@ -43,8 +43,6 @@
         <div id="navigationContainer"></div>
 
     <div class="dashboard">
-        <div id="followUpBookingsPanel"></div>
-
         <!-- Statistics -->
         <div class="kpi-rows">
             <section class="kpi-row-section">
@@ -1727,8 +1725,6 @@
                 onConfirm();
             };
         };
-
-        window.showConfirmationModal = showConfirmationModal;
 
         const formatDate = (dateStr) => {
             const date = new Date(dateStr);
@@ -8027,17 +8023,17 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
 
                 html += `<details class="admin-rental-collapse"><summary class="admin-rental-summary">${escapeHtml(type.name)}</summary><div class="admin-rental-section-content">`;
 
-                if (type.name === 'JamRoom' && type.basePrice && type.basePrice > 0 && categoryRentalType !== 'perday') {
+                if (Number(type.basePrice || 0) > 0) {
                     const baseId = `${type.name}_base`;
                     const qtyInputId = getRentalInputId(baseId);
-                    const isJamRoomBase = type.name === 'JamRoom';
+                    const isJamRoomBase = false;
                     const baseMaxQuantity = normalizeConfiguredMaxQuantity(type.maxQuantity, 10);
                     const encodedBaseData = encodeURIComponent(JSON.stringify({
                         id: baseId,
                         name: `${type.name} (Base)`,
                         category: type.name,
-                        price: type.basePrice,
-                        perdayPrice: 0,
+                        price: Number(type.basePrice || 0),
+                        perdayPrice: categoryRentalType === 'perday' ? Number(type.basePrice || 0) : 0,
                         rentalType: categoryRentalType,
                         description: type.description || '',
                         isRequired: false,
@@ -8046,9 +8042,9 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                         maxQuantity: baseMaxQuantity
                     }));
 
-                    const basePriceUnit = categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
+                    const basePriceUnit = categoryRentalType === 'perday' ? '/day' : categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
 
-                    const shouldCheckCreateBase = false;
+                    const shouldCheckCreateBase = true;
 
                     html += `
                         <div class="admin-rental-row base">
@@ -8121,37 +8117,6 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                             </div>
                         `;
                     });
-                } else if (type.name !== 'JamRoom' && type.basePrice && type.basePrice > 0) {
-                    const itemId = `${type.name}__${type.name}`;
-                    const qtyInputId = getRentalInputId(itemId);
-                    const encodedRentalData = encodeURIComponent(JSON.stringify({
-                        id: itemId,
-                        name: type.name,
-                        category: type.name,
-                        price: type.basePrice,
-                        perdayPrice: 0,
-                        rentalType: categoryRentalType,
-                        description: type.description || `${type.name} rental`,
-                        isRequired: false,
-                        isBase: false,
-                        quantityEnabled: type.quantityEnabled === true
-                    }));
-
-                    const categoryUnit = categoryRentalType === 'persession' ? '/session' : categoryRentalType === 'pertrack' ? '/track' : '/hr';
-
-                    html += `
-                        <div class="admin-rental-row child">
-                            <input type="checkbox" id="rental_${qtyInputId}" name="rental" data-rental="${encodedRentalData}">
-                            <label for="rental_${qtyInputId}" class="admin-rental-meta">
-                                🔗 ${escapeHtml(type.name)} - ₹${type.basePrice}${categoryUnit}
-                                <span class="admin-rental-subtext">Category base price item</span>
-                            </label>
-                            <div class="admin-rental-qty">
-                                <span class="admin-rental-subtext admin-rental-subtext-tight">Qty fixed: 1</span>
-                                <input type="hidden" id="${qtyInputId}" value="1">
-                            </div>
-                        </div>
-                    `;
                 }
 
                 html += '</div></details>';
