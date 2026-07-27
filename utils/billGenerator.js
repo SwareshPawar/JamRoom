@@ -697,8 +697,8 @@ const generateQuotationHTML = (data, settings) => {
 
       <section class="totals-card">
         <h3>Pricing Summary</h3>
-        ${discountRow}
         <div class="total-row"><span>Subtotal</span><strong>${presentation.subtotalAmountLabel}</strong></div>
+        ${discountRow}
         ${gstRow}
         <div class="grand-total"><span>Total Amount</span><strong>${presentation.totalAmountLabel}</strong></div>
       </section>

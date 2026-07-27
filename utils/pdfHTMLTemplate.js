@@ -433,8 +433,8 @@ const generateUnifiedPDFHTML = (booking, settings) => {
         <section class="totals-card">
             <h3>Pricing Summary</h3>
             ${classPlanFeeRow}
-            ${classPlanDiscountRow}
             <div class="total-row"><span>Subtotal</span><strong>&#8377;${subtotal.toFixed(2)}</strong></div>
+            ${classPlanDiscountRow}
             ${gstRow}
             ${adjustmentRow}
             <div class="grand-total"><span>Total Amount</span><strong>&#8377;${totalAmount.toFixed(2)}</strong></div>
