@@ -1638,6 +1638,7 @@
                 </div>
                 <div class="action-row-end">
                     <button type="button" onclick="saveQuotationTemplateOnly()" class="btn btn-secondary">Save Template</button>
+                    <button type="button" onclick="convertQuotationToBooking()" class="btn btn-success">Convert to Booking</button>
                     <button type="button" onclick="hideQuotationModal()" class="btn btn-secondary">Cancel</button>
                     <button type="submit" class="btn btn-primary">Send Quotation</button>
                 </div>
@@ -2156,6 +2157,9 @@
                         <td>
                             <div class="booking-table-actions">
                                 <button type="button" class="btn btn-primary btn-sm" onclick="useSavedQuotationTemplate('${item.id}')">Use</button>
+                                ${!item.deletedAt
+                                    ? `<button type="button" class="btn btn-success btn-sm" onclick="startSavedQuotationConversion('${item.id}')">Convert</button>`
+                                    : ''}
                                 ${item.deletedAt
                                     ? `<button type="button" class="btn btn-success btn-sm" onclick="restoreSavedQuotationTemplate('${item.id}')">Restore</button>`
                                     : ''}
@@ -5620,6 +5624,7 @@
         let quotationUserCache = [];
         let activeQuotationTemplateId = '';
         let activeQuotationTemplateName = '';
+        let quoteLastSentAt = null;
 
         const clearCreateBookingDraft = () => {
             if (createBookingDraftSaveTimer) {
@@ -6222,6 +6227,7 @@
             selectedQuotationUsers = [];
             activeQuotationTemplateId = '';
             activeQuotationTemplateName = '';
+            quoteLastSentAt = null;
             document.getElementById('quoteUserSearch').value = '';
             document.getElementById('quoteUserTypeahead').style.display = 'none';
             document.getElementById('quoteUserTypeahead').classList.add('admin-hidden');
@@ -6850,6 +6856,11 @@
             showSuccessAlert(`Loaded template: ${selected.name || 'Saved quotation'}`);
         };
 
+        window.startSavedQuotationConversion = async (templateId) => {
+            await window.useSavedQuotationTemplate(templateId);
+            showSuccessAlert('Template loaded for conversion. Review any changes, select exactly one user, then click "Convert to Booking".');
+        };
+
         function hideQuotationModal() {
             closeModal('quotationModal');
             resetQuotationForm();
@@ -7010,21 +7021,144 @@
                 });
                 const result = await res.json();
                 if (!res.ok || !result.success) throw new Error(result.message || 'Failed to send quotation');
-                hideQuotationModal();
+                quoteLastSentAt = new Date();
                 const recipientLabel = (result.recipients || []).join(', ');
                 const sentModeLabel = result.emailDeliveryMode === 'separate'
                     ? 'separately'
                     : 'in a single email thread';
                 if (result.pdfAttached === false) {
-                    showWarningAlert(`Quotation sent ${sentModeLabel} to: ${recipientLabel}. PDF attachment could not be generated.`);
+                    showWarningAlert(`Quotation sent ${sentModeLabel} to: ${recipientLabel}. PDF attachment could not be generated. You can still convert this quotation to booking.`);
                 } else {
-                    showSuccessAlert(`Quotation sent ${sentModeLabel} to: ${recipientLabel}${result.pdfAttached ? ' (PDF attached)' : ''}${result.savedQuotation ? '. Template saved.' : ''}`);
+                    showSuccessAlert(`Quotation sent ${sentModeLabel} to: ${recipientLabel}${result.pdfAttached ? ' (PDF attached)' : ''}${result.savedQuotation ? '. Template saved.' : ''}. Review and click "Convert to Booking" when ready.`);
                 }
                 if (result.savedQuotation) {
                     await loadSavedQuotations();
                 }
             } catch (error) {
                 showErrorAlert(error.message || 'Failed to send quotation');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function convertQuotationToBooking() {
+            try {
+                if (selectedQuotationUsers.length !== 1) {
+                    throw new Error('Select exactly one registered user to convert quotation into a booking.');
+                }
+
+                const quoteData = collectQuotationSelectedRentals({ strict: true });
+                const selectedRentals = Array.isArray(quoteData?.selectedRentals) ? quoteData.selectedRentals : [];
+                if (selectedRentals.length === 0) {
+                    throw new Error('Please select at least one rental item before conversion.');
+                }
+
+                const rentalTypes = Array.isArray(createBookingSettings?.rentalTypes) ? createBookingSettings.rentalTypes : [];
+                const derivedLabel = typeof window.deriveAdminBookingTypeLabel === 'function'
+                    ? window.deriveAdminBookingTypeLabel(selectedRentals, rentalTypes)
+                    : '';
+                const quoteLabel = String(document.getElementById('quoteBookingType')?.value || '').trim() || derivedLabel || 'Quotation Booking';
+
+                const hasInhouse = selectedRentals.some((item) => String(item?.rentalType || '').toLowerCase() === 'inhouse');
+                const hasPerday = selectedRentals.some((item) => String(item?.rentalType || '').toLowerCase() === 'perday');
+                const hasOnlyFlatRate = selectedRentals.every((item) => {
+                    const type = String(item?.rentalType || '').toLowerCase();
+                    return type === 'persession' || type === 'pertrack';
+                });
+
+                const today = new Date().toISOString().split('T')[0];
+                let bookingMode = 'hourly';
+                let bookingDate = quoteData?.inhouseSchedule?.date || today;
+                let bookingStartTime = quoteData?.inhouseSchedule?.startTime || '09:00';
+                let bookingEndTime = quoteData?.inhouseSchedule?.endTime || '10:00';
+                let bookingDuration = Number(quoteData?.inhouseSchedule?.durationHours || 1);
+                let overrideDateTime = false;
+                const perdayPayload = {};
+
+                if (hasPerday && !hasInhouse) {
+                    bookingMode = 'perday';
+                    bookingDate = quoteData?.perdaySchedule?.startDate || today;
+                    bookingStartTime = quoteData?.perdaySchedule?.pickupTime || '09:00';
+                    bookingEndTime = quoteData?.perdaySchedule?.returnTime || '09:00';
+                    const perDayDays = Math.max(1, Number(quoteData?.perdaySchedule?.days || 1));
+                    bookingDuration = perDayDays * 24;
+                    perdayPayload.perDayStartDate = quoteData?.perdaySchedule?.startDate || bookingDate;
+                    perdayPayload.perDayEndDate = quoteData?.perdaySchedule?.endDate || bookingDate;
+                    perdayPayload.perDayPickupTime = bookingStartTime;
+                    perdayPayload.perDayReturnTime = bookingEndTime;
+                    perdayPayload.perDayDays = perDayDays;
+                } else if (hasOnlyFlatRate && !hasInhouse && !hasPerday) {
+                    bookingMode = 'hourly';
+                    bookingDate = today;
+                    bookingStartTime = '09:00';
+                    bookingEndTime = '09:00';
+                    bookingDuration = 1;
+                    overrideDateTime = true;
+                }
+
+                if (!Number.isFinite(bookingDuration) || bookingDuration <= 0) {
+                    bookingDuration = 1;
+                }
+
+                const rawDiscountAmount = Number(document.getElementById('quoteDiscountAmount')?.value || 0);
+                const discountAmount = Number.isFinite(rawDiscountAmount) && rawDiscountAmount > 0
+                    ? rawDiscountAmount
+                    : 0;
+                const discountNote = String(document.getElementById('quoteDiscountNote')?.value || '').trim();
+                const quoteNotes = String(document.getElementById('quoteNotes')?.value || '').trim();
+                const conversionTimestamp = quoteLastSentAt || new Date();
+                const conversionNote = `[Converted from quotation on ${conversionTimestamp.toLocaleString('en-IN')}]`;
+
+                const bookingData = {
+                    userId: String(selectedQuotationUsers[0]?._id || '').trim(),
+                    bookingMode,
+                    date: bookingDate,
+                    startTime: bookingStartTime,
+                    endTime: bookingEndTime,
+                    duration: bookingDuration,
+                    rentalType: quoteLabel,
+                    rentals: selectedRentals.map((rental) => ({
+                        name: rental.name,
+                        category: rental.category || '',
+                        price: Number(rental.price || 0),
+                        quantity: Math.max(1, Number(rental.quantity || 1)),
+                        rentalType: rental.rentalType || 'inhouse',
+                        description: rental.description || ''
+                    })),
+                    subtotal: Number(quoteData?.subtotal || 0),
+                    priceAdjustmentType: discountAmount > 0 ? 'discount' : 'none',
+                    priceAdjustmentAmount: discountAmount,
+                    priceAdjustmentNote: discountAmount > 0 ? discountNote : '',
+                    paymentStatus: 'PENDING',
+                    amountPaid: 0,
+                    paymentReference: '',
+                    paymentNote: '',
+                    bandName: '',
+                    notes: quoteNotes ? `${quoteNotes}\n${conversionNote}` : conversionNote,
+                    overrideDateTime,
+                    ...perdayPayload
+                };
+
+                showLoading('Converting quotation to booking...');
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/admin/bookings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(bookingData)
+                });
+                const result = await res.json();
+                if (!res.ok || !result.success) {
+                    throw new Error(result.message || 'Failed to convert quotation to booking');
+                }
+
+                hideQuotationModal();
+                const convertedFor = selectedQuotationUsers[0]?.name || 'selected user';
+                const totalValue = Number(result?.booking?.price || 0);
+                showSuccessAlert(`Quotation converted to confirmed booking for ${convertedFor}. Total: ₹${totalValue.toFixed(2)}`);
+                await loadStats();
+                await loadBookings();
+            } catch (error) {
+                showErrorAlert(error.message || 'Failed to convert quotation to booking');
             } finally {
                 hideLoading();
             }

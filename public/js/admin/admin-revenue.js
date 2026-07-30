@@ -287,7 +287,7 @@
             <div class="revenue-trend-scroll" aria-label="Drag horizontally to explore earlier months">
                 <svg viewBox="0 0 ${width} ${height}" class="revenue-trend-svg" style="width:${width}px" preserveAspectRatio="xMinYMin meet" aria-hidden="true">
                     ${gridLines}
-                    <polyline points="${polylinePoints}" class="revenue-trend-line"></polyline>
+                    <polyline points="${polylinePoints}" fill="none" class="revenue-trend-line"></polyline>
                     ${pointMarkers}
                 </svg>
             </div>
@@ -340,10 +340,13 @@
         });
 
         if (trendScrollHost) {
-            requestAnimationFrame(() => {
+            // double-rAF: first frame schedules layout; second fires after paint/measure
+            requestAnimationFrame(() => requestAnimationFrame(() => {
                 trendScrollHost.scrollLeft = Math.max(0, trendScrollHost.scrollWidth - trendScrollHost.clientWidth);
-            });
+            }));
         }
+
+        setSelectedPoint(points.length - 1);
     };
 
     const refreshRevenueSelectionUi = () => {

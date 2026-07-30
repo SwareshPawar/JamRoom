@@ -741,6 +741,7 @@
     --revenue-trend-surface: color-mix(in srgb, var(--surface-1) 78%, var(--surface-elevated) 22%);
 
     margin-top: 10px;
+    overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
     border-radius: 12px;
     background:
