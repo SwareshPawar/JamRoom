@@ -777,13 +777,15 @@
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
+    touch-action: none;
     cursor: grab;
     border-radius: 10px;
     padding-bottom: 2px;
+    user-select: none;
 }
 
-.revenue-trend-scroll:active {
+.revenue-trend-scroll:active,
+.revenue-trend-scroll.is-dragging {
     cursor: grabbing;
 }
 

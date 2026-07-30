@@ -153,6 +153,61 @@
             .sort((a, b) => a.order - b.order);
     };
 
+    const bindRevenueTrendPointerDrag = (container) => {
+        if (!container) {
+            return;
+        }
+
+        let isDragging = false;
+        let startX = 0;
+        let startScrollLeft = 0;
+        let pointerId = null;
+
+        const beginDrag = (event) => {
+            if (event.target.closest('.revenue-trend-point-hit')) {
+                return;
+            }
+
+            isDragging = true;
+            pointerId = event.pointerId;
+            startX = event.clientX;
+            startScrollLeft = container.scrollLeft;
+            container.setPointerCapture?.(pointerId);
+            container.classList.add('is-dragging');
+        };
+
+        const moveDrag = (event) => {
+            if (!isDragging || event.pointerId !== pointerId) {
+                return;
+            }
+
+            const deltaX = event.clientX - startX;
+            container.scrollLeft = startScrollLeft - deltaX;
+            event.preventDefault();
+        };
+
+        const endDrag = (event) => {
+            if (!isDragging || event.pointerId !== pointerId) {
+                return;
+            }
+
+            isDragging = false;
+            pointerId = null;
+            container.releasePointerCapture?.(event.pointerId);
+            container.classList.remove('is-dragging');
+        };
+
+        container.addEventListener('pointerdown', beginDrag);
+        container.addEventListener('pointermove', moveDrag);
+        container.addEventListener('pointerup', endDrag);
+        container.addEventListener('pointercancel', endDrag);
+        container.addEventListener('pointerleave', (event) => {
+            if (isDragging && event.pointerId === pointerId) {
+                endDrag(event);
+            }
+        });
+    };
+
     const renderMonthlyRevenueTrend = ({ monthlyTrend = [], bookings = [], trendSource = '' } = {}) => {
         const chartHost = document.getElementById('revenueMonthlyChart');
         if (!chartHost) {
@@ -243,6 +298,7 @@
         const detailHost = chartHost.querySelector('[data-revenue-trend-details]');
         const trendScrollHost = chartHost.querySelector('.revenue-trend-scroll');
         const pointTargets = Array.from(chartHost.querySelectorAll('.revenue-trend-point-hit'));
+        bindRevenueTrendPointerDrag(trendScrollHost);
 
         const setSelectedPoint = (index) => {
             const pointData = points[index];
