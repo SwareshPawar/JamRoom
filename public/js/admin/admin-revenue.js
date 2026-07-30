@@ -80,6 +80,216 @@
         return 0;
     };
 
+    const formatCurrency = (value) => {
+        const amount = Math.max(0, toNumber(value));
+        return `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    };
+
+    const getMonthBucket = (dateValue) => {
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+
+        const year = date.getFullYear();
+        const monthIndex = date.getMonth();
+        const key = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+        const label = date.toLocaleDateString('en-IN', {
+            month: 'short',
+            year: '2-digit'
+        });
+
+        return {
+            key,
+            label,
+            order: year * 12 + monthIndex
+        };
+    };
+
+    const buildMonthlyTrendFromBookings = (bookings = []) => {
+        const monthMap = new Map();
+        (Array.isArray(bookings) ? bookings : []).forEach((booking) => {
+            const bucket = getMonthBucket(booking?.date);
+            if (!bucket) {
+                return;
+            }
+
+            const current = monthMap.get(bucket.key) || {
+                ...bucket,
+                amount: 0,
+                bookings: 0
+            };
+
+            current.amount += getCollectedAmount(booking);
+            current.bookings += 1;
+            monthMap.set(bucket.key, current);
+        });
+
+        return [...monthMap.values()].sort((a, b) => a.order - b.order);
+    };
+
+    const normalizeMonthlyTrend = (monthlyTrend = []) => {
+        return (Array.isArray(monthlyTrend) ? monthlyTrend : [])
+            .map((point) => {
+                const key = String(point?.key || point?.monthKey || '').trim();
+                if (!key) return null;
+
+                const [yearToken, monthToken] = key.split('-');
+                const year = Number(yearToken);
+                const month = Number(monthToken);
+                const order = Number.isFinite(year) && Number.isFinite(month)
+                    ? (year * 12) + (month - 1)
+                    : 0;
+
+                return {
+                    key,
+                    label: String(point?.label || point?.monthLabel || key),
+                    amount: Math.max(0, toNumber(point?.amount ?? point?.collectedRevenue)),
+                    bookings: Math.max(0, Number(point?.bookings ?? point?.bookingCount) || 0),
+                    order
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.order - b.order);
+    };
+
+    const renderMonthlyRevenueTrend = ({ monthlyTrend = [], bookings = [], trendSource = '' } = {}) => {
+        const chartHost = document.getElementById('revenueMonthlyChart');
+        if (!chartHost) {
+            return;
+        }
+
+        const normalizedTrend = normalizeMonthlyTrend(monthlyTrend);
+        const series = normalizedTrend.length > 0
+            ? normalizedTrend
+            : buildMonthlyTrendFromBookings(bookings);
+
+        if (series.length === 0) {
+            chartHost.innerHTML = '<p class="loading-inline-muted">No paid bookings available for monthly trend.</p>';
+            return;
+        }
+
+        const minimumPointSpacing = 92;
+        const width = Math.max(1000, 56 + 18 + (Math.max(1, series.length - 1) * minimumPointSpacing));
+        const height = 300;
+        const leftPad = 56;
+        const rightPad = 18;
+        const topPad = 20;
+        const bottomPad = 54;
+        const chartWidth = width - leftPad - rightPad;
+        const chartHeight = height - topPad - bottomPad;
+        const maxValue = Math.max(...series.map((point) => point.amount), 1);
+        const yTickCount = 4;
+
+        const xStep = series.length > 1 ? chartWidth / (series.length - 1) : 0;
+        const points = series.map((point, index) => {
+            const x = leftPad + (index * xStep);
+            const yRatio = point.amount / maxValue;
+            const y = topPad + chartHeight - (yRatio * chartHeight);
+            return { ...point, x, y };
+        });
+
+        const polylinePoints = points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
+        const gridLines = Array.from({ length: yTickCount + 1 }, (_, idx) => {
+            const ratio = idx / yTickCount;
+            const y = topPad + (chartHeight * ratio);
+            const value = maxValue * (1 - ratio);
+            return `
+                <g>
+                    <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" class="revenue-trend-grid-line"></line>
+                    <text x="${(leftPad - 8).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" class="revenue-trend-axis-label">${formatCurrency(value)}</text>
+                </g>
+            `;
+        }).join('');
+
+        const pointMarkers = points.map((point, index) => {
+            const pointLabel = `${point.label}: ${formatCurrency(point.amount)} (${point.bookings} booking${point.bookings !== 1 ? 's' : ''})`;
+            return `
+                <g class="revenue-trend-point-hit" data-point-index="${index}" tabindex="0" role="button" aria-label="${pointLabel}">
+                    <circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4.5" class="revenue-trend-point"></circle>
+                    <text x="${point.x.toFixed(2)}" y="${(height - 26).toFixed(2)}" text-anchor="middle" class="revenue-trend-axis-label">${point.label}</text>
+                </g>
+            `;
+        }).join('');
+
+        const peakMonth = [...series].sort((a, b) => b.amount - a.amount)[0];
+        const sourceLabel = String(trendSource || '').toUpperCase() === 'LIVE_BOOKINGS'
+            ? 'Live booking aggregate'
+            : String(trendSource || '').toUpperCase() === 'SYNTHETIC_SPREAD'
+                ? 'Synthetic spread snapshot'
+                : String(trendSource || '').toUpperCase() === 'BOOKING_ROLLUP'
+                    ? 'Monthly rollup snapshot'
+                    : normalizedTrend.length > 0
+                        ? 'Snapshot'
+                        : 'Live booking aggregate';
+
+        chartHost.innerHTML = `
+            <div class="revenue-trend-meta">
+                <span>Months plotted: <strong>${series.length}</strong></span>
+                <span>Peak month: <strong>${peakMonth.label}</strong> (${formatCurrency(peakMonth.amount)})</span>
+                <span>Source: <strong>${sourceLabel}</strong></span>
+            </div>
+            <div class="revenue-trend-scroll" aria-label="Drag horizontally to explore earlier months">
+                <svg viewBox="0 0 ${width} ${height}" class="revenue-trend-svg" style="width:${width}px" preserveAspectRatio="xMinYMin meet" aria-hidden="true">
+                    ${gridLines}
+                    <polyline points="${polylinePoints}" class="revenue-trend-line"></polyline>
+                    ${pointMarkers}
+                </svg>
+            </div>
+            <p class="revenue-trend-click-hint">Click or tap a point to view month details.</p>
+            <div class="revenue-trend-point-details" data-revenue-trend-details aria-live="polite"></div>
+        `;
+
+        const detailHost = chartHost.querySelector('[data-revenue-trend-details]');
+        const trendScrollHost = chartHost.querySelector('.revenue-trend-scroll');
+        const pointTargets = Array.from(chartHost.querySelectorAll('.revenue-trend-point-hit'));
+
+        const setSelectedPoint = (index) => {
+            const pointData = points[index];
+            if (!pointData || !detailHost) {
+                return;
+            }
+
+            pointTargets.forEach((target, targetIndex) => {
+                if (targetIndex === index) {
+                    target.classList.add('is-active');
+                } else {
+                    target.classList.remove('is-active');
+                }
+            });
+
+            detailHost.innerHTML = `
+                <span class="revenue-trend-point-month">${pointData.label}</span>
+                <span class="revenue-trend-point-amount">${formatCurrency(pointData.amount)}</span>
+                <span class="revenue-trend-point-bookings">${pointData.bookings} booking${pointData.bookings !== 1 ? 's' : ''}</span>
+            `;
+        };
+
+        pointTargets.forEach((pointTarget) => {
+            const pointIndex = Number(pointTarget.dataset.pointIndex);
+            if (!Number.isFinite(pointIndex)) {
+                return;
+            }
+
+            pointTarget.addEventListener('click', () => {
+                setSelectedPoint(pointIndex);
+            });
+
+            pointTarget.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedPoint(pointIndex);
+                }
+            });
+        });
+
+        if (trendScrollHost) {
+            requestAnimationFrame(() => {
+                trendScrollHost.scrollLeft = Math.max(0, trendScrollHost.scrollWidth - trendScrollHost.clientWidth);
+            });
+        }
+    };
+
     const refreshRevenueSelectionUi = () => {
         const selectedCountEl = document.getElementById('revenueSelectedCount');
         const exportButton = document.getElementById('exportRevenueCsvBtn');
@@ -330,12 +540,9 @@
 
     const loadRevenue = async ({ apiUrl, showSectionLoading, showAlert, formatDate, formatTime }) => {
         try {
-            if (typeof showSectionLoading === 'function') {
-                showSectionLoading('revenueTable', 'Loading revenue data...');
-            }
-
             const filter = document.getElementById('revenueFilter')?.value || 'month';
-            let url = `${apiUrl}/api/admin/revenue?filter=${filter}`;
+            let url = `${apiUrl}/api/admin/revenue?filter=${encodeURIComponent(filter)}&trendScope=filtered&trendSource=LIVE_BOOKINGS`;
+            const trendUrl = `${apiUrl}/api/admin/revenue?filter=all&trendScope=all&trendSource=LIVE_BOOKINGS`;
 
             if (filter === 'range') {
                 const startDate = document.getElementById('revenueStartDate')?.value;
@@ -352,9 +559,14 @@
             }
 
             const token = localStorage.getItem('token');
-            const res = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const [res, trendRes] = await Promise.all([
+                fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }),
+                fetch(trendUrl, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+            ]);
 
             if (!res.ok) {
                 throw new Error('Failed to load revenue data');
@@ -362,6 +574,8 @@
 
             const data = await res.json();
             const revenue = data.revenue || {};
+            const trendData = trendRes.ok ? await trendRes.json() : null;
+            const trendRevenue = trendData?.revenue || {};
 
             state.selectedBookingIds.clear();
 
@@ -370,9 +584,18 @@
             setText('revenueAvg', `₹${revenue.avgBookingValue || 0}`);
 
             updateRevenueCharts(revenue);
+            renderMonthlyRevenueTrend({
+                monthlyTrend: trendRevenue.monthlyTrend || revenue.monthlyTrend || [],
+                trendSource: trendRevenue.monthlyTrendSource || revenue.monthlyTrendSource || '',
+                bookings: trendData?.bookings || data.bookings || []
+            });
             updateRevenueTable({ bookings: data.bookings || [], formatDate, formatTime });
         } catch (error) {
             console.error('Failed to load revenue:', error);
+            const tableEl = document.getElementById('revenueTable');
+            if (tableEl) {
+                tableEl.innerHTML = '<p class="loading-inline-muted">Failed to load revenue data. Please retry.</p>';
+            }
             if (typeof showAlert === 'function') {
                 showAlert('revenueAlert', 'Failed to load revenue data', 'error');
             }

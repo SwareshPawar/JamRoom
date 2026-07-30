@@ -729,6 +729,168 @@
     height: 16px;
 }
 
+.revenue-trend-section {
+    margin-top: 14px;
+}
+
+.revenue-monthly-chart {
+    --revenue-trend-accent: var(--primary-color);
+    --revenue-trend-accent-soft: color-mix(in srgb, var(--primary-color) 26%, transparent);
+    --revenue-trend-grid: color-mix(in srgb, var(--border-color) 70%, transparent);
+    --revenue-trend-label: var(--text-color-light);
+    --revenue-trend-surface: color-mix(in srgb, var(--surface-1) 78%, var(--surface-elevated) 22%);
+
+    margin-top: 10px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+    border-radius: 12px;
+    background:
+        radial-gradient(circle at 18% 12%, var(--revenue-trend-accent-soft), transparent 52%),
+        linear-gradient(180deg, var(--revenue-trend-surface), var(--surface-elevated));
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-elevation), var(--transition-colors);
+}
+
+.revenue-monthly-chart:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.revenue-trend-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    font-size: 0.88rem;
+    color: var(--revenue-trend-label);
+    margin-bottom: 10px;
+}
+
+.revenue-trend-meta strong {
+    color: var(--text-color);
+}
+
+.revenue-trend-svg {
+    height: 300px;
+    display: block;
+}
+
+.revenue-trend-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    cursor: grab;
+    border-radius: 10px;
+    padding-bottom: 2px;
+}
+
+.revenue-trend-scroll:active {
+    cursor: grabbing;
+}
+
+.revenue-trend-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.revenue-trend-scroll::-webkit-scrollbar-track {
+    background: color-mix(in srgb, var(--surface-1) 76%, transparent);
+    border-radius: 999px;
+}
+
+.revenue-trend-scroll::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--primary-color) 40%, var(--border-color));
+    border-radius: 999px;
+}
+
+.revenue-trend-scroll::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--primary-color) 56%, var(--border-color));
+}
+
+.revenue-trend-grid-line {
+    stroke: var(--revenue-trend-grid);
+    stroke-width: 1;
+}
+
+.revenue-trend-axis-label {
+    fill: var(--revenue-trend-label);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.revenue-trend-line {
+    fill: none;
+    stroke: var(--revenue-trend-accent);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--revenue-trend-accent) 22%, transparent));
+}
+
+.revenue-trend-point {
+    fill: var(--revenue-trend-accent);
+    stroke: var(--surface-elevated);
+    stroke-width: 2;
+    transition: r 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.revenue-trend-point-hit {
+    cursor: pointer;
+}
+
+.revenue-trend-point-hit:hover .revenue-trend-point,
+.revenue-trend-point-hit:focus-visible .revenue-trend-point,
+.revenue-trend-point-hit.is-active .revenue-trend-point {
+    r: 6;
+    stroke-width: 2.6;
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--revenue-trend-accent) 35%, transparent));
+}
+
+.revenue-trend-point-hit:focus-visible {
+    outline: none;
+}
+
+.revenue-trend-click-hint {
+    margin: 10px 0 6px;
+    color: var(--text-color-light);
+    font-size: 0.84rem;
+}
+
+.revenue-trend-point-details {
+    min-height: 40px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+    padding: 8px 10px;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+}
+
+.revenue-trend-point-month {
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.revenue-trend-point-amount {
+    font-weight: 600;
+    color: var(--revenue-trend-accent);
+}
+
+.revenue-trend-point-bookings {
+    color: var(--text-color-light);
+    font-size: 0.88rem;
+}
+
+@media (max-width: 768px) {
+    .revenue-monthly-chart {
+        padding: 12px;
+    }
+
+    .revenue-trend-svg {
+        height: 240px;
+    }
+}
+
 .text-muted {
     color: var(--text-color-light);
 }

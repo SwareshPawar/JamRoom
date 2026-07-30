@@ -7,9 +7,98 @@ const express = require('express');
 const router = express.Router();
 const Booking = require('../../models/Booking');
 const AdminSettings = require('../../models/AdminSettings');
+const RevenueMonthlySnapshot = require('../../models/RevenueMonthlySnapshot');
 const { protect } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/admin');
 const { computeCollectedAmount } = require('../../utils/adminHelpers');
+
+const toMonthKey = (dateValue) => {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const toMonthLabelFromKey = (monthKey) => {
+  const [yearStr, monthStr] = String(monthKey || '').split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return monthKey;
+
+  const monthDate = new Date(year, month - 1, 1);
+  if (Number.isNaN(monthDate.getTime())) return monthKey;
+
+  return monthDate.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+};
+
+const buildMonthlyTrendFromBookings = (bookings = []) => {
+  const monthMap = new Map();
+
+  (Array.isArray(bookings) ? bookings : []).forEach((booking) => {
+    const monthKey = toMonthKey(booking?.date);
+    if (!monthKey) return;
+
+    const existing = monthMap.get(monthKey) || {
+      key: monthKey,
+      label: toMonthLabelFromKey(monthKey),
+      amount: 0,
+      bookings: 0
+    };
+
+    existing.amount += computeCollectedAmount({
+      totalAmount: booking.price,
+      paymentStatus: booking.paymentStatus,
+      amountPaid: booking.amountPaid
+    });
+    existing.bookings += 1;
+    monthMap.set(monthKey, existing);
+  });
+
+  return [...monthMap.values()].sort((left, right) => left.key.localeCompare(right.key));
+};
+
+const getMonthlyTrendFromSnapshots = async ({ sourceCandidates = [], dateRange = {} }) => {
+  const sourceList = Array.isArray(sourceCandidates) && sourceCandidates.length > 0
+    ? sourceCandidates
+    : ['SYNTHETIC_SPREAD', 'BOOKING_ROLLUP'];
+
+  const monthStartRange = {};
+  if (dateRange?.$gte instanceof Date && !Number.isNaN(dateRange.$gte.getTime())) {
+    monthStartRange.$gte = dateRange.$gte;
+  }
+  if (dateRange?.$lt instanceof Date && !Number.isNaN(dateRange.$lt.getTime())) {
+    monthStartRange.$lt = dateRange.$lt;
+  }
+  if (dateRange?.$lte instanceof Date && !Number.isNaN(dateRange.$lte.getTime())) {
+    monthStartRange.$lte = dateRange.$lte;
+  }
+
+  for (const source of sourceList) {
+    const query = { source };
+    if (Object.keys(monthStartRange).length > 0) {
+      query.monthStart = monthStartRange;
+    }
+
+    const rows = await RevenueMonthlySnapshot.find(query)
+      .sort({ monthStart: 1 })
+      .lean();
+
+    if (!rows.length) {
+      continue;
+    }
+
+    return {
+      source,
+      points: rows.map((row) => ({
+        key: row.monthKey,
+        label: row.monthLabel || toMonthLabelFromKey(row.monthKey),
+        amount: Number(row.collectedRevenue || 0),
+        bookings: Number(row.bookingCount || 0)
+      }))
+    };
+  }
+
+  return { source: 'NONE', points: [] };
+};
 
 const parseTimeToMinutes = (timeValue) => {
   const [hourPart, minutePart] = String(timeValue || '').split(':');
@@ -147,7 +236,7 @@ router.get('/debug-settings', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.get('/revenue', protect, isAdmin, async (req, res) => {
   try {
-    const { filter, startDate, endDate, year, month, week } = req.query;
+    const { filter, startDate, endDate, year, month, week, trendSource, trendScope } = req.query;
     let query = { bookingStatus: 'CONFIRMED', paymentStatus: { $in: ['PAID', 'PARTIAL'] } };
     let dateRange = {};
 
@@ -269,6 +358,28 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
       });
     });
 
+    const preferredTrendSources = (() => {
+      const normalized = String(trendSource || '').toUpperCase();
+      if (normalized === 'LIVE_BOOKINGS') return [];
+      if (normalized === 'BOOKING_ROLLUP') return ['BOOKING_ROLLUP', 'SYNTHETIC_SPREAD'];
+      if (normalized === 'SYNTHETIC_SPREAD') return ['SYNTHETIC_SPREAD', 'BOOKING_ROLLUP'];
+      return ['SYNTHETIC_SPREAD', 'BOOKING_ROLLUP'];
+    })();
+
+    const normalizedTrendScope = String(trendScope || 'all').toLowerCase();
+    const snapshotDateRange = normalizedTrendScope === 'filtered' ? dateRange : {};
+
+    const snapshotTrend = preferredTrendSources.length > 0
+      ? await getMonthlyTrendFromSnapshots({
+          sourceCandidates: preferredTrendSources,
+          dateRange: snapshotDateRange
+        })
+      : { source: 'LIVE_BOOKINGS', points: [] };
+
+    const monthlyTrend = snapshotTrend.points.length > 0
+      ? snapshotTrend.points
+      : buildMonthlyTrendFromBookings(bookings);
+
     res.json({
       success: true,
       revenue: {
@@ -277,7 +388,9 @@ router.get('/revenue', protect, isAdmin, async (req, res) => {
         avgBookingValue: Math.round(avgBookingValue),
         revenueByType,
         bookingsByType,
-        revenueByDate
+        revenueByDate,
+        monthlyTrend,
+        monthlyTrendSource: snapshotTrend.points.length > 0 ? snapshotTrend.source : 'LIVE_BOOKINGS'
       },
       bookings: bookings.map(booking => ({
         _id: booking._id,
