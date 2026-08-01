@@ -852,6 +852,145 @@ Authorization: Bearer <admin_token>
 
 ---
 
+### Block Time (Admin)
+**POST** `/api/admin/block-time`
+
+Create one or more blocked time entries.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body (Single Date):**
+```json
+{
+  "date": "2026-08-10",
+  "startTime": "10:00",
+  "endTime": "12:00",
+  "reason": "Maintenance"
+}
+```
+
+**Request Body (Date Range):**
+```json
+{
+  "dateFrom": "2026-08-10",
+  "dateTo": "2026-08-12",
+  "startTime": "10:00",
+  "endTime": "12:00",
+  "reason": "Private Event"
+}
+```
+
+**Request Body (Full Day):**
+```json
+{
+  "dateFrom": "2026-08-10",
+  "dateTo": "2026-08-12",
+  "startTime": "00:00",
+  "endTime": "23:59",
+  "reason": "Maintenance"
+}
+```
+
+**Response:** `201 Created`
+```json
+{
+  "success": true,
+  "message": "Blocked time created for 3 dates",
+  "blockedTime": {
+    "_id": "66f1...",
+    "date": "2026-08-10T00:00:00.000Z",
+    "startTime": "10:00",
+    "endTime": "12:00",
+    "reason": "Private Event"
+  },
+  "blockedTimes": [
+    { "_id": "66f1...", "date": "2026-08-10T00:00:00.000Z" },
+    { "_id": "66f2...", "date": "2026-08-11T00:00:00.000Z" },
+    { "_id": "66f3...", "date": "2026-08-12T00:00:00.000Z" }
+  ]
+}
+```
+
+**Validation Notes:**
+- Date range must be valid and `dateTo >= dateFrom`.
+- Maximum supported date range is 120 days.
+- Conflict checks run against confirmed bookings for each date.
+
+---
+
+### Update Blocked Time (Admin)
+**PUT** `/api/admin/blocked-times/:id`
+
+Update an existing active blocked time.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Request Body:**
+```json
+{
+  "date": "2026-08-10",
+  "startTime": "11:00",
+  "endTime": "13:00",
+  "reason": "Internal Meeting"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Blocked time updated successfully",
+  "blockedTime": {
+    "_id": "66f1...",
+    "date": "2026-08-10T00:00:00.000Z",
+    "startTime": "11:00",
+    "endTime": "13:00",
+    "reason": "Internal Meeting"
+  }
+}
+```
+
+---
+
+### Get Blocked Times (Admin)
+**GET** `/api/admin/blocked-times?deleted=active|deleted|all`
+
+Get blocked-time records with deleted-state filters.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+---
+
+### Soft Delete Blocked Time (Admin)
+**DELETE** `/api/admin/blocked-times/:id`
+
+Moves a blocked-time record to deleted state.
+
+---
+
+### Restore Deleted Blocked Time (Admin)
+**PUT** `/api/admin/blocked-times/:id/restore`
+
+Restores a previously soft-deleted blocked-time record.
+
+---
+
+### Permanently Delete Blocked Time (Admin)
+**DELETE** `/api/admin/blocked-times/:id/permanent`
+
+Permanently removes a soft-deleted blocked-time record.
+
+---
+
 ### Get Admin Users (Admin)
 **GET** `/api/admin/users?q=&limit=100`
 

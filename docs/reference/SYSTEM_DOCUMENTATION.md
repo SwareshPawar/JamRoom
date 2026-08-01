@@ -235,10 +235,12 @@
 - `GET /api/admin/settings` - Get admin settings
 - `PUT /api/admin/settings` - Update admin settings
 - `POST /api/admin/make-admin` - Grant admin privileges
-- `POST /api/admin/block-time` - Block time slot
+- `POST /api/admin/block-time` - Block time slot (single date or date range)
 - `PUT /api/admin/blocked-times/:id` - Edit blocked time
 - `GET /api/admin/blocked-times` - Get blocked times
-- `DELETE /api/admin/blocked-times/:id` - Remove blocked time
+- `DELETE /api/admin/blocked-times/:id` - Soft-delete blocked time
+- `PUT /api/admin/blocked-times/:id/restore` - Restore deleted blocked time
+- `DELETE /api/admin/blocked-times/:id/permanent` - Permanently delete blocked time
 - `GET /api/admin/debug-settings` - Debug settings (temporary)
 
 ### Slot Routes (`/routes/slot.routes.js`)

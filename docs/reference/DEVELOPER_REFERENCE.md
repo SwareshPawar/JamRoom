@@ -169,6 +169,11 @@ function checkSlots() // Not descriptive enough
 /api/admin/users/:id/reset-default-password
 /api/admin/stats
 /api/admin/settings
+/api/admin/block-time
+/api/admin/blocked-times
+/api/admin/blocked-times/:id
+/api/admin/blocked-times/:id/restore
+/api/admin/blocked-times/:id/permanent
 
 /api/slots               // Simple resource routes
 /api/slots/bulk
