@@ -792,6 +792,25 @@ Authorization: Bearer <admin_token>
 
 ---
 
+### Additional Admin Booking Operations
+
+Additional booking lifecycle endpoints:
+- `GET /api/admin/bookings/calendar`
+- `GET /api/admin/availability/:date`
+- `DELETE /api/admin/bookings/:id`
+- `DELETE /api/admin/bookings/:id/permanent`
+- `PUT /api/admin/bookings/:id/restore`
+- `GET /api/admin/bookings/:id/download-pdf`
+
+Class lesson management endpoints under a booking:
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/complete`
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/cancel`
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/approve-slot`
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/reject-slot`
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/book-slot`
+
+---
+
 ### Get Statistics (Admin)
 **GET** `/api/admin/stats`
 
@@ -849,6 +868,95 @@ Authorization: Bearer <admin_token>
   1. Booking date ascending
   2. Start time ascending
   3. Priority as tie-breaker
+
+---
+
+### Get Revenue Analytics (Admin)
+**GET** `/api/admin/revenue`
+
+Get admin revenue analytics and booking-level revenue rows.
+
+**Headers:**
+```
+Authorization: Bearer <admin_token>
+```
+
+**Query Parameters (optional):**
+- `filter`: `today | week | month | last_month | last_3_months | year | range`
+- `startDate`, `endDate`: used when `filter=range`
+- `year`, `month`, `week`: used by year/month/week filters
+- `trendSource`: `SYNTHETIC_SPREAD | BOOKING_ROLLUP | LIVE_BOOKINGS`
+- `trendScope`: `all | filtered`
+
+**Response fields (subset):**
+- `revenue.totalRevenue`
+- `revenue.totalBookings`
+- `revenue.avgBookingValue`
+- `revenue.revenueByType`
+- `revenue.bookingsByType`
+- `revenue.revenueByDate`
+- `revenue.monthlyTrend`
+- `revenue.monthlyTrendSource`
+
+---
+
+### Saved Quotations (Admin)
+
+Saved quotation template endpoints:
+- `GET /api/admin/quotations/saved`
+- `POST /api/admin/quotations/saved`
+- `PUT /api/admin/quotations/saved/:id`
+- `DELETE /api/admin/quotations/saved/:id`
+- `DELETE /api/admin/quotations/saved/:id/permanent`
+- `PUT /api/admin/quotations/saved/:id/restore`
+- `POST /api/admin/quotations/send`
+
+Notes:
+- Quotation-to-booking conversion in admin currently creates a booking using `POST /api/admin/bookings` with quotation-derived payload.
+
+---
+
+### Open Events (Admin)
+
+Open event management endpoints:
+- `POST /api/admin/open-events`
+- `GET /api/admin/open-events`
+- `PATCH /api/admin/open-events/:id`
+- `PATCH /api/admin/open-events/:id/status`
+- `GET /api/admin/open-events/:id/bookings`
+- `POST /api/admin/open-events/:id/notify-users`
+- `POST /api/admin/open-events/:id/test-email`
+- `DELETE /api/admin/open-events/:id`
+- `DELETE /api/admin/open-events/:id/bookings/:bookingId`
+- `POST /api/admin/open-events/:id/bookings`
+
+---
+
+### Admin Settings and WhatsApp (Admin)
+
+Additional admin settings/catalog endpoints:
+- `GET /api/admin/settings/deleted-summary`
+- `POST /api/admin/settings/export-catalog`
+- `DELETE /api/admin/settings/rental-types/:id`
+- `DELETE /api/admin/settings/rental-types/:id/permanent`
+- `PUT /api/admin/settings/rental-types/:id/restore`
+- `DELETE /api/admin/settings/bindings/:id`
+- `DELETE /api/admin/settings/bindings/:id/permanent`
+- `PUT /api/admin/settings/bindings/:id/restore`
+- `DELETE /api/admin/settings/instagram-embeds/:id`
+- `DELETE /api/admin/settings/instagram-embeds/:id/permanent`
+- `PUT /api/admin/settings/instagram-embeds/:id/restore`
+- `DELETE /api/admin/settings/rental-types/:rentalTypeId/sub-items/:subItemId`
+- `DELETE /api/admin/settings/rental-types/:rentalTypeId/sub-items/:subItemId/permanent`
+- `PUT /api/admin/settings/rental-types/:rentalTypeId/sub-items/:subItemId/restore`
+
+Admin WhatsApp settings endpoints:
+- `GET /api/admin/whatsapp-settings`
+- `PUT /api/admin/whatsapp-settings`
+- `POST /api/admin/whatsapp-settings/add-contact`
+- `PUT /api/admin/whatsapp-settings/update-contact/:index`
+- `DELETE /api/admin/whatsapp-settings/remove-contact/:index`
+- `POST /api/admin/whatsapp-settings/test-notification`
 
 ---
 

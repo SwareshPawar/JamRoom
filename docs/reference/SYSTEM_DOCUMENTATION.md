@@ -217,23 +217,47 @@
 - `GET /api/bookings/:id` - Get single booking
 
 ### Admin Routes (`/routes/admin.routes.js`)
-- `GET /api/admin/revenue` - Get revenue analytics
 - `GET /api/admin/bookings/calendar` - Get calendar formatted bookings
 - `GET /api/admin/bookings` - Get bookings with filters + pagination/search/sort
+- `GET /api/admin/availability/:date` - Get admin availability for a date
 - `POST /api/admin/bookings` - Create confirmed/paid booking for registered user
 - `PUT /api/admin/bookings/:id/approve` - Approve booking
 - `PUT /api/admin/bookings/:id/reject` - Reject booking
 - `POST /api/admin/bookings/:id/send-ebill` - Send eBill to selected recipients
 - `DELETE /api/admin/bookings/:id` - Delete booking *(NEW)*
+- `DELETE /api/admin/bookings/:id/permanent` - Permanently delete booking
+- `PUT /api/admin/bookings/:id/restore` - Restore deleted booking
 - `PUT /api/admin/bookings/:id/edit` - Edit booking *(NEW)*
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/complete` - Mark lesson complete
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/cancel` - Cancel lesson
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/approve-slot` - Approve lesson slot
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/reject-slot` - Reject lesson slot
+- `PUT /api/admin/bookings/:id/class-lessons/:lessonId/book-slot` - Assign lesson slot
 - `GET /api/admin/users` - Fetch users for admin booking/create-user flows
 - `POST /api/admin/users` - Create user from admin panel
 - `PUT /api/admin/users/:id` - Update user details from admin panel
 - `POST /api/admin/users/:id/reset-default-password` - Reset user temporary password
 - `DELETE /api/admin/users/:id` - Delete user and related bookings
+- `DELETE /api/admin/users/:id/permanent` - Permanently delete user
+- `PUT /api/admin/users/:id/restore` - Restore deleted user
 - `GET /api/admin/stats` - Get dashboard statistics
+- `GET /api/admin/revenue` - Get revenue analytics (includes monthly trend payload)
 - `GET /api/admin/settings` - Get admin settings
 - `PUT /api/admin/settings` - Update admin settings
+- `GET /api/admin/settings/deleted-summary` - Get deleted-item summary for catalog modules
+- `POST /api/admin/settings/export-catalog` - Export catalog backup snapshot
+- `DELETE /api/admin/settings/rental-types/:id` - Soft-delete rental type
+- `DELETE /api/admin/settings/rental-types/:id/permanent` - Permanently delete rental type
+- `PUT /api/admin/settings/rental-types/:id/restore` - Restore rental type
+- `DELETE /api/admin/settings/bindings/:id` - Soft-delete binding item
+- `DELETE /api/admin/settings/bindings/:id/permanent` - Permanently delete binding item
+- `PUT /api/admin/settings/bindings/:id/restore` - Restore binding item
+- `DELETE /api/admin/settings/instagram-embeds/:id` - Soft-delete Instagram embed
+- `DELETE /api/admin/settings/instagram-embeds/:id/permanent` - Permanently delete Instagram embed
+- `PUT /api/admin/settings/instagram-embeds/:id/restore` - Restore Instagram embed
+- `DELETE /api/admin/settings/rental-types/:rentalTypeId/sub-items/:subItemId` - Soft-delete rental sub-item
+- `DELETE /api/admin/settings/rental-types/:rentalTypeId/sub-items/:subItemId/permanent` - Permanently delete rental sub-item
+- `PUT /api/admin/settings/rental-types/:rentalTypeId/sub-items/:subItemId/restore` - Restore rental sub-item
 - `POST /api/admin/make-admin` - Grant admin privileges
 - `POST /api/admin/block-time` - Block time slot (single date or date range)
 - `PUT /api/admin/blocked-times/:id` - Edit blocked time
@@ -241,7 +265,43 @@
 - `DELETE /api/admin/blocked-times/:id` - Soft-delete blocked time
 - `PUT /api/admin/blocked-times/:id/restore` - Restore deleted blocked time
 - `DELETE /api/admin/blocked-times/:id/permanent` - Permanently delete blocked time
+- `GET /api/admin/quotations/saved` - List saved quotations
+- `POST /api/admin/quotations/saved` - Create saved quotation
+- `PUT /api/admin/quotations/saved/:id` - Update saved quotation
+- `DELETE /api/admin/quotations/saved/:id` - Soft-delete saved quotation
+- `PUT /api/admin/quotations/saved/:id/restore` - Restore saved quotation
+- `DELETE /api/admin/quotations/saved/:id/permanent` - Permanently delete saved quotation
+- `POST /api/admin/quotations/send` - Send quotation
+- `POST /api/admin/open-events` - Create open event
+- `GET /api/admin/open-events` - List open events
+- `PATCH /api/admin/open-events/:id` - Update open event details
+- `PATCH /api/admin/open-events/:id/status` - Update open event status
+- `GET /api/admin/open-events/:id/bookings` - Get open event bookings
+- `POST /api/admin/open-events/:id/notify-users` - Send open event notifications
+- `POST /api/admin/open-events/:id/test-email` - Send test email for open event
+- `DELETE /api/admin/open-events/:id` - Delete open event
+- `DELETE /api/admin/open-events/:id/bookings/:bookingId` - Remove open event booking
+- `POST /api/admin/open-events/:id/bookings` - Create open event booking entry
+- `GET /api/admin/whatsapp-settings` - Get WhatsApp notification settings
+- `PUT /api/admin/whatsapp-settings` - Update WhatsApp notification settings
+- `POST /api/admin/whatsapp-settings/add-contact` - Add WhatsApp contact
+- `PUT /api/admin/whatsapp-settings/update-contact/:index` - Update WhatsApp contact
+- `DELETE /api/admin/whatsapp-settings/remove-contact/:index` - Remove WhatsApp contact
+- `POST /api/admin/whatsapp-settings/test-notification` - Send test WhatsApp notification
 - `GET /api/admin/debug-settings` - Debug settings (temporary)
+
+### 3-Month Parity Audit (2026-05-01 to 2026-08-01)
+
+This reference was reconciled against current code and commits for the full three-month window.
+Verified feature areas:
+- Follow-up queue rules and payload under `/api/admin/stats`
+- Block time range/full-day behavior and blocked-time lifecycle endpoints
+- Revenue monthly trend payload (`monthlyTrend`, `monthlyTrendSource`) from `/api/admin/revenue`
+- Open events admin routes and notification/test-email flow
+- Saved quotations routes and quotation send flow
+- Admin booking lifecycle extensions (restore/permanent delete, class lesson actions, admin availability)
+- Settings catalog lifecycle endpoints (deleted-summary/export and soft-delete restore flows)
+- Admin WhatsApp settings and test-notification endpoints
 
 ### Slot Routes (`/routes/slot.routes.js`)
 - `GET /api/slots` - Get available slots
