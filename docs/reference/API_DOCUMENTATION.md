@@ -157,6 +157,21 @@ Reset password with token from email.
 
 ---
 
+### Validate Reset Token
+**GET** `/api/auth/validate-reset-token/:token`
+
+Validate password reset token before showing new-password form.
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Reset token is valid"
+}
+```
+
+---
+
 ### Get Current User
 **GET** `/api/auth/me`
 
@@ -325,6 +340,14 @@ Authorization: Bearer <admin_token>
 
 ---
 
+### Slot Restore/Permanent Delete (Admin)
+
+Additional slot lifecycle endpoints:
+- `PUT /api/slots/:id/restore`
+- `DELETE /api/slots/:id/permanent`
+
+---
+
 ## 🎫 Booking Endpoints
 
 ### Create Booking
@@ -475,6 +498,52 @@ Content-Disposition: attachment; filename="booking-65def....pdf"
 - `404`: Booking not found
 - `403`: Access denied (not user's booking)
 - `500`: Server error generating PDF
+
+---
+
+### Additional Public Booking Endpoints
+
+Supplementary booking endpoints:
+- `GET /api/bookings/payment-info`
+- `GET /api/bookings/instagram-embeds`
+- `GET /api/bookings/availability/perday-items`
+- `GET /api/bookings/open-sessions`
+- `POST /api/bookings/open-sessions/:id/comments`
+- `PUT /api/bookings/open-sessions/:id/presence`
+- `POST /api/bookings/:id/class-lessons/:lessonId/request-slot`
+
+---
+
+### Profile Endpoints
+
+User profile and account endpoints:
+- `GET /api/profile/`
+- `GET /api/profile/bookings`
+- `PUT /api/profile/password`
+- `POST /api/profile/whatsapp`
+- `GET /api/profile/whatsapp-setup`
+
+---
+
+### Open Event Public Endpoints
+
+Public open-event discovery and booking endpoints:
+- `GET /api/open-events/`
+- `GET /api/open-events/:id`
+- `POST /api/open-events/:id/book`
+
+---
+
+### Test Utility Endpoints
+
+Diagnostic/test endpoints:
+- `GET /api/test/admin-booking`
+- `GET /api/test/dummy-booking`
+- `GET /api/test/calendar-preview`
+- `GET /api/test/perf-baseline`
+- `GET /api/test/perf-metrics`
+- `GET /api/test/whatsapp`
+- `GET /api/test/whatsapp-config`
 
 ---
 
@@ -801,6 +870,7 @@ Additional booking lifecycle endpoints:
 - `DELETE /api/admin/bookings/:id/permanent`
 - `PUT /api/admin/bookings/:id/restore`
 - `GET /api/admin/bookings/:id/download-pdf`
+- `GET /api/admin/debug-pdf`
 
 Class lesson management endpoints under a booking:
 - `PUT /api/admin/bookings/:id/class-lessons/:lessonId/complete`

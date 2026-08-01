@@ -207,6 +207,7 @@
 - `GET /api/auth/me` - Get current user info
 - `POST /api/auth/forgot-password` - Request password reset
 - `POST /api/auth/reset-password` - Reset password with token
+- `GET /api/auth/validate-reset-token/:token` - Validate reset token before password update
 
 ### Booking Routes (`/routes/booking.routes.js`)
 - `POST /api/bookings` - Create new booking
@@ -214,7 +215,26 @@
 - `PUT /api/bookings/:id/cancel` - Cancel booking
 - `GET /api/bookings/settings` - Get public settings (rental types)
 - `GET /api/bookings/availability/:date` - Get availability for specific date
+- `GET /api/bookings/availability/perday-items` - Get per-day item availability
+- `GET /api/bookings/payment-info` - Get payment info metadata for client display
+- `GET /api/bookings/instagram-embeds` - Get homepage Instagram embed configuration
+- `GET /api/bookings/open-sessions` - Get open sessions feed
+- `POST /api/bookings/open-sessions/:id/comments` - Add comment to open session
+- `PUT /api/bookings/open-sessions/:id/presence` - Update user presence for open session
+- `POST /api/bookings/:id/class-lessons/:lessonId/request-slot` - Request lesson reschedule slot
 - `GET /api/bookings/:id` - Get single booking
+
+### Profile Routes (`/routes/profile.routes.js`)
+- `GET /api/profile/` - Get profile data
+- `GET /api/profile/bookings` - Get profile-scoped bookings
+- `PUT /api/profile/password` - Update account password
+- `POST /api/profile/whatsapp` - Update WhatsApp preferences
+- `GET /api/profile/whatsapp-setup` - Get WhatsApp setup metadata
+
+### Open Event Public Routes (`/routes/open-event.routes.js`)
+- `GET /api/open-events/` - List public open events
+- `GET /api/open-events/:id` - Get single public open event
+- `POST /api/open-events/:id/book` - Book into an open event
 
 ### Admin Routes (`/routes/admin.routes.js`)
 - `GET /api/admin/bookings/calendar` - Get calendar formatted bookings
@@ -288,11 +308,12 @@
 - `PUT /api/admin/whatsapp-settings/update-contact/:index` - Update WhatsApp contact
 - `DELETE /api/admin/whatsapp-settings/remove-contact/:index` - Remove WhatsApp contact
 - `POST /api/admin/whatsapp-settings/test-notification` - Send test WhatsApp notification
+- `GET /api/admin/debug-pdf` - Debug PDF render payload (temporary)
 - `GET /api/admin/debug-settings` - Debug settings (temporary)
 
-### 3-Month Parity Audit (2026-05-01 to 2026-08-01)
+### 6-Month Parity Audit (2026-02-01 to 2026-08-01)
 
-This reference was reconciled against current code and commits for the full three-month window.
+This reference was reconciled against current code and commits for the full six-month window.
 Verified feature areas:
 - Follow-up queue rules and payload under `/api/admin/stats`
 - Block time range/full-day behavior and blocked-time lifecycle endpoints
@@ -302,11 +323,25 @@ Verified feature areas:
 - Admin booking lifecycle extensions (restore/permanent delete, class lesson actions, admin availability)
 - Settings catalog lifecycle endpoints (deleted-summary/export and soft-delete restore flows)
 - Admin WhatsApp settings and test-notification endpoints
+- Public open-events routes and profile routes
+- Additional booking utilities (`payment-info`, per-day availability items, open-session interactions)
+- Auth token validation endpoint and test utility route inventory
 
 ### Slot Routes (`/routes/slot.routes.js`)
 - `GET /api/slots` - Get available slots
 - `POST /api/slots` - Create slot (Admin)
 - `PUT /api/slots/:id` - Update slot (Admin)
+- `PUT /api/slots/:id/restore` - Restore deleted slot (Admin)
+- `DELETE /api/slots/:id/permanent` - Permanently delete slot (Admin)
+
+### Test Routes (`/routes/test.routes.js`)
+- `GET /api/test/admin-booking` - Admin booking integration test endpoint
+- `GET /api/test/dummy-booking` - Dummy booking payload endpoint
+- `GET /api/test/calendar-preview` - Calendar invite preview endpoint
+- `GET /api/test/perf-baseline` - Performance baseline endpoint
+- `GET /api/test/perf-metrics` - Runtime performance metrics endpoint
+- `GET /api/test/whatsapp` - WhatsApp test endpoint
+- `GET /api/test/whatsapp-config` - WhatsApp config diagnostic endpoint
 
 ---
 

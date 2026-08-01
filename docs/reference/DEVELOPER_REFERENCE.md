@@ -152,12 +152,20 @@ function checkSlots() // Not descriptive enough
 /api/auth/login
 /api/auth/forgot-password
 /api/auth/reset-password
+/api/auth/validate-reset-token/:token
 /api/auth/me
 
 /api/bookings             // Resource-based routes
 /api/bookings/my-bookings
 /api/bookings/:id
 /api/bookings/:id/cancel
+/api/bookings/payment-info
+/api/bookings/instagram-embeds
+/api/bookings/open-sessions
+/api/bookings/open-sessions/:id/comments
+/api/bookings/open-sessions/:id/presence
+/api/bookings/availability/perday-items
+/api/bookings/:id/class-lessons/:lessonId/request-slot
 
 /api/admin/bookings       // Admin prefixed routes
 /api/admin/bookings/:id/approve
@@ -218,9 +226,29 @@ function checkSlots() // Not descriptive enough
 /api/admin/whatsapp-settings/remove-contact/:index
 /api/admin/whatsapp-settings/test-notification
 
+/api/profile/
+/api/profile/bookings
+/api/profile/password
+/api/profile/whatsapp
+/api/profile/whatsapp-setup
+
+/api/open-events/
+/api/open-events/:id
+/api/open-events/:id/book
+
 /api/slots               // Simple resource routes
 /api/slots/bulk
 /api/slots/:id
+/api/slots/:id/restore
+/api/slots/:id/permanent
+
+/api/test/admin-booking
+/api/test/dummy-booking
+/api/test/calendar-preview
+/api/test/perf-baseline
+/api/test/perf-metrics
+/api/test/whatsapp
+/api/test/whatsapp-config
 ```
 
 #### **Request/Response Naming**
