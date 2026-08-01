@@ -271,6 +271,16 @@ JamRoom (1h) + Keyboard Per-day + 3 IEMs
 - [ ] Confirmed bookings count correct
 - [ ] Total revenue calculated correctly
 
+### Follow-up Queue (Admin Dashboard)
+- [ ] Follow-up queue is visible on dashboard
+- [ ] Queue includes today and future bookings
+- [ ] Queue excludes CANCELLED and REJECTED bookings
+- [ ] Queue includes confirmed+paid upcoming bookings (UPCOMING)
+- [ ] Queue includes confirmed unpaid bookings (UNPAID)
+- [ ] Queue includes not confirmed bookings (NOT_CONFIRMED)
+- [ ] Queue ordering is by booking date, then start time (for example 2:00 PM before 4:00 PM)
+- [ ] Queue item shows contact actions (Call/WhatsApp) when mobile is available
+
 ### View All Bookings
 - [ ] All bookings list loads
 - [ ] Filter by status works

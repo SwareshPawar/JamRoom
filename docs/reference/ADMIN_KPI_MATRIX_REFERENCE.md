@@ -65,6 +65,42 @@ The stats API currently returns (relevant subset):
 - `upcomingSessions`
 - `cancellations`
 - `avgBookingDuration`
+- `followupQueue`
+
+## Follow-up Queue (Dashboard Quick Actions)
+
+The dashboard renders a Follow-up Queue card from `stats.followupQueue`.
+
+### Inclusion Rules
+
+Queue includes bookings that satisfy all conditions:
+1. Booking is on or after current day (`date >= todayStart` or `perDayStartDate >= todayStart`)
+2. Booking is not cancelled/rejected
+3. Booking matches one of the follow-up categories below
+
+### Categories
+
+Each queue item has `title`, `subtitle`, `priority`, and `reasonKey`:
+1. Not confirmed
+- Condition: `bookingStatus !== 'CONFIRMED'`
+- `reasonKey: 'NOT_CONFIRMED'`
+2. Unpaid
+- Condition: confirmed booking with `paymentStatus in ['PENDING', 'PARTIAL']`
+- `reasonKey: 'UNPAID'`
+3. Upcoming booking
+- Condition: confirmed and paid future booking
+- `reasonKey: 'UPCOMING'`
+
+### Ordering
+
+Queue is sorted by:
+1. Booking date ascending
+2. Start time ascending (`HH:MM`)
+3. Priority ascending as tie-breaker
+
+### Payload Notes
+
+Queue item includes user contact (`userName`, `userEmail`, `userMobile`) and schedule fields (`date`, `startTime`, `endTime`, `perDayStartDate`, `perDayEndDate`) for direct dashboard actions.
 
 ## Metric Calculations
 

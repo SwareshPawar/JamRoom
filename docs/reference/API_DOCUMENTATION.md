@@ -797,6 +797,8 @@ Authorization: Bearer <admin_token>
 
 Get admin dashboard statistics.
 
+Includes Follow-up Queue data used by Admin dashboard quick-action panel.
+
 **Headers:**
 ```
 Authorization: Bearer <admin_token>
@@ -811,10 +813,42 @@ Authorization: Bearer <admin_token>
     "pendingBookings": 5,
     "confirmedBookings": 38,
     "totalRevenue": 22500,
-    "recentBookings": [...]
+    "recentBookings": [...],
+    "followupQueue": [
+      {
+        "_id": "66f1...",
+        "userName": "Customer Name",
+        "userEmail": "customer@example.com",
+        "userMobile": "9876543210",
+        "bookingStatus": "CONFIRMED",
+        "paymentStatus": "PENDING",
+        "rentalType": "JamRoom",
+        "bookingMode": "hourly",
+        "date": "2026-08-04T00:00:00.000Z",
+        "startTime": "14:00",
+        "endTime": "16:00",
+        "title": "Advance payment pending",
+        "subtitle": "Upcoming confirmed booking without payment received.",
+        "priority": 2,
+        "reasonKey": "UNPAID"
+      }
+    ]
   }
 }
 ```
+
+**Follow-up Queue Rules:**
+- Includes only current-day and future bookings (`date >= todayStart` or `perDayStartDate >= todayStart`).
+- Excludes cancelled/rejected bookings.
+- Includes future bookings even if already paid, so upcoming sessions remain visible.
+- Categories:
+  - `NOT_CONFIRMED`: booking status is not `CONFIRMED`.
+  - `UNPAID`: confirmed booking with payment status `PENDING` or `PARTIAL`.
+  - `UPCOMING`: confirmed and paid future booking.
+- Sorting priority:
+  1. Booking date ascending
+  2. Start time ascending
+  3. Priority as tie-breaker
 
 ---
 

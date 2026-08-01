@@ -236,6 +236,7 @@
 - `PUT /api/admin/settings` - Update admin settings
 - `POST /api/admin/make-admin` - Grant admin privileges
 - `POST /api/admin/block-time` - Block time slot
+- `PUT /api/admin/blocked-times/:id` - Edit blocked time
 - `GET /api/admin/blocked-times` - Get blocked times
 - `DELETE /api/admin/blocked-times/:id` - Remove blocked time
 - `GET /api/admin/debug-settings` - Debug settings (temporary)
@@ -292,6 +293,7 @@ let settings = null;
 ```javascript
 // Key Functions:
 - loadStats() - Load dashboard statistics
+  - includes follow-up queue data (`stats.followupQueue`) for upcoming/unpaid/not-confirmed actions
 - loadBookings() - Load all bookings table
 - approveBooking() - Approve booking
 - rejectBooking() - Reject booking
