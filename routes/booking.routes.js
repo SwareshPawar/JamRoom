@@ -1625,10 +1625,22 @@ router.get('/availability/:date', async (req, res) => {
     });
     const mergedBookings = Array.from(mergedBookingsMap.values());
 
-    // Get all blocked times for the date
-    const blockedTimes = await BlockedTime.find({
-      date: { $gte: dayStart, $lte: dayEnd }
-    }).select('startTime endTime reason');
+    // Get blocked times for the selected IST day.
+    // Use a wider window and then filter by IST day string to be resilient
+    // to historical records created with timezone-shifted midnight values.
+    const blockedWindowStart = new Date(dayStart);
+    blockedWindowStart.setHours(blockedWindowStart.getHours() - 12);
+    const blockedWindowEnd = new Date(dayEnd);
+    blockedWindowEnd.setHours(blockedWindowEnd.getHours() + 12);
+    const requestedYmd = formatDateAsYmdInIst(date);
+
+    const blockedTimesRaw = await BlockedTime.find({
+      date: { $gte: blockedWindowStart, $lte: blockedWindowEnd }
+    }).select('date startTime endTime reason');
+
+    const blockedTimes = blockedTimesRaw.filter((blocked) => {
+      return formatDateAsYmdInIst(new Date(blocked.date)) === requestedYmd;
+    });
 
     res.json({
       success: true,

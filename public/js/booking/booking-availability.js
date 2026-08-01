@@ -96,7 +96,14 @@ const buildTimeRangeSummary = (items = [], emptyText) => {
     }
 
     return items
-        .map((item) => `${formatTimeLabel(item.startTime)}-${formatTimeLabel(item.endTime)}`)
+        .map((item) => {
+            const timeRange = `${formatTimeLabel(item.startTime)}-${formatTimeLabel(item.endTime)}`;
+            if (item?.type === 'blocked') {
+                const reason = String(item?.reason || '').trim() || 'Blocked by admin';
+                return `${timeRange} - ${reason}`;
+            }
+            return timeRange;
+        })
         .join(', ');
 };
 
@@ -588,9 +595,20 @@ const displayAvailability = (data) => {
     }
 
     const confirmedBookings = sortByStartTime(
-        upcomingBookings.filter((booking) => booking.bookingStatus === 'CONFIRMED')
+        upcomingBookings
+            .filter((booking) => booking.bookingStatus === 'CONFIRMED')
+            .map((booking) => ({
+                ...booking,
+                type: 'booking'
+            }))
     );
-    const sortedBlockedTimes = sortByStartTime(upcomingBlockedTimes);
+    const sortedBlockedTimes = sortByStartTime(
+        upcomingBlockedTimes.map((blocked) => ({
+            ...blocked,
+            type: 'blocked',
+            reason: blocked?.reason || 'Blocked by admin'
+        }))
+    );
 
     const occupiedRanges = sortByStartTime([
         ...confirmedBookings,

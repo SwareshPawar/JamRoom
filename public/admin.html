@@ -825,29 +825,52 @@
     <div id="blockTimeModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Block Time Slot</h2>
+                <h2 id="blockTimeModalTitle">Block Time Slot</h2>
                 <span class="close" onclick="closeModal('blockTimeModal')">&times;</span>
             </div>
             <form id="blockTimeForm">
+                <div class="time-container">
+                    <div class="form-group">
+                        <label>From Date*</label>
+                        <input type="date" id="blockDateFrom" class="admin-book-slot-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>To Date*</label>
+                        <input type="date" id="blockDateTo" class="admin-book-slot-date" required>
+                    </div>
+                </div>
                 <div class="form-group">
-                    <label>Date*</label>
-                    <input type="date" id="blockDate" required>
+                    <label><input type="checkbox" id="blockFullDay"> Block Full Day</label>
                 </div>
                 <div class="time-container">
                     <div class="form-group">
                         <label>Start Time*</label>
-                        <input type="time" id="blockStartTime" required>
+                        <select id="blockStartTime" required>
+                            <option value="">Select start time</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>End Time*</label>
-                        <input type="time" id="blockEndTime" required>
+                        <select id="blockEndTime" required disabled>
+                            <option value="">Select start time first</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Reason (Optional)</label>
-                    <input type="text" id="blockReason" placeholder="e.g., Maintenance, Private event">
+                    <label>Reason*</label>
+                    <select id="blockReason" required>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Private Event">Private Event</option>
+                        <option value="Internal Meeting">Internal Meeting</option>
+                        <option value="Equipment Setup">Equipment Setup</option>
+                        <option value="Other">Other</option>
+                    </select>
                 </div>
-                <button type="submit" class="btn btn-danger btn-full">Block Time</button>
+                <div class="form-group admin-hidden" id="blockReasonCustomGroup">
+                    <label>Custom Reason*</label>
+                    <input type="text" id="blockReasonCustom" placeholder="Enter custom block reason">
+                </div>
+                <button type="submit" id="blockTimeSubmitBtn" class="btn btn-danger btn-full">Block Time</button>
             </form>
         </div>
     </div>
@@ -1655,6 +1678,7 @@
         let usersManagementById = new Map();
         let usersDeletedFilter = 'active';
         let blockedDeletedFilter = 'active';
+        let editingBlockedTimeId = null;
         let settingsDeletedFilter = 'active';
         let savedQuotationsDeletedFilter = 'active';
         let deletedRecordsActiveTab = 'bookings';
@@ -1908,9 +1932,275 @@
         };
 
         const showBlockTimeModal = () => {
+            editingBlockedTimeId = null;
             document.getElementById('blockTimeForm').reset();
+            const modalTitleEl = document.getElementById('blockTimeModalTitle');
+            const submitBtnEl = document.getElementById('blockTimeSubmitBtn');
+            if (modalTitleEl) modalTitleEl.textContent = 'Block Time Slot';
+            if (submitBtnEl) submitBtnEl.textContent = 'Block Time';
+            initializeBlockDatePicker();
+            setBlockDateMinToToday();
+            populateBlockStartTimeOptions();
+            populateBlockEndTimeOptions();
+            setBlockDateToValueFromDateFrom();
+            setBlockDateRangeEditable(true);
+            syncBlockFullDayState();
+            if (typeof syncBlockReasonCustomField === 'function') {
+                syncBlockReasonCustomField();
+            }
+            document.getElementById('blockTimeModal').classList.add('show');
+        };
+
+        const initializeBlockDatePicker = () => {
+            if (typeof window.flatpickr !== 'function') {
+                return;
+            }
+
+            ['blockDateFrom', 'blockDateTo'].forEach((id) => {
+                const inputEl = document.getElementById(id);
+                if (!inputEl || inputEl.dataset.flatpickrBound === '1') {
+                    return;
+                }
+
+                inputEl.dataset.flatpickrBound = '1';
+                window.flatpickr(inputEl, {
+                    dateFormat: 'Y-m-d',
+                    altInput: true,
+                    altFormat: 'd M Y',
+                    disableMobile: true,
+                    minDate: 'today',
+                    clickOpens: true,
+                    onChange: () => {
+                        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+            });
+        };
+
+        const setBlockDateMinToToday = () => {
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('blockDate').setAttribute('min', today);
+            ['blockDateFrom', 'blockDateTo'].forEach((id) => {
+                const inputEl = document.getElementById(id);
+                if (!inputEl) return;
+
+                if (inputEl._flatpickr) {
+                    inputEl._flatpickr.set('minDate', 'today');
+                    return;
+                }
+
+                inputEl.setAttribute('min', today);
+            });
+        };
+
+        const setBlockDateValue = (inputEl, ymd) => {
+            if (!inputEl || !ymd) return;
+            if (inputEl._flatpickr) {
+                inputEl._flatpickr.setDate(ymd, true, 'Y-m-d');
+            } else {
+                inputEl.value = ymd;
+            }
+        };
+
+        const setBlockDateToValueFromDateFrom = () => {
+            const fromEl = document.getElementById('blockDateFrom');
+            const toEl = document.getElementById('blockDateTo');
+            const fromValue = String(fromEl?.value || '').trim();
+            if (!fromValue || !toEl) return;
+
+            const toValue = String(toEl.value || '').trim();
+            if (!toValue || toValue < fromValue) {
+                setBlockDateValue(toEl, fromValue);
+            }
+
+            if (toEl._flatpickr) {
+                toEl._flatpickr.set('minDate', fromValue);
+            } else {
+                toEl.setAttribute('min', fromValue);
+            }
+        };
+
+        const setBlockDateRangeEditable = (isEditable) => {
+            const toEl = document.getElementById('blockDateTo');
+            if (toEl) {
+                toEl.disabled = !isEditable;
+            }
+        };
+
+        const syncBlockFullDayState = () => {
+            const fullDayEl = document.getElementById('blockFullDay');
+            const startEl = document.getElementById('blockStartTime');
+            const endEl = document.getElementById('blockEndTime');
+            if (!fullDayEl || !startEl || !endEl) return;
+
+            if (fullDayEl.checked) {
+                startEl.innerHTML = '<option value="00:00">12:00 AM</option>';
+                startEl.value = '00:00';
+                endEl.innerHTML = '<option value="23:59">11:59 PM</option>';
+                endEl.value = '23:59';
+                startEl.disabled = true;
+                endEl.disabled = true;
+                return;
+            }
+
+            startEl.disabled = false;
+            populateBlockStartTimeOptions(startEl.value);
+            populateBlockEndTimeOptions(endEl.value);
+        };
+
+        const getBlockTimeSlotConfig = () => {
+            const parseHour = (value, fallback) => {
+                const match = String(value || '').trim().match(/^([0-1]?\d|2[0-3]):[0-5]\d$/);
+                return match ? Number(match[1]) : fallback;
+            };
+
+            const startHour = parseHour(adminSettingsData?.businessHours?.startTime, 9);
+            const endHourRaw = parseHour(adminSettingsData?.businessHours?.endTime, 23);
+            const endHour = Math.max(startHour, endHourRaw);
+
+            const toHourLabel = (hour24) => {
+                const normalized = ((hour24 % 24) + 24) % 24;
+                const period = normalized >= 12 ? 'PM' : 'AM';
+                const displayHour = normalized % 12 || 12;
+                return `${displayHour}:00 ${period}`;
+            };
+
+            const toHourValue = (hour24) => {
+                const normalized = ((hour24 % 24) + 24) % 24;
+                return `${String(normalized).padStart(2, '0')}:00`;
+            };
+
+            const startSlots = [];
+            for (let hour = startHour; hour <= endHour; hour += 1) {
+                startSlots.push({ value: toHourValue(hour), label: toHourLabel(hour) });
+            }
+
+            const endSlots = [];
+            for (let hour = startHour + 1; hour <= endHour + 1; hour += 1) {
+                endSlots.push({ value: toHourValue(hour), label: toHourLabel(hour) });
+            }
+
+            return { startSlots, endSlots };
+        };
+
+        const populateBlockStartTimeOptions = (selectedValue = '') => {
+            const startEl = document.getElementById('blockStartTime');
+            if (!startEl) return;
+
+            const { startSlots } = getBlockTimeSlotConfig();
+            startEl.innerHTML = '<option value="">Select start time</option>';
+
+            startSlots.forEach((slot) => {
+                const option = document.createElement('option');
+                option.value = slot.value;
+                option.textContent = slot.label;
+                startEl.appendChild(option);
+            });
+
+            if (selectedValue && startEl.querySelector(`option[value="${selectedValue}"]`)) {
+                startEl.value = selectedValue;
+            }
+        };
+
+        const populateBlockEndTimeOptions = (selectedValue = '') => {
+            const startEl = document.getElementById('blockStartTime');
+            const endEl = document.getElementById('blockEndTime');
+            if (!startEl || !endEl) return;
+
+            const startValue = String(startEl.value || '').trim();
+            if (!startValue) {
+                endEl.innerHTML = '<option value="">Select start time first</option>';
+                endEl.disabled = true;
+                return;
+            }
+
+            const { endSlots } = getBlockTimeSlotConfig();
+            const startMinutes = timeToMinutes(startValue);
+
+            endEl.innerHTML = '<option value="">Select end time</option>';
+
+            let hasOptions = false;
+            endSlots.forEach((slot) => {
+                const endMinutes = timeToMinutes(slot.value, true);
+                if (endMinutes <= startMinutes) return;
+
+                const option = document.createElement('option');
+                option.value = slot.value;
+                option.textContent = slot.label;
+                endEl.appendChild(option);
+                hasOptions = true;
+            });
+
+            if (!hasOptions) {
+                endEl.innerHTML = '<option value="">No valid end times</option>';
+                endEl.disabled = true;
+                return;
+            }
+
+            endEl.disabled = false;
+            if (selectedValue && endEl.querySelector(`option[value="${selectedValue}"]`)) {
+                endEl.value = selectedValue;
+            }
+        };
+
+        const openEditBlockedTimeModal = (blockedId, dateValue, startTime, endTime, encodedReason) => {
+            editingBlockedTimeId = blockedId;
+            initializeBlockDatePicker();
+            setBlockDateMinToToday();
+            populateBlockStartTimeOptions(String(startTime || '').trim());
+            populateBlockEndTimeOptions(String(endTime || '').trim());
+            setBlockDateRangeEditable(false);
+            const modalTitleEl = document.getElementById('blockTimeModalTitle');
+            const submitBtnEl = document.getElementById('blockTimeSubmitBtn');
+            if (modalTitleEl) modalTitleEl.textContent = 'Edit Blocked Time';
+            if (submitBtnEl) submitBtnEl.textContent = 'Save Changes';
+
+            const blockDateFromEl = document.getElementById('blockDateFrom');
+            const blockDateToEl = document.getElementById('blockDateTo');
+            const blockFullDayEl = document.getElementById('blockFullDay');
+            const reasonSelectEl = document.getElementById('blockReason');
+            const customReasonEl = document.getElementById('blockReasonCustom');
+
+            const parsedDate = new Date(dateValue);
+            if (blockDateFromEl && !Number.isNaN(parsedDate.getTime())) {
+                const yyyy = parsedDate.getFullYear();
+                const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(parsedDate.getDate()).padStart(2, '0');
+                const ymd = `${yyyy}-${mm}-${dd}`;
+                setBlockDateValue(blockDateFromEl, ymd);
+                setBlockDateValue(blockDateToEl, ymd);
+            }
+
+            if (blockFullDayEl) {
+                blockFullDayEl.checked = String(startTime || '') === '00:00' && String(endTime || '') === '23:59';
+            }
+            syncBlockFullDayState();
+
+            if (!(blockFullDayEl && blockFullDayEl.checked)) {
+                populateBlockStartTimeOptions(String(startTime || '').trim());
+                populateBlockEndTimeOptions(String(endTime || '').trim());
+            }
+
+            const decodedReason = decodeURIComponent(String(encodedReason || '')).trim();
+            const presetReasons = ['Maintenance', 'Private Event', 'Internal Meeting', 'Equipment Setup'];
+
+            if (reasonSelectEl) {
+                if (presetReasons.includes(decodedReason)) {
+                    reasonSelectEl.value = decodedReason;
+                    if (customReasonEl) customReasonEl.value = '';
+                } else {
+                    reasonSelectEl.value = 'Other';
+                    if (customReasonEl) customReasonEl.value = decodedReason || 'Blocked by admin';
+                }
+            }
+
+            if (typeof syncBlockReasonCustomField === 'function') {
+                syncBlockReasonCustomField();
+                if (reasonSelectEl?.value === 'Other' && customReasonEl && decodedReason) {
+                    customReasonEl.value = decodedReason;
+                }
+            }
+
             document.getElementById('blockTimeModal').classList.add('show');
         };
 
@@ -3548,19 +3838,20 @@
                 let html = '';
                 data.blockedTimes.forEach(blocked => {
                     const isDeletedBlock = blocked.isDeleted === true;
+                    const encodedReason = encodeURIComponent(String(blocked.reason || 'Blocked by admin'));
                     html += `
                         <div class="blocked-item">
                             <div class="blocked-item-row">
                                 <div>
                                     <h4>${formatDate(blocked.date)}</h4>
                                     <p><strong>Time:</strong> ${formatTime(blocked.startTime)} - ${formatTime(blocked.endTime)}</p>
-                                    <p><strong>Reason:</strong> ${blocked.reason}</p>
+                                    <p><strong>Reason:</strong> ${escapeHtml(blocked.reason || 'Blocked by admin')}</p>
                                     ${isDeletedBlock ? '<p><strong>Status:</strong> Deleted</p>' : ''}
                                     <small>Blocked by: ${blocked.blockedBy?.name || 'N/A'}</small>
                                 </div>
                                 ${isDeletedBlock
                                     ? `<div class="booking-table-actions"><button onclick="restoreBlockedTime('${blocked._id}')" class="btn btn-success btn-sm">Restore</button><button onclick="permanentlyDeleteBlockedTime('${blocked._id}')" class="btn btn-danger btn-sm">Permanent Delete</button></div>`
-                                    : `<button onclick="unblockTime('${blocked._id}')" class="btn btn-danger btn-sm">Unblock</button>`}
+                                    : `<div class="booking-table-actions"><button onclick="openEditBlockedTimeModal('${blocked._id}','${blocked.date}','${blocked.startTime}','${blocked.endTime}','${encodedReason}')" class="btn btn-info btn-sm">Edit</button><button onclick="unblockTime('${blocked._id}')" class="btn btn-danger btn-sm">Delete</button></div>`}
                             </div>
                         </div>
                     `;
@@ -3607,22 +3898,92 @@
             await window.AdminBookingsEdit.submitEditBookingForm(buildEditBookingModuleDeps());
         });
 
+        const blockReasonSelect = document.getElementById('blockReason');
+        const blockReasonCustomGroup = document.getElementById('blockReasonCustomGroup');
+        const blockReasonCustomInput = document.getElementById('blockReasonCustom');
+
+        const syncBlockReasonCustomField = () => {
+            const selectedReason = blockReasonSelect?.value || 'Maintenance';
+            const isCustom = selectedReason === 'Other';
+            if (blockReasonCustomGroup) {
+                blockReasonCustomGroup.classList.toggle('admin-hidden', !isCustom);
+            }
+            if (blockReasonCustomInput) {
+                blockReasonCustomInput.required = isCustom;
+                if (!isCustom) {
+                    blockReasonCustomInput.value = '';
+                }
+            }
+        };
+
+        if (blockReasonSelect) {
+            blockReasonSelect.addEventListener('change', syncBlockReasonCustomField);
+        }
+        syncBlockReasonCustomField();
+
+        const blockStartTimeSelect = document.getElementById('blockStartTime');
+        if (blockStartTimeSelect) {
+            blockStartTimeSelect.addEventListener('change', () => {
+                populateBlockEndTimeOptions();
+            });
+        }
+
+        const blockDateFromInput = document.getElementById('blockDateFrom');
+        if (blockDateFromInput) {
+            blockDateFromInput.addEventListener('change', () => {
+                setBlockDateToValueFromDateFrom();
+            });
+        }
+
+        const blockDateToInput = document.getElementById('blockDateTo');
+        if (blockDateToInput) {
+            blockDateToInput.addEventListener('change', () => {
+                setBlockDateToValueFromDateFrom();
+            });
+        }
+
+        const blockFullDayInput = document.getElementById('blockFullDay');
+        if (blockFullDayInput) {
+            blockFullDayInput.addEventListener('change', () => {
+                syncBlockFullDayState();
+            });
+        }
+
         // Block time
         document.getElementById('blockTimeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            const selectedReason = document.getElementById('blockReason')?.value || 'Maintenance';
+            const customReason = String(document.getElementById('blockReasonCustom')?.value || '').trim();
+            const finalReason = selectedReason === 'Other' ? customReason : selectedReason;
+
+            if (!finalReason) {
+                showAlert('blockedAlert', 'Please enter a custom block reason', 'error');
+                return;
+            }
+
             const formData = {
-                date: document.getElementById('blockDate').value,
+                dateFrom: document.getElementById('blockDateFrom').value,
+                dateTo: document.getElementById('blockDateTo').value,
                 startTime: document.getElementById('blockStartTime').value,
                 endTime: document.getElementById('blockEndTime').value,
-                reason: document.getElementById('blockReason').value
+                reason: finalReason
             };
 
+            if (editingBlockedTimeId) {
+                formData.date = formData.dateFrom;
+                formData.dateTo = formData.dateFrom;
+            }
+
             try {
-                showLoading('Blocking selected time...');
+                const isEditMode = Boolean(editingBlockedTimeId);
+                showLoading(isEditMode ? 'Saving blocked time changes...' : 'Blocking selected time...');
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/api/admin/block-time`, {
-                    method: 'POST',
+                const endpoint = isEditMode
+                    ? `${API_URL}/api/admin/blocked-times/${editingBlockedTimeId}`
+                    : `${API_URL}/api/admin/block-time`;
+                const res = await fetch(endpoint, {
+                    method: isEditMode ? 'PUT' : 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
@@ -3636,8 +3997,10 @@
                     throw new Error(data.message || 'Failed to block time');
                 }
 
-                showAlert('blockedAlert', 'Time blocked successfully!', 'success');
+                showAlert('blockedAlert', isEditMode ? 'Blocked time updated successfully!' : 'Time blocked successfully!', 'success');
                 closeModal('blockTimeModal');
+                editingBlockedTimeId = null;
+                syncBlockReasonCustomField();
                 await loadBlockedTimes();
             } catch (error) {
                 showAlert('blockedAlert', error.message, 'error');

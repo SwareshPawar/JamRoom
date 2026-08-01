@@ -101,10 +101,13 @@ const getMonthlyTrendFromSnapshots = async ({ sourceCandidates = [], dateRange =
 };
 
 const parseTimeToMinutes = (timeValue) => {
-  const [hourPart, minutePart] = String(timeValue || '').split(':');
-  const hours = Number(hourPart);
-  const minutes = Number(minutePart);
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return NaN;
+  const raw = String(timeValue || '').trim();
+  if (!raw) return NaN;
+  const match = raw.match(/^([0-1]?\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return NaN;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
   return (hours * 60) + minutes;
 };
 
@@ -117,32 +120,41 @@ const buildFollowupQueueItem = (booking, todayStart) => {
   const perDayStartDate = booking?.perDayStartDate ? new Date(booking.perDayStartDate) : null;
   const perDayEndDate = booking?.perDayEndDate ? new Date(booking.perDayEndDate) : null;
   const referenceDate = perDayStartDate || bookingDate;
-  const isUpcoming = referenceDate instanceof Date && !Number.isNaN(referenceDate.getTime())
+  const isFutureDate = referenceDate instanceof Date && !Number.isNaN(referenceDate.getTime())
     ? referenceDate >= todayStart
     : false;
+
+  if (!isFutureDate) {
+    return null;
+  }
+
+  const isConfirmed = bookingStatus === 'CONFIRMED';
+  const isUnpaid = paymentStatus === 'PENDING' || paymentStatus === 'PARTIAL';
 
   let priority = 99;
   let title = 'Needs follow-up';
   let subtitle = 'Review this booking in the manage bookings table.';
 
-  if (bookingStatus === 'PENDING') {
+  if (!isConfirmed) {
     priority = 1;
-    title = 'Pending approval';
-    subtitle = 'This booking request is waiting for admin confirmation.';
-  } else if (bookingStatus === 'CONFIRMED' && paymentStatus === 'PARTIAL') {
+    title = 'Not confirmed';
+    subtitle = 'This future booking is still awaiting confirmation.';
+  } else if (isUnpaid && paymentStatus === 'PARTIAL') {
     priority = 2;
     title = 'Partial payment pending';
     subtitle = 'Follow up with the customer to collect the remaining balance.';
-  } else if (bookingStatus === 'CONFIRMED' && paymentStatus === 'PENDING' && isUpcoming) {
-    priority = 3;
+  } else if (isUnpaid && paymentStatus === 'PENDING') {
+    priority = 2;
     title = 'Advance payment pending';
     subtitle = 'Upcoming confirmed booking without payment received.';
-  } else if (bookingStatus === 'CONFIRMED' && paymentStatus === 'PENDING') {
-    priority = 4;
+  } else if (isUnpaid) {
+    priority = 2;
     title = 'Payment pending';
     subtitle = 'Confirmed booking still shows pending payment.';
   } else {
-    return null;
+    priority = 3;
+    title = 'Upcoming booking';
+    subtitle = 'Future booking is confirmed and paid.';
   }
 
   return {
@@ -166,7 +178,9 @@ const buildFollowupQueueItem = (booking, todayStart) => {
     title,
     subtitle,
     priority,
-    reasonKey: `${bookingStatus}-${paymentStatus}`
+    reasonKey: !isConfirmed
+      ? 'NOT_CONFIRMED'
+      : (isUnpaid ? 'UNPAID' : 'UPCOMING')
   };
 };
 
@@ -496,9 +510,16 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
         .limit(5),
       Booking.find({
         isDeleted: { $ne: true },
-        $or: [
-          { bookingStatus: 'PENDING' },
-          { bookingStatus: 'CONFIRMED', paymentStatus: { $in: ['PENDING', 'PARTIAL'] } }
+        $and: [
+          {
+            $or: [
+              { date: { $gte: todayStart } },
+              { perDayStartDate: { $gte: todayStart } }
+            ]
+          },
+          {
+            bookingStatus: { $nin: ['CANCELLED', 'REJECTED'] }
+          }
         ]
       })
         .populate('userId', 'name email mobile')
@@ -602,8 +623,29 @@ router.get('/stats', protect, isAdmin, async (req, res) => {
       .map((booking) => buildFollowupQueueItem(booking, todayStart))
       .filter(Boolean)
       .sort((left, right) => {
-        if (left.priority !== right.priority) return left.priority - right.priority;
-        return new Date(left.date || left.perDayStartDate || 0).getTime() - new Date(right.date || right.perDayStartDate || 0).getTime();
+        const leftDate = new Date(left.perDayStartDate || left.date || 0);
+        const rightDate = new Date(right.perDayStartDate || right.date || 0);
+        const leftDateStart = Number.isNaN(leftDate.getTime())
+          ? 0
+          : new Date(leftDate.getFullYear(), leftDate.getMonth(), leftDate.getDate()).getTime();
+        const rightDateStart = Number.isNaN(rightDate.getTime())
+          ? 0
+          : new Date(rightDate.getFullYear(), rightDate.getMonth(), rightDate.getDate()).getTime();
+
+        if (leftDateStart !== rightDateStart) {
+          return leftDateStart - rightDateStart;
+        }
+
+        const leftTime = parseTimeToMinutes(left.startTime);
+        const rightTime = parseTimeToMinutes(right.startTime);
+        const leftTimeMinutes = Number.isNaN(leftTime) ? 0 : leftTime;
+        const rightTimeMinutes = Number.isNaN(rightTime) ? 0 : rightTime;
+
+        if (leftTimeMinutes !== rightTimeMinutes) {
+          return leftTimeMinutes - rightTimeMinutes;
+        }
+
+        return left.priority - right.priority;
       })
       .slice(0, 6);
 
