@@ -15,5 +15,15 @@
   "env": {
     "VERCEL": "1",
     "NODE_OPTIONS": "--max-old-space-size=1024"
-  }
+  },
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["**/*.js"],
+        "nodeVersion": "24.x"
+      }
+    }
+  ]
 }
