@@ -2673,8 +2673,6 @@ table {
         padding: 6px 4px;
     }
 
-    #bookingsTable table th:nth-child(6),
-    #bookingsTable table td:nth-child(6),
     #revenueTable table th:nth-child(5),
     #revenueTable table td:nth-child(5),
     #revenueTable table th:nth-child(6),
@@ -2688,7 +2686,43 @@ table {
     }
 
     #bookingsTable .table-container table {
-        min-width: 620px;
+        min-width: 420px;
+    }
+
+    #bookingsTable table th,
+    #bookingsTable table td {
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: normal;
+    }
+
+    #bookingsTable .booking-status-payment-cell {
+        min-width: 84px;
+    }
+
+    #bookingsTable .booking-status-payment-stack {
+        align-items: flex-start;
+    }
+
+    #bookingsTable table th:nth-child(4),
+    #bookingsTable table td:nth-child(4) {
+        width: 112px;
+        min-width: 112px;
+    }
+
+    #bookingsTable table th:last-child,
+    #bookingsTable table td:last-child {
+        width: 96px;
+        min-width: 96px;
+    }
+
+    #bookingsTable .booking-schedule-cell,
+    #bookingsTable .booking-status-payment-stack {
+        white-space: normal;
+    }
+
+    #bookingsTable .booking-schedule-cell {
+        line-height: 1.35;
     }
 }
 

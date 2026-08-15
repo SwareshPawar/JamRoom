@@ -262,6 +262,26 @@ class NavigationManager {
             });
         }
 
+        links.push({
+            href: 'https://oldand-new.vercel.app/',
+            icon: '🎶',
+            label: 'Old & New',
+            class: 'nav-link',
+            id: 'oldAndNewNavLink',
+            target: '_blank',
+            rel: 'noopener noreferrer'
+        });
+
+        links.push({
+            href: 'https://praiseand-worship.vercel.app/',
+            icon: '🙌',
+            label: 'Praise & Worship',
+            class: 'nav-link',
+            id: 'praiseAndWorshipNavLink',
+            target: '_blank',
+            rel: 'noopener noreferrer'
+        });
+
         return links;
     }
 
@@ -366,7 +386,9 @@ class NavigationManager {
         const mainLinksHTML = mainLinks.map((link) => {
             const labelText = this.escapeHtml(link.label || link.text || 'Link');
             const iconText = this.escapeHtml(link.icon || '•');
-            return `<a href="${link.href}" class="${link.class}" id="${link.id}"><span class="nav-link-icon" aria-hidden="true">${iconText}</span><span class="nav-link-label">${labelText}</span></a>`;
+            const targetAttr = link.target ? ` target="${this.escapeHtml(link.target)}"` : '';
+            const relAttr = link.rel ? ` rel="${this.escapeHtml(link.rel)}"` : '';
+            return `<a href="${link.href}" class="${link.class}" id="${link.id}"${targetAttr}${relAttr}><span class="nav-link-icon" aria-hidden="true">${iconText}</span><span class="nav-link-label">${labelText}</span></a>`;
         }).join('\n                ');
 
         // Generate header actions HTML
