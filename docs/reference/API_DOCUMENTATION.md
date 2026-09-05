@@ -610,7 +610,7 @@ Authorization: Bearer <admin_token>
 ### Create Booking (Admin)
 **POST** `/api/admin/bookings`
 
-Create an admin booking for a registered user.
+Create an admin booking for either a registered user or a manual customer name.
 
 **Headers:**
 ```
@@ -644,10 +644,12 @@ Authorization: Bearer <admin_token>
 ```
 
 **Behavior:**
-- Admin create flow is registered-user-only (`userId` required)
+- Supply either a registered `userId` or a non-empty `manualName`; registered users take precedence when both are supplied.
+- A manual booking is stored with `isManualCustomer = true`, the supplied `userName`, and no `userId`, email, or mobile number.
+- Manual bookings do not generate calendar invites or send email or WhatsApp notifications to customers or admins.
 - Created booking is always enforced as:
   - `bookingStatus = CONFIRMED`
-  - `paymentStatus = PAID`
+  - `paymentStatus` uses the submitted value, defaulting to `PENDING`
 - Optional pricing override fields:
   - `priceAdjustmentType`: `none | discount | surcharge`
   - `priceAdjustmentAmount`: non-negative number
@@ -656,7 +658,20 @@ Authorization: Bearer <admin_token>
   - `price = subtotal + taxAmount + signedAdjustment`
   - where signed adjustment is negative for `discount`, positive for `surcharge`
 - When `overrideDateTime=true`, conflict/blocked-time validations are bypassed for historical entries and note is tagged with an admin override marker
-- Uses the same confirmation email/calendar flow as admin approve
+- Registered-user bookings use the confirmation email/calendar flow; manual bookings do not.
+
+**Manual Customer Example:**
+```json
+{
+  "manualName": "Walk-in Customer",
+  "date": "2026-03-10",
+  "startTime": "14:00",
+  "endTime": "16:00",
+  "duration": 2,
+  "rentals": [{ "name": "JamRoom (Base)", "price": 300, "quantity": 1 }],
+  "subtotal": 600
+}
+```
 
 **Response:** `201 Created`
 ```json
@@ -667,7 +682,7 @@ Authorization: Bearer <admin_token>
     "_id": "65new...",
     "userName": "Customer Name",
     "bookingStatus": "CONFIRMED",
-    "paymentStatus": "PAID",
+    "paymentStatus": "PENDING",
     "priceAdjustmentType": "discount",
     "priceAdjustmentAmount": 100,
     "priceAdjustmentValue": -100,
@@ -678,7 +693,7 @@ Authorization: Bearer <admin_token>
 ```
 
 **Common Error Responses:**
-- `400`: missing `userId`/required fields, conflicting slot (when override disabled)
+- `400`: missing both `userId` and `manualName`, other required fields, or a conflicting slot (when override disabled)
 - `404`: selected user not found
 
 ---

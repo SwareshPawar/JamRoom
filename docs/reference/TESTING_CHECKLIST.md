@@ -9,8 +9,8 @@ Use this checklist to verify that everything is working correctly.
 Scope tested against local API:
 - `GET /api/admin/users`
 - `POST /api/admin/users`
-- `POST /api/admin/bookings` strict `userId` requirement
-- Enforced admin create status behavior (`CONFIRMED` + `PAID`)
+- `POST /api/admin/bookings` registered-user and manual-name validation
+- Enforced admin create status behavior (`CONFIRMED` with payment tracking)
 - Overlap conflict rejection
 
 Results:
@@ -18,8 +18,10 @@ Results:
 - [x] Admin users list API returns results
 - [x] Admin can create user inline (temp password `Qwerty123` from API response)
 - [x] Duplicate admin-created user is rejected (`400`)
-- [x] Admin booking create without `userId` is rejected (`400`)
-- [x] Admin booking create stores `bookingStatus=CONFIRMED` and `paymentStatus=PAID`
+- [x] Admin booking create without `userId` or `manualName` is rejected (`400`)
+- [x] Admin booking create with `manualName` validates without `userId` or `userEmail`
+- [x] Manual booking sets `isManualCustomer=true` and skips email, calendar, and WhatsApp notifications
+- [x] Admin booking create stores `bookingStatus=CONFIRMED` with submitted/default payment tracking
 - [x] Overlapping booking is rejected (`400`)
 
 Notes:

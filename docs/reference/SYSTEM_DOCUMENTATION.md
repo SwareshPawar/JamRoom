@@ -97,7 +97,8 @@
 ### 2. Booking Model (`/models/Booking.js`)
 ```javascript
 {
-  userId: ObjectId (ref: 'User', required),
+  userId: ObjectId (ref: 'User', optional for manual admin bookings),
+  isManualCustomer: Boolean (default: false),
   bookingMode: String (enum: ['hourly', 'perday']),
   date: Date (required),
   startTime: String (required, format: 'HH:MM'),
@@ -126,7 +127,7 @@
   bookingStatus: String (enum: ['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED']),
   paymentStatus: String (enum: ['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']),
   userName: String (required),
-  userEmail: String (required),
+  userEmail: String (default: '', empty for manual admin bookings),
   userMobile: String (optional),
   bandName: String (optional),
   notes: String (optional),
@@ -240,7 +241,7 @@
 - `GET /api/admin/bookings/calendar` - Get calendar formatted bookings
 - `GET /api/admin/bookings` - Get bookings with filters + pagination/search/sort
 - `GET /api/admin/availability/:date` - Get admin availability for a date
-- `POST /api/admin/bookings` - Create confirmed/paid booking for registered user
+- `POST /api/admin/bookings` - Create confirmed booking for a registered user or manual customer name
 - `PUT /api/admin/bookings/:id/approve` - Approve booking
 - `PUT /api/admin/bookings/:id/reject` - Reject booking
 - `POST /api/admin/bookings/:id/send-ebill` - Send eBill to selected recipients
@@ -525,7 +526,7 @@ rentalTypes: [
 ### 3. Admin Create Booking Flow
 ```
 1. Admin opens create booking modal
-2. Admin selects registered user (or creates user inline)
+2. Admin selects a registered user (or creates one inline), or enters a manual name
 3. Admin selects date/time/rentals and optional price override, then submits:
   - Enforced status: bookingStatus = CONFIRMED
   - Enforced payment: paymentStatus = PAID
@@ -534,7 +535,8 @@ rentalTypes: [
 4. If override mode enabled (`overrideDateTime=true`):
   - Conflict and blocked-time checks are bypassed
   - Booking note is tagged with admin override marker
-5. Unified confirmation emails + calendar invite are sent
+5. For registered users, unified confirmation emails and a calendar invite are sent.
+  Manual-name bookings store only the name and send no email, calendar, or WhatsApp notifications.
 ```
 
 ### 4. Email & Calendar Flow
@@ -722,7 +724,8 @@ EMAIL_REPLY_TO=support@jamroom.com
 
 #### 3. Admin Booking Workflow Hardening
 **Updated**:
-- Admin create booking requires registered user selection (`userId`)
+- Admin create booking accepts a registered user selection (`userId`) or a manual customer name (`manualName`)
+- Manual-name bookings have no linked user/email/mobile and skip email, calendar, and WhatsApp notifications
 - Inline user create/reset/delete flows added to support create-booking pipeline
 - Admin-created bookings are enforced as `CONFIRMED` with payment tracking (`PENDING|PARTIAL|PAID`) supported on create/edit
 - Historical override mode allows bypassing date/time conflict checks for missed-bill backfill entries
