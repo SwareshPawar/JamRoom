@@ -1205,13 +1205,13 @@
             </div>
             <form id="createBookingForm" onsubmit="submitCreateBooking(event)">
                 <div class="form-group">
-                    <label for="createUserSearch">Select Registered User*</label>
+                    <label for="createUserSearch">Registered User or Manual Name*</label>
                     <div class="typeahead-input-row">
-                        <input type="text" id="createUserSearch" class="flex-1" placeholder="Search by name, email, or mobile" autocomplete="off">
+                        <input type="text" id="createUserSearch" class="flex-1" placeholder="Search registered users or enter a manual name" autocomplete="off">
                         <button type="button" class="btn btn-secondary" onclick="openRegisterUserModal()">+ Add User</button>
                     </div>
-                    <input type="hidden" id="createUserId" name="userId" required>
-                    <small id="createUserSelected" class="settings-help-text">No user selected</small>
+                    <input type="hidden" id="createUserId" name="userId">
+                    <small id="createUserSelected" class="settings-help-text">Select a registered user, or use the typed name for a manual booking with no notifications.</small>
                     <div id="createUserTypeahead" class="create-user-typeahead admin-hidden"></div>
                 </div>
 
@@ -8163,7 +8163,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             selectedCreateUser = null;
             document.getElementById('createUserId').value = '';
             document.getElementById('createUserSearch').value = '';
-            document.getElementById('createUserSelected').textContent = 'No user selected';
+            document.getElementById('createUserSelected').textContent = 'Select a registered user, or use the typed name for a manual booking with no notifications.';
             document.getElementById('createUserTypeahead').style.display = 'none';
 
             const customContainer = document.getElementById('createCustomItemsContainer');
@@ -8239,7 +8239,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             }).slice(0, 25);
 
             if (filteredUsers.length === 0) {
-                dropdown.innerHTML = '<div class="typeahead-empty">No user found. Click + Add User.</div>';
+                dropdown.innerHTML = '<div class="typeahead-empty">No registered user found. The typed name will create a manual booking with no notifications.</div>';
                 dropdown.style.display = 'block';
                 return;
             }
@@ -8800,8 +8800,9 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
         async function submitCreateBooking(event) {
             event.preventDefault();
             const formData = new FormData(event.target);
-            const userId = document.getElementById('createUserId').value;
-            if (!userId) { showAlert('', 'Please select a registered user before creating booking.', 'warning'); return; }
+            const userId = document.getElementById('createUserId').value.trim();
+            const manualName = (document.getElementById('createUserSearch').value || '').trim();
+            if (!userId && !manualName) { showAlert('', 'Please select a registered user or enter a manual name.', 'warning'); return; }
             const bookingTypeLabel = document.getElementById('createBookingType')?.value.trim() || '';
             if (!bookingTypeLabel) { showAlert('', 'Please select a booking type from the booking catalog.', 'warning'); return; }
 
@@ -8903,6 +8904,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             const isFlatRateMode = bookingMode === 'persession' || bookingMode === 'pertrack';
             const bookingData = {
                 userId,
+                ...(userId ? {} : { manualName }),
                 bookingMode: bookingMode === 'perday' ? 'perday' : 'hourly',
                 date: bookingDate,
                 startTime,
@@ -8941,7 +8943,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.message || 'Failed to create booking');
-                const bookedFor = selectedCreateUser?.name || 'selected user';
+                const bookedFor = selectedCreateUser?.name || manualName;
                 showAlert('', `Booking created successfully for ${bookedFor}.\nTotal: ₹${totalAmount}`, 'success');
                 clearCreateBookingDraft();
                 hideCreateBookingModal();
@@ -8957,6 +8959,11 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
 
         let createUserSearchDebounceTimer = null;
         document.getElementById('createUserSearch').addEventListener('input', (e) => {
+            if (selectedCreateUser) {
+                selectedCreateUser = null;
+                document.getElementById('createUserId').value = '';
+                document.getElementById('createUserSelected').textContent = 'Manual booking: no notifications will be sent.';
+            }
             clearTimeout(createUserSearchDebounceTimer);
             createUserSearchDebounceTimer = setTimeout(() => renderCreateUserTypeahead(e.target.value), 200);
             scheduleCreateBookingDraftSave();

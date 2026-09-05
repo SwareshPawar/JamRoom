@@ -3,8 +3,11 @@ const mongoose = require('mongoose');
 const bookingSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'User ID is required']
+    ref: 'User'
+  },
+  isManualCustomer: {
+    type: Boolean,
+    default: false
   },
   bookingMode: {
     type: String,
@@ -158,7 +161,7 @@ const bookingSchema = new mongoose.Schema({
   },
   userEmail: {
     type: String,
-    required: true
+    default: ''
   },
   userMobile: {
     type: String,

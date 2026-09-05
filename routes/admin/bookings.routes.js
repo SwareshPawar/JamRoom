@@ -1949,6 +1949,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
 
     const {
       userId,
+      manualName,
       date,
       startTime: reqStartTime,
       endTime: reqEndTime,
@@ -1987,10 +1988,11 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     const requestedAmountPaid = amountPaid;
     const normalizedPaymentReference = String(paymentReference || '').trim();
     const normalizedPaymentNote = String(paymentNote || '').trim();
+    const normalizedManualName = String(manualName || '').trim();
     const enforcedBookingStatus = 'CONFIRMED';
 
-    if (!userId || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
-      return res.status(400).json({ success: false, message: 'Please provide userId and at least one rental' });
+    if ((!userId && !normalizedManualName) || !rentals || !Array.isArray(rentals) || rentals.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide a registered user or manual name and at least one rental' });
     }
     if (isAdminClassBooking) {
       if (!classPreferredWeekday) return res.status(400).json({ success: false, message: 'Please select a preferred weekday for class booking' });
@@ -2005,8 +2007,10 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       }
     }
 
-    const selectedUser = await User.findById(userId).select('name email mobile role forcePasswordReset');
-    if (!selectedUser) {
+    const selectedUser = userId
+      ? await User.findById(userId).select('name email mobile role forcePasswordReset')
+      : null;
+    if (userId && !selectedUser) {
       return res.status(404).json({
         success: false,
         message: 'Selected user not found'
@@ -2173,7 +2177,8 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     }
 
     const booking = await Booking.create({
-      userId: selectedUser._id,
+      ...(selectedUser ? { userId: selectedUser._id } : {}),
+      isManualCustomer: !selectedUser,
       ...(isAdminPerdayBooking ? { bookingMode: 'perday' } : {}),
       date: bookingDate,
       startTime: effectiveStartTime,
@@ -2194,9 +2199,9 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       priceAdjustmentValue: normalizedAdjustment.value,
       priceAdjustmentNote: normalizedAdjustment.note,
       price: calculatedTotalAmount,
-      userName: selectedUser.name,
-      userEmail: selectedUser.email,
-      userMobile: selectedUser.mobile,
+      userName: selectedUser ? selectedUser.name : normalizedManualName,
+      userEmail: selectedUser ? selectedUser.email : '',
+      userMobile: selectedUser ? selectedUser.mobile : '',
       bandName,
       notes: shouldOverrideDateTime
         ? `${notes ? `${notes}\n` : ""}[Admin Override] Date/time checks bypassed for historical booking entry.`
@@ -2230,7 +2235,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       }
     }).join('\n');
 
-    const calendarInvite = generateCalendarInvite({
+    const calendarInvite = selectedUser ? generateCalendarInvite({
       title: `${settings.studioName || 'JamRoom'} Booking - ${rentalTypeSummary}`,
       description: `Booking confirmed for ${selectedUser.name}${bandName ? ` (${bandName})` : ''}`,
       location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
@@ -2243,47 +2248,49 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       sequence: booking.calendarSequence,
       method: 'REQUEST',
       status: 'CONFIRMED'
-    });
+    }) : null;
 
-    await sendUnifiedBookingConfirmationEmails({
-      settings,
-      booking,
-      confirmedByName: req.user.name,
-      calendarInvite
-    });
+    if (selectedUser) {
+      await sendUnifiedBookingConfirmationEmails({
+        settings,
+        booking,
+        confirmedByName: req.user.name,
+        calendarInvite
+      });
 
-    if (selectedUser.mobile) {
+      if (selectedUser.mobile) {
+        try {
+          await sendBookingConfirmationWhatsApp(selectedUser.mobile, {
+            bookingId: booking._id,
+            date: displayDate,
+            startTime: effectiveStartTime,
+            endTime: effectiveEndTime,
+            totalAmount: calculatedTotalAmount,
+            rentals: rentalsWhatsAppSummary,
+            status: enforcedBookingStatus,
+            paymentStatus: normalizedPaymentTracking.paymentStatus
+          });
+        } catch (whatsappError) {
+          console.log('Customer WhatsApp failed:', whatsappError.message);
+        }
+      }
+
       try {
-        await sendBookingConfirmationWhatsApp(selectedUser.mobile, {
-          bookingId: booking._id,
+        await sendBookingConfirmationNotifications({
+          userName: selectedUser.name,
+          userEmail: selectedUser.email,
+          userMobile: selectedUser.mobile,
           date: displayDate,
           startTime: effectiveStartTime,
           endTime: effectiveEndTime,
           totalAmount: calculatedTotalAmount,
-          rentals: rentalsWhatsAppSummary,
-          status: enforcedBookingStatus,
+          bookingId: booking._id,
+          bandName,
           paymentStatus: normalizedPaymentTracking.paymentStatus
-        });
+        }, settings.whatsappNotifications);
       } catch (whatsappError) {
-        console.log('Customer WhatsApp failed:', whatsappError.message);
+        console.log('WhatsApp notifications failed:', whatsappError.message);
       }
-    }
-
-    try {
-      await sendBookingConfirmationNotifications({
-        userName: selectedUser.name,
-        userEmail: selectedUser.email,
-        userMobile: selectedUser.mobile,
-        date: displayDate,
-        startTime: effectiveStartTime,
-        endTime: effectiveEndTime,
-        totalAmount: calculatedTotalAmount,
-        bookingId: booking._id,
-        bandName,
-        paymentStatus: normalizedPaymentTracking.paymentStatus
-      }, settings.whatsappNotifications);
-    } catch (whatsappError) {
-      console.log('WhatsApp notifications failed:', whatsappError.message);
     }
 
     const populatedBooking = await Booking.findById(booking._id).populate('userId', 'name email mobile');
