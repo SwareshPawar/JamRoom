@@ -644,9 +644,10 @@ Authorization: Bearer <admin_token>
 ```
 
 **Behavior:**
-- Supply either a registered `userId` or a non-empty `manualName`; registered users take precedence when both are supplied.
-- A manual booking is stored with `isManualCustomer = true`, the supplied `userName`, and no `userId`, email, or mobile number.
-- Manual bookings do not generate calendar invites or send email or WhatsApp notifications to customers or admins.
+- Supply either a registered `userId` or a non-empty `manualName`; the UI requires selecting an existing user when a matching dropdown result is shown.
+- An unmatched name creates a normal `User` record with `isManualUser = true`, the supplied name, a unique internal non-deliverable email, mobile `N/A`, and a temporary password.
+- The booking always stores the created/selected user's normal `userId`, `userName`, `userEmail`, and `userMobile` fields.
+- Incomplete users do not receive customer email, calendar, or WhatsApp notifications; admin/staff notifications still run. Their email/mobile can later be updated from the Users tab.
 - Created booking is always enforced as:
   - `bookingStatus = CONFIRMED`
   - `paymentStatus` uses the submitted value, defaulting to `PENDING`
@@ -660,7 +661,7 @@ Authorization: Bearer <admin_token>
 - When `overrideDateTime=true`, conflict/blocked-time validations are bypassed for historical entries and note is tagged with an admin override marker
 - Registered-user bookings use the confirmation email/calendar flow; manual bookings do not.
 
-**Manual Customer Example:**
+**New Name Example:**
 ```json
 {
   "manualName": "Walk-in Customer",

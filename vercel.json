@@ -21,7 +21,7 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["**/*.js"],
+        "includeFiles": ["**/*.js", "public/**"],
         "nodeVersion": "24.x"
       }
     }

@@ -11,7 +11,11 @@ const { sendEmail } = require('./email');
 const { buildInvoiceStyleEmail } = require('./templates/email/invoiceStyleEmailTemplate');
 const DEFAULT_ADMIN_CREATED_USER_PASSWORD = 'Qwerty123';
 const DEFAULT_APP_LOGIN_URL = 'https://jam-room-mu.vercel.app/';
+const INTERNAL_NO_EMAIL_DOMAIN = 'no-email.jamroom.local';
 const IST_TIMEZONE = 'Asia/Kolkata';
+
+const buildInternalNoEmail = () => `na+${Date.now()}-${Math.random().toString(36).slice(2, 8)}@${INTERNAL_NO_EMAIL_DOMAIN}`;
+const isInternalNoEmail = (email) => String(email || '').toLowerCase().endsWith(`@${INTERNAL_NO_EMAIL_DOMAIN}`);
 
 const buildBookingFooterEmailConfig = (settings = {}) => {
   const emailSettings = settings?.emailSettings && typeof settings.emailSettings === 'object'
@@ -468,7 +472,8 @@ const sendUnifiedBookingConfirmationEmails = async ({
   booking,
   confirmedByName,
   calendarInvite,
-  customerExtraHtml = ''
+  customerExtraHtml = '',
+  sendCustomerNotification = true
 }) => {
   const displayDate = formatBookingDisplayDate(booking.date);
   const studioName = settings.studioName || 'JamRoom';
@@ -549,8 +554,8 @@ const sendUnifiedBookingConfirmationEmails = async ({
     </div>
   `;
 
-  // Send confirmation email to customer.
-  try {
+  // Send confirmation email to customer when contact details are deliverable.
+  if (sendCustomerNotification) try {
     await sendEmail({
       to: booking.userEmail,
       subject: `Booking Confirmed - ${studioName}`,
@@ -659,6 +664,9 @@ module.exports = {
   // Constants
   DEFAULT_ADMIN_CREATED_USER_PASSWORD,
   DEFAULT_APP_LOGIN_URL,
+  INTERNAL_NO_EMAIL_DOMAIN,
+  buildInternalNoEmail,
+  isInternalNoEmail,
   // Time
   formatTime12Hour,
   formatTimeRange12Hour,

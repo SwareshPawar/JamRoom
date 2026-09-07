@@ -18,7 +18,11 @@ const userSchema = new mongoose.Schema({
   mobile: {
     type: String,
     trim: true,
-    match: [/^(\+91[-\s]?)?[6-9]\d{9}$/, 'Please provide a valid Indian mobile number']
+    match: [/^(N\/A|\+91[-\s]?[6-9]\d{9})$/, 'Please provide a valid Indian mobile number']
+  },
+  isManualUser: {
+    type: Boolean,
+    default: false
   },
   whatsappNotifications: {
     enabled: { type: Boolean, default: false },

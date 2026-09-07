@@ -19,8 +19,13 @@ Results:
 - [x] Admin can create user inline (temp password `Qwerty123` from API response)
 - [x] Duplicate admin-created user is rejected (`400`)
 - [x] Admin booking create without `userId` or `manualName` is rejected (`400`)
-- [x] Admin booking create with `manualName` validates without `userId` or `userEmail`
-- [x] Manual booking sets `isManualCustomer=true` and skips email, calendar, and WhatsApp notifications
+- [x] Admin booking create with `manualName` creates a reusable `User` with `isManualUser=true`
+- [x] New-name booking stores the normal `userId`, name, internal email, and `N/A` mobile fields
+- [x] Incomplete-user booking skips customer email, calendar, and WhatsApp notifications
+- [x] Admin/staff notifications continue for incomplete-user bookings
+- [x] Approve, reject, edit, delete, eBill, and class-slot actions skip customer notifications for incomplete users
+- [x] Calendar and PDF displays show `N/A` instead of the internal placeholder email
+- [ ] Completing email/mobile from Users tab enables normal notification behavior for future bookings
 - [x] Admin booking create stores `bookingStatus=CONFIRMED` with submitted/default payment tracking
 - [x] Overlapping booking is rejected (`400`)
 

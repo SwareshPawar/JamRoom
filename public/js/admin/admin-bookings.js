@@ -568,7 +568,7 @@
         const normalizedBookingStatus = String(booking?.bookingStatus || '').toUpperCase();
         const isRejectedBooking = normalizedBookingStatus === 'REJECTED';
         const userName = booking.userId?.name || booking.userName || 'N/A';
-        const userEmail = booking.userId?.email || booking.userEmail || 'N/A';
+        const userEmail = JamRoomUtils.displayEmail(booking.userId?.email || booking.userEmail);
         const userMobile = booking.userMobile || 'N/A';
 
         const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
@@ -1064,7 +1064,7 @@
             const normalizedBookingStatus = String(booking.bookingStatus || '').toUpperCase();
             const showPaymentBadge = normalizedBookingStatus !== 'REJECTED';
             const userName = booking.userId?.name || booking.userName || 'N/A';
-            const userEmail = booking.userId?.email || booking.userEmail || 'N/A';
+            const userEmail = JamRoomUtils.displayEmail(booking.userId?.email || booking.userEmail);
             const scheduleSummary = `
                 <div class="booking-schedule-cell">
                     <div class="booking-schedule-date">${dateText}</div>

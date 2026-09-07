@@ -4,33 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - JamRoom</title>
-    <script src="/js/shared/theme.js"></script>
+    <script src="/js/shared/theme.js?v=20260907a"></script>
     
     <!-- Shared CSS -->
     <link rel="stylesheet" href="/css/shared.css?v=20260513c">
-    <link rel="stylesheet" href="/css/vendor/flatpickr.min.css">
+    <link rel="stylesheet" href="/css/vendor/flatpickr.min.css?v=20260907a">
     
     <!-- Shared JavaScript Modules -->
-    <script src="/js/shared/utils.js"></script>
-    <script src="/js/shared/alerts.js"></script>
-    <script src="/js/shared/auth.js"></script>
-    <script src="/js/shared/tabs.js"></script>
-    <script src="/js/shared/data.js"></script>
+    <script src="/js/shared/utils.js?v=20260907b"></script>
+    <script src="/js/shared/alerts.js?v=20260907a"></script>
+    <script src="/js/shared/auth.js?v=20260907a"></script>
+    <script src="/js/shared/tabs.js?v=20260907a"></script>
+    <script src="/js/shared/data.js?v=20260907a"></script>
     <script src="/js/shared/quotation-billing.js?v=20260727a"></script>
-    <script src="/js/shared/navigation.js"></script>
-    <script src="/js/shared/lazy-loader.js"></script>
+    <script src="/js/shared/navigation.js?v=20260907a"></script>
+    <script src="/js/shared/lazy-loader.js?v=20260907a"></script>
     
     <!-- Client-side PDF Generation -->
-    <script src="/js/client-pdf-generator.js"></script>
+    <script src="/js/client-pdf-generator.js?v=20260907a"></script>
     <!-- Admin extraction modules -->
     <script src="/js/admin/admin-dashboard.js?v=20260727b"></script>
-    <script src="/js/admin/admin-bookings.js?v=20260728a"></script>
-    <script src="/js/admin/admin-bookings-actions.js"></script>
+    <script src="/js/admin/admin-bookings.js?v=20260907b"></script>
+    <script src="/js/admin/admin-bookings-actions.js?v=20260907b"></script>
     <script src="/js/admin/admin-bookings-edit.js?v=20260727-1"></script>
-    <script src="/js/admin/admin-calendar.js"></script>
-    <script src="/js/admin/admin-revenue.js?v=20260730a"></script>
+    <script src="/js/admin/admin-calendar.js?v=20260907b"></script>
+    <script src="/js/admin/admin-revenue.js?v=20260907b"></script>
     <script src="/js/admin/admin-open-events.js?v=20260526a"></script>
-    <script src="/js/vendor/flatpickr.min.js"></script>
+    <script src="/js/vendor/flatpickr.min.js?v=20260907a"></script>
     
     <!-- Admin-specific styles -->
     
@@ -1211,7 +1211,7 @@
                         <button type="button" class="btn btn-secondary" onclick="openRegisterUserModal()">+ Add User</button>
                     </div>
                     <input type="hidden" id="createUserId" name="userId">
-                    <small id="createUserSelected" class="settings-help-text">Select a registered user, or use the typed name for a manual booking with no notifications.</small>
+                    <small id="createUserSelected" class="settings-help-text">Select a registered user, or enter a new name to create an incomplete user with no notifications.</small>
                     <div id="createUserTypeahead" class="create-user-typeahead admin-hidden"></div>
                 </div>
 
@@ -3264,14 +3264,17 @@
                 const isDeletedRow = user.isDeleted === true;
                 const showDelete = !isCurrentUser && (!isAdminRow || isOwnerAdmin);
                 const showReset = !isCurrentUser && !isDeletedRow;
-                const missingDetails = !(user.name && user.email && user.mobile);
+                const isIncompleteUser = user.isManualUser === true;
+                const displayEmail = isIncompleteUser ? 'N/A' : (user.email || '-');
+                const displayMobile = isIncompleteUser ? 'N/A' : (user.mobile || '-');
+                const missingDetails = isIncompleteUser || !(user.name && user.email && user.mobile);
                 const editLabel = missingDetails ? 'Add Details' : 'Edit';
 
                 return `
                     <tr>
                         <td>${escapeHtml(user.name || '-')}</td>
-                        <td>${escapeHtml(user.email || '-')}</td>
-                        <td>${escapeHtml(user.mobile || '-')}</td>
+                        <td>${escapeHtml(displayEmail)}</td>
+                        <td>${escapeHtml(displayMobile)}</td>
                         <td>
                             <span class="user-role-badge user-role-${escapeHtml(role)}">
                                 ${escapeHtml(role)}
@@ -8163,7 +8166,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             selectedCreateUser = null;
             document.getElementById('createUserId').value = '';
             document.getElementById('createUserSearch').value = '';
-            document.getElementById('createUserSelected').textContent = 'Select a registered user, or use the typed name for a manual booking with no notifications.';
+            document.getElementById('createUserSelected').textContent = 'Select a registered user, or enter a new name to create an incomplete user with no notifications.';
             document.getElementById('createUserTypeahead').style.display = 'none';
 
             const customContainer = document.getElementById('createCustomItemsContainer');
@@ -8239,7 +8242,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             }).slice(0, 25);
 
             if (filteredUsers.length === 0) {
-                dropdown.innerHTML = '<div class="typeahead-empty">No registered user found. The typed name will create a manual booking with no notifications.</div>';
+                dropdown.innerHTML = '<div class="typeahead-empty">No registered user found. This name will create a user with email/mobile set to N/A.</div>';
                 dropdown.style.display = 'block';
                 return;
             }
@@ -8247,11 +8250,22 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             dropdown.innerHTML = filteredUsers.map((user) => `
                 <button type="button" onclick="selectCreateBookingUser('${user._id}')" class="typeahead-option-btn">
                     <div class="typeahead-option-name">${escapeHtml(user.name)}</div>
-                    <div class="typeahead-option-meta">${escapeHtml(user.email)}${user.mobile ? ` | ${escapeHtml(user.mobile)}` : ''}</div>
+                    <div class="typeahead-option-meta">${escapeHtml(user.isManualUser ? 'N/A' : user.email)}${user.mobile ? ` | ${escapeHtml(user.isManualUser ? 'N/A' : user.mobile)}` : ''}</div>
                 </button>
             `).join('');
             dropdown.style.display = 'block';
         }
+
+        const findCreateBookingUserMatches = (query = '') => {
+            const normalizedQuery = query.trim().toLowerCase();
+            if (!normalizedQuery) return [];
+            return adminCreateUsers.filter((user) => {
+                const name = (user.name || '').toLowerCase();
+                const email = (user.email || '').toLowerCase();
+                const mobile = (user.mobile || '').toLowerCase();
+                return name.includes(normalizedQuery) || email.includes(normalizedQuery) || mobile.includes(normalizedQuery);
+            });
+        };
 
         function selectCreateBookingUser(userId) {
             const user = adminCreateUsers.find((u) => u._id === userId);
@@ -8259,8 +8273,10 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
 
             selectedCreateUser = user;
             document.getElementById('createUserId').value = user._id;
-            document.getElementById('createUserSearch').value = `${user.name} (${user.email})`;
-            document.getElementById('createUserSelected').textContent = `Selected: ${user.name} | ${user.email}${user.mobile ? ` | ${user.mobile}` : ''}`;
+            const displayEmail = user.isManualUser ? 'N/A' : user.email;
+            const displayMobile = user.isManualUser ? 'N/A' : user.mobile;
+            document.getElementById('createUserSearch').value = `${user.name} (${displayEmail})`;
+            document.getElementById('createUserSelected').textContent = `Selected: ${user.name} | ${displayEmail}${displayMobile ? ` | ${displayMobile}` : ''}`;
             document.getElementById('createUserTypeahead').style.display = 'none';
             scheduleCreateBookingDraftSave();
         }
@@ -8803,6 +8819,10 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             const userId = document.getElementById('createUserId').value.trim();
             const manualName = (document.getElementById('createUserSearch').value || '').trim();
             if (!userId && !manualName) { showAlert('', 'Please select a registered user or enter a manual name.', 'warning'); return; }
+            if (!userId && findCreateBookingUserMatches(manualName).length > 0) {
+                showAlert('', 'A registered user matches this search. Please select the user from the dropdown.', 'warning');
+                return;
+            }
             const bookingTypeLabel = document.getElementById('createBookingType')?.value.trim() || '';
             if (!bookingTypeLabel) { showAlert('', 'Please select a booking type from the booking catalog.', 'warning'); return; }
 
@@ -8962,7 +8982,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             if (selectedCreateUser) {
                 selectedCreateUser = null;
                 document.getElementById('createUserId').value = '';
-                document.getElementById('createUserSelected').textContent = 'Manual booking: no notifications will be sent.';
+                document.getElementById('createUserSelected').textContent = 'New incomplete user: email/mobile will be N/A and no notifications will be sent.';
             }
             clearTimeout(createUserSearchDebounceTimer);
             createUserSearchDebounceTimer = setTimeout(() => renderCreateUserTypeahead(e.target.value), 200);
@@ -9218,7 +9238,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             if (el) el.addEventListener('change', recalculateQuotationTotals);
         });
     </script>
-    <script src="/js/shared/perf-baseline.js"></script>
+    <script src="/js/shared/perf-baseline.js?v=20260907a"></script>
     </div> <!-- app-container -->
 
 </body>

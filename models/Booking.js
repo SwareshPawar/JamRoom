@@ -5,10 +5,6 @@ const bookingSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  isManualCustomer: {
-    type: Boolean,
-    default: false
-  },
   bookingMode: {
     type: String,
     enum: ['hourly', 'perday'],

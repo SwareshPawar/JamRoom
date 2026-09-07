@@ -4,7 +4,8 @@
  */
 
 (() => {
-    const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+    const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim())
+        && !String(email || '').trim().toLowerCase().endsWith('@no-email.jamroom.local');
     let sendEBillSearchDebounceTimer = null;
     let sendEBillSearchRequestSeq = 0;
 

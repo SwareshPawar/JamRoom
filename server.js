@@ -95,6 +95,20 @@ app.use(express.static(PUBLIC_DIR, {
   setHeaders: setStaticCacheHeaders
 }));
 
+// Reuse one connection promise across warm Vercel function invocations.
+const serverlessDatabaseReady = process.env.VERCEL ? connectDB() : null;
+if (serverlessDatabaseReady) {
+  app.use('/api', async (req, res, next) => {
+    try {
+      await serverlessDatabaseReady;
+      next();
+    } catch (error) {
+      console.error('Serverless database connection failed:', error.message);
+      res.status(503).json({ success: false, message: 'Database temporarily unavailable' });
+    }
+  });
+}
+
 // API Routes
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/bookings', require('./routes/booking.routes'));
@@ -228,8 +242,10 @@ process.on('unhandledRejection', (err) => {
   process.exit(1);
 });
 
-// Start the server
-startServer();
+// Vercel invokes the exported app directly; only start a listener locally.
+if (!process.env.VERCEL) {
+  startServer();
+}
 
 // Export app for Vercel
 module.exports = app;

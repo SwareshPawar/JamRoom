@@ -404,7 +404,7 @@
                 booking._id,
                 booking.date ? new Date(booking.date).toISOString().split('T')[0] : '',
                 booking.userName || '',
-                booking.userEmail || '',
+                JamRoomUtils.displayEmail(booking.userEmail),
                 booking.startTime || '',
                 booking.endTime || '',
                 booking.duration || '',
@@ -569,7 +569,7 @@
                                 >
                             </td>
                             <td>${formatDate(booking.date)}</td>
-                            <td>${booking.userName}<br><small>${booking.userEmail}</small></td>
+                            <td>${booking.userName}<br><small>${JamRoomUtils.displayEmail(booking.userEmail)}</small></td>
                             <td>${formatTime(booking.startTime)} - ${formatTime(booking.endTime)}</td>
                             <td>${booking.duration}h</td>
                             <td>

@@ -47,8 +47,15 @@ const {
   resolveAdminNotificationEmails,
   sendUnifiedBookingConfirmationEmails,
   DEFAULT_APP_LOGIN_URL,
-  normalizeIndianMobile
+  normalizeIndianMobile,
+  DEFAULT_ADMIN_CREATED_USER_PASSWORD,
+  buildInternalNoEmail,
+  isInternalNoEmail
 } = require('../../utils/adminHelpers');
+
+const isIncompleteCustomerBooking = (booking) => Boolean(
+  booking?.userId?.isManualUser === true || isInternalNoEmail(booking?.userEmail)
+);
 const { buildEbillEmailHtml } = require('../../utils/templates/email/ebillEmailTemplate');
 
 const buildBookingFooterEmailConfig = (settings = {}) => {
@@ -461,6 +468,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
         });
 
     const settings = await AdminSettings.getSettings();
+    const isIncompleteCustomer = isIncompleteCustomerBooking(booking);
     const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
 
     const rejectedBookings = [];
@@ -470,7 +478,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
         await pendingBooking.save();
         rejectedBookings.push(pendingBooking);
 
-        try {
+        if (!isIncompleteCustomerBooking(pendingBooking)) try {
           await sendEmail({
             to: pendingBooking.userEmail,
             subject: `Booking Request Update - ${settings.studioName || 'JamRoom'}`,
@@ -515,7 +523,7 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
           startDate: formatDateAsYmdInIst(new Date(booking.date)),
           startTime: booking.startTime,
           endTime: booking.endTime,
-          attendees: [booking.userEmail, ...adminNotificationEmails],
+          attendees: [...(isIncompleteCustomer ? [] : [booking.userEmail]), ...adminNotificationEmails],
           studioName: settings.studioName || 'JamRoom',
           uid: booking.calendarUid,
           sequence: booking.calendarSequence,
@@ -527,10 +535,11 @@ router.put('/bookings/:id/approve', protect, isAdmin, async (req, res) => {
       settings,
       booking,
       confirmedByName: req.user.name,
-      calendarInvite
+      calendarInvite,
+      sendCustomerNotification: !isIncompleteCustomer
     });
 
-    if (booking.userMobile) {
+    if (!isIncompleteCustomer && booking.userMobile) {
       try {
         await sendBookingConfirmationWhatsApp(booking.userMobile, {
           bookingId: booking._id,
@@ -682,7 +691,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/cancel', protect, isAdmin, asy
     const { id, lessonId } = req.params;
     const { reason } = req.body || {};
 
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findById(id).populate('userId', 'isManualUser');
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
@@ -732,7 +741,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
     const { id, lessonId } = req.params;
     const { responseNote } = req.body || {};
 
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findById(id).populate('userId', 'isManualUser');
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
     if (!booking.classSession?.isClassBooking) return res.status(400).json({ success: false, message: 'Not a class booking' });
 
@@ -754,6 +763,8 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
     booking.markModified('classSession');
     await booking.save();
 
+    const shouldNotifyCustomer = !isIncompleteCustomerBooking(booking);
+
     // Send calendar invite + approval email to user and admins
     try {
       const settings = await AdminSettings.getSettings();
@@ -771,7 +782,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
           startDate: slotDateStr,
           startTime,
           endTime,
-          attendees: [booking.userEmail, ...adminNotificationEmails].filter(Boolean),
+          attendees: [...(shouldNotifyCustomer ? [booking.userEmail] : []), ...adminNotificationEmails].filter(Boolean),
           studioName: settings.studioName || 'JamRoom',
           uid: `lesson-${booking._id}-${id}@${process.env.CALENDAR_UID_DOMAIN || 'jamroom.local'}`,
           sequence: 0,
@@ -786,7 +797,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/approve-slot', protect, isAdmi
       const slotDateLabel = new Date(lesson.scheduledDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
       const calAttachment = calendarInvite ? [{ filename: 'class-slot.ics', content: calendarInvite, contentType: 'text/calendar; charset=utf-8; method=REQUEST' }] : [];
 
-      await sendEmail({
+      if (shouldNotifyCustomer) await sendEmail({
         to: booking.userEmail,
         subject: `Class Slot Approved – ${classItem} | JamRoom`,
         html: buildInvoiceStyleEmail({
@@ -899,7 +910,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
     const { proposedDate, proposedStartTime } = req.body || {};
 
     const [booking, settings] = await Promise.all([
-      Booking.findById(id),
+      Booking.findById(id).populate('userId', 'isManualUser'),
       AdminSettings.getSettings()
     ]);
 
@@ -951,6 +962,8 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
     booking.markModified('classSession');
     await booking.save();
 
+    const shouldNotifyCustomer = !isIncompleteCustomerBooking(booking);
+
     // Send calendar invite + notification to user and admins
     try {
       const classItem = booking.classSession?.selectedClassItemName || booking.classSession?.instrument || 'Music Class';
@@ -965,7 +978,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
           startDate: slotDateStr,
           startTime,
           endTime,
-          attendees: [booking.userEmail, ...adminNotificationEmails].filter(Boolean),
+          attendees: [...(shouldNotifyCustomer ? [booking.userEmail] : []), ...adminNotificationEmails].filter(Boolean),
           studioName: settings.studioName || 'JamRoom',
           uid: `lesson-${booking._id}-${lessonId}@${process.env.CALENDAR_UID_DOMAIN || 'jamroom.local'}`,
           sequence: 0,
@@ -980,7 +993,7 @@ router.put('/bookings/:id/class-lessons/:lessonId/book-slot', protect, isAdmin, 
       const slotDateLabel = proposedD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
       const calAttachment = calendarInvite ? [{ filename: 'class-slot.ics', content: calendarInvite, contentType: 'text/calendar; charset=utf-8; method=REQUEST' }] : [];
 
-      try {
+      if (shouldNotifyCustomer) try {
         await sendEmail({
           to: booking.userEmail,
           subject: `Class Slot Booked – ${classItem} | JamRoom`,
@@ -1068,6 +1081,10 @@ router.post('/bookings/:id/send-ebill', protect, isAdmin, async (req, res) => {
         success: false,
         message: 'Booking not found'
       });
+    }
+
+    if (isIncompleteCustomerBooking(booking)) {
+      return res.status(400).json({ success: false, message: 'eBill is unavailable until customer details are completed' });
     }
 
     if (booking.bookingStatus !== 'CONFIRMED') {
@@ -1319,6 +1336,8 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
       });
     }
 
+    const isIncompleteCustomer = isIncompleteCustomerBooking(booking);
+
     if (!booking.startTime || !booking.endTime || !booking.duration ||
         !booking.userEmail || !booking.userName || !booking.rentalType || !booking.userId) {
       return res.status(400).json({
@@ -1338,7 +1357,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
 
     const displayDate = formatBookingDisplayDate(booking.date);
 
-    try {
+    if (!isIncompleteCustomer) try {
       await sendEmail({
         to: booking.userEmail,
         subject: `Booking Update - ${settings.studioName || 'JamRoom'}`,
@@ -1370,7 +1389,7 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
       console.log('Rejection email failed:', emailError.message);
     }
 
-    if (booking.userMobile) {
+    if (!isIncompleteCustomer && booking.userMobile) {
       try {
         const message = `❌ JamRoom Booking Declined\n\nHi ${booking.userName},\nUnfortunately, your booking request has been declined.\n\n📅 Date: ${displayDate}\n⏰ Time: ${formatTimeRange12Hour(booking.startTime, booking.endTime)}\n${reason ? `📝 Reason: ${reason}` : ''}\n\nPlease contact us for alternative slots. 📞`;
         await sendWhatsApp(booking.userMobile, message);
@@ -1414,7 +1433,9 @@ router.put('/bookings/:id/reject', protect, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id).setOptions({ includeDeleted: true });
+    const booking = await Booking.findById(req.params.id)
+      .setOptions({ includeDeleted: true })
+      .populate('userId', 'isManualUser');
 
     if (!booking) {
       return res.status(404).json({
@@ -1433,7 +1454,8 @@ router.delete('/bookings/:id', protect, isAdmin, async (req, res) => {
     const settings = await AdminSettings.getSettings();
     const displayDate = formatBookingDisplayDate(booking.date);
 
-    try {
+    const isIncompleteCustomer = isIncompleteCustomerBooking(booking);
+    if (!isIncompleteCustomer) try {
       await sendEmail({
         to: booking.userEmail,
         subject: `Booking Deleted - ${settings.studioName || 'JamRoom'}`,
@@ -1585,7 +1607,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
       paymentMode
     } = req.body;
 
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id).populate('userId', 'isManualUser');
 
     if (!booking) {
       return res.status(404).json({
@@ -1827,7 +1849,8 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
     await booking.save();
 
     const displayDate = formatBookingDisplayDate(booking.date);
-    const updateInvite = (booking.bookingStatus === 'CONFIRMED' && hasCalendarRelevantChange)
+    const isIncompleteCustomer = isIncompleteCustomerBooking(booking);
+    const updateInvite = !isIncompleteCustomer && (booking.bookingStatus === 'CONFIRMED' && hasCalendarRelevantChange)
       ? generateCalendarInvite({
           title: `${settings.studioName || 'JamRoom'} Booking - ${booking.rentalType}`,
           description: `Booking updated for ${booking.userName}${booking.bandName ? ` (${booking.bandName})` : ''}`,
@@ -1844,7 +1867,7 @@ router.put('/bookings/:id/edit', protect, isAdmin, async (req, res) => {
         })
       : null;
 
-    try {
+    if (!isIncompleteCustomer) try {
       await sendEmail({
         to: booking.userEmail,
         subject: `Booking Updated - ${settings.studioName || 'JamRoom'}`,
@@ -1941,7 +1964,7 @@ router.get('/bookings/:id/download-pdf', protect, isAdmin, async (req, res) => {
 });
 
 // @route   POST /api/admin/bookings
-// @desc    Create a new booking as admin for a registered user
+// @desc    Create a new booking as admin for a registered or newly named user
 // @access  Private/Admin
 router.post('/bookings', protect, isAdmin, async (req, res) => {
   try {
@@ -2007,8 +2030,8 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       }
     }
 
-    const selectedUser = userId
-      ? await User.findById(userId).select('name email mobile role forcePasswordReset')
+    let selectedUser = userId
+      ? await User.findById(userId).select('name email mobile role forcePasswordReset isManualUser')
       : null;
     if (userId && !selectedUser) {
       return res.status(404).json({
@@ -2121,6 +2144,27 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: normalizedPaymentTracking.error });
     }
 
+    if (!selectedUser && normalizedManualName) {
+      const nameMatch = await User.findOne({ name: normalizedManualName }).select('_id name email mobile');
+      if (nameMatch) {
+        return res.status(409).json({
+          success: false,
+          message: 'A user with this name already exists. Select the registered user from the dropdown.'
+        });
+      }
+
+      selectedUser = await User.create({
+        name: normalizedManualName,
+        email: buildInternalNoEmail(),
+        mobile: 'N/A',
+        password: DEFAULT_ADMIN_CREATED_USER_PASSWORD,
+        role: 'user',
+        isManualUser: true,
+        forcePasswordReset: true,
+        tempPasswordSetAt: new Date()
+      });
+    }
+
     const adminNotificationEmails = await resolveAdminNotificationEmails(settings);
     const rentalTypeSummary = deriveDynamicBookingLabel(rentals, rentalType);
 
@@ -2177,8 +2221,7 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
     }
 
     const booking = await Booking.create({
-      ...(selectedUser ? { userId: selectedUser._id } : {}),
-      isManualCustomer: !selectedUser,
+      userId: selectedUser._id,
       ...(isAdminPerdayBooking ? { bookingMode: 'perday' } : {}),
       date: bookingDate,
       startTime: effectiveStartTime,
@@ -2199,9 +2242,9 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       priceAdjustmentValue: normalizedAdjustment.value,
       priceAdjustmentNote: normalizedAdjustment.note,
       price: calculatedTotalAmount,
-      userName: selectedUser ? selectedUser.name : normalizedManualName,
-      userEmail: selectedUser ? selectedUser.email : '',
-      userMobile: selectedUser ? selectedUser.mobile : '',
+      userName: selectedUser.name,
+      userEmail: selectedUser.email,
+      userMobile: selectedUser.mobile,
       bandName,
       notes: shouldOverrideDateTime
         ? `${notes ? `${notes}\n` : ""}[Admin Override] Date/time checks bypassed for historical booking entry.`
@@ -2235,29 +2278,34 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
       }
     }).join('\n');
 
-    const calendarInvite = selectedUser ? generateCalendarInvite({
+    const shouldNotifyCustomer = !isIncompleteCustomerBooking({
+      userId: selectedUser,
+      userEmail: selectedUser.email
+    });
+    const calendarInvite = generateCalendarInvite({
       title: `${settings.studioName || 'JamRoom'} Booking - ${rentalTypeSummary}`,
       description: `Booking confirmed for ${selectedUser.name}${bandName ? ` (${bandName})` : ''}`,
       location: settings.studioAddress || 'Zen Business Center - 202, Bhumkar Chowk Rd, above Cafe Coffee Day, Shankar Kalat Nagar, Wakad, Pune, Pimpri-Chinchwad, Maharashtra 411057',
       startDate: formatDateAsYmdInIst(new Date(bookingDate)),
       startTime: effectiveStartTime,
       endTime: effectiveEndTime,
-      attendees: [selectedUser.email, ...adminNotificationEmails],
+      attendees: [...(shouldNotifyCustomer ? [selectedUser.email] : []), ...adminNotificationEmails],
       studioName: settings.studioName || 'JamRoom',
       uid: booking.calendarUid,
       sequence: booking.calendarSequence,
       method: 'REQUEST',
       status: 'CONFIRMED'
-    }) : null;
+    });
 
-    if (selectedUser) {
-      await sendUnifiedBookingConfirmationEmails({
-        settings,
-        booking,
-        confirmedByName: req.user.name,
-        calendarInvite
-      });
+    await sendUnifiedBookingConfirmationEmails({
+      settings,
+      booking,
+      confirmedByName: req.user.name,
+      calendarInvite,
+      sendCustomerNotification: shouldNotifyCustomer
+    });
 
+    if (shouldNotifyCustomer) {
       if (selectedUser.mobile) {
         try {
           await sendBookingConfirmationWhatsApp(selectedUser.mobile, {
@@ -2275,22 +2323,23 @@ router.post('/bookings', protect, isAdmin, async (req, res) => {
         }
       }
 
-      try {
-        await sendBookingConfirmationNotifications({
-          userName: selectedUser.name,
-          userEmail: selectedUser.email,
-          userMobile: selectedUser.mobile,
-          date: displayDate,
-          startTime: effectiveStartTime,
-          endTime: effectiveEndTime,
-          totalAmount: calculatedTotalAmount,
-          bookingId: booking._id,
-          bandName,
-          paymentStatus: normalizedPaymentTracking.paymentStatus
-        }, settings.whatsappNotifications);
-      } catch (whatsappError) {
-        console.log('WhatsApp notifications failed:', whatsappError.message);
-      }
+    }
+
+    try {
+      await sendBookingConfirmationNotifications({
+        userName: selectedUser.name,
+        userEmail: selectedUser.email,
+        userMobile: selectedUser.mobile,
+        date: displayDate,
+        startTime: effectiveStartTime,
+        endTime: effectiveEndTime,
+        totalAmount: calculatedTotalAmount,
+        bookingId: booking._id,
+        bandName,
+        paymentStatus: normalizedPaymentTracking.paymentStatus
+      }, settings.whatsappNotifications);
+    } catch (whatsappError) {
+      console.log('WhatsApp notifications failed:', whatsappError.message);
     }
 
     const populatedBooking = await Booking.findById(booking._id).populate('userId', 'name email mobile');

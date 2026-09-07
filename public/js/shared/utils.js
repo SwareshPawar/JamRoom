@@ -455,6 +455,11 @@ class JamRoomUtils {
         return emailRegex.test(email);
     }
 
+    static displayEmail(email) {
+        const value = String(email || '').trim();
+        return !value || value.toLowerCase().endsWith('@no-email.jamroom.local') ? 'N/A' : value;
+    }
+
     static isValidPhone(phone) {
         const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
         return phoneRegex.test(phone.replace(/\s/g, ''));

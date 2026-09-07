@@ -17,7 +17,8 @@ const {
   normalizeIndianMobile,
   isValidIndianMobile,
   DEFAULT_ADMIN_CREATED_USER_PASSWORD,
-  DEFAULT_APP_LOGIN_URL
+  DEFAULT_APP_LOGIN_URL,
+  isInternalNoEmail
 } = require('../../utils/adminHelpers');
 
 const resolveDeletedFilterMode = (value) => {
@@ -52,7 +53,7 @@ router.get('/users', protect, isAdmin, async (req, res) => {
 
     const users = await User.find(query)
       .setOptions({ includeDeleted })
-      .select('name email mobile role createdAt isDeleted deletedAt')
+      .select('name email mobile role isManualUser createdAt isDeleted deletedAt')
       .sort({ createdAt: -1 })
       .limit(safeLimit);
 
@@ -227,6 +228,7 @@ router.put('/users/:id', protect, isAdmin, async (req, res) => {
     }
 
     const previousEmail = normalizeEmail(user.email);
+    const isNaMobile = String(mobile || '').trim().toUpperCase() === 'N/A';
     const normalizedMobile = normalizeIndianMobile(mobile);
     if (normalizedMobile && !isValidIndianMobile(normalizedMobile)) {
       return res.status(400).json({
@@ -237,7 +239,8 @@ router.put('/users/:id', protect, isAdmin, async (req, res) => {
 
     user.name = String(name).trim();
     user.email = normalizedEmailValue;
-    user.mobile = normalizedMobile || undefined;
+    user.mobile = isNaMobile ? 'N/A' : (normalizedMobile || undefined);
+    user.isManualUser = isInternalNoEmail(user.email) || user.mobile === 'N/A';
 
     await user.save();
 

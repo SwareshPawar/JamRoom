@@ -102,11 +102,12 @@ async function loadProfile() {
             window.NavigationManager.render('navigationContainer');
 
             // Fill profile info
+            const displayEmail = window.JamRoomUtils.displayEmail(data.user.email);
             document.getElementById('profileInfo').innerHTML = `
                 <div class="info-card">
                     <h3>👤 Personal Info</h3>
                     <p><strong>Name:</strong> ${data.user.name}</p>
-                    <p><strong>Email:</strong> ${data.user.email}</p>
+                    <p><strong>Email:</strong> ${displayEmail}</p>
                     <p><strong>Mobile:</strong> ${data.user.mobile || 'Not provided'}</p>
                 </div>
                 <div class="info-card">

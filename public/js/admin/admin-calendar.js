@@ -88,7 +88,7 @@
             ? booking.rentals.map((r) => `  - ${r.name} × ${r.quantity}`).join('\n')
             : booking.rentalType;
 
-        return `Booking Details:\nName: ${booking.userName}\nEmail: ${booking.userEmail}\nBand: ${booking.bandName || 'N/A'}\nRentals:\n${rentalsDisplay}\nPrice: ₹${booking.price}\nStatus: ${booking.status}\nPayment: ${booking.paymentStatus}\nNotes: ${booking.notes || 'N/A'}`;
+        return `Booking Details:\nName: ${booking.userName}\nEmail: ${JamRoomUtils.displayEmail(booking.userEmail)}\nBand: ${booking.bandName || 'N/A'}\nRentals:\n${rentalsDisplay}\nPrice: ₹${booking.price}\nStatus: ${booking.status}\nPayment: ${booking.paymentStatus}\nNotes: ${booking.notes || 'N/A'}`;
     };
 
     const initCalendar = async ({ fullCalendar, loadCalendar }) => {

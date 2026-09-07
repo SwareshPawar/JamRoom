@@ -499,7 +499,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
             <div class="info-card">
                 <div class="info-label">Bill To</div>
                 <div class="info-name">${booking.userName || 'N/A'}</div>
-                <div class="info-email">${booking.userEmail || 'N/A'}</div>
+                <div class="info-email">${window.JamRoomUtils ? window.JamRoomUtils.displayEmail(booking.userEmail) : (booking.userEmail || 'N/A')}</div>
                 ${booking.bandName ? `<div class="info-row"><strong>Band:</strong> ${booking.bandName}</div>` : ''}
             </div>
             <div class="info-card">
