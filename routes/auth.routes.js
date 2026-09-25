@@ -6,6 +6,7 @@ const User = require('../models/User');
 const AdminSettings = require('../models/AdminSettings');
 const { sendEmail } = require('../utils/email');
 const { buildInvoiceStyleEmail } = require('../utils/templates/email/invoiceStyleEmailTemplate');
+const { normalizeIndianMobile } = require('../utils/adminHelpers');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -59,7 +60,7 @@ router.post('/register', async (req, res) => {
       name,
       email,
       password,
-      mobile,
+      mobile: normalizeIndianMobile(mobile),
       role: 'user'
     });
 

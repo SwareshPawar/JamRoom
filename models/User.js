@@ -18,7 +18,8 @@ const userSchema = new mongoose.Schema({
   mobile: {
     type: String,
     trim: true,
-    match: [/^(N\/A|\+91[-\s]?[6-9]\d{9})$/, 'Please provide a valid Indian mobile number']
+    // Accepts both the normalized 10-digit format used by admin/user routes and the legacy +91-prefixed format
+    match: [/^(N\/A|(\+91[-\s]?)?[6-9]\d{9})$/, 'Please provide a valid Indian mobile number']
   },
   isManualUser: {
     type: Boolean,

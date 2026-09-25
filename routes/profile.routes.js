@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
 const { protect } = require('../middleware/auth');
+const { normalizeIndianMobile } = require('../utils/adminHelpers');
 
 // @route   GET /api/profile
 // @desc    Get current user profile
@@ -104,7 +105,7 @@ router.put('/', protect, async (req, res) => {
     const updates = {};
     if (name !== undefined) updates.name = name.trim();
     if (email !== undefined) updates.email = email.toLowerCase().trim();
-    if (mobile !== undefined) updates.mobile = mobile.trim() || null;
+    if (mobile !== undefined) updates.mobile = normalizeIndianMobile(mobile) || null;
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
