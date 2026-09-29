@@ -175,7 +175,11 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const bookingDate = new Date(booking.date);
     const normalizedBookingRentalType = normalizeRentalType(booking.rentalType);
     const isPerday = booking.bookingMode === 'perday' || normalizedBookingRentalType === 'perday';
-    const isPerSessionBooking = normalizedBookingRentalType === 'persession';
+    // booking.rentalType usually holds the catalog category name, so the session flag comes from the rental items
+    const bookingRentalItems = Array.isArray(booking.rentals) ? booking.rentals : [];
+    const bookingItemRentalTypes = bookingRentalItems.map((item) => normalizeRentalType(item?.rentalType));
+    const isPerSessionBooking = normalizedBookingRentalType === 'persession'
+        || (bookingItemRentalTypes.includes('persession') && !bookingItemRentalTypes.includes('inhouse'));
     const isPerTrackBooking = normalizedBookingRentalType === 'pertrack';
     const perDayDays = Math.max(1, Number(booking.perDayDays) || 1);
     const perDayStartLabel = booking.perDayStartDate ? new Date(booking.perDayStartDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');

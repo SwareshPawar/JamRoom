@@ -413,10 +413,6 @@
         const selectedRentals = [];
         const rentalInputs = document.querySelectorAll('#editBookingRentals input[name="editRental"]:checked');
 
-        if (strict && rentalInputs.length === 0) {
-            throw new Error('Please select at least one rental item.');
-        }
-
         rentalInputs.forEach((input) => {
             const rentalData = JSON.parse(decodeURIComponent(input.dataset.rental));
             const quantityElement = document.getElementById(getEditRentalInputId(rentalData.id, deps));
