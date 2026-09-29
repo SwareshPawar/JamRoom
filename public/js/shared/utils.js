@@ -455,9 +455,18 @@ class JamRoomUtils {
         return emailRegex.test(email);
     }
 
+    static isPlaceholderEmail(email) {
+        const value = String(email || '').trim().toLowerCase();
+        return !value || value.endsWith('@no-email.jamroom.local');
+    }
+
     static displayEmail(email) {
-        const value = String(email || '').trim();
-        return !value || value.toLowerCase().endsWith('@no-email.jamroom.local') ? 'N/A' : value;
+        return JamRoomUtils.isPlaceholderEmail(email) ? 'N/A' : String(email).trim();
+    }
+
+    static displayMobile(mobile) {
+        const value = String(mobile || '').trim();
+        return !value || value.toUpperCase() === 'N/A' ? 'N/A' : value;
     }
 
     static isValidPhone(phone) {

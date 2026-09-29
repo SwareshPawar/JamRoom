@@ -460,7 +460,7 @@
                                             <span class="open-event-booking-time">${escapeHtml(slot.timeLabel || formatTimeRange12Hour(slot.slotStartTime || '--:--', slot.slotEndTime || '--:--'))}</span>
                                     </div>
                                     <p><strong>Full Name:</strong> ${escapeHtml(slot.userFullName || slot.userName || slot.userFirstName || 'User')}</p>
-                                    <p><strong>Email:</strong> ${escapeHtml(slot.userEmail || 'Not available')}</p>
+                                    <p><strong>Email:</strong> ${escapeHtml(window.JamRoomUtils ? window.JamRoomUtils.displayEmail(slot.userEmail) : (slot.userEmail || 'Not available'))}</p>
                                     ${slot.userPhone ? `<p><strong>Phone:</strong> ${escapeHtml(slot.userPhone)}</p>` : ''}
                                     <p><strong>Booked At:</strong> ${slot.createdAt ? new Date(slot.createdAt).toLocaleString('en-IN') : 'N/A'}</p>
                                     <div class="booking-table-actions" style="margin-top:8px;">

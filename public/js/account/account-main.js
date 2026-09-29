@@ -108,7 +108,7 @@ async function loadProfile() {
                     <h3>👤 Personal Info</h3>
                     <p><strong>Name:</strong> ${data.user.name}</p>
                     <p><strong>Email:</strong> ${displayEmail}</p>
-                    <p><strong>Mobile:</strong> ${data.user.mobile || 'Not provided'}</p>
+                    <p><strong>Mobile:</strong> ${window.JamRoomUtils.displayMobile(data.user.mobile) === 'N/A' ? 'Not provided' : data.user.mobile}</p>
                 </div>
                 <div class="info-card">
                     <h3>📊 Account Info</h3>
@@ -119,8 +119,8 @@ async function loadProfile() {
 
             // Fill form
             document.getElementById('name').value = data.user.name;
-            document.getElementById('email').value = data.user.email;
-            document.getElementById('mobile').value = data.user.mobile || '';
+            document.getElementById('email').value = window.JamRoomUtils.isPlaceholderEmail(data.user.email) ? '' : data.user.email;
+            document.getElementById('mobile').value = window.JamRoomUtils.displayMobile(data.user.mobile) === 'N/A' ? '' : data.user.mobile;
 
             // Load WhatsApp preferences
             loadWhatsAppPreferences(data.user);

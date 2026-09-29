@@ -181,6 +181,11 @@ const generateUnifiedPDFHTML = (booking, settings) => {
     const perDayStartLabel = booking.perDayStartDate ? new Date(booking.perDayStartDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');
     const perDayEndLabel = booking.perDayEndDate ? new Date(booking.perDayEndDate).toLocaleDateString('en-IN') : bookingDate.toLocaleDateString('en-IN');
     const perDayTimeRangeLabel = `${formatTime12Hour(booking.startTime)} - ${formatTime12Hour(booking.endTime)}`;
+    const rawBillToEmail = String(booking.userEmail || '').trim();
+    const isPlaceholderBillToEmail = window.JamRoomUtils
+        ? window.JamRoomUtils.isPlaceholderEmail(rawBillToEmail)
+        : rawBillToEmail.toLowerCase().endsWith('@no-email.jamroom.local');
+    const billToEmail = isPlaceholderBillToEmail ? '' : rawBillToEmail;
     const { subtotal, taxAmount, totalAmount } = calculatePricing(booking);
     const paymentStatus = String(booking?.paymentStatus || 'PENDING').toUpperCase();
     const amountPaidRaw = Math.max(0, Number(booking?.amountPaid) || 0);
@@ -316,6 +321,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
             })),
             renderRow: (item) => {
                 const rentalType = normalizeRentalType(item.rentalType || 'inhouse');
+                const isSessionItem = rentalType === 'persession' || isPerSessionBooking;
                 const bookingMeta = rentalType === 'perday'
                     ? `${perDayStartLabel} ${formatTime12Hour(booking.startTime)} to ${perDayEndLabel} ${formatTime12Hour(booking.endTime)}`
                     : `${bookingDate.toLocaleDateString('en-IN')} (${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)})`;
@@ -326,7 +332,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                 <tr class="service-row">
                     <td class="service-col-copy">
                         <div class="service-title">${item.title}</div>
-                        <div class="service-desc">${item.description || 'Studio rental service'} &bull; ${bookingMeta}</div>
+                        <div class="service-desc">${item.description || 'Studio rental service'}${isSessionItem ? '' : ` &bull; ${bookingMeta}`}</div>
                     </td>
                     <td class="service-col-meta">
                         <div class="service-meta-top">${itemRateLabel}${item.quantity > 1 ? ` x ${item.quantity}` : ''}</div>
@@ -358,7 +364,7 @@ const generateUnifiedPDFHTML = (booking, settings) => {
                     <tr class="service-row">
                         <td class="service-col-copy">
                             <div class="service-title">${booking.rentalType || 'Studio Session'}</div>
-                            <div class="service-desc">${isPerday ? `${perDayDays} day(s) &middot; ${perDayTimeRangeLabel}` : `${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)}`}${booking.notes ? ` &middot; ${booking.notes}` : ''}</div>
+                            <div class="service-desc">${isPerSessionBooking ? (booking.notes || 'Studio session') : `${isPerday ? `${perDayDays} day(s) &middot; ${perDayTimeRangeLabel}` : `${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)}`}${booking.notes ? ` &middot; ${booking.notes}` : ''}`}</div>
                         </td>
                         <td class="service-col-meta">
                             <div class="service-meta-top">${isPerSessionBooking ? `&#8377;${subtotal.toFixed(2)}/session` : (isPerTrackBooking ? `&#8377;${subtotal.toFixed(2)}/track` : `&#8377;${(subtotal / safeDuration).toFixed(2)}/hr`)}</div>
@@ -499,14 +505,14 @@ const generateUnifiedPDFHTML = (booking, settings) => {
             <div class="info-card">
                 <div class="info-label">Bill To</div>
                 <div class="info-name">${booking.userName || 'N/A'}</div>
-                <div class="info-email">${window.JamRoomUtils ? window.JamRoomUtils.displayEmail(booking.userEmail) : (booking.userEmail || 'N/A')}</div>
+                ${billToEmail ? `<div class="info-email">${billToEmail}</div>` : ''}
                 ${booking.bandName ? `<div class="info-row"><strong>Band:</strong> ${booking.bandName}</div>` : ''}
             </div>
             <div class="info-card">
                 <div class="info-label">Booking Details</div>
                 <div class="info-row"><strong>Date:</strong> ${isPerday ? `${perDayStartLabel} to ${perDayEndLabel}` : bookingDate.toLocaleDateString('en-IN')}</div>
-                <div class="info-row"><strong>Time:</strong> ${isPerday ? perDayTimeRangeLabel : `${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)}`}</div>
-                <div class="info-row"><strong>Duration:</strong> ${isPerday ? `${perDayDays} day(s)` : `${safeDuration} hour(s)`}</div>
+                ${isPerSessionBooking ? '' : `<div class="info-row"><strong>Time:</strong> ${isPerday ? perDayTimeRangeLabel : `${formatTime12Hour(booking.startTime)} &ndash; ${formatTime12Hour(booking.endTime)}`}</div>
+                <div class="info-row"><strong>Duration:</strong> ${isPerday ? `${perDayDays} day(s)` : `${safeDuration} hour(s)`}</div>`}
             </div>
         </div>
 

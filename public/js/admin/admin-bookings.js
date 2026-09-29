@@ -569,7 +569,7 @@
         const isRejectedBooking = normalizedBookingStatus === 'REJECTED';
         const userName = booking.userId?.name || booking.userName || 'N/A';
         const userEmail = JamRoomUtils.displayEmail(booking.userId?.email || booking.userEmail);
-        const userMobile = booking.userMobile || 'N/A';
+        const userMobile = JamRoomUtils.displayMobile(booking.userId?.mobile || booking.userMobile);
 
         const dateText = isPerday && booking.perDayStartDate && booking.perDayEndDate
             ? `${formatDate(booking.perDayStartDate)} to ${formatDate(booking.perDayEndDate)}`

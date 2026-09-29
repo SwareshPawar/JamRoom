@@ -16,6 +16,11 @@ const IST_TIMEZONE = 'Asia/Kolkata';
 
 const buildInternalNoEmail = () => `na+${Date.now()}-${Math.random().toString(36).slice(2, 8)}@${INTERNAL_NO_EMAIL_DOMAIN}`;
 const isInternalNoEmail = (email) => String(email || '').toLowerCase().endsWith(`@${INTERNAL_NO_EMAIL_DOMAIN}`);
+const isPlaceholderMobile = (mobile) => String(mobile || '').trim().toUpperCase() === 'N/A';
+
+// Returns '' for placeholder/internal values so callers can omit the field entirely
+const getDisplayEmail = (email) => (isInternalNoEmail(email) ? '' : String(email || '').trim());
+const getDisplayMobile = (mobile) => (isPlaceholderMobile(mobile) ? '' : String(mobile || '').trim());
 
 const buildBookingFooterEmailConfig = (settings = {}) => {
   const emailSettings = settings?.emailSettings && typeof settings.emailSettings === 'object'
@@ -630,8 +635,8 @@ const sendUnifiedBookingConfirmationEmails = async ({
             introLines: [`A booking has been approved by ${confirmedByName}.`],
             summaryTitle: 'Booking Details',
             summaryRows: [
-              { label: 'User', value: `${booking.userName} (${booking.userEmail})` },
-              ...(booking.userMobile ? [{ label: 'Mobile', value: booking.userMobile }] : []),
+              { label: 'User', value: getDisplayEmail(booking.userEmail) ? `${booking.userName} (${getDisplayEmail(booking.userEmail)})` : booking.userName },
+              ...(getDisplayMobile(booking.userMobile) ? [{ label: 'Mobile', value: getDisplayMobile(booking.userMobile) }] : []),
               { label: 'Date', value: displayDate },
               { label: 'Time', value: formatTimeRange12Hour(booking.startTime, booking.endTime) },
               { label: 'Duration', value: `${booking.duration} hour(s)` },
@@ -667,6 +672,9 @@ module.exports = {
   INTERNAL_NO_EMAIL_DOMAIN,
   buildInternalNoEmail,
   isInternalNoEmail,
+  isPlaceholderMobile,
+  getDisplayEmail,
+  getDisplayMobile,
   // Time
   formatTime12Hour,
   formatTimeRange12Hour,

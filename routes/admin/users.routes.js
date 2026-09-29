@@ -86,11 +86,16 @@ router.post('/users', protect, isAdmin, async (req, res) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const existingUser = await User.findOne({ email: normalizedEmail });
+    // Soft-deleted users still occupy the unique email index, so look them up too
+    const existingUser = await User.findOne({ email: normalizedEmail })
+      .setOptions({ includeDeleted: true })
+      .select('_id isDeleted');
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Email is already registered'
+        message: existingUser.isDeleted === true
+          ? 'This email belongs to a deleted user. Restore that user, or permanently delete them before creating a new account with this email.'
+          : 'Email is already registered'
       });
     }
 
@@ -180,6 +185,13 @@ router.post('/users', protect, isAdmin, async (req, res) => {
       });
     }
 
+    if (error && error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'A user with these details already exists (it may be in deleted records)'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Server error creating user'
@@ -218,11 +230,16 @@ router.put('/users/:id', protect, isAdmin, async (req, res) => {
     }
 
     if (normalizedEmailValue !== normalizeEmail(user.email)) {
-      const duplicateUser = await User.findOne({ email: normalizedEmailValue, _id: { $ne: user._id } }).select('_id');
+      // Soft-deleted users still occupy the unique email index, so look them up too
+      const duplicateUser = await User.findOne({ email: normalizedEmailValue, _id: { $ne: user._id } })
+        .setOptions({ includeDeleted: true })
+        .select('_id isDeleted');
       if (duplicateUser) {
         return res.status(400).json({
           success: false,
-          message: 'Email is already registered'
+          message: duplicateUser.isDeleted === true
+            ? 'This email belongs to a deleted user. Restore that user, or permanently delete them before reusing this email.'
+            : 'Email is already registered'
         });
       }
     }
@@ -276,6 +293,13 @@ router.put('/users/:id', protect, isAdmin, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: firstValidationError?.message || 'Validation failed while updating user'
+      });
+    }
+
+    if (error && error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'A user with these details already exists (it may be in deleted records)'
       });
     }
 

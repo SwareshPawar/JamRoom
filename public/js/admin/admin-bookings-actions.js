@@ -72,7 +72,8 @@
         typeahead.innerHTML = users.slice(0, 15).map((user) => {
             const safeName = escapeHtml(user.name || 'User');
             const safeEmail = escapeHtml((user.email || '').toLowerCase());
-            const safeMobile = escapeHtml(user.mobile || '');
+            const rawMobile = String(user.mobile || '').trim();
+            const safeMobile = rawMobile.toUpperCase() === 'N/A' ? '' : escapeHtml(rawMobile);
             const mobileText = safeMobile ? ` | ${safeMobile}` : '';
 
             return `

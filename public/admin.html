@@ -3264,9 +3264,9 @@
                 const isDeletedRow = user.isDeleted === true;
                 const showDelete = !isCurrentUser && (!isAdminRow || isOwnerAdmin);
                 const showReset = !isCurrentUser && !isDeletedRow;
-                const isIncompleteUser = user.isManualUser === true;
-                const displayEmail = isIncompleteUser ? 'N/A' : (user.email || '-');
-                const displayMobile = isIncompleteUser ? 'N/A' : (user.mobile || '-');
+                const isIncompleteUser = user.isManualUser === true || JamRoomUtils.isPlaceholderEmail(user.email);
+                const displayEmail = JamRoomUtils.displayEmail(user.email);
+                const displayMobile = JamRoomUtils.displayMobile(user.mobile);
                 const missingDetails = isIncompleteUser || !(user.name && user.email && user.mobile);
                 const editLabel = missingDetails ? 'Add Details' : 'Edit';
 
@@ -3284,12 +3284,12 @@
                         <td>
                             ${isDeletedRow ? '<span class="text-muted-xs">Deleted record</span>' : `<button class="btn btn-primary btn-sm" onclick="openRegisteredUserEditor('${user._id}')">${editLabel}</button>`}
                             ${isCurrentUser ? '<span class="text-muted-xs text-gap-left">Current user</span>' : `
-                                ${showReset ? `<button class="btn btn-secondary btn-sm" onclick="resetUserPasswordToDefault('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Reset Password</button>` : ''}
+                                ${showReset ? `<button class="btn btn-secondary btn-sm" onclick="resetUserPasswordToDefault('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(displayEmail)}')">Reset Password</button>` : ''}
                                 ${showDelete
                                     ? isDeletedRow
-                                        ? `<button class="btn btn-success btn-sm" onclick="restoreRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Restore</button>
-                                           <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Permanent Delete</button>`
-                                        : `<button class="btn btn-danger btn-sm" onclick="deleteRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">Delete</button>`
+                                        ? `<button class="btn btn-success btn-sm" onclick="restoreRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(displayEmail)}')">Restore</button>
+                                           <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(displayEmail)}')">Permanent Delete</button>`
+                                        : `<button class="btn btn-danger btn-sm" onclick="deleteRegisteredUser('${user._id}', '${escapeHtml(user.name)}', '${escapeHtml(displayEmail)}')">Delete</button>`
                                     : '<span class="text-muted-xs text-gap-left">Admin delete restricted</span>'}
                                 ${isDeletedRow ? '<span class="text-muted-xs text-gap-left">Deleted</span>' : ''}
                             `}
@@ -3330,8 +3330,8 @@
 
             document.getElementById('editRegisteredUserId').value = String(user._id || '');
             document.getElementById('editRegisteredUserName').value = user.name || '';
-            document.getElementById('editRegisteredUserEmail').value = user.email || '';
-            document.getElementById('editRegisteredUserMobile').value = user.mobile || '';
+            document.getElementById('editRegisteredUserEmail').value = JamRoomUtils.isPlaceholderEmail(user.email) ? '' : user.email;
+            document.getElementById('editRegisteredUserMobile').value = JamRoomUtils.displayMobile(user.mobile) === 'N/A' ? '' : user.mobile;
             document.getElementById('editRegisteredUserModal').classList.add('show');
         };
 
@@ -6749,11 +6749,11 @@
             }
             typeahead.innerHTML = users.slice(0, 20).map((user) => {
                 const safeName = escapeHtml(user.name || 'User');
-                const safeEmail = escapeHtml(user.email || '');
-                const safeMobile = escapeHtml(user.mobile || '');
+                const safeEmail = escapeHtml(JamRoomUtils.displayEmail(user.email));
+                const safeMobile = escapeHtml(JamRoomUtils.displayMobile(user.mobile));
                 return `<button type="button" class="typeahead-option-btn" onclick="selectQuotationUser('${user._id}')">
                     <div class="typeahead-option-name">${safeName}</div>
-                    <div class="typeahead-option-meta">${safeEmail}${safeMobile ? ` | ${safeMobile}` : ''}</div>
+                    <div class="typeahead-option-meta">${safeEmail} | ${safeMobile}</div>
                 </button>`;
             }).join('');
             typeahead.style.display = 'block';
@@ -8250,7 +8250,7 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
             dropdown.innerHTML = filteredUsers.map((user) => `
                 <button type="button" onclick="selectCreateBookingUser('${user._id}')" class="typeahead-option-btn">
                     <div class="typeahead-option-name">${escapeHtml(user.name)}</div>
-                    <div class="typeahead-option-meta">${escapeHtml(user.isManualUser ? 'N/A' : user.email)}${user.mobile ? ` | ${escapeHtml(user.isManualUser ? 'N/A' : user.mobile)}` : ''}</div>
+                    <div class="typeahead-option-meta">${escapeHtml(JamRoomUtils.displayEmail(user.email))} | ${escapeHtml(JamRoomUtils.displayMobile(user.mobile))}</div>
                 </button>
             `).join('');
             dropdown.style.display = 'block';
@@ -8273,8 +8273,8 @@ window.populateAdminBookingTypeSelect = populateAdminBookingTypeSelect;
 
             selectedCreateUser = user;
             document.getElementById('createUserId').value = user._id;
-            const displayEmail = user.isManualUser ? 'N/A' : user.email;
-            const displayMobile = user.isManualUser ? 'N/A' : user.mobile;
+            const displayEmail = JamRoomUtils.displayEmail(user.email);
+            const displayMobile = JamRoomUtils.displayMobile(user.mobile);
             document.getElementById('createUserSearch').value = `${user.name} (${displayEmail})`;
             document.getElementById('createUserSelected').textContent = `Selected: ${user.name} | ${displayEmail}${displayMobile ? ` | ${displayMobile}` : ''}`;
             document.getElementById('createUserTypeahead').style.display = 'none';
